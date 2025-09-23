@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "AlUmmahNow.BunnyBulkUploader": {
+      "commandName": "Project",
+      "commandLineArgs": "-f \"\\\\Home-NAS\\Originals\\Backup\\Youtube\\القناة الرسمية للشيخ فيصل بن قزار الجاسم\""
+    }
+  }
+}
