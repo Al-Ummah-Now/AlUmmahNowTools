@@ -122,8 +122,8 @@ namespace AlUmmahNow.DataImporter
                 session.EndTime = DateTime.UtcNow;
                 await _dbContext.SaveChangesAsync();
                 
-                Console.WriteLine($"Import session {session.Id} failed: {ex.Message}")
-;                throw;
+                Console.WriteLine($"Import session {session.Id} failed: {ex.Message}");
+                throw;
             }
         }
 
@@ -283,8 +283,6 @@ namespace AlUmmahNow.DataImporter
             {
                 Console.WriteLine($"Error scanning directory {currentDir.FullName}: {ex.Message}");
             }
-
-            await Task.CompletedTask; // Make method async for consistency
         }
 
         private FileInfo? FindThumbnailForVideo(FileInfo videoFile, DirectoryInfo directory)
