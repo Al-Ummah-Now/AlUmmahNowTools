@@ -10,8 +10,9 @@
     <PackageReference Include="AWSSDK.S3" Version="3.7.415.26" />
     <PackageReference Include="BunnyCDN.Net.Storage" Version="1.0.4" />
     <PackageReference Include="DeepL.net" Version="1.15.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.9" />
     <PackageReference Include="RestSharp" Version="112.1.0" />
-    <PackageReference Include="System.Text.Json" Version="9.0.3" />
+    <PackageReference Include="System.Text.Json" Version="9.0.9" />
   </ItemGroup>
 
 </Project>
