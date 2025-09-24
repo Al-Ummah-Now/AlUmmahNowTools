@@ -33,7 +33,8 @@ namespace AlUmmahNow.Tests.Repository
             };
 
             _mockR2Client.Setup(x => x.ListBucketsAsync())
-                        .ReturnsAsync(expectedBuckets);
+                        .ReturnsAsync(expectedBuckets)
+                        .Verifiable();
 
             // Act
             var result = await _repository.ListS3BucketsAsync();
@@ -43,7 +44,10 @@ namespace AlUmmahNow.Tests.Repository
             Assert.Equal(2, result.Count);
             Assert.Equal("test-bucket-1", result[0].BucketName);
             Assert.Equal("test-bucket-2", result[1].BucketName);
+            
+            // Verify the mock was called
             _mockR2Client.Verify(x => x.ListBucketsAsync(), Times.Once);
+            _mockR2Client.VerifyAll();
         }
 
         [Fact]
@@ -172,7 +176,7 @@ namespace AlUmmahNow.Tests.Repository
             var key = "test-key";
 
             _mockR2Client.Setup(x => x.GetObjectAsync(bucketName, key))
-                        .ReturnsAsync((string?)null);
+                        .ReturnsAsync(() => null!);
 
             // Act
             var result = await _repository.GetObjectAsync(bucketName, key);
