@@ -53,110 +53,31 @@ using (var scope = serviceProvider.CreateScope())
 var app = new CommandLineApplication();
 
 app.HelpOption();
-var optionFolder = app.Option("-f|--folder <Folder>", "The folder", CommandOptionType.SingleValue)
-    .IsRequired()
+
+// Define options (let Importer handle validation/branching)
+var optionFolder = app.Option("-f|--folder <Folder>", "The folder containing channel subfolders", CommandOptionType.SingleValue)
     .Accepts(v => v.ExistingDirectory());
 
 var optionUserId = app.Option("-u|--user <UserId>", "User ID for the import", CommandOptionType.SingleValue);
-
 var optionBaseVideoUrl = app.Option("--video-url <VideoUrl>", "Base video storage URL", CommandOptionType.SingleValue);
-
 var optionBaseImageUrl = app.Option("--image-url <ImageUrl>", "Base image storage URL", CommandOptionType.SingleValue);
-
 var optionResumeSession = app.Option("--resume <SessionId>", "Resume import session", CommandOptionType.SingleValue);
-
 var optionStatusSession = app.Option("--status <SessionId>", "Get status of import session", CommandOptionType.SingleValue);
 
 app.OnExecuteAsync(async (ct) =>
 {
+    var importArgs = ImportArgs.FromCommandLine(
+        optionFolder.Value(),
+        optionUserId.Value(),
+        optionBaseVideoUrl.Value(),
+        optionBaseImageUrl.Value(),
+        optionResumeSession.Value(),
+        optionStatusSession.Value());
+
     using var scope = serviceProvider.CreateScope();
     var importer = scope.ServiceProvider.GetRequiredService<Importer>();
 
-    // Check for status request
-    if (optionStatusSession.HasValue())
-    {
-        if (!Guid.TryParse(optionStatusSession.Value(), out var statusSessionId))
-        {
-            Console.WriteLine("Invalid session ID format");
-            return 1;
-        }
-
-        try
-        {
-            var status = await importer.GetImportStatusAsync(statusSessionId);
-            Console.WriteLine($"Session: {status.SessionId}");
-            Console.WriteLine($"Status: {status.Status}");
-            Console.WriteLine($"Progress: {status.ProgressPercentage:F1}% ({status.VideosProcessed}/{status.TotalVideosFound})");
-            Console.WriteLine($"Uploaded: {status.VideosUploaded}");
-            Console.WriteLine($"Failed: {status.VideosFailed}");
-            
-            if (!string.IsNullOrEmpty(status.ErrorMessage))
-            {
-                Console.WriteLine($"Error: {status.ErrorMessage}");
-            }
-
-            Console.WriteLine("\nChannels:");
-            foreach (var channel in status.Channels)
-            {
-                Console.WriteLine($"  {channel.ChannelName}: {channel.ProgressPercentage:F1}% ({channel.ProcessedVideos}/{channel.TotalVideos}) - Uploaded: {channel.UploadedVideos}, Failed: {channel.FailedVideos}");
-            }
-            
-            return 0;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error getting status: {ex.Message}");
-            return 1;
-        }
-    }
-
-    // Check for resume request
-    if (optionResumeSession.HasValue())
-    {
-        if (!Guid.TryParse(optionResumeSession.Value(), out var resumeSessionId))
-        {
-            Console.WriteLine("Invalid session ID format");
-            return 1;
-        }
-
-        try
-        {
-            var success = await importer.ResumeImportAsync(resumeSessionId);
-            Console.WriteLine(success ? "Import resumed successfully" : "Failed to resume import");
-            return success ? 0 : 1;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error resuming import: {ex.Message}");
-            return 1;
-        }
-    }
-
-    // New multi-channel import
-    var folderPath = optionFolder.Value() ?? "";
-    var userId = optionUserId.Value() ?? Guid.NewGuid().ToString();
-    var baseVideoUrl = optionBaseVideoUrl.Value() ?? "https://cdn.alummahnow.net";
-    var baseImageUrl = optionBaseImageUrl.Value() ?? "https://images.alummahnow.net";
-
-    try
-    {
-        var sessionId = await importer.ImportMultiChannelAsync(folderPath, userId, baseVideoUrl, baseImageUrl);
-        Console.WriteLine($"Import completed. Session ID: {sessionId}");
-        
-        // Show final status
-        var finalStatus = await importer.GetImportStatusAsync(sessionId);
-        Console.WriteLine($"Final Status: {finalStatus.Status}");
-        Console.WriteLine($"Total Videos: {finalStatus.TotalVideosFound}");
-        Console.WriteLine($"Uploaded: {finalStatus.VideosUploaded}");
-        Console.WriteLine($"Failed: {finalStatus.VideosFailed}");
-        
-        return finalStatus.Status == AlUmmahNow.Data.Models.ImportStatus.Completed ? 0 : 1;
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"Import failed: {ex.Message}");
-        return 1;
-    }
+    return await importer.ExecuteImportAsync(importArgs);
 });
 
 return await app.ExecuteAsync(args);

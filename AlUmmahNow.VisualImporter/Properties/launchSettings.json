@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "AlUmmahNow.VisualImporter (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "AlUmmahNow.VisualImporter (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
