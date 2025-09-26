@@ -1,0 +1,26 @@
+{
+  "servers": {
+    "github": {
+      "url": "https://api.githubcopilot.com/mcp/"
+    },
+    "MCP_DOCKER": {
+      "command": "docker",
+      "args": [
+        "mcp",
+        "gateway",
+        "run"
+      ],
+      "type": "stdio"
+    },
+    "runway-api-mcp-server": {
+      "command": "node",
+      "args": [
+        "F:\\Code\\Repos\\runway-api-mcp-server\\build\\index.js"
+      ],
+      "env": {
+        "RUNWAYML_API_SECRET": "key_3805e81d2b307a745bd0679f7ce40cbd66f1ab92f929c00dc3296e74890b8ad1fdcd7e45d85df10fcfa28d700b917e03b19b3cb1d706a51f75b82526a695a2a9",
+        "MCP_TOOL_TIMEOUT": "1000000"
+      }
+    }
+  }
+}

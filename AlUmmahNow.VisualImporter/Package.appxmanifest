@@ -15,7 +15,7 @@
   <mp:PhoneIdentity PhoneProductId="472f4ee9-5900-4f65-9fe2-5bc32975ead6" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
   <Properties>
-    <DisplayName>AlUmmahNow.VisualImporter</DisplayName>
+    <DisplayName>AlUmmah Now Visual Importer</DisplayName>
     <PublisherDisplayName>MEYWD</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
@@ -34,13 +34,19 @@
       Executable="$targetnametoken$.exe"
       EntryPoint="$targetentrypoint$">
       <uap:VisualElements
-        DisplayName="AlUmmahNow.VisualImporter"
-        Description="AlUmmahNow.VisualImporter"
-        BackgroundColor="transparent"
-        Square150x150Logo="Assets\Square150x150Logo.png"
-        Square44x44Logo="Assets\Square44x44Logo.png">
-        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
-        <uap:SplashScreen Image="Assets\SplashScreen.png" />
+        DisplayName="AlUmmah Now Visual Importer"
+        Description="Import and manage video content with AlUmmah Now Visual Importer"
+        BackgroundColor="#1E1E1E"
+        Square150x150Logo="Assets\Square150x150Logo.scale-200.png"
+        Square44x44Logo="Assets\Square44x44Logo.scale-200.png">
+        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.scale-200.png">
+          <uap:ShowNameOnTiles>
+            <uap:ShowOn Tile="wide310x150Logo"/>
+            <uap:ShowOn Tile="square150x150Logo"/>
+          </uap:ShowNameOnTiles>
+        </uap:DefaultTile>
+        <uap:LockScreen Notification="badge" BadgeLogo="Assets\LockScreenLogo.scale-200.png" />
+        <uap:SplashScreen Image="Assets\SplashScreen.scale-200.png" BackgroundColor="#1E1E1E" />
       </uap:VisualElements>
     </Application>
   </Applications>
