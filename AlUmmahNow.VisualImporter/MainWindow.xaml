@@ -7,13 +7,162 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
-    Title="AlUmmahNow.VisualImporter">
+    Title="AlUmmah Now Visual Importer">
 
     <Window.SystemBackdrop>
         <MicaBackdrop />
     </Window.SystemBackdrop>
 
-    <Grid>
+    <Grid x:Name="RootGrid">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
 
+        <!-- Header -->
+        <Border Grid.Row="0" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,0,0,1" Padding="20">
+            <StackPanel>
+                <!-- App Header with Logo -->
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                    <Image Source="Assets/logo.png" Width="32" Height="32" Margin="0,0,10,0"/>
+                    <TextBlock Text="AlUmmah Now Visual Importer" Style="{ThemeResource TitleTextBlockStyle}" VerticalAlignment="Center"/>
+                </StackPanel>
+                
+                <!-- Folder Selection -->
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                    <TextBlock Text="Import Folder:" VerticalAlignment="Center" Margin="0,0,10,0" MinWidth="100"/>
+                    <TextBox x:Name="FolderPathTextBox" Width="400" Margin="0,0,10,0"/>
+                    <Button x:Name="BrowseButton" Content="Browse..." Click="BrowseButton_Click" Margin="0,0,10,0"/>
+                    <Button x:Name="StartImportButton" Content="Start Import" Click="StartImportButton_Click"
+                            Style="{ThemeResource AccentButtonStyle}"/>
+                </StackPanel>
+
+                <!-- Progress -->
+                <StackPanel x:Name="ProgressPanel" Visibility="Collapsed">
+                    <ProgressBar x:Name="ImportProgressBar" Value="0" Maximum="100" Height="6" Margin="0,5"/>
+                    <TextBlock x:Name="StatusTextBlock" Text="Ready to import" 
+                               Style="{ThemeResource CaptionTextBlockStyle}" Margin="0,5,0,0"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- Main Content -->
+        <Grid Grid.Row="1" Margin="20">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="1*"/>
+                <ColumnDefinition Width="10"/>
+                <ColumnDefinition Width="1.5*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Import Sessions List -->
+            <Grid Grid.Column="0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+                    <TextBlock Text="Import Sessions" Style="{ThemeResource SubtitleTextBlockStyle}" 
+                               VerticalAlignment="Center" Margin="0,0,10,0"/>
+                    <Button x:Name="RefreshButton" Content="&#xE72C;" FontFamily="Segoe MDL2 Assets" 
+                            ToolTipService.ToolTip="Refresh" Click="RefreshButton_Click"/>
+                </StackPanel>
+
+                <ListView Grid.Row="1" x:Name="SessionsListView" SelectionChanged="SessionsListView_SelectionChanged">
+                </ListView>
+            </Grid>
+
+            <!-- Session Details -->
+            <Grid Grid.Column="2">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Session Info -->
+                <Border Grid.Row="0" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" 
+                        CornerRadius="8" Padding="16" Margin="0,0,0,10">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                            <TextBlock Text="Session Details" Style="{ThemeResource SubtitleTextBlockStyle}" 
+                                       VerticalAlignment="Center" Margin="0,0,10,0"/>
+                            <Button x:Name="ViewDetailsButton" Content="View Details" Click="ViewDetailsButton_Click"
+                                    Margin="0,0,5,0"/>
+                            <Button x:Name="ResumeButton" Content="Resume" Click="ResumeButton_Click"
+                                    Margin="0,0,5,0"/>
+                            <Button x:Name="CancelButton" Content="Cancel" Click="CancelButton_Click"/>
+                        </StackPanel>
+
+                        <StackPanel x:Name="SessionDetailsPanel" Visibility="Collapsed">
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="Progress" Style="{ThemeResource CaptionTextBlockStyle}"/>
+                                    <TextBlock x:Name="ProgressTextBlock" Text="0%" 
+                                               Style="{ThemeResource SubheaderTextBlockStyle}"/>
+                                </StackPanel>
+                                
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock Text="Videos Processed" Style="{ThemeResource CaptionTextBlockStyle}"/>
+                                    <TextBlock x:Name="VideosProcessedTextBlock" Text="0/0"
+                                               Style="{ThemeResource SubheaderTextBlockStyle}"/>
+                                </StackPanel>
+                            </Grid>
+
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="Uploaded" Style="{ThemeResource CaptionTextBlockStyle}"/>
+                                    <TextBlock x:Name="UploadedTextBlock" Text="0"
+                                               Style="{ThemeResource SubheaderTextBlockStyle}" Foreground="Green"/>
+                                </StackPanel>
+                                
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock Text="Failed" Style="{ThemeResource CaptionTextBlockStyle}"/>
+                                    <TextBlock x:Name="FailedTextBlock" Text="0"
+                                               Style="{ThemeResource SubheaderTextBlockStyle}" Foreground="Red"/>
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- Videos List -->
+                <Border Grid.Row="2" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" 
+                        CornerRadius="8" Padding="16">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Text="Videos" Style="{ThemeResource BodyStrongTextBlockStyle}" Margin="0,0,0,10"/>
+                        <ListView Grid.Row="1" x:Name="VideosListView"/>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Grid>
+
+        <!-- Status Bar -->
+        <Border Grid.Row="2" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" Padding="20,10">
+            <StackPanel Orientation="Horizontal">
+                <Image Source="Assets/logo.png" Width="16" Height="16" Margin="0,0,10,0"/>
+                <TextBlock x:Name="StatusBarTextBlock" Text="Ready to import" Style="{ThemeResource CaptionTextBlockStyle}" VerticalAlignment="Center"/>
+            </StackPanel>
+        </Border>
     </Grid>
 </Window>
