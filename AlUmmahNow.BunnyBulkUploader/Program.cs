@@ -1,9 +1,10 @@
 ﻿using AlUmmahNow.Data.Storage;
+using AlUmmahNow.Importer;
+using AlUmmahNow.Importer.Core;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using System;
-
+using ShellProgressBar;
 
 namespace AlUmmahNow.BunnyBulkUploader
 {
@@ -11,30 +12,65 @@ namespace AlUmmahNow.BunnyBulkUploader
     {
         static async Task Main(string[] args)
         {
-
             var services = new ServiceCollection();
             ConfigurationBuilder configurationBuilder = new ConfigurationBuilder();
             IConfiguration configuration = configurationBuilder.AddUserSecrets<Program>().Build();
-            var r2 = configuration.GetSection("R2DB");
             var bunnyVideo = configuration.GetSection("BunnyVideo");
 
             // Configure services
             services.AddSingleton<IStorageClient<Video>>(provider => new BunnyStorageClient<Video>(bunnyVideo["Zone"], bunnyVideo["Key"], bunnyVideo["Region"]));
-            services.AddSingleton<Uploader>();
+            services.AddSingleton<SimpleVideoUploader>();
 
             var serviceProvider = services.BuildServiceProvider();
 
             var app = new CommandLineApplication();
 
             app.HelpOption();
-            var optionFolder = app.Option("-f|--folder <Folder>", "The folder", CommandOptionType.SingleValue)
+            var optionFolder = app.Option("-f|--folder <Folder>", "The folder containing video files", CommandOptionType.SingleValue)
                 .IsRequired()
                 .Accepts(v => v.ExistingDirectory());
 
-            var importer = serviceProvider.GetRequiredService<Uploader>();
-
             app.OnExecuteAsync(async (ct) =>
-            await importer.Upload(optionFolder.Value() ?? "", "/faisal-aljasem/"));
+            {
+                var uploader = serviceProvider.GetRequiredService<SimpleVideoUploader>();
+                var folderPath = optionFolder.Value() ?? "";
+                
+                ProgressBar? progressBar = null;
+
+                // Subscribe to events
+                uploader.ProgressChanged += (sender, e) =>
+                {
+                    if (progressBar == null)
+                    {
+                        progressBar = new ProgressBar(e.TotalFiles, $"Uploading files from {folderPath}");
+                    }
+                    
+                    progressBar.Tick($"Processing {e.CurrentFileName} ({e.ProcessedFiles}/{e.TotalFiles})");
+                };
+
+                uploader.FileUploadError += (sender, e) =>
+                {
+                    Console.WriteLine($"Failed to upload {e.FileName}: {e.ErrorMessage}");
+                };
+
+                uploader.UploadCompleted += (sender, e) =>
+                {
+                    progressBar?.Dispose();
+                    Console.WriteLine($"Upload completed: {e.SuccessfulUploads} successful, {e.FailedUploads} failed out of {e.TotalFiles} total files.");
+                };
+
+                try
+                {
+                    await uploader.UploadAsync(folderPath, "/faisal-aljasem/");
+                    return 0;
+                }
+                catch (Exception ex)
+                {
+                    progressBar?.Dispose();
+                    Console.WriteLine($"Upload failed: {ex.Message}");
+                    return 1;
+                }
+            });
 
             await app.ExecuteAsync(args);
         }

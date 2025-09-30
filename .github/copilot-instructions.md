@@ -1,6 +1,6 @@
 # AlUmmahNowTools - Developer Instructions
 
-AlUmmahNowTools is a collection of .NET 8 console applications for managing video and image content with cloud storage services (Cloudflare R2, BunnyCDN, DeepL translation). The solution contains two main CLI tools: DataImporter and BunnyBulkUploader, plus a shared data library.
+AlUmmahNowTools is a collection of .NET 8 console applications for managing video and image content with cloud storage services (Cloudflare R2, BunnyCDN, DeepL translation). The solution contains two main CLI tools: DataImporter and BunnyBulkUploader, plus a shared data library and a centralized import library.
 
 **Always reference these instructions first and fallback to search or bash commands only when you encounter unexpected information that does not match the info here.**
 
@@ -64,23 +64,58 @@ Both applications require user secrets configuration before they can run success
 }
 ```
 
+#### Required User Secrets for VisualImporter:
+```json
+{
+  "R2DB": {
+    "S3Api": "https://your-cloudflare-r2-endpoint",
+    "S3Key": "your-r2-access-key", 
+    "S3Secret": "your-r2-secret-key"
+  },
+  "BunnyVideo": {
+    "Zone": "your-bunny-video-zone-name",
+    "Key": "your-bunny-video-api-key",
+    "Region": "your-bunny-video-region"
+  },
+  "BunnyImage": {
+    "Zone": "your-bunny-image-zone-name", 
+    "Key": "your-bunny-image-api-key",
+    "Region": "your-bunny-image-region"
+  },
+  "BunnyStream": {
+    "Key": "your-bunny-stream-api-key"
+  }
+}
+```
+
 **IMPORTANT: Applications will fail to start without proper configuration. They cannot display help without valid service initialization.**
 
 ## Project Structure
 
 ### Solution Components
-- **AlUmmahNow.sln** - Main solution file containing 3 projects
+- **AlUmmahNow.sln** - Main solution file containing 5 projects
 - **AlUmmahNow.Data** - Shared data library (.NET 8 library)
   - Storage clients for BunnyCDN and Cloudflare R2
   - Translation services using DeepL
   - Video streaming integration with Bunny Stream
   - Models for videos, images, and storage objects
+- **AlUmmahNow.Importer** - Centralized import logic library (.NET 8 library)
+  - VideoImporter class with session management and progress tracking
+  - SimpleVideoUploader for basic bulk uploads
+  - ImportCommandExecutor for CLI integration
+  - Reduces code duplication across console and GUI applications
 - **AlUmmahNow.DataImporter** - Console application for importing video content
   - UserSecretsId: `4803ba67-724e-4477-aeb0-1d38aa664f85`
   - Requires folder path parameter: `-f|--folder <path>`
+  - Uses AlUmmahNow.Importer library for core functionality
 - **AlUmmahNow.BunnyBulkUploader** - Console application for bulk uploading to BunnyCDN
   - UserSecretsId: `4de61621-8c00-4020-a0b6-0ff95676f865`
   - Requires folder path parameter: `-f|--folder <path>`
+  - Uses AlUmmahNow.Importer library for upload functionality
+- **AlUmmahNow.VisualImporter** - WinUI 3 visual interface for importing video content
+  - UserSecretsId: `4803ba67-724e-4477-aeb0-1d38aa664f85`
+  - Modern WinUI application with session management and real-time progress tracking
+  - Uses AlUmmahNow.Importer library for core import operations
 
 ### Key Dependencies
 - **AWSSDK.S3** (3.7.415.26) - Cloudflare R2 S3-compatible storage
@@ -89,6 +124,8 @@ Both applications require user secrets configuration before they can run success
 - **McMaster.Extensions.CommandLineUtils** (4.1.1) - CLI argument parsing
 - **RestSharp** (112.1.0) - HTTP client for API calls
 - **ShellProgressBar** (5.2.0) - Progress indication during operations
+- **Microsoft.EntityFrameworkCore** (9.0.9) - Database operations
+- **Microsoft.WindowsAppSDK** (1.8.250916003) - WinUI 3 framework
 
 ## CLI Usage
 
@@ -108,6 +145,14 @@ dotnet run -- --help                    # Shows usage (fails without config)
 dotnet run -- -f "/path/to/video/files" # Upload videos from folder
 ```
 
+### VisualImporter Usage
+```bash
+# Build and run VisualImporter (WinUI application)
+cd AlUmmahNow.VisualImporter
+dotnet build --configuration Debug /p:Platform=x64
+.\bin\x64\Debug\net8.0-windows10.0.19041.0\win-x64\AlUmmahNow.VisualImporter.exe
+```
+
 ### Using Published Executables
 ```bash
 # After publishing, run standalone executables
@@ -125,6 +170,10 @@ dotnet run -- -f "/path/to/video/files" # Upload videos from folder
 5. Progress bars show operation status during file processing
 
 ### Code Navigation
+- **Centralized Import Logic**: `AlUmmahNow.Importer/`
+  - `VideoImporter.cs` - Main import functionality with session management
+  - `SimpleVideoUploader.cs` - Basic bulk upload operations
+  - `ImportCommandExecutor.cs` - CLI command handling
 - **Storage implementations**: `AlUmmahNow.Data/Storage/`
   - `BunnyStorageClient.cs` - BunnyCDN storage operations
   - `R2Client.cs` - Cloudflare R2 S3-compatible client
@@ -132,7 +181,13 @@ dotnet run -- -f "/path/to/video/files" # Upload videos from folder
 - **Translation**: `AlUmmahNow.Data/Translation/DeepLClient.cs`
 - **Models**: `AlUmmahNow.Data/Models/` - Video, Image, Bucket definitions
 - **CLI entry points**: `Program.cs` files in each console project
-- **Core logic**: `Importer.cs` and `Uploader.cs` in respective projects
+- **WinUI Application**: `AlUmmahNow.VisualImporter/` - Modern Windows application
+
+### Import Library Benefits
+- **Reduced Redundancy**: Single implementation of import logic shared across projects
+- **Consistent Behavior**: All applications use the same core import functionality
+- **Easier Maintenance**: Bug fixes and improvements only need to be made in one place
+- **Better Testing**: Centralized logic can be unit tested more effectively
 
 ### Example Usage Classes
 - `AlUmmahNow.DataImporter/DeepLUsageExample.cs` - Shows DeepL translation API usage patterns
@@ -143,10 +198,10 @@ dotnet run -- -f "/path/to/video/files" # Upload videos from folder
 ### Build Validation
 - Run `dotnet build` - should complete in ~30 seconds with warnings but no errors
 - Run `dotnet build --configuration Release` - should complete in ~3 seconds
-- Verify warning count is exactly 49 warnings (nullable reference types)
+- Verify warning count is approximately 49 warnings (nullable reference types)
 
 ### Publishing Validation  
-- Publish both applications successfully
+- Publish both CLI applications successfully
 - Verify executable files are created in publish directories
 - Check executable file size (~72KB for DataImporter)
 - Verify all dependencies are included (~76MB total per published app)
@@ -155,8 +210,9 @@ dotnet run -- -f "/path/to/video/files" # Upload videos from folder
 With proper user secrets configured:
 - DataImporter should accept folder parameter and process video files
 - BunnyBulkUploader should accept folder parameter and upload to BunnyCDN
-- Both should show progress bars during operations
-- Applications scan for `.mp4` and `.mkv` files in specified folders
+- VisualImporter should provide GUI interface for import operations
+- All should show progress bars during operations
+- Applications scan for `.mp4`, `.mkv`, `.avi`, `.mov`, and `.wmv` files in specified folders
 
 ### Configuration Testing
 - Applications will crash immediately without user secrets
@@ -166,7 +222,7 @@ With proper user secrets configured:
 ## Common Issues and Solutions
 
 ### Build Issues
-- All builds produce 49 nullable reference warnings - this is expected
+- All builds produce nullable reference warnings - this is expected
 - No build errors should occur with .NET 8.0 SDK
 - Missing packages are auto-restored on first build
 
@@ -180,21 +236,30 @@ With proper user secrets configured:
 - Each project has unique UserSecretsId in .csproj files
 - Configuration template is in `appsettings.json` (DataImporter only)
 
+### Library Integration
+- All import functionality now uses `AlUmmahNow.Importer` library
+- Breaking changes require updating all dependent projects
+- Library must be built before dependent projects
+
 ## File Locations
 
 ### Important Files
 - `/AlUmmahNow.sln` - Solution file
 - `/README.md` - Basic project description (minimal)
 - `/AlUmmahNow.Data/` - Shared library source code
-- `/AlUmmahNow.DataImporter/` - Video import application
-- `/AlUmmahNow.BunnyBulkUploader/` - Bulk upload application
+- `/AlUmmahNow.Importer/` - Centralized import logic library
+- `/AlUmmahNow.DataImporter/` - Video import console application
+- `/AlUmmahNow.BunnyBulkUploader/` - Bulk upload console application
+- `/AlUmmahNow.VisualImporter/` - WinUI 3 visual import application
 
 ### Configuration Files
 - `AlUmmahNow.DataImporter/appsettings.json` - Configuration template
 - `AlUmmahNow.DataImporter/Properties/launchSettings.json` - Debug settings
 - `AlUmmahNow.BunnyBulkUploader/Properties/launchSettings.json` - Debug settings
+- `AlUmmahNow.VisualImporter/Package.appxmanifest` - WinUI app manifest
 
 ### Build Outputs
 - `bin/Debug/net8.0/` - Debug build outputs
 - `bin/Release/net8.0/` - Release build outputs  
 - `bin/Release/net8.0/linux-x64/publish/` - Published standalone applications
+- `AlUmmahNow.VisualImporter/bin/x64/Debug/net8.0-windows10.0.19041.0/win-x64/` - WinUI app outputs

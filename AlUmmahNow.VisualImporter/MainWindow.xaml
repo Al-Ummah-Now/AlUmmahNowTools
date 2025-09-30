@@ -33,8 +33,10 @@
                 <!-- Folder Selection -->
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                     <TextBlock Text="Import Folder:" VerticalAlignment="Center" Margin="0,0,10,0" MinWidth="100"/>
-                    <TextBox x:Name="FolderPathTextBox" Width="400" Margin="0,0,10,0"/>
+                    <TextBox x:Name="FolderPathTextBox" Width="300" Margin="0,0,10,0"/>
                     <Button x:Name="BrowseButton" Content="Browse..." Click="BrowseButton_Click" Margin="0,0,10,0"/>
+                    <Button x:Name="ScanButton" Content="Scan Folder" Click="ScanButton_Click" Margin="0,0,10,0"
+                            Style="{ThemeResource DefaultButtonStyle}"/>
                     <Button x:Name="StartImportButton" Content="Start Import" Click="StartImportButton_Click"
                             Style="{ThemeResource AccentButtonStyle}"/>
                 </StackPanel>
@@ -56,7 +58,7 @@
                 <ColumnDefinition Width="1.5*"/>
             </Grid.ColumnDefinitions>
 
-            <!-- Import Sessions List -->
+            <!-- Left Column: Import Sessions List -->
             <Grid Grid.Column="0">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -74,83 +76,279 @@
                 </ListView>
             </Grid>
 
-            <!-- Session Details -->
+            <!-- Right Column: Tabbed Content -->
             <Grid Grid.Column="2">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
-                <!-- Session Info -->
+                <!-- Tab Header -->
                 <Border Grid.Row="0" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" 
-                        CornerRadius="8" Padding="16" Margin="0,0,0,10">
-                    <StackPanel>
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                            <TextBlock Text="Session Details" Style="{ThemeResource SubtitleTextBlockStyle}" 
-                                       VerticalAlignment="Center" Margin="0,0,10,0"/>
-                            <Button x:Name="ViewDetailsButton" Content="View Details" Click="ViewDetailsButton_Click"
-                                    Margin="0,0,5,0"/>
-                            <Button x:Name="ResumeButton" Content="Resume" Click="ResumeButton_Click"
-                                    Margin="0,0,5,0"/>
-                            <Button x:Name="CancelButton" Content="Cancel" Click="CancelButton_Click"/>
-                        </StackPanel>
-
-                        <StackPanel x:Name="SessionDetailsPanel" Visibility="Collapsed">
-                            <Grid Margin="0,0,0,10">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                
-                                <StackPanel Grid.Column="0">
-                                    <TextBlock Text="Progress" Style="{ThemeResource CaptionTextBlockStyle}"/>
-                                    <TextBlock x:Name="ProgressTextBlock" Text="0%" 
-                                               Style="{ThemeResource SubheaderTextBlockStyle}"/>
-                                </StackPanel>
-                                
-                                <StackPanel Grid.Column="1">
-                                    <TextBlock Text="Videos Processed" Style="{ThemeResource CaptionTextBlockStyle}"/>
-                                    <TextBlock x:Name="VideosProcessedTextBlock" Text="0/0"
-                                               Style="{ThemeResource SubheaderTextBlockStyle}"/>
-                                </StackPanel>
-                            </Grid>
-
-                            <Grid Margin="0,0,0,10">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                
-                                <StackPanel Grid.Column="0">
-                                    <TextBlock Text="Uploaded" Style="{ThemeResource CaptionTextBlockStyle}"/>
-                                    <TextBlock x:Name="UploadedTextBlock" Text="0"
-                                               Style="{ThemeResource SubheaderTextBlockStyle}" Foreground="Green"/>
-                                </StackPanel>
-                                
-                                <StackPanel Grid.Column="1">
-                                    <TextBlock Text="Failed" Style="{ThemeResource CaptionTextBlockStyle}"/>
-                                    <TextBlock x:Name="FailedTextBlock" Text="0"
-                                               Style="{ThemeResource SubheaderTextBlockStyle}" Foreground="Red"/>
-                                </StackPanel>
-                            </Grid>
-                        </StackPanel>
+                        CornerRadius="8,8,0,0" Padding="16,8">
+                    <StackPanel Orientation="Horizontal">
+                        <RadioButton x:Name="FilesTabButton" Content="Discovered Files" IsChecked="True" 
+                                     Click="FilesTabButton_Click" Margin="0,0,20,0"/>
+                        <RadioButton x:Name="SessionTabButton" Content="Session Details" 
+                                     Click="SessionTabButton_Click"/>
                     </StackPanel>
                 </Border>
 
-                <!-- Videos List -->
-                <Border Grid.Row="2" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
-                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" 
-                        CornerRadius="8" Padding="16">
+                <!-- Tab Content -->
+                <Border Grid.Row="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1,0,1,1" 
+                        CornerRadius="0,0,8,8" Padding="16">
+                    
                     <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="*"/>
-                        </Grid.RowDefinitions>
+                        <!-- Discovered Files Tab -->
+                        <Grid x:Name="FilesTabContent" Visibility="Visible">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
 
-                        <TextBlock Grid.Row="0" Text="Videos" Style="{ThemeResource BodyStrongTextBlockStyle}" Margin="0,0,0,10"/>
-                        <ListView Grid.Row="1" x:Name="VideosListView"/>
+                            <!-- File Statistics -->
+                            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="20" Margin="0,0,0,10"
+                                        x:Name="FileStatsPanel" Visibility="Collapsed">
+                                <Border Background="{ThemeResource LayerFillColorDefaultBrush}" 
+                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" 
+                                        BorderThickness="1" CornerRadius="4" Padding="8,4">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon Glyph="&#xE8B7;" FontSize="16" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                                        <TextBlock x:Name="TotalFilesText" Text="0 files" Style="{ThemeResource BodyStrongTextBlockStyle}"/>
+                                    </StackPanel>
+                                </Border>
+                                
+                                <Border Background="{ThemeResource LayerFillColorDefaultBrush}" 
+                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" 
+                                        BorderThickness="1" CornerRadius="4" Padding="8,4">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon Glyph="&#xE7F8;" FontSize="16" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                                        <TextBlock x:Name="TotalSizeText" Text="0 B" Style="{ThemeResource BodyTextBlockStyle}"/>
+                                    </StackPanel>
+                                </Border>
+                                
+                                <Border Background="{ThemeResource SystemFillColorCautionBackgroundBrush}" 
+                                        BorderBrush="{ThemeResource SystemFillColorCautionBrush}" 
+                                        BorderThickness="1" CornerRadius="4" Padding="8,4">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon Glyph="&#xE7C3;" FontSize="16" Foreground="{ThemeResource SystemFillColorCautionBrush}"/>
+                                        <TextBlock x:Name="DuplicatesText" Text="0 duplicates" Style="{ThemeResource BodyTextBlockStyle}" 
+                                                   Foreground="{ThemeResource SystemFillColorCautionBrush}"/>
+                                    </StackPanel>
+                                </Border>
+                                
+                                <Border Background="{ThemeResource SystemFillColorSuccessBackgroundBrush}" 
+                                        BorderBrush="{ThemeResource SystemFillColorSuccessBrush}" 
+                                        BorderThickness="1" CornerRadius="4" Padding="8,4">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon Glyph="&#xE73E;" FontSize="16" Foreground="{ThemeResource SystemFillColorSuccessBrush}"/>
+                                        <TextBlock x:Name="SelectedFilesText" Text="0 selected" Style="{ThemeResource BodyTextBlockStyle}" 
+                                                   Foreground="{ThemeResource SystemFillColorSuccessBrush}"/>
+                                    </StackPanel>
+                                </Border>
+                                
+                                <!-- Import Status Stats -->
+                                <Border x:Name="UploadedStatsPanel" Background="{ThemeResource SystemFillColorSuccessBackgroundBrush}" 
+                                        BorderBrush="{ThemeResource SystemFillColorSuccessBrush}" 
+                                        BorderThickness="1" CornerRadius="4" Padding="8,4" Visibility="Collapsed">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon Glyph="&#xE73E;" FontSize="16" Foreground="{ThemeResource SystemFillColorSuccessBrush}"/>
+                                        <TextBlock x:Name="UploadedStatsText" Text="0 uploaded" Style="{ThemeResource BodyTextBlockStyle}" 
+                                                   Foreground="{ThemeResource SystemFillColorSuccessBrush}"/>
+                                    </StackPanel>
+                                </Border>
+                                
+                                <Border x:Name="FailedStatsPanel" Background="{ThemeResource SystemFillColorCriticalBackgroundBrush}" 
+                                        BorderBrush="{ThemeResource SystemFillColorCriticalBrush}" 
+                                        BorderThickness="1" CornerRadius="4" Padding="8,4" Visibility="Collapsed">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon Glyph="&#xE783;" FontSize="16" Foreground="{ThemeResource SystemFillColorCriticalBrush}"/>
+                                        <TextBlock x:Name="FailedStatsText" Text="0 failed" Style="{ThemeResource BodyTextBlockStyle}" 
+                                                   Foreground="{ThemeResource SystemFillColorCriticalBrush}"/>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+
+                            <!-- File Controls -->
+                            <Grid Grid.Row="1" Margin="0,0,0,10" x:Name="FileControlsPanel" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                
+                                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10">
+                                    <CheckBox x:Name="HideDuplicatesCheckBox" Content="Hide duplicates" IsChecked="True" 
+                                              Click="HideDuplicatesCheckBox_Click"/>
+                                    <CheckBox x:Name="ShowOnlySelectedCheckBox" Content="Show only selected" IsChecked="False" 
+                                              Click="ShowOnlySelectedCheckBox_Click"/>
+                                    <Button x:Name="SelectAllButton" Content="Select All" Click="SelectAllButton_Click"
+                                            Style="{ThemeResource DefaultButtonStyle}"/>
+                                    <Button x:Name="DeselectAllButton" Content="Deselect All" Click="DeselectAllButton_Click"/>
+                                </StackPanel>
+                                
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
+                                    <ComboBox x:Name="SortByComboBox" Header="Sort by" MinWidth="120" 
+                                              SelectionChanged="SortByComboBox_SelectionChanged">
+                                        <ComboBoxItem Content="Name" Tag="Name" IsSelected="True"/>
+                                        <ComboBoxItem Content="Size" Tag="Size"/>
+                                        <ComboBoxItem Content="Date Created" Tag="DateCreated"/>
+                                        <ComboBoxItem Content="Date Modified" Tag="DateModified"/>
+                                        <ComboBoxItem Content="Channel" Tag="Directory"/>
+                                        <ComboBoxItem Content="Import Status" Tag="ImportStatus"/>
+                                    </ComboBox>
+                                    
+                                    <Button x:Name="SortDirectionButton" Content="↑" Click="SortDirectionButton_Click"
+                                            ToolTipService.ToolTip="Toggle sort direction" Width="32"/>
+                                    
+                                    <ComboBox x:Name="ChannelFilterComboBox" Header="Channel" MinWidth="150"
+                                              SelectionChanged="ChannelFilterComboBox_SelectionChanged"/>
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- Files List -->
+                            <ScrollViewer Grid.Row="2" x:Name="FilesScrollViewer" Visibility="Collapsed">
+                                <ListView x:Name="DiscoveredFilesListView" SelectionMode="None">
+                                <ListView.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Spacing="2"/>
+                                    </ItemsPanelTemplate>
+                                </ListView.ItemsPanel>
+                            </ListView>
+                        </ScrollViewer>
+
+                        <!-- Progress/Loading Message -->
+                        <StackPanel Grid.Row="2" x:Name="OperationProgressPanel" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed">
+                            <ProgressRing IsActive="True" Width="40" Height="40" Margin="0,0,0,15"/>
+                            <TextBlock x:Name="OperationTitleLabel" Text="Processing..." Style="{ThemeResource BodyTextBlockStyle}" 
+                                       HorizontalAlignment="Center" Margin="0,0,0,5"/>
+                            <TextBlock x:Name="OperationSubtitleLabel" Text="Please wait while the operation completes" Style="{ThemeResource CaptionTextBlockStyle}" 
+                                       HorizontalAlignment="Center" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" Margin="0,0,0,15"/>
+                            
+
+                            <!-- Current Operation Progress Bar -->
+                            <TextBlock Text="Current Operation" Style="{ThemeResource CaptionTextBlockStyle}"
+                                       HorizontalAlignment="Center" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"
+                                       Margin="0,0,0,5"/>
+                            <ProgressBar x:Name="OperationProgressBar" 
+                                         Width="400" Height="4" 
+                                         Minimum="0" Maximum="100" Value="0"
+                                         Margin="0,0,0,5"/>
+                            <TextBlock x:Name="OperationProgressLabel" 
+                                       Text="0%" 
+                                       Style="{ThemeResource CaptionTextBlockStyle}"
+                                       HorizontalAlignment="Center" 
+                                       Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"
+                                       Margin="0,0,0,10"/>
+                            
+                            <!-- Current Operation -->
+                            <TextBlock x:Name="OperationStatusLabel" 
+                                       Text="Initializing..." 
+                                       Style="{ThemeResource CaptionTextBlockStyle}"
+                                       HorizontalAlignment="Center" 
+                                       Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"
+                                       Margin="0,0,0,5"/>
+                            
+                            <!-- Progress Counter -->
+                            <TextBlock x:Name="OperationCounterLabel" 
+                                       Text="Items processed: 0" 
+                                       Style="{ThemeResource CaptionTextBlockStyle}"
+                                       HorizontalAlignment="Center" 
+                                       Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"
+                                       Margin="0,0,0,5"/>
+                            
+                            <!-- Current Item -->
+                            <TextBlock x:Name="OperationCurrentItemLabel" 
+                                       Text="" 
+                                       Style="{ThemeResource CaptionTextBlockStyle}"
+                                       HorizontalAlignment="Center" 
+                                       Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                                       FontWeight="SemiBold"
+                                       TextTrimming="CharacterEllipsis"
+                                       MaxWidth="350"/>
+                        </StackPanel>
+
+                        <!-- No Files Message -->
+                        <StackPanel Grid.Row="2" x:Name="NoFilesPanel" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <FontIcon Glyph="&#xE8B7;" FontSize="48" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" 
+                                      HorizontalAlignment="Center" Margin="0,0,0,15"/>
+                            <TextBlock Text="No video files found" Style="{ThemeResource SubtitleTextBlockStyle}" 
+                                       HorizontalAlignment="Center" Margin="0,0,0,10"/>
+                            <TextBlock Text="Use 'Scan Folder' to discover video files" Style="{ThemeResource BodyTextBlockStyle}" 
+                                       HorizontalAlignment="Center" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" Margin="0,0,0,5"/>
+                            <TextBlock Text="Supported formats: MP4, MKV, AVI, MOV, WMV" Style="{ThemeResource CaptionTextBlockStyle}" 
+                                       HorizontalAlignment="Center" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
+                        </StackPanel>
+                        </Grid>
+
+                        <!-- Session Details Tab -->
+                        <Grid x:Name="SessionTabContent" Visibility="Collapsed">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- Session Info -->
+                            <StackPanel Grid.Row="0">
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                    <Button x:Name="ViewDetailsButton" Content="View Details" Click="ViewDetailsButton_Click"
+                                            Margin="0,0,5,0"/>
+                                    <Button x:Name="ResumeButton" Content="Resume" Click="ResumeButton_Click"
+                                            Margin="0,0,5,0"/>
+                                    <Button x:Name="CancelButton" Content="Cancel" Click="CancelButton_Click"/>
+                                </StackPanel>
+
+                                <StackPanel x:Name="SessionDetailsPanel" Visibility="Collapsed">
+                                    <Grid Margin="0,0,0,10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="Progress" Style="{ThemeResource CaptionTextBlockStyle}"/>
+                                            <TextBlock x:Name="ProgressTextBlock" Text="0%" 
+                                                       Style="{ThemeResource SubheaderTextBlockStyle}"/>
+                                        </StackPanel>
+                                        
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Text="Videos Processed" Style="{ThemeResource CaptionTextBlockStyle}"/>
+                                            <TextBlock x:Name="VideosProcessedTextBlock" Text="0/0"
+                                                       Style="{ThemeResource SubheaderTextBlockStyle}"/>
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <Grid Margin="0,0,0,10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="Uploaded" Style="{ThemeResource CaptionTextBlockStyle}"/>
+                                            <TextBlock x:Name="UploadedTextBlock" Text="0"
+                                                       Style="{ThemeResource SubheaderTextBlockStyle}" Foreground="Green"/>
+                                        </StackPanel>
+                                        
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Text="Failed" Style="{ThemeResource CaptionTextBlockStyle}"/>
+                                            <TextBlock x:Name="FailedTextBlock" Text="0"
+                                                       Style="{ThemeResource SubheaderTextBlockStyle}" Foreground="Red"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </StackPanel>
+                            </StackPanel>
+
+                            <!-- Videos List -->
+                            <ScrollViewer Grid.Row="1">
+                                <StackPanel>
+                                    <TextBlock Text="Videos" Style="{ThemeResource BodyStrongTextBlockStyle}" Margin="0,0,0,10"/>
+                                    <ListView x:Name="VideosListView"/>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </Grid>
                     </Grid>
                 </Border>
             </Grid>
