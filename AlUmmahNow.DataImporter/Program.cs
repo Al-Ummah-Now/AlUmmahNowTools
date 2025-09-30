@@ -3,7 +3,8 @@ using AlUmmahNow.Data.Video;
 using AlUmmahNow.Data.Translation;
 using AlUmmahNow.Data.Repository;
 using AlUmmahNow.Data.Database;
-using AlUmmahNow.DataImporter;
+using AlUmmahNow.Importer;
+using AlUmmahNow.Importer.Core;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -38,7 +39,8 @@ services.AddSingleton<IStorageClient<Video>>(provider => new BunnyStorageClient<
 services.AddSingleton<IStorageClient<Image>>(provider => new BunnyStorageClient<Image>(bunnyImage["Zone"], bunnyImage["Key"], bunnyImage["Region"]));
 services.AddSingleton<BunnyStreamClient>(provider => new BunnyStreamClient(bunnyStream["Key"]));
 services.AddSingleton<DeepLClient>(provider => new DeepLClient(deepL["ApiKey"], bool.Parse(deepL["IsFreeApi"] ?? "false")));
-services.AddScoped<Importer>();
+services.AddScoped<VideoImporter>();
+services.AddScoped<ImportCommandExecutor>();
 services.AddScoped(typeof(Repository<>));
 
 var serviceProvider = services.BuildServiceProvider();
@@ -54,7 +56,7 @@ var app = new CommandLineApplication();
 
 app.HelpOption();
 
-// Define options (let Importer handle validation/branching)
+// Define options
 var optionFolder = app.Option("-f|--folder <Folder>", "The folder containing channel subfolders", CommandOptionType.SingleValue)
     .Accepts(v => v.ExistingDirectory());
 
@@ -75,9 +77,9 @@ app.OnExecuteAsync(async (ct) =>
         optionStatusSession.Value());
 
     using var scope = serviceProvider.CreateScope();
-    var importer = scope.ServiceProvider.GetRequiredService<Importer>();
+    var executor = scope.ServiceProvider.GetRequiredService<ImportCommandExecutor>();
 
-    return await importer.ExecuteImportAsync(importArgs);
+    return await executor.ExecuteImportAsync(importArgs);
 });
 
 return await app.ExecuteAsync(args);

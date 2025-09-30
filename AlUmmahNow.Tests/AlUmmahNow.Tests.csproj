@@ -4,7 +4,6 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
@@ -30,6 +29,7 @@
   <ItemGroup>
     <ProjectReference Include="..\AlUmmahNow.Data\AlUmmahNow.Data.csproj" />
     <ProjectReference Include="..\AlUmmahNow.DataImporter\AlUmmahNow.DataImporter.csproj" />
+    <ProjectReference Include="..\AlUmmahNow.Importer\AlUmmahNow.Importer.csproj" />
   </ItemGroup>
 
 </Project>

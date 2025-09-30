@@ -4,7 +4,7 @@ using AlUmmahNow.Data.Repository;
 using AlUmmahNow.Data.Storage;
 using AlUmmahNow.Data.Video;
 using AlUmmahNow.Data.Database;
-using AlUmmahNow.DataImporter;
+using AlUmmahNow.Importer;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Threading.Tasks;
@@ -32,13 +32,13 @@ namespace AlUmmahNow.Tests.DataImporter
         {
             // Arrange
             var mockR2Client = new Mock<IR2Client>();
-            var repository = new Repository<AlUmmahNow.DataImporter.Video>(mockR2Client.Object);
-            var mockVideoStorageClient = new Mock<IStorageClient<AlUmmahNow.DataImporter.Video>>();
-            var mockImageStorageClient = new Mock<IStorageClient<AlUmmahNow.DataImporter.Image>>();
+            var repository = new Repository<AlUmmahNow.Importer.Core.Video>(mockR2Client.Object);
+            var mockVideoStorageClient = new Mock<IStorageClient<AlUmmahNow.Importer.Core.Video>>();
+            var mockImageStorageClient = new Mock<IStorageClient<AlUmmahNow.Importer.Core.Image>>();
             var bunnyStreamClient = new BunnyStreamClient("test-key");
 
             // Act
-            var importer = new Importer(
+            var importer = new VideoImporter(
                 repository,
                 mockVideoStorageClient.Object,
                 mockImageStorageClient.Object,
@@ -54,12 +54,12 @@ namespace AlUmmahNow.Tests.DataImporter
         {
             // Arrange
             var mockR2Client = new Mock<IR2Client>();
-            var repository = new Repository<AlUmmahNow.DataImporter.Video>(mockR2Client.Object);
-            var mockVideoStorageClient = new Mock<IStorageClient<AlUmmahNow.DataImporter.Video>>();
-            var mockImageStorageClient = new Mock<IStorageClient<AlUmmahNow.DataImporter.Image>>();
+            var repository = new Repository<AlUmmahNow.Importer.Core.Video>(mockR2Client.Object);
+            var mockVideoStorageClient = new Mock<IStorageClient<AlUmmahNow.Importer.Core.Video>>();
+            var mockImageStorageClient = new Mock<IStorageClient<AlUmmahNow.Importer.Core.Image>>();
             var bunnyStreamClient = new BunnyStreamClient("test-key");
             
-            var importer = new Importer(
+            var importer = new VideoImporter(
                 repository,
                 mockVideoStorageClient.Object,
                 mockImageStorageClient.Object,
@@ -85,12 +85,12 @@ namespace AlUmmahNow.Tests.DataImporter
         {
             // Arrange
             var mockR2Client = new Mock<IR2Client>();
-            var repository = new Repository<AlUmmahNow.DataImporter.Video>(mockR2Client.Object);
-            var mockVideoStorageClient = new Mock<IStorageClient<AlUmmahNow.DataImporter.Video>>();
-            var mockImageStorageClient = new Mock<IStorageClient<AlUmmahNow.DataImporter.Image>>();
+            var repository = new Repository<AlUmmahNow.Importer.Core.Video>(mockR2Client.Object);
+            var mockVideoStorageClient = new Mock<IStorageClient<AlUmmahNow.Importer.Core.Video>>();
+            var mockImageStorageClient = new Mock<IStorageClient<AlUmmahNow.Importer.Core.Image>>();
             var bunnyStreamClient = new BunnyStreamClient("test-key");
             
-            var importer = new Importer(
+            var importer = new VideoImporter(
                 repository,
                 mockVideoStorageClient.Object,
                 mockImageStorageClient.Object,
@@ -132,12 +132,12 @@ namespace AlUmmahNow.Tests.DataImporter
         {
             // Arrange
             var mockR2Client = new Mock<IR2Client>();
-            var repository = new Repository<AlUmmahNow.DataImporter.Video>(mockR2Client.Object);
-            var mockVideoStorageClient = new Mock<IStorageClient<AlUmmahNow.DataImporter.Video>>();
-            var mockImageStorageClient = new Mock<IStorageClient<AlUmmahNow.DataImporter.Image>>();
+            var repository = new Repository<AlUmmahNow.Importer.Core.Video>(mockR2Client.Object);
+            var mockVideoStorageClient = new Mock<IStorageClient<AlUmmahNow.Importer.Core.Video>>();
+            var mockImageStorageClient = new Mock<IStorageClient<AlUmmahNow.Importer.Core.Image>>();
             var bunnyStreamClient = new BunnyStreamClient("test-key");
             
-            var importer = new Importer(
+            var importer = new VideoImporter(
                 repository,
                 mockVideoStorageClient.Object,
                 mockImageStorageClient.Object,
@@ -199,12 +199,12 @@ namespace AlUmmahNow.Tests.DataImporter
         {
             // Arrange
             var mockR2Client = new Mock<IR2Client>();
-            var repository = new Repository<AlUmmahNow.DataImporter.Video>(mockR2Client.Object);
-            var mockVideoStorageClient = new Mock<IStorageClient<AlUmmahNow.DataImporter.Video>>();
-            var mockImageStorageClient = new Mock<IStorageClient<AlUmmahNow.DataImporter.Image>>();
+            var repository = new Repository<AlUmmahNow.Importer.Core.Video>(mockR2Client.Object);
+            var mockVideoStorageClient = new Mock<IStorageClient<AlUmmahNow.Importer.Core.Video>>();
+            var mockImageStorageClient = new Mock<IStorageClient<AlUmmahNow.Importer.Core.Image>>();
             var bunnyStreamClient = new BunnyStreamClient("test-key");
             
-            var importer = new Importer(
+            var importer = new VideoImporter(
                 repository,
                 mockVideoStorageClient.Object,
                 mockImageStorageClient.Object,
@@ -225,12 +225,12 @@ namespace AlUmmahNow.Tests.DataImporter
         {
             // Arrange
             var mockR2Client = new Mock<IR2Client>();
-            var repository = new Repository<AlUmmahNow.DataImporter.Video>(mockR2Client.Object);
-            var mockVideoStorageClient = new Mock<IStorageClient<AlUmmahNow.DataImporter.Video>>();
-            var mockImageStorageClient = new Mock<IStorageClient<AlUmmahNow.DataImporter.Image>>();
+            var repository = new Repository<AlUmmahNow.Importer.Core.Video>(mockR2Client.Object);
+            var mockVideoStorageClient = new Mock<IStorageClient<AlUmmahNow.Importer.Core.Video>>();
+            var mockImageStorageClient = new Mock<IStorageClient<AlUmmahNow.Importer.Core.Image>>();
             var bunnyStreamClient = new BunnyStreamClient("test-key");
             
-            var importer = new Importer(
+            var importer = new VideoImporter(
                 repository,
                 mockVideoStorageClient.Object,
                 mockImageStorageClient.Object,
@@ -250,16 +250,16 @@ namespace AlUmmahNow.Tests.DataImporter
         }
 
         [Fact]
-        public async Task ImportFromBunnyApi_WithInvalidCredentials_ThrowsException()
+        public async Task ImportFromBunnyApiAsync_WithInvalidCredentials_ThrowsException()
         {
             // Arrange
             var mockR2Client = new Mock<IR2Client>();
-            var repository = new Repository<AlUmmahNow.DataImporter.Video>(mockR2Client.Object);
-            var mockVideoStorageClient = new Mock<IStorageClient<AlUmmahNow.DataImporter.Video>>();
-            var mockImageStorageClient = new Mock<IStorageClient<AlUmmahNow.DataImporter.Image>>();
+            var repository = new Repository<AlUmmahNow.Importer.Core.Video>(mockR2Client.Object);
+            var mockVideoStorageClient = new Mock<IStorageClient<AlUmmahNow.Importer.Core.Video>>();
+            var mockImageStorageClient = new Mock<IStorageClient<AlUmmahNow.Importer.Core.Image>>();
             var bunnyStreamClient = new BunnyStreamClient("invalid-test-key");
             
-            var importer = new Importer(
+            var importer = new VideoImporter(
                 repository,
                 mockVideoStorageClient.Object,
                 mockImageStorageClient.Object,
@@ -278,7 +278,7 @@ namespace AlUmmahNow.Tests.DataImporter
             // Act & Assert
             var exception = await Record.ExceptionAsync(async () =>
             {
-                await importer.ImportFromBunnyApi(libraryId, userId, channelName, channelThumbnail,
+                await importer.ImportFromBunnyApiAsync(libraryId, userId, channelName, channelThumbnail,
                     videoStoreRoot, videoStoreUrl, imageStoreRoot, imageStoreUrl);
             });
 

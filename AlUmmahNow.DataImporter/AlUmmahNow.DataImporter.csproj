@@ -17,12 +17,11 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="9.0.9" />
     <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="9.0.9" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.9" />
-    <PackageReference Include="ShellProgressBar" Version="5.2.0" />
-    <PackageReference Include="System.Text.Json" Version="9.0.9" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\AlUmmahNow.Data\AlUmmahNow.Data.csproj" />
+    <ProjectReference Include="..\AlUmmahNow.Importer\AlUmmahNow.Importer.csproj" />
   </ItemGroup>
 
 </Project>

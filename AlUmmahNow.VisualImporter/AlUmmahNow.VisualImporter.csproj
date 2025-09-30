@@ -40,21 +40,18 @@
   
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.9" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.9" />
     <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="9.0.9" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.9" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.9" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.6584" />
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.250916003" />
-    <PackageReference Include="ShellProgressBar" Version="5.2.0" />
-    <PackageReference Include="System.Text.Json" Version="9.0.9" />
   </ItemGroup>
   
   <ItemGroup>
     <ProjectReference Include="..\AlUmmahNow.Data\AlUmmahNow.Data.csproj" />
+    <ProjectReference Include="..\AlUmmahNow.Importer\AlUmmahNow.Importer.csproj" />
   </ItemGroup>
-
+  
   <!--
     Defining the "HasPackageAndPublishMenuAddedByProject" property here allows the Solution
     Explorer "Package and Publish" context menu entry to be enabled for this project even if
