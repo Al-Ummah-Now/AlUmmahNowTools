@@ -10,8 +10,10 @@ using AlUmmahNow.Data.Video;
 using AlUmmahNow.Data.Repository;
 using AlUmmahNow.Data.Models;
 using AlUmmahNow.Data.Database;
+using AlUmmahNow.Data.Translation;
 using Microsoft.EntityFrameworkCore;
 using AlUmmahNow.Importer.Core;
+using AlUmmahNow.Importer.Services;
 
 namespace AlUmmahNow.Importer
 {
@@ -25,6 +27,7 @@ namespace AlUmmahNow.Importer
         private readonly IStorageClient<Image> _imageStorageClient;
         private readonly BunnyStreamClient _bunnyStreamClient;
         private readonly ImportDbContext? _dbContext;
+        private readonly VideoTranslationService? _translationService;
 
         /// <summary>
         /// Raised when import progress changes
@@ -47,20 +50,22 @@ namespace AlUmmahNow.Importer
         public event EventHandler<FileImportErrorEventArgs>? FileImportError;
 
         /// <summary>
-        /// Initializes a new instance with database session tracking support
+        /// Initializes a new instance with database session tracking and optional translation support
         /// </summary>
         public VideoImporter(
             Repository<Video> repo, 
             IStorageClient<Video> videoStorageClient, 
             IStorageClient<Image> imageStorageClient, 
             BunnyStreamClient bunnyStreamClient, 
-            ImportDbContext dbContext)
+            ImportDbContext dbContext,
+            VideoTranslationService? translationService = null)
         {
             _repo = repo ?? throw new ArgumentNullException(nameof(repo));
             _videoStorageClient = videoStorageClient ?? throw new ArgumentNullException(nameof(videoStorageClient));
             _imageStorageClient = imageStorageClient ?? throw new ArgumentNullException(nameof(imageStorageClient));
             _bunnyStreamClient = bunnyStreamClient ?? throw new ArgumentNullException(nameof(bunnyStreamClient));
             _dbContext = dbContext;
+            _translationService = translationService;
         }
 
         /// <summary>
@@ -70,13 +75,15 @@ namespace AlUmmahNow.Importer
             Repository<Video> repo,
             IStorageClient<Video> videoStorageClient,
             IStorageClient<Image> imageStorageClient,
-            BunnyStreamClient bunnyStreamClient)
+            BunnyStreamClient bunnyStreamClient,
+            VideoTranslationService? translationService = null)
         {
             _repo = repo ?? throw new ArgumentNullException(nameof(repo));
             _videoStorageClient = videoStorageClient ?? throw new ArgumentNullException(nameof(videoStorageClient));
             _imageStorageClient = imageStorageClient ?? throw new ArgumentNullException(nameof(imageStorageClient));
             _bunnyStreamClient = bunnyStreamClient ?? throw new ArgumentNullException(nameof(bunnyStreamClient));
             _dbContext = null;
+            _translationService = translationService;
         }
 
         #region Multi-Channel Import with Session Management
@@ -447,6 +454,61 @@ namespace AlUmmahNow.Importer
 
         #region Private Helper Methods
 
+        /// <summary>
+        /// Translate video metadata if translation service is available
+        /// </summary>
+        private async Task<TranslatedVideoMetadata?> TranslateVideoMetadataIfEnabledAsync(string title, string description, string channelName)
+        {
+            if (_translationService == null || !_translationService.IsTranslationAvailable)
+                return null;
+
+            try
+            {
+                var metadata = new VideoMetadata
+                {
+                    Title = title,
+                    Description = description,
+                    ChannelName = channelName
+                };
+
+                // Get translation settings - you can customize these
+                var targetLanguages = new[] { "AR", "EN", "ES", "FR", "DE" }; // Default languages
+
+                var translatedMetadata = await _translationService.TranslateVideoMetadataAsync(
+                    metadata, 
+                    targetLanguages);
+
+                return translatedMetadata;
+            }
+            catch (Exception ex)
+            {
+                // Log translation failure but don't fail the import
+                Console.WriteLine($"Translation failed for video '{title}': {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Store translated metadata as JSON string
+        /// </summary>
+        private string? SerializeTranslatedMetadata(TranslatedVideoMetadata? translatedMetadata)
+        {
+            if (translatedMetadata == null)
+                return null;
+
+            try
+            {
+                return JsonSerializer.Serialize(translatedMetadata, new JsonSerializerOptions 
+                { 
+                    WriteIndented = false 
+                });
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         private async Task<List<(FileInfo video, FileInfo? thumbnail)>> ScanChannelForVideosAsync(DirectoryInfo channelDir)
         {
             var videos = new List<(FileInfo video, FileInfo? thumbnail)>();
@@ -640,10 +702,19 @@ namespace AlUmmahNow.Importer
                     }
 
                     // Create video metadata
+                    var videoTitle = Path.GetFileNameWithoutExtension(videoFile.Name);
+                    var videoDescription = videoTitle; // Use title as description by default
+
+                    // Translate metadata if translation service is available
+                    var translatedMetadata = await TranslateVideoMetadataIfEnabledAsync(
+                        videoTitle, 
+                        videoDescription, 
+                        channelName);
+
                     var video = new Video
                     {
-                        Title = Path.GetFileNameWithoutExtension(videoFile.Name),
-                        Description = Path.GetFileNameWithoutExtension(videoFile.Name),
+                        Title = videoTitle,
+                        Description = videoDescription,
                         UserId = (await _dbContext.ImportSessions.FindAsync(sessionId))?.UserId ?? "",
                         VideoUrl = $"{channel.VideoStoreUrl}{videoFile.Name}",
                         ThumbnailUrl = importVideo.ThumbnailUrl ?? "",
@@ -661,6 +732,12 @@ namespace AlUmmahNow.Importer
                     importVideo.Status = VideoImportStatus.Uploaded;
                     importVideo.ProcessedAt = DateTime.UtcNow;
                     importVideo.UploadedAt = DateTime.UtcNow;
+                    
+                    // Store translated metadata if available
+                    if (translatedMetadata != null)
+                    {
+                        importVideo.VideoMetadata = SerializeTranslatedMetadata(translatedMetadata);
+                    }
 
                     await _dbContext.SaveChangesAsync();
                     channelProcessed++;
