@@ -51,6 +51,17 @@ namespace AlUmmahNow.Data.Database
                 entity.HasIndex(e => e.SessionId);
                 entity.HasIndex(e => e.ChannelId);
                 entity.HasIndex(e => e.Status);
+                
+                // Configure relationships to avoid cascade path conflicts
+                entity.HasOne(e => e.Session)
+                    .WithMany(s => s.Videos)
+                    .HasForeignKey(e => e.SessionId)
+                    .OnDelete(DeleteBehavior.NoAction);
+                    
+                entity.HasOne(e => e.Channel)
+                    .WithMany(c => c.Videos)
+                    .HasForeignKey(e => e.ChannelId)
+                    .OnDelete(DeleteBehavior.NoAction);
             });
 
             // Configure new file scanning models
@@ -101,10 +112,11 @@ namespace AlUmmahNow.Data.Database
                 entity.HasIndex(e => new { e.ContentHash, e.FileSize });
                 
                 // Self-referencing relationship for duplicate detection
+                // Use NoAction to avoid SQL Server cascade path conflicts
                 entity.HasOne(e => e.OriginalFile)
                     .WithMany()
                     .HasForeignKey(e => e.OriginalFileId)
-                    .OnDelete(DeleteBehavior.SetNull);
+                    .OnDelete(DeleteBehavior.NoAction);
                 
                 // Relationship to scan session
                 entity.HasOne(e => e.ScanSession)
@@ -132,10 +144,11 @@ namespace AlUmmahNow.Data.Database
                 entity.HasIndex(e => new { e.ScanSessionId, e.DepthLevel });
                 
                 // Self-referencing relationship for parent/child channels
+                // Use NoAction to avoid SQL Server cascade path conflicts
                 entity.HasOne(e => e.ParentChannel)
                     .WithMany()
                     .HasForeignKey(e => e.ParentChannelId)
-                    .OnDelete(DeleteBehavior.SetNull);
+                    .OnDelete(DeleteBehavior.NoAction);
                 
                 // Relationship to scan session
                 entity.HasOne(e => e.ScanSession)

@@ -82,10 +82,11 @@ namespace AlUmmahNow.VisualImporter
                         // Register configuration
                         services.AddSingleton<IConfiguration>(configuration);
 
-                        // Register database with SQL Server
+                        // Register database with SQL Server - Use Scoped lifetime to prevent threading issues
                         services.AddDbContext<ImportDbContext>(options =>
                             options.UseSqlServer(configuration.GetConnectionString("DefaultConnection") 
-                                ?? "Server=(localdb)\\MSSQLLocalDB;Database=AlUmmahNowFileScan;Trusted_Connection=true;MultipleActiveResultSets=true;TrustServerCertificate=true"));
+                                ?? "Server=(localdb)\\MSSQLLocalDB;Database=AlUmmahNowFileScan;Trusted_Connection=true;MultipleActiveResultSets=true;TrustServerCertificate=true"),
+                            ServiceLifetime.Scoped); // Explicitly set Scoped lifetime
 
                         // Register storage clients (gracefully handle missing configuration)
                         services.AddSingleton<IR2Client>(sp =>
@@ -121,6 +122,10 @@ namespace AlUmmahNow.VisualImporter
                             return new BunnyStreamClient(bunnyStreamKey);
                         });
 
+                        // Register SignalR client for FileScan service
+                        var fileScanServiceUrl = configuration.GetValue<string>("FileScanService:Url") ?? "http://localhost:5000";
+                        services.AddSingleton(sp => new FileScanSignalRClient(fileScanServiceUrl));
+
                         // Register repository
                         services.AddTransient<Repository<Video>>();
 
@@ -135,6 +140,8 @@ namespace AlUmmahNow.VisualImporter
                         
                         // Register view models
                         services.AddTransient<MainViewModel>();
+                        services.AddTransient<ServiceStatusViewModel>();
+
 
                         // Register logging
                         services.AddLogging(builder =>
