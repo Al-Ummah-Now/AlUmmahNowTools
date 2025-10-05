@@ -14,6 +14,13 @@
             
             <!-- Converters -->
             <converters:BoolNegationConverter x:Key="BoolNegationConverter"/>
+            <converters:ColorConverter x:Key="ColorConverter"/>
+            <converters:InverseBoolConverter x:Key="InverseBoolConverter"/>
+            <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibilityConverter"/>
+            <converters:CountToBoolConverter x:Key="CountToBoolConverter"/>
+            <converters:CountComparisonToVisibilityConverter x:Key="CountComparisonToVisibilityConverter"/>
+            <converters:ServiceStatusToVisibilityConverter x:Key="ServiceStatusToVisibilityConverter"/>
+            <converters:ItemsProcessedConverter x:Key="ItemsProcessedConverter"/>
             
             <!-- Other app resources here -->
         </ResourceDictionary>

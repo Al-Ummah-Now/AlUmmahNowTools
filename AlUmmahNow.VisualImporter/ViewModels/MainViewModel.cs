@@ -672,7 +672,12 @@ namespace AlUmmahNow.VisualImporter.ViewModels
         {
             try
             {
+                // DON'T load import sessions on startup - they're not needed until user explicitly requests them
+                // This prevents database threading issues and missing table errors
+                // The ImportSessions table is from the old schema and may not exist
+                
                 // Use Task.Run to avoid blocking the constructor
+                /*
                 Task.Run(async () =>
                 {
                     try
@@ -684,6 +689,7 @@ namespace AlUmmahNow.VisualImporter.ViewModels
                         WindowsEventLogger.LogCriticalCrash(ex, "Initial Load Background Task");
                     }
                 });
+                */
             }
             catch (Exception ex)
             {

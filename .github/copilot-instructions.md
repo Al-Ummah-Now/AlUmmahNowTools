@@ -4,6 +4,14 @@ AlUmmahNowTools is a collection of .NET 8 applications for managing video and im
 
 **Always reference these instructions first and fallback to search or bash commands only when you encounter unexpected information that does not match the info here.**
 
+## General Development Guidelines
+
+### Documentation and Reporting
+- **DO NOT create fix summary documents or FIXES_SUMMARY.md files**
+- Provide verbal summaries of changes in responses
+- Only create documentation when explicitly requested by the user
+- Focus on making fixes rather than documenting them
+
 ## Working Effectively
 
 ### Prerequisites and Bootstrap
