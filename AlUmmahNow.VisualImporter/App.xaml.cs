@@ -1,20 +1,21 @@
-﻿using Microsoft.UI.Xaml;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Configuration;
-using Microsoft.EntityFrameworkCore;
-using AlUmmahNow.Data.Database;
+﻿using AlUmmahNow.Data.Database;
 using AlUmmahNow.Data.Repository;
 using AlUmmahNow.Data.Storage;
 using AlUmmahNow.Data.Video;
-using AlUmmahNow.Data.Models;
-using AlUmmahNow.Importer;
 using AlUmmahNow.Importer.Core;
 using AlUmmahNow.VisualImporter.Services;
 using AlUmmahNow.VisualImporter.ViewModels;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.UI.Xaml;
+using Serilog;
 using System;
 using System.IO;
-using System.Threading.Tasks;
+using System.Reflection;
+using AlUmmahNow.Importer;
 
 namespace AlUmmahNow.VisualImporter
 {
@@ -23,17 +24,25 @@ namespace AlUmmahNow.VisualImporter
     /// </summary>
     public partial class App : Application
     {
-        private static IHost? _host;
-        
-        public static IHost Host => _host ?? throw new InvalidOperationException("Host is not initialized");
-        
-        public static T GetService<T>() where T : class => Host.Services.GetRequiredService<T>();
+        private readonly IHost _host;
+
+        public static IServiceProvider Services => ((App)Current)._host.Services;
 
         // Add static reference to current instance
         public static new App Current => (App)Application.Current;
         
         // Add MainWindow property
         public Window? MainWindow { get; private set; }
+
+        /// <summary>
+        /// Get a service from the DI container
+        /// </summary>
+        /// <typeparam name="T">Service type</typeparam>
+        /// <returns>Service instance</returns>
+        public static T GetService<T>() where T : class
+        {
+            return Services.GetRequiredService<T>();
+        }
 
         /// <summary>
         /// Initializes the singleton application object.
@@ -46,9 +55,99 @@ namespace AlUmmahNow.VisualImporter
                 CrashHandler.Initialize();
                 WindowsEventLogger.LogStartup();
 
-                InitializeComponent();
+                this.InitializeComponent();
+
+                // Get the application directory (for WinUI 3 apps)
+                var appDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? Directory.GetCurrentDirectory();
+
+                // Configure configuration
+                var configuration = new ConfigurationBuilder()
+                    .SetBasePath(appDirectory)
+                    .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+                    .AddUserSecrets<App>()
+                    .Build();
+
+                // Configure Serilog
+                Log.Logger = new LoggerConfiguration()
+                    .ReadFrom.Configuration(configuration)
+                    .CreateLogger();
+
+                Log.Information("App starting from directory: {Directory}", appDirectory);
+
+                // Build host with services
+                _host = Host.CreateDefaultBuilder()
+                    .UseSerilog()
+                    .ConfigureServices((context, services) =>
+                    {
+                        // Register configuration
+                        services.AddSingleton<IConfiguration>(configuration);
+
+                        // Register database with SQL Server
+                        services.AddDbContext<ImportDbContext>(options =>
+                            options.UseSqlServer(configuration.GetConnectionString("DefaultConnection") 
+                                ?? "Server=(localdb)\\MSSQLLocalDB;Database=AlUmmahNowFileScan;Trusted_Connection=true;MultipleActiveResultSets=true;TrustServerCertificate=true"));
+
+                        // Register storage clients (gracefully handle missing configuration)
+                        services.AddSingleton<IR2Client>(sp =>
+                        {
+                            var r2Config = configuration.GetSection("R2DB");
+                            return new R2Client(
+                                r2Config["S3Api"] ?? "",
+                                r2Config["S3Key"] ?? "",
+                                r2Config["S3Secret"] ?? "");
+                        });
+
+                        services.AddSingleton<IStorageClient<Video>>(sp =>
+                        {
+                            var bunnyConfig = configuration.GetSection("BunnyVideo");
+                            return new BunnyStorageClient<Video>(
+                                bunnyConfig["Zone"] ?? "",
+                                bunnyConfig["Key"] ?? "",
+                                bunnyConfig["Region"] ?? "");
+                        });
+
+                        services.AddSingleton<IStorageClient<Image>>(sp =>
+                        {
+                            var bunnyConfig = configuration.GetSection("BunnyImage");
+                            return new BunnyStorageClient<Image>(
+                                bunnyConfig["Zone"] ?? "",
+                                bunnyConfig["Key"] ?? "",
+                                bunnyConfig["Region"] ?? "");
+                        });
+
+                        services.AddSingleton(sp =>
+                        {
+                            var bunnyStreamKey = configuration.GetSection("BunnyStream")["Key"] ?? "";
+                            return new BunnyStreamClient(bunnyStreamKey);
+                        });
+
+                        // Register repository
+                        services.AddTransient<Repository<Video>>();
+
+                        // Register file discovery service (local scanning)
+                        services.AddTransient<FileDiscoveryService>();
+                        
+                        // Register video importer (with all dependencies)
+                        services.AddTransient<VideoImporter>();
+                        
+                        // Register import service (uses FileDiscoveryService and VideoImporter)
+                        services.AddTransient<ImportService>();
+                        
+                        // Register view models
+                        services.AddTransient<MainViewModel>();
+
+                        // Register logging
+                        services.AddLogging(builder =>
+                        {
+                            builder.ClearProviders();
+                            builder.AddSerilog();
+                        });
+                    })
+                    .Build();
+
+                // Initialize services
                 InitializeServices();
-                
+
                 // Handle application exit gracefully - use UnhandledException instead of Exit
                 AppDomain.CurrentDomain.ProcessExit += OnProcessExit;
             }
@@ -73,215 +172,20 @@ namespace AlUmmahNow.VisualImporter
             }
         }
 
-        private void InitializeServices()
+        private async void InitializeServices()
         {
             try
             {
-                WindowsEventLogger.LogEvent(System.Diagnostics.EventLogEntryType.Information, 1100,
-                    "Service Initialization Started", "Beginning service registration and configuration");
+                // Ensure database is created
+                using var scope = _host.Services.CreateScope();
+                var dbContext = scope.ServiceProvider.GetRequiredService<ImportDbContext>();
+                await dbContext.Database.EnsureCreatedAsync();
 
-                var builder = Microsoft.Extensions.Hosting.Host.CreateApplicationBuilder();
-
-                // Configuration
-                try
-                {
-                    builder.Configuration.AddUserSecrets<App>();
-                    WindowsEventLogger.LogEvent(System.Diagnostics.EventLogEntryType.Information, 1101,
-                        "User Secrets Loaded", "User secrets configuration loaded successfully");
-                }
-                catch (Exception ex)
-                {
-                    WindowsEventLogger.LogServiceInitializationFailure("User Secrets", ex);
-                    // Continue without user secrets - use defaults
-                }
-
-                // Database
-                var appDataFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AlUmmahNowVisualImporter");
-                Directory.CreateDirectory(appDataFolder);
-                var dbPath = Path.Combine(appDataFolder, "imports.db");
-                
-                try
-                {
-                    builder.Services.AddDbContext<ImportDbContext>(options =>
-                        options.UseSqlite($"Data Source={dbPath}"));
-                    
-                    WindowsEventLogger.LogEvent(System.Diagnostics.EventLogEntryType.Information, 1102,
-                        "Database Context Registered", $"SQLite database configured at: {dbPath}");
-                }
-                catch (Exception ex)
-                {
-                    WindowsEventLogger.LogServiceInitializationFailure("Database Context", ex);
-                }
-
-                // R2Client - non-generic with safe configuration
-                builder.Services.AddScoped<IR2Client>(provider =>
-                {
-                    try
-                    {
-                        var config = provider.GetRequiredService<IConfiguration>();
-                        var r2Config = config.GetSection("R2DB");
-                        var client = new R2Client(
-                            r2Config["S3Api"] ?? "https://your-r2-endpoint.com",
-                            r2Config["S3Key"] ?? "your-r2-key",
-                            r2Config["S3Secret"] ?? "your-r2-secret"
-                        );
-                        
-                        WindowsEventLogger.LogEvent(System.Diagnostics.EventLogEntryType.Information, 1103,
-                            "R2Client Configured", "R2 storage client configured successfully");
-                        return client;
-                    }
-                    catch (Exception ex)
-                    {
-                        WindowsEventLogger.LogServiceInitializationFailure("R2Client", ex);
-                        // Return a default instance
-                        return new R2Client("https://default.com", "default", "default");
-                    }
-                });
-
-                // Storage clients - proper generic usage with safe configuration
-                builder.Services.AddScoped<IStorageClient<Video>>(provider =>
-                {
-                    try
-                    {
-                        var config = provider.GetRequiredService<IConfiguration>();
-                        var r2Config = config.GetSection("BunnyVideo");
-                        var client = new BunnyStorageClient<Video>(
-                            r2Config["Zone"] ?? "your-bunny-zone",
-                            r2Config["Key"] ?? "your-bunny-key",
-                            r2Config["Region"] ?? "your-bunny-region"
-                        );
-                        
-                        WindowsEventLogger.LogEvent(System.Diagnostics.EventLogEntryType.Information, 1104,
-                            "Video Storage Client Configured", "Bunny video storage client configured successfully");
-                        return client;
-                    }
-                    catch (Exception ex)
-                    {
-                        WindowsEventLogger.LogServiceInitializationFailure("Video Storage Client", ex);
-                        // Return a default instance
-                        return new BunnyStorageClient<Video>("default", "default", "default");
-                    }
-                });
-
-                builder.Services.AddScoped<IStorageClient<Image>>(provider =>
-                {
-                    try
-                    {
-                        var config = provider.GetRequiredService<IConfiguration>();
-                        var bunnyConfig = config.GetSection("BunnyImage");
-                        var client = new BunnyStorageClient<Image>(
-                            bunnyConfig["Zone"] ?? "your-bunny-zone",
-                            bunnyConfig["Key"] ?? "your-bunny-key",
-                            bunnyConfig["Region"] ?? "your-bunny-region"
-                        );
-                        
-                        WindowsEventLogger.LogEvent(System.Diagnostics.EventLogEntryType.Information, 1105,
-                            "Image Storage Client Configured", "Bunny image storage client configured successfully");
-                        return client;
-                    }
-                    catch (Exception ex)
-                    {
-                        WindowsEventLogger.LogServiceInitializationFailure("Image Storage Client", ex);
-                        // Return a default instance
-                        return new BunnyStorageClient<Image>("default", "default", "default");
-                    }
-                });
-
-                builder.Services.AddScoped<BunnyStreamClient>(provider =>
-                {
-                    try
-                    {
-                        var config = provider.GetRequiredService<IConfiguration>();
-                        var bunnyStreamConfig = config.GetSection("BunnyStream");
-                        var client = new BunnyStreamClient(
-                            bunnyStreamConfig["Key"] ?? "your-bunny-stream-key"
-                        );
-                        
-                        WindowsEventLogger.LogEvent(System.Diagnostics.EventLogEntryType.Information, 1106,
-                            "Bunny Stream Client Configured", "Bunny stream client configured successfully");
-                        return client;
-                    }
-                    catch (Exception ex)
-                    {
-                        WindowsEventLogger.LogServiceInitializationFailure("Bunny Stream Client", ex);
-                        // Return a default instance
-                        return new BunnyStreamClient("default");
-                    }
-                });
-
-                // Repository - takes only IR2Client
-                builder.Services.AddScoped<Repository<Video>>(provider =>
-                {
-                    try
-                    {
-                        var r2Client = provider.GetRequiredService<IR2Client>();
-                        var repo = new Repository<Video>(r2Client);
-                        
-                        WindowsEventLogger.LogEvent(System.Diagnostics.EventLogEntryType.Information, 1107,
-                            "Video Repository Configured", "Video repository configured successfully");
-                        return repo;
-                    }
-                    catch (Exception ex)
-                    {
-                        WindowsEventLogger.LogServiceInitializationFailure("Video Repository", ex);
-                        throw; // Repository is critical
-                    }
-                });
-
-                // Main importer service from the new library
-                builder.Services.AddScoped<VideoImporter>();
-                
-                // Application services
-                builder.Services.AddSingleton<FileDiscoveryService>();
-                builder.Services.AddSingleton<ImportService>();
-                
-                // View models
-                builder.Services.AddTransient<MainViewModel>();
-
-                // Build the host
-                _host = builder.Build();
-
-                WindowsEventLogger.LogEvent(System.Diagnostics.EventLogEntryType.Information, 1108,
-                    "Service Host Built Successfully", "All services registered and host created successfully");
-
-                // Initialize database in a background task to avoid blocking startup
-                _ = Task.Run(async () =>
-                {
-                    try
-                    {
-                        using var scope = _host.Services.CreateScope();
-                        var dbContext = scope.ServiceProvider.GetRequiredService<ImportDbContext>();
-                        await dbContext.Database.EnsureCreatedAsync();
-                        
-                        WindowsEventLogger.LogEvent(System.Diagnostics.EventLogEntryType.Information, 1109,
-                            "Database Initialized Successfully", $"SQLite database created/verified at: {dbPath}");
-                    }
-                    catch (Exception ex)
-                    {
-                        WindowsEventLogger.LogServiceInitializationFailure("Database Initialization", ex);
-                        // Database failure is not critical for basic app functionality
-                    }
-                });
+                Log.Information("Services initialized successfully");
             }
             catch (Exception ex)
             {
-                WindowsEventLogger.LogCriticalCrash(ex, "Service Initialization");
-                
-                // Continue without services - the app will handle this gracefully
-                // Create a minimal host for error scenarios
-                try
-                {
-                    var fallbackBuilder = Microsoft.Extensions.Hosting.Host.CreateApplicationBuilder();
-                    fallbackBuilder.Services.AddSingleton<FileDiscoveryService>();
-                    _host = fallbackBuilder.Build();
-                    
-                    WindowsEventLogger.LogEvent(System.Diagnostics.EventLogEntryType.Warning, 1110,
-                        "Fallback Host Created", "Minimal host created after service initialization failure");
-                }
-                catch (Exception fallbackEx)
-                {
-                    WindowsEventLogger.LogCriticalCrash(fallbackEx, "Fallback Host Creation");
-                }
+                Log.Error(ex, "Failed to initialize services");
             }
         }
 
@@ -292,34 +196,16 @@ namespace AlUmmahNow.VisualImporter
         {
             try
             {
-                WindowsEventLogger.LogEvent(System.Diagnostics.EventLogEntryType.Information, 1200,
-                    "Application Launch Started", "OnLaunched event received, creating main window");
+                WindowsEventLogger.LogEvent(System.Diagnostics.EventLogEntryType.Information, 1000,
+                    "Application Started", "AlUmmahNow Visual Importer application started successfully");
 
                 MainWindow = new MainWindow();
                 MainWindow.Activate();
-                
-                WindowsEventLogger.LogEvent(System.Diagnostics.EventLogEntryType.Information, 1201,
-                    "Main Window Created Successfully", "Main window created and activated successfully");
             }
             catch (Exception ex)
             {
-                WindowsEventLogger.LogCriticalCrash(ex, "Main Window Creation");
-                
-                // Try to create a minimal window to show error state
-                try
-                {
-                    MainWindow = new Window();
-                    MainWindow.Title = "AlUmmah Now Visual Importer - Error";
-                    MainWindow.Activate();
-                    
-                    WindowsEventLogger.LogEvent(System.Diagnostics.EventLogEntryType.Warning, 1202,
-                        "Fallback Window Created", "Minimal error window created after main window creation failure");
-                }
-                catch (Exception fallbackEx)
-                {
-                    WindowsEventLogger.LogCriticalCrash(fallbackEx, "Fallback Window Creation");
-                    throw; // If we can't even create a basic window, we need to crash
-                }
+                Log.Fatal(ex, "Failed to launch application");
+                throw;
             }
         }
     }

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat Code Coverage">
+        <Configuration>
+          <Format>opencover,cobertura,lcov,teamcity,html</Format>
+          <Exclude>[*.Tests]*,[*.Test]*,[*]*.Program,[*]*.Startup</Exclude>
+          <ExcludeByAttribute>GeneratedCode,ExcludeFromCodeCoverage</ExcludeByAttribute>
+          <ExcludeByFile>**/Migrations/**/*.cs</ExcludeByFile>
+          <IncludeDirectory>../AlUmmahNow.FileScanService/</IncludeDirectory>
+          <IncludeDirectory>../AlUmmahNow.FileScanApi/</IncludeDirectory>
+          <IncludeDirectory>../AlUmmahNow.DataImporter/</IncludeDirectory>
+          <IncludeDirectory>../AlUmmahNow.Data/</IncludeDirectory>
+          <IncludeDirectory>../AlUmmahNow.Importer/</IncludeDirectory>
+          <SingleHit>false</SingleHit>
+          <UseSourceLink>true</UseSourceLink>
+          <IncludeTestAssembly>false</IncludeTestAssembly>
+          <SkipAutoProps>true</SkipAutoProps>
+          <DeterministicReport>true</DeterministicReport>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>

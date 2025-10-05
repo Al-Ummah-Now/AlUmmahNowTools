@@ -1,16 +1,10 @@
-﻿using AlUmmahNow.Data.Storage;
-using AlUmmahNow.Data.Video;
-using AlUmmahNow.Data.Translation;
-using AlUmmahNow.Data.Repository;
-using AlUmmahNow.Data.Database;
-using AlUmmahNow.Importer;
-using AlUmmahNow.Importer.Core;
+﻿using AlUmmahNow.Data.Database;
+using AlUmmahNow.DataImporter.Commands;
+using AlUmmahNow.DataImporter.Services;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.IO;
 
 var services = new ServiceCollection();
 
@@ -19,67 +13,141 @@ IConfiguration configuration = configurationBuilder
     .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
     .AddUserSecrets<Program>()
     .Build();
-var r2 = configuration.GetSection("R2DB");
-var bunnyVideo = configuration.GetSection("BunnyVideo");
-var bunnyImage = configuration.GetSection("BunnyImage");
-var bunnyStream = configuration.GetSection("BunnyStream");
-var deepL = configuration.GetSection("DeepL");
 
-// Configure SQLite database
-var dbPath = configuration.GetConnectionString("DefaultConnection") ?? 
-             Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "importdb.sqlite");
+// Configure SQL Server database (for reading scan results)
+var connectionString = configuration.GetConnectionString("DefaultConnection") ?? 
+                      "Server=(localdb)\\MSSQLLocalDB;Database=AlUmmahNowFileScan;Trusted_Connection=true;MultipleActiveResultSets=true;TrustServerCertificate=true";
 
 services.AddDbContext<ImportDbContext>(options =>
-    options.UseSqlite($"Data Source={dbPath}"));
+    options.UseSqlServer(connectionString));
 
-// Configure services
-services.AddSingleton<IR2Client>(provider => new R2Client(r2["S3Api"], r2["S3Key"], r2["S3Secret"]));
-services.AddSingleton<Repository<Video>>();
-services.AddSingleton<IStorageClient<Video>>(provider => new BunnyStorageClient<Video>(bunnyVideo["Zone"], bunnyVideo["Key"], bunnyVideo["Region"]));
-services.AddSingleton<IStorageClient<Image>>(provider => new BunnyStorageClient<Image>(bunnyImage["Zone"], bunnyImage["Key"], bunnyImage["Region"]));
-services.AddSingleton<BunnyStreamClient>(provider => new BunnyStreamClient(bunnyStream["Key"]));
-services.AddSingleton<DeepLClient>(provider => new DeepLClient(deepL["ApiKey"], bool.Parse(deepL["IsFreeApi"] ?? "false")));
-services.AddScoped<VideoImporter>();
-services.AddScoped<ImportCommandExecutor>();
-services.AddScoped(typeof(Repository<>));
+// Configure SignalR client for real-time communication
+var serviceUrl = configuration.GetValue<string>("FileScanService:Url") ?? "http://localhost:5000";
+
+// Register services
+services.AddSingleton(provider => new FileScanSignalRClient(serviceUrl));
+services.AddTransient<CommandExecutor>();
+services.AddTransient<CommandValidator>();
 
 var serviceProvider = services.BuildServiceProvider();
 
-// Ensure database is created
-using (var scope = serviceProvider.CreateScope())
-{
-    var dbContext = scope.ServiceProvider.GetRequiredService<ImportDbContext>();
-    await dbContext.Database.EnsureCreatedAsync();
-}
-
 var app = new CommandLineApplication();
+app.Name = "AlUmmahNow DataImporter Client";
+app.Description = "Client for triggering scans and imports via the AlUmmahNow File Scan Service (SignalR)";
 
 app.HelpOption();
 
 // Define options
-var optionFolder = app.Option("-f|--folder <Folder>", "The folder containing channel subfolders", CommandOptionType.SingleValue)
+var optionFolder = app.Option("-f|--folder <Folder>", "The folder to scan for video files", CommandOptionType.SingleValue)
     .Accepts(v => v.ExistingDirectory());
 
-var optionUserId = app.Option("-u|--user <UserId>", "User ID for the import", CommandOptionType.SingleValue);
-var optionBaseVideoUrl = app.Option("--video-url <VideoUrl>", "Base video storage URL", CommandOptionType.SingleValue);
-var optionBaseImageUrl = app.Option("--image-url <ImageUrl>", "Base image storage URL", CommandOptionType.SingleValue);
-var optionResumeSession = app.Option("--resume <SessionId>", "Resume import session", CommandOptionType.SingleValue);
-var optionStatusSession = app.Option("--status <SessionId>", "Get status of import session", CommandOptionType.SingleValue);
+var optionScanName = app.Option("-n|--name <Name>", "Name for the scan session", CommandOptionType.SingleValue);
+
+var optionStartImport = app.Option("--start-import <SessionId>", "Start import for a completed scan session", CommandOptionType.SingleValue);
+
+var optionListSessions = app.Option("--list-sessions", "List all scan sessions", CommandOptionType.NoValue);
+
+var optionSessionStatus = app.Option("--status <SessionId>", "Get status of a scan session", CommandOptionType.SingleValue);
+
+var optionImportStatus = app.Option("--import-status <SessionId>", "Get import status of a scan session", CommandOptionType.SingleValue);
+
+var optionWaitForCompletion = app.Option("--wait", "Wait for scan completion before exiting", CommandOptionType.NoValue);
 
 app.OnExecuteAsync(async (ct) =>
 {
-    var importArgs = ImportArgs.FromCommandLine(
-        optionFolder.Value(),
-        optionUserId.Value(),
-        optionBaseVideoUrl.Value(),
-        optionBaseImageUrl.Value(),
-        optionResumeSession.Value(),
-        optionStatusSession.Value());
-
     using var scope = serviceProvider.CreateScope();
-    var executor = scope.ServiceProvider.GetRequiredService<ImportCommandExecutor>();
+    var commandExecutor = scope.ServiceProvider.GetRequiredService<CommandExecutor>();
+    var commandValidator = scope.ServiceProvider.GetRequiredService<CommandValidator>();
+    var dbContext = scope.ServiceProvider.GetRequiredService<ImportDbContext>();
+    var signalRClient = scope.ServiceProvider.GetRequiredService<FileScanSignalRClient>();
 
-    return await executor.ExecuteImportAsync(importArgs);
+    try
+    {
+        // Ensure database connection works
+        await dbContext.Database.EnsureCreatedAsync(ct);
+
+        // Connect to SignalR service
+        Console.WriteLine($"Connecting to FileScan service at {serviceUrl}...");
+        await signalRClient.ConnectAsync();
+
+        // Check if service is available
+        if (!commandExecutor.IsServiceAvailable())
+        {
+            Console.WriteLine($"✗ Unable to connect to File Scan Service at {serviceUrl}");
+            Console.WriteLine("Make sure the AlUmmahNow.FileScanService is running.");
+            return 1;
+        }
+
+        // Handle list sessions command
+        if (optionListSessions.HasValue())
+        {
+            return await commandExecutor.ListScanSessionsAsync();
+        }
+
+        // Handle session status command
+        if (optionSessionStatus.HasValue())
+        {
+            if (!commandValidator.ValidateSessionId(optionSessionStatus.Value(), out var sessionGuid))
+            {
+                return 1;
+            }
+            return await commandExecutor.GetSessionStatusAsync(sessionGuid);
+        }
+
+        // Handle start import command
+        if (optionStartImport.HasValue())
+        {
+            if (!commandValidator.ValidateSessionId(optionStartImport.Value(), out var sessionGuid))
+            {
+                return 1;
+            }
+            return await commandExecutor.StartImportAsync(sessionGuid);
+        }
+
+        // Handle folder scan command
+        if (optionFolder.HasValue())
+        {
+            var folderPath = optionFolder.Value();
+            if (!commandValidator.ValidateFolderPath(folderPath))
+            {
+                return 1;
+            }
+
+            var scanName = commandValidator.GetScanName(optionScanName, folderPath!);
+            return await commandExecutor.StartScanAsync(folderPath!, scanName, optionWaitForCompletion.HasValue(), ct);
+        }
+
+        // Handle import status command
+        if (optionImportStatus.HasValue())
+        {
+            if (!commandValidator.ValidateSessionId(optionImportStatus.Value(), out var sessionGuid))
+            {
+                return 1;
+            }
+            return await commandExecutor.GetImportStatusAsync(sessionGuid);
+        }
+
+        // No valid command provided
+        app.ShowHelp();
+        return 1;
+    }
+    catch (InvalidOperationException ex) when (ex.Message.Contains("connect"))
+    {
+        Console.WriteLine($"✗ Unable to connect to File Scan Service at {serviceUrl}");
+        Console.WriteLine($"Details: {ex.Message}");
+        Console.WriteLine("Make sure the AlUmmahNow.FileScanService is running.");
+        return 1;
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"✗ Error: {ex.Message}");
+        return 1;
+    }
+    finally
+    {
+        // Cleanup SignalR connection
+        await signalRClient.DisposeAsync();
+    }
 });
 
 return await app.ExecuteAsync(args);

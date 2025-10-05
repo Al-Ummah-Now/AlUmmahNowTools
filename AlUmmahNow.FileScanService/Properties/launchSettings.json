@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "AlUmmahNow.FileScanService": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:47922;http://localhost:47923"
+    }
+  }
+}
