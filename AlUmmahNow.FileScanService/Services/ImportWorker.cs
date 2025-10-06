@@ -1,6 +1,9 @@
 using AlUmmahNow.Data.Database;
 using AlUmmahNow.Data.Models.FileScanning;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace AlUmmahNow.FileScanService.Services
 {
@@ -11,17 +14,14 @@ namespace AlUmmahNow.FileScanService.Services
     {
         private readonly ILogger<ImportWorker> _logger;
         private readonly IServiceProvider _serviceProvider;
-        private readonly IWebSocketManager _webSocketManager;
         private readonly TimeSpan _importCheckInterval = TimeSpan.FromSeconds(30);
 
         public ImportWorker(
             ILogger<ImportWorker> logger,
-            IServiceProvider serviceProvider,
-            IWebSocketManager webSocketManager)
+            IServiceProvider serviceProvider)
         {
             _logger = logger;
             _serviceProvider = serviceProvider;
-            _webSocketManager = webSocketManager;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -98,16 +98,12 @@ namespace AlUmmahNow.FileScanService.Services
             file.LastScanned = DateTime.UtcNow;
             await dbContext.SaveChangesAsync(cancellationToken);
 
-            // Notify UI of status change
-            await _webSocketManager.BroadcastFileUpdate(file);
-
             try
             {
                 // Update status to uploading
                 file.ImportStatus = FileImportStatus.Uploading;
                 file.LastScanned = DateTime.UtcNow;
                 await dbContext.SaveChangesAsync(cancellationToken);
-                await _webSocketManager.BroadcastFileUpdate(file);
 
                 // TODO: Implement actual import logic here
                 // This would involve:
@@ -126,7 +122,6 @@ namespace AlUmmahNow.FileScanService.Services
                 await dbContext.SaveChangesAsync(cancellationToken);
 
                 _logger.LogInformation("Successfully imported file {FileName}", file.FileName);
-                await _webSocketManager.BroadcastFileUpdate(file);
             }
             catch (Exception ex)
             {
@@ -135,7 +130,6 @@ namespace AlUmmahNow.FileScanService.Services
                 file.ImportStatus = FileImportStatus.Failed;
                 file.LastScanned = DateTime.UtcNow;
                 await dbContext.SaveChangesAsync(cancellationToken);
-                await _webSocketManager.BroadcastFileUpdate(file);
                 throw;
             }
         }

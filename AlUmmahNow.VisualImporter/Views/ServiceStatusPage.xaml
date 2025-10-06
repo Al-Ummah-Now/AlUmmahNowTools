@@ -12,6 +12,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
@@ -62,6 +63,10 @@
                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                    FontSize="14"
                                    Margin="0,4,0,0"/>
+                        <TextBlock Text="{x:Bind ViewModel.ServiceHealthMessage, Mode=OneWay}" 
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                   FontSize="12"
+                                   Margin="0,2,0,0"/>
                     </StackPanel>
 
                     <!-- Connect/Disconnect Buttons -->
@@ -92,8 +97,151 @@
             </Border>
         </Grid>
 
-        <!-- Ongoing Operations Section -->
+        <!-- Service Management Section -->
         <Grid Grid.Row="1" Margin="0,0,0,24">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <TextBlock Grid.Row="0" 
+                       Text="Service Management" 
+                       Style="{StaticResource SubtitleTextBlockStyle}"
+                       Margin="0,0,0,12"/>
+
+            <!-- Quick Actions Panel -->
+            <Border Grid.Row="1" 
+                    Background="{ThemeResource AccentFillColorTertiaryBrush}"
+                    BorderBrush="{ThemeResource AccentFillColorSecondaryBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="16"
+                    Margin="0,0,0,12">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    
+                    <FontIcon Grid.Column="0"
+                              Glyph="&#xE7C3;"
+                              FontSize="20"
+                              Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                              VerticalAlignment="Center"
+                              Margin="0,0,12,0"/>
+                    
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Text="Quick Service Control" 
+                                   FontWeight="SemiBold"
+                                   FontSize="14"
+                                   Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                        <TextBlock Text="Start the FileScan service with one click and view real-time status updates" 
+                                   FontSize="12"
+                                   Foreground="{ThemeResource AccentTextFillColorSecondaryBrush}"
+                                   Margin="0,2,0,0"/>
+                    </StackPanel>
+                    
+                    <Button Grid.Column="2" 
+                            Content="🚀 Quick Start" 
+                            Command="{x:Bind ViewModel.StartServiceCommand}"
+                            IsEnabled="{x:Bind ViewModel.CanStartService, Mode=OneWay}"
+                            Style="{StaticResource AccentButtonStyle}">
+                        <Button.Visibility>
+                            <Binding Path="IsStartingService" Converter="{StaticResource InverseBoolToVisibilityConverter}"/>
+                        </Button.Visibility>
+                    </Button>
+                </Grid>
+            </Border>
+
+            <!-- Detailed Service Management -->
+            <Border Grid.Row="2" 
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="20">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Service Info -->
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="Advanced Service Management" 
+                                   FontWeight="SemiBold"
+                                   FontSize="14"/>
+                        <TextBlock Text="Detailed control over the FileScan service lifecycle" 
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                   FontSize="12"
+                                   Margin="0,4,0,0"/>
+                    </StackPanel>
+
+                    <!-- Management Buttons -->
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                        <Button Content="Start Service" 
+                                Command="{x:Bind ViewModel.StartServiceCommand}"
+                                IsEnabled="{x:Bind ViewModel.CanStartService, Mode=OneWay}">
+                            <Button.Visibility>
+                                <Binding Path="IsStartingService" Converter="{StaticResource InverseBoolToVisibilityConverter}"/>
+                            </Button.Visibility>
+                        </Button>
+                        
+                        <Button Content="Stop Service" 
+                                Command="{x:Bind ViewModel.StopServiceCommand}"
+                                IsEnabled="{x:Bind ViewModel.CanStopService, Mode=OneWay}">
+                            <Button.Visibility>
+                                <Binding Path="IsStoppingService" Converter="{StaticResource InverseBoolToVisibilityConverter}"/>
+                            </Button.Visibility>
+                        </Button>
+                        
+                        <Button Content="Refresh" 
+                                Command="{x:Bind ViewModel.RefreshStatusCommand}"
+                                ToolTipService.ToolTip="Refresh service status"/>
+                        
+                        <!-- Loading indicators -->
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <ProgressRing IsActive="{x:Bind ViewModel.IsStartingService, Mode=OneWay}" 
+                                          Width="24" 
+                                          Height="24">
+                                <ProgressRing.Visibility>
+                                    <Binding Path="IsStartingService" Converter="{StaticResource BoolToVisibilityConverter}"/>
+                                </ProgressRing.Visibility>
+                            </ProgressRing>
+                            <TextBlock Text="Starting service..." 
+                                       VerticalAlignment="Center"
+                                       FontSize="12"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}">
+                                <TextBlock.Visibility>
+                                    <Binding Path="IsStartingService" Converter="{StaticResource BoolToVisibilityConverter}"/>
+                                </TextBlock.Visibility>
+                            </TextBlock>
+                            
+                            <ProgressRing IsActive="{x:Bind ViewModel.IsStoppingService, Mode=OneWay}" 
+                                          Width="24" 
+                                          Height="24">
+                                <ProgressRing.Visibility>
+                                    <Binding Path="IsStoppingService" Converter="{StaticResource BoolToVisibilityConverter}"/>
+                                </ProgressRing.Visibility>
+                            </ProgressRing>
+                            <TextBlock Text="Stopping service..." 
+                                       VerticalAlignment="Center"
+                                       FontSize="12"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}">
+                                <TextBlock.Visibility>
+                                    <Binding Path="IsStoppingService" Converter="{StaticResource BoolToVisibilityConverter}"/>
+                                </TextBlock.Visibility>
+                            </TextBlock>
+                        </StackPanel>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- Ongoing Operations Section -->
+        <Grid Grid.Row="2" Margin="0,0,0,24">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
@@ -177,7 +325,7 @@
         </Grid>
 
         <!-- Errors Section -->
-        <Grid Grid.Row="2">
+        <Grid Grid.Row="3">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
@@ -191,7 +339,7 @@
                 </Grid.ColumnDefinitions>
 
                 <TextBlock Grid.Column="0" 
-                           Text="Errors" 
+                           Text="Messages &amp; Errors" 
                            Style="{StaticResource SubtitleTextBlockStyle}"/>
                 <Button Grid.Column="1" 
                         Content="Clear" 
@@ -209,7 +357,7 @@
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel>
                         <!-- No errors message -->
-                        <TextBlock Text="No errors" 
+                        <TextBlock Text="No messages" 
                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                    FontSize="12">
                             <TextBlock.Visibility>
@@ -224,14 +372,42 @@
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="viewmodels:ErrorMessage">
                                     <Border Margin="0,0,0,8" 
-                                            Background="{ThemeResource SystemFillColorCriticalBackgroundBrush}"
-                                            BorderBrush="{ThemeResource SystemFillColorCriticalBrush}"
                                             BorderThickness="1"
                                             CornerRadius="4"
                                             Padding="12">
-                                        <TextBlock Text="{x:Bind DisplayText}" 
-                                                   TextWrapping="Wrap"
-                                                   FontSize="12"/>
+                                        <Border.Background>
+                                            <SolidColorBrush>
+                                                <SolidColorBrush.Color>
+                                                    <Binding Path="Type" Converter="{StaticResource MessageTypeToColorConverter}"/>
+                                                </SolidColorBrush.Color>
+                                            </SolidColorBrush>
+                                        </Border.Background>
+                                        <Border.BorderBrush>
+                                            <SolidColorBrush>
+                                                <SolidColorBrush.Color>
+                                                    <Binding Path="Type" Converter="{StaticResource MessageTypeToBorderColorConverter}"/>
+                                                </SolidColorBrush.Color>
+                                            </SolidColorBrush>
+                                        </Border.BorderBrush>
+                                        
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            
+                                            <TextBlock Grid.Column="0"
+                                                       Text="{x:Bind TypeIcon}" 
+                                                       VerticalAlignment="Top"
+                                                       Margin="0,0,8,0"
+                                                       FontSize="14"/>
+                                            
+                                            <TextBlock Grid.Column="1"
+                                                       Text="{x:Bind DisplayText}" 
+                                                       TextWrapping="Wrap"
+                                                       FontSize="12"
+                                                       VerticalAlignment="Top"/>
+                                        </Grid>
                                     </Border>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>

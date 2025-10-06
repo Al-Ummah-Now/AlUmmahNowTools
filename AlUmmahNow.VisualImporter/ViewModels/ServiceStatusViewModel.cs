@@ -5,16 +5,18 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
 using AlUmmahNow.VisualImporter.Services;
+using AlUmmahNow.Data.Models.FileScanning;
 using Microsoft.UI.Dispatching;
 
 namespace AlUmmahNow.VisualImporter.ViewModels;
 
 /// <summary>
-/// ViewModel for monitoring FileScan service status
+/// ViewModel for monitoring FileScan service status and managing service lifecycle
 /// </summary>
 public partial class ServiceStatusViewModel : ObservableObject, IDisposable
 {
     private readonly FileScanSignalRClient _signalRClient;
+    private readonly FileScanServiceManager _serviceManager;
     private readonly DispatcherQueue? _dispatcherQueue;
     private bool _disposed = false;
 
@@ -26,6 +28,21 @@ public partial class ServiceStatusViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     private string _serviceStatusColor = "#FF6B6B"; // Red
+
+    [ObservableProperty]
+    private ServiceHealthStatus _serviceHealthStatus = ServiceHealthStatus.Unknown;
+
+    [ObservableProperty]
+    private string _serviceHealthMessage = "Unknown";
+
+    [ObservableProperty]
+    private bool _isServiceManaged = false;
+
+    [ObservableProperty]
+    private bool _canStartService = true;
+
+    [ObservableProperty]
+    private bool _canStopService = false;
 
     [ObservableProperty]
     private string _currentOperation = "No operations";
@@ -45,14 +62,21 @@ public partial class ServiceStatusViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private bool _isConnecting = false;
 
+    [ObservableProperty]
+    private bool _isStartingService = false;
+
+    [ObservableProperty]
+    private bool _isStoppingService = false;
+
     public ObservableCollection<ErrorMessage> Errors { get; } = new();
     public ObservableCollection<OperationInfo> OngoingOperations { get; } = new();
 
-    public ServiceStatusViewModel(FileScanSignalRClient signalRClient)
+    public ServiceStatusViewModel(FileScanSignalRClient signalRClient, FileScanServiceManager serviceManager)
     {
         _signalRClient = signalRClient ?? throw new ArgumentNullException(nameof(signalRClient));
+        _serviceManager = serviceManager ?? throw new ArgumentNullException(nameof(serviceManager));
         
-        // Get dispatcher queue for UI updates
+        // Get dispatcher queue for UI updates with enhanced safety
         try
         {
             _dispatcherQueue = App.Current?.MainWindow?.DispatcherQueue 
@@ -61,14 +85,175 @@ public partial class ServiceStatusViewModel : ObservableObject, IDisposable
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"Failed to get dispatcher queue: {ex.Message}");
+            _dispatcherQueue = null;
         }
 
-        // Subscribe to SignalR events
-        SubscribeToEvents();
+        // Subscribe to events with safe initialization
+        try
+        {
+            SubscribeToEvents();
+            
+            // Initialize connection in background to avoid blocking constructor
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await Task.Delay(1000); // Give UI time to initialize
+                    await InitializeServiceAsync();
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Background initialization failed: {ex.Message}");
+                    DispatcherExecute(() => AddServiceLog($"?? Initialization failed: {ex.Message}", MessageType.Error));
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"ServiceStatusViewModel initialization failed: {ex.Message}");
+            // Don't throw - let the view model exist in a degraded state
+            ServiceStatusMessage = $"Initialization failed: {ex.Message}";
+            ServiceStatus = ServiceStatus.NotAvailable;
+        }
+    }
+
+    private async Task InitializeServiceAsync()
+    {
+        try
+        {
+            AddServiceLog("?? Initializing FileScan service management...", MessageType.Information);
+            
+            // First update service manager status
+            await UpdateServiceManagerStatusAsync();
+
+            DispatcherExecute(() =>
+            {
+                IsConnecting = true;
+                ServiceStatusMessage = "Checking service availability...";
+            });
+
+            // Check if service is already running
+            if (await _serviceManager.IsServiceRunningAsync())
+            {
+                AddServiceLog("? FileScan service is already running", MessageType.Success);
+                
+                // Try to connect to existing service
+                var connected = await _signalRClient.ConnectAsync();
+                
+                DispatcherExecute(() =>
+                {
+                    if (connected)
+                    {
+                        ServiceStatusMessage = "Connected to existing FileScan service";
+                        ServiceStatus = ServiceStatus.Connected;
+                        AddServiceLog("?? Connected to existing FileScan service", MessageType.Success);
+                    }
+                    else
+                    {
+                        ServiceStatusMessage = "Service running but connection failed";
+                        ServiceStatus = ServiceStatus.NotAvailable;
+                        AddServiceLog("?? Service is running but SignalR connection failed", MessageType.Warning);
+                    }
+                    IsConnecting = false;
+                });
+            }
+            else
+            {
+                AddServiceLog("?? No running FileScan service detected", MessageType.Information);
+                
+                DispatcherExecute(() =>
+                {
+                    ServiceStatusMessage = "FileScan service not running";
+                    ServiceStatus = ServiceStatus.NotAvailable;
+                    IsConnecting = false;
+                });
+                
+                // Optionally start the service automatically
+                AddServiceLog("?? Auto-starting FileScan service...", MessageType.Information);
+                await StartServiceAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            DispatcherExecute(() =>
+            {
+                ServiceStatusMessage = $"Initialization failed: {ex.Message}";
+                ServiceStatus = ServiceStatus.NotAvailable;
+                IsConnecting = false;
+                AddServiceLog($"?? Service initialization error: {ex.Message}", MessageType.Error);
+            });
+        }
+    }
+
+    private async Task UpdateServiceManagerStatusAsync()
+    {
+        try
+        {
+            var serviceInfo = await _serviceManager.GetServiceInfoAsync();
+            
+            DispatcherExecute(() =>
+            {
+                ServiceHealthStatus = serviceInfo.Status;
+                IsServiceManaged = serviceInfo.IsManaged;
+                
+                ServiceHealthMessage = ServiceHealthStatus switch
+                {
+                    ServiceHealthStatus.Running => GetRunningStatusMessage(serviceInfo),
+                    ServiceHealthStatus.Starting => "Service starting...",
+                    ServiceHealthStatus.Stopping => "Service stopping...",
+                    ServiceHealthStatus.Stopped => "Service stopped",
+                    ServiceHealthStatus.Error => "Service error",
+                    ServiceHealthStatus.NotFound => "Service executable not found",
+                    _ => "Unknown"
+                };
+                
+                CanStartService = ServiceHealthStatus != ServiceHealthStatus.Running && 
+                                 ServiceHealthStatus != ServiceHealthStatus.Starting &&
+                                 ServiceHealthStatus != ServiceHealthStatus.NotFound;
+                                 
+                CanStopService = IsServiceManaged && 
+                               (ServiceHealthStatus == ServiceHealthStatus.Running || 
+                                ServiceHealthStatus == ServiceHealthStatus.Starting);
+            });
+        }
+        catch (Exception ex)
+        {
+            DispatcherExecute(() =>
+            {
+                AddError($"Failed to get service status: {ex.Message}");
+            });
+        }
+    }
+
+    private string GetRunningStatusMessage(ServiceInfo serviceInfo)
+    {
+        var baseMessage = $"Service running{(IsServiceManaged ? " (managed)" : " (external)")}";
+        
+        if (serviceInfo.SingletonInfo != null)
+        {
+            var singletonInfo = serviceInfo.SingletonInfo;
+            if (singletonInfo.IsLockHeld)
+            {
+                baseMessage += $" - PID: {singletonInfo.CurrentProcessId}";
+                if (singletonInfo.LockHolderStartTime.HasValue)
+                {
+                    var uptime = DateTime.Now - singletonInfo.LockHolderStartTime.Value;
+                    if (uptime.TotalHours >= 1)
+                        baseMessage += $", up {uptime.Hours}h {uptime.Minutes}m";
+                    else if (uptime.TotalMinutes >= 1)
+                        baseMessage += $", up {uptime.Minutes}m";
+                    else
+                        baseMessage += $", up {uptime.Seconds}s";
+                }
+            }
+        }
+        
+        return baseMessage;
     }
 
     private void SubscribeToEvents()
     {
+        // SignalR client events
         _signalRClient.ServiceStatusChanged += OnServiceStatusChanged;
         _signalRClient.ScanProgressReceived += OnScanProgressReceived;
         _signalRClient.ScanStarted += OnScanStarted;
@@ -76,6 +261,110 @@ public partial class ServiceStatusViewModel : ObservableObject, IDisposable
         _signalRClient.ScanFailed += OnScanFailed;
         _signalRClient.ScanCancelled += OnScanCancelled;
         _signalRClient.ErrorOccurred += OnErrorOccurred;
+
+        // Service manager events
+        _serviceManager.ServiceStatusChanged += OnServiceManagerStatusChanged;
+    }
+
+    private void OnScanProgressReceived(object? sender, FileScanProgressEventArgs e)
+    {
+        DispatcherExecute(() =>
+        {
+            try
+            {
+                ProgressPercentage = e.ProgressPercentage;
+                FilesScanned = e.FilesScanned;
+                CurrentFile = e.CurrentFile;
+                CurrentOperation = e.CurrentOperation;
+
+                // Update the operation info for this session
+                var operation = OngoingOperations.FirstOrDefault(o => o.SessionId == e.SessionId);
+                if (operation != null)
+                {
+                    operation.Progress = e.ProgressPercentage;
+                    operation.CurrentOperation = e.CurrentOperation;
+                    operation.ItemsProcessed = e.FilesScanned;
+                }
+
+                AddServiceLog($"?? Scan progress: {e.ProgressPercentage:F1}% ({e.FilesScanned} files scanned)", MessageType.Information);
+            }
+            catch (Exception ex)
+            {
+                AddServiceLog($"?? Error processing scan progress: {ex.Message}", MessageType.Error);
+            }
+        });
+    }
+
+    [RelayCommand]
+    private async Task StartServiceAsync()
+    {
+        try
+        {
+            IsStartingService = true;
+            CanStartService = false;
+            AddServiceLog("?? Starting FileScan service...", MessageType.Information);
+            
+            var started = await _serviceManager.EnsureServiceRunningAsync();
+            
+            if (started)
+            {
+                AddServiceLog("? FileScan service started successfully", MessageType.Success);
+                
+                // Try to connect after service starts
+                await Task.Delay(2000); // Give service time to fully initialize
+                AddServiceLog("?? Attempting to connect to started service...", MessageType.Information);
+                await ConnectToServiceAsync();
+            }
+            else
+            {
+                AddServiceLog("? Failed to start FileScan service", MessageType.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            AddServiceLog($"?? Error starting service: {ex.Message}", MessageType.Error);
+        }
+        finally
+        {
+            IsStartingService = false;
+            await UpdateServiceManagerStatusAsync();
+        }
+    }
+
+    [RelayCommand]
+    private async Task StopServiceAsync()
+    {
+        try
+        {
+            IsStoppingService = true;
+            CanStopService = false;
+            AddServiceLog("?? Stopping FileScan service...", MessageType.Information);
+            
+            // Disconnect first
+            AddServiceLog("?? Disconnecting from service...", MessageType.Information);
+            await _signalRClient.DisconnectAsync();
+            
+            // Then stop the service
+            var stopped = await _serviceManager.StopServiceAsync();
+            
+            if (stopped)
+            {
+                AddServiceLog("? FileScan service stopped successfully", MessageType.Success);
+            }
+            else
+            {
+                AddServiceLog("?? Failed to stop FileScan service gracefully", MessageType.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            AddServiceLog($"?? Error stopping service: {ex.Message}", MessageType.Error);
+        }
+        finally
+        {
+            IsStoppingService = false;
+            await UpdateServiceManagerStatusAsync();
+        }
     }
 
     [RelayCommand]
@@ -85,17 +374,22 @@ public partial class ServiceStatusViewModel : ObservableObject, IDisposable
         {
             IsConnecting = true;
             ServiceStatusMessage = "Connecting to FileScan service...";
+            AddServiceLog("?? Connecting to FileScan service...", MessageType.Information);
             
             var connected = await _signalRClient.ConnectAsync();
             
             if (!connected)
             {
-                AddError("Failed to connect to FileScan service. Make sure the service is running.");
+                AddServiceLog("? Failed to connect to FileScan service. Make sure the service is running.", MessageType.Error);
+            }
+            else
+            {
+                AddServiceLog("? Successfully connected to FileScan service", MessageType.Success);
             }
         }
         catch (Exception ex)
         {
-            AddError($"Connection error: {ex.Message}");
+            AddServiceLog($"?? Connection error: {ex.Message}", MessageType.Error);
         }
         finally
         {
@@ -108,15 +402,134 @@ public partial class ServiceStatusViewModel : ObservableObject, IDisposable
     {
         try
         {
+            AddServiceLog("?? Disconnecting from FileScan service...", MessageType.Information);
             await _signalRClient.DisconnectAsync();
             ServiceStatus = ServiceStatus.Disconnected;
             ServiceStatusMessage = "Disconnected from service";
             UpdateStatusColor();
+            AddServiceLog("? Disconnected from FileScan service", MessageType.Success);
         }
         catch (Exception ex)
         {
-            AddError($"Disconnect error: {ex.Message}");
+            AddServiceLog($"?? Disconnect error: {ex.Message}", MessageType.Error);
         }
+    }
+
+    [RelayCommand]
+    private async Task RefreshStatusAsync()
+    {
+        try
+        {
+            AddServiceLog("?? Refreshing service status...", MessageType.Information);
+            
+            // Update service manager status
+            await UpdateServiceManagerStatusAsync();
+            
+            if (_signalRClient.IsConnected)
+            {
+                // Refresh ongoing operations by querying the service
+                var sessions = await _signalRClient.GetAllSessionsAsync();
+                
+                DispatcherExecute(() =>
+                {
+                    // Update ongoing operations
+                    OngoingOperations.Clear();
+                    
+                    var activeScans = sessions.Where(s => s.Status == "InProgress").ToList();
+                    
+                    foreach (var scan in activeScans)
+                    {
+                        OngoingOperations.Add(new OperationInfo
+                        {
+                            SessionId = scan.Id,
+                            Type = "Scan",
+                            Progress = 0, // Progress percentage not available in session DTO
+                            CurrentOperation = scan.Status,
+                            ItemsProcessed = scan.FilesScanned,
+                            StartTime = scan.CreatedAt
+                        });
+                    }
+                    
+                    HasActiveOperation = OngoingOperations.Count > 0;
+                    
+                    if (!HasActiveOperation)
+                    {
+                        CurrentOperation = "No operations";
+                        ProgressPercentage = 0;
+                    }
+                });
+                
+                AddServiceLog($"? Status refreshed: {sessions.Count} total sessions, {sessions.Count(s => s.Status == "InProgress")} active", MessageType.Success);
+            }
+            else
+            {
+                AddServiceLog("?? Not connected to service - cannot refresh operations", MessageType.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            AddServiceLog($"?? Refresh failed: {ex.Message}", MessageType.Error);
+        }
+    }
+
+    private void OnServiceManagerStatusChanged(object? sender, ServiceStatusChangedEventArgs e)
+    {
+        DispatcherExecute(async () =>
+        {
+            ServiceHealthStatus = e.CurrentStatus;
+            
+            ServiceHealthMessage = ServiceHealthStatus switch
+            {
+                ServiceHealthStatus.Running => $"Service running{(IsServiceManaged ? " (managed)" : " (external)")}",
+                ServiceHealthStatus.Starting => "Service starting...",
+                ServiceHealthStatus.Stopping => "Service stopping...",
+                ServiceHealthStatus.Stopped => "Service stopped",
+                ServiceHealthStatus.Error => "Service error",
+                ServiceHealthStatus.NotFound => "Service executable not found",
+                _ => "Unknown"
+            };
+            
+            // Log service status changes
+            var statusMessage = ServiceHealthStatus switch
+            {
+                ServiceHealthStatus.Running => $"?? Service is now running {(IsServiceManaged ? "(managed by this app)" : "(external process)")}",
+                ServiceHealthStatus.Starting => "?? Service is starting up...",
+                ServiceHealthStatus.Stopping => "?? Service is shutting down...",
+                ServiceHealthStatus.Stopped => "?? Service has stopped",
+                ServiceHealthStatus.Error => "?? Service encountered an error",
+                ServiceHealthStatus.NotFound => "? Service executable not found",
+                _ => $"? Service status unknown: {ServiceHealthStatus}"
+            };
+            
+            var messageType = ServiceHealthStatus switch
+            {
+                ServiceHealthStatus.Running => MessageType.Success,
+                ServiceHealthStatus.Starting or ServiceHealthStatus.Stopping => MessageType.Information,
+                ServiceHealthStatus.Stopped => MessageType.Warning,
+                ServiceHealthStatus.Error or ServiceHealthStatus.NotFound => MessageType.Error,
+                _ => MessageType.Information
+            };
+            
+            AddServiceLog(statusMessage, messageType);
+            
+            CanStartService = ServiceHealthStatus != ServiceHealthStatus.Running && 
+                             ServiceHealthStatus != ServiceHealthStatus.Starting &&
+                             ServiceHealthStatus != ServiceHealthStatus.NotFound;
+                             
+            CanStopService = IsServiceManaged && 
+                           (ServiceHealthStatus == ServiceHealthStatus.Running || 
+                            ServiceHealthStatus == ServiceHealthStatus.Starting);
+
+            // Try to connect when service becomes available
+            if (ServiceHealthStatus == ServiceHealthStatus.Running && 
+                ServiceStatus != ServiceStatus.Connected && 
+                !IsConnecting)
+            {
+                AddServiceLog("?? Service is running, attempting automatic connection...", MessageType.Information);
+                await Task.Delay(1000); // Give service time to fully start
+                await ConnectToServiceAsync();
+            }
+        });
     }
 
     private void OnServiceStatusChanged(object? sender, ServiceStatusEventArgs e)
@@ -127,6 +540,28 @@ public partial class ServiceStatusViewModel : ObservableObject, IDisposable
             ServiceStatusMessage = e.Message;
             UpdateStatusColor();
             
+            // Log SignalR connection status changes
+            var connectionMessage = ServiceStatus switch
+            {
+                ServiceStatus.Connected => "?? SignalR connection established",
+                ServiceStatus.Reconnecting => "?? SignalR connection lost, reconnecting...",
+                ServiceStatus.Disconnected => "?? SignalR disconnected",
+                ServiceStatus.NotAvailable => "? SignalR service not available",
+                ServiceStatus.Stopped => "?? SignalR service stopped",
+                _ => $"? SignalR status: {ServiceStatus}"
+            };
+            
+            var messageType = ServiceStatus switch
+            {
+                ServiceStatus.Connected => MessageType.Success,
+                ServiceStatus.Reconnecting => MessageType.Information,
+                ServiceStatus.Disconnected or ServiceStatus.Stopped => MessageType.Warning,
+                ServiceStatus.NotAvailable => MessageType.Error,
+                _ => MessageType.Information
+            };
+            
+            AddServiceLog(connectionMessage, messageType);
+            
             // Clear ongoing operations if disconnected
             if (e.Status == ServiceStatus.Disconnected || e.Status == ServiceStatus.NotAvailable)
             {
@@ -135,41 +570,6 @@ public partial class ServiceStatusViewModel : ObservableObject, IDisposable
                 CurrentOperation = "No operations";
                 ProgressPercentage = 0;
             }
-        });
-    }
-
-    private void OnScanProgressReceived(object? sender, FileScanProgressEventArgs e)
-    {
-        DispatcherExecute(() =>
-        {
-            CurrentOperation = e.CurrentOperation;
-            ProgressPercentage = e.ProgressPercentage;
-            FilesScanned = e.FilesScanned;
-            CurrentFile = !string.IsNullOrEmpty(e.CurrentFile) ? 
-                System.IO.Path.GetFileName(e.CurrentFile) : string.Empty;
-            
-            // Update or add operation info
-            var operation = OngoingOperations.FirstOrDefault(o => o.SessionId == e.SessionId);
-            if (operation != null)
-            {
-                operation.Progress = e.ProgressPercentage;
-                operation.CurrentOperation = e.CurrentOperation;
-                operation.ItemsProcessed = e.FilesScanned;
-            }
-            else
-            {
-                OngoingOperations.Add(new OperationInfo
-                {
-                    SessionId = e.SessionId,
-                    Type = "Scan",
-                    Progress = e.ProgressPercentage,
-                    CurrentOperation = e.CurrentOperation,
-                    ItemsProcessed = e.FilesScanned,
-                    StartTime = DateTime.Now
-                });
-            }
-            
-            HasActiveOperation = OngoingOperations.Count > 0;
         });
     }
 
@@ -190,6 +590,8 @@ public partial class ServiceStatusViewModel : ObservableObject, IDisposable
             OngoingOperations.Add(operation);
             HasActiveOperation = true;
             CurrentOperation = "Scan started";
+            
+            AddServiceLog($"?? Scan operation started (Session: {sessionId:N})", MessageType.Success);
         });
     }
 
@@ -203,6 +605,8 @@ public partial class ServiceStatusViewModel : ObservableObject, IDisposable
                 operation.Progress = 100;
                 operation.CurrentOperation = "Completed";
                 operation.EndTime = DateTime.Now;
+                
+                AddServiceLog($"? Scan operation completed (Session: {sessionId:N})", MessageType.Success);
                 
                 // Remove after a delay
                 Task.Delay(3000).ContinueWith(_ =>
@@ -235,7 +639,7 @@ public partial class ServiceStatusViewModel : ObservableObject, IDisposable
                 OngoingOperations.Remove(operation);
             }
             
-            AddError($"Scan {args.sessionId} failed: {args.error}");
+            AddServiceLog($"? Scan operation failed (Session: {args.sessionId:N}): {args.error}", MessageType.Error);
             HasActiveOperation = OngoingOperations.Count > 0;
         });
     }
@@ -252,6 +656,7 @@ public partial class ServiceStatusViewModel : ObservableObject, IDisposable
                 OngoingOperations.Remove(operation);
             }
             
+            AddServiceLog($"?? Scan operation cancelled (Session: {sessionId:N})", MessageType.Warning);
             HasActiveOperation = OngoingOperations.Count > 0;
             
             if (!HasActiveOperation)
@@ -264,7 +669,7 @@ public partial class ServiceStatusViewModel : ObservableObject, IDisposable
 
     private void OnErrorOccurred(object? sender, string error)
     {
-        DispatcherExecute(() => AddError(error));
+        DispatcherExecute(() => AddServiceLog($"?? SignalR error: {error}", MessageType.Error));
     }
 
     private void AddError(string message)
@@ -272,13 +677,48 @@ public partial class ServiceStatusViewModel : ObservableObject, IDisposable
         var error = new ErrorMessage
         {
             Message = message,
-            Timestamp = DateTime.Now
+            Timestamp = DateTime.Now,
+            Type = GetMessageType(message)
         };
         
         Errors.Insert(0, error); // Add to beginning
         
-        // Keep only last 50 errors
-        while (Errors.Count > 50)
+        // Keep only last 100 messages
+        while (Errors.Count > 100)
+        {
+            Errors.RemoveAt(Errors.Count - 1);
+        }
+    }
+
+    private MessageType GetMessageType(string message)
+    {
+        var lowerMessage = message.ToLowerInvariant();
+        
+        if (lowerMessage.Contains("error") || lowerMessage.Contains("failed") || lowerMessage.Contains("exception"))
+            return MessageType.Error;
+        
+        if (lowerMessage.Contains("warning") || lowerMessage.Contains("timeout") || lowerMessage.Contains("retry"))
+            return MessageType.Warning;
+        
+        if (lowerMessage.Contains("connected") || lowerMessage.Contains("started") || lowerMessage.Contains("completed") || lowerMessage.Contains("successful"))
+            return MessageType.Success;
+        
+        return MessageType.Information;
+    }
+
+    private void AddServiceLog(string message, MessageType type = MessageType.Information)
+    {
+        var error = new ErrorMessage
+        {
+            Message = message,
+            Timestamp = DateTime.Now,
+            Type = type
+        };
+        
+        Errors.Insert(0, error);
+        
+        // Keep only last 100 messages
+        while (Errors.Count > 100)
         {
             Errors.RemoveAt(Errors.Count - 1);
         }
@@ -324,6 +764,7 @@ public partial class ServiceStatusViewModel : ObservableObject, IDisposable
     {
         if (!_disposed)
         {
+            // Unsubscribe from SignalR events
             _signalRClient.ServiceStatusChanged -= OnServiceStatusChanged;
             _signalRClient.ScanProgressReceived -= OnScanProgressReceived;
             _signalRClient.ScanStarted -= OnScanStarted;
@@ -331,6 +772,9 @@ public partial class ServiceStatusViewModel : ObservableObject, IDisposable
             _signalRClient.ScanFailed -= OnScanFailed;
             _signalRClient.ScanCancelled -= OnScanCancelled;
             _signalRClient.ErrorOccurred -= OnErrorOccurred;
+            
+            // Unsubscribe from service manager events
+            _serviceManager.ServiceStatusChanged -= OnServiceManagerStatusChanged;
             
             _disposed = true;
         }
@@ -385,6 +829,26 @@ public class ErrorMessage
 {
     public string Message { get; set; } = string.Empty;
     public DateTime Timestamp { get; set; }
+    public MessageType Type { get; set; } = MessageType.Information;
     
     public string DisplayText => $"[{Timestamp:HH:mm:ss}] {Message}";
+    public string TypeIcon => Type switch
+    {
+        MessageType.Error => "?",
+        MessageType.Warning => "??",
+        MessageType.Success => "?",
+        MessageType.Information => "??",
+        _ => "•"
+    };
+}
+
+/// <summary>
+/// Message type enumeration
+/// </summary>
+public enum MessageType
+{
+    Information,
+    Success,
+    Warning,
+    Error
 }

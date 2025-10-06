@@ -21,7 +21,7 @@ namespace AlUmmahNow.VisualImporter.ViewModels
 {
     public partial class MainViewModel : ObservableObject, IDisposable
     {
-        private readonly ImportService _importService;
+        private readonly ImportService _importService = null!; // Mark as non-nullable and initialized
         private readonly DispatcherQueue? _dispatcherQueue;
         private readonly Stopwatch _operationStopwatch = new();
         private bool _disposed = false;

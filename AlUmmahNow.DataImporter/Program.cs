@@ -5,6 +5,14 @@ using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Serilog;
+using System.Diagnostics;
+
+// Configure Serilog for console
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.Console()
+    .CreateLogger();
 
 var services = new ServiceCollection();
 
@@ -21,13 +29,21 @@ var connectionString = configuration.GetConnectionString("DefaultConnection") ??
 services.AddDbContext<ImportDbContext>(options =>
     options.UseSqlServer(connectionString));
 
-// Configure SignalR client for real-time communication
-var serviceUrl = configuration.GetValue<string>("FileScanService:Url") ?? "http://localhost:5000";
+// Add logging
+services.AddLogging(builder =>
+{
+    builder.ClearProviders();
+    builder.AddSerilog();
+});
+
+// Register SignalR client
+var fileScanServiceUrl = configuration["FileScanService:Url"] ?? "http://localhost:5000";
+services.AddSingleton(sp => new FileScanSignalRClient(fileScanServiceUrl));
 
 // Register services
-services.AddSingleton(provider => new FileScanSignalRClient(serviceUrl));
 services.AddTransient<CommandExecutor>();
 services.AddTransient<CommandValidator>();
+services.AddTransient<FileScanServiceManager>();
 
 var serviceProvider = services.BuildServiceProvider();
 
@@ -53,29 +69,26 @@ var optionImportStatus = app.Option("--import-status <SessionId>", "Get import s
 
 var optionWaitForCompletion = app.Option("--wait", "Wait for scan completion before exiting", CommandOptionType.NoValue);
 
+var optionDaemon = app.Option("--daemon", "Run scan service in daemon mode", CommandOptionType.NoValue);
+
 app.OnExecuteAsync(async (ct) =>
 {
     using var scope = serviceProvider.CreateScope();
     var commandExecutor = scope.ServiceProvider.GetRequiredService<CommandExecutor>();
     var commandValidator = scope.ServiceProvider.GetRequiredService<CommandValidator>();
     var dbContext = scope.ServiceProvider.GetRequiredService<ImportDbContext>();
-    var signalRClient = scope.ServiceProvider.GetRequiredService<FileScanSignalRClient>();
+    var fileScanManager = scope.ServiceProvider.GetRequiredService<FileScanServiceManager>();
 
     try
     {
         // Ensure database connection works
         await dbContext.Database.EnsureCreatedAsync(ct);
 
-        // Connect to SignalR service
-        Console.WriteLine($"Connecting to FileScan service at {serviceUrl}...");
-        await signalRClient.ConnectAsync();
-
-        // Check if service is available
-        if (!commandExecutor.IsServiceAvailable())
+        // Handle daemon mode
+        if (optionDaemon.HasValue())
         {
-            Console.WriteLine($"✗ Unable to connect to File Scan Service at {serviceUrl}");
-            Console.WriteLine("Make sure the AlUmmahNow.FileScanService is running.");
-            return 1;
+            Console.WriteLine("Starting FileScan service in daemon mode...");
+            return await fileScanManager.RunDaemonAsync(ct);
         }
 
         // Handle list sessions command
@@ -131,22 +144,12 @@ app.OnExecuteAsync(async (ct) =>
         app.ShowHelp();
         return 1;
     }
-    catch (InvalidOperationException ex) when (ex.Message.Contains("connect"))
-    {
-        Console.WriteLine($"✗ Unable to connect to File Scan Service at {serviceUrl}");
-        Console.WriteLine($"Details: {ex.Message}");
-        Console.WriteLine("Make sure the AlUmmahNow.FileScanService is running.");
-        return 1;
-    }
     catch (Exception ex)
     {
         Console.WriteLine($"✗ Error: {ex.Message}");
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "Application error");
         return 1;
-    }
-    finally
-    {
-        // Cleanup SignalR connection
-        await signalRClient.DisposeAsync();
     }
 });
 
