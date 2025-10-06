@@ -2,6 +2,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Data;
 using System;
 using Windows.UI;
+using AlUmmahNow.VisualImporter.ViewModels;
 
 namespace AlUmmahNow.VisualImporter.Converters;
 
@@ -44,6 +45,62 @@ public class ColorConverter : IValueConverter
             }
         }
         return Color.FromArgb(255, 128, 128, 128); // Gray
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, string language)
+    {
+        throw new NotImplementedException();
+    }
+}
+
+/// <summary>
+/// Converts MessageType to background color
+/// </summary>
+public class MessageTypeToColorConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, string language)
+    {
+        if (value is MessageType messageType)
+        {
+            return messageType switch
+            {
+                MessageType.Error => Color.FromArgb(40, 255, 107, 107),     // Light red background
+                MessageType.Warning => Color.FromArgb(40, 255, 212, 59),   // Light yellow background
+                MessageType.Success => Color.FromArgb(40, 81, 207, 102),   // Light green background
+                MessageType.Information => Color.FromArgb(20, 100, 149, 237), // Light blue background
+                _ => Color.FromArgb(20, 128, 128, 128)                     // Light gray background
+            };
+        }
+        
+        return Color.FromArgb(20, 128, 128, 128);
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, string language)
+    {
+        throw new NotImplementedException();
+    }
+}
+
+/// <summary>
+/// Converts MessageType to border color
+/// </summary>
+public class MessageTypeToBorderColorConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, string language)
+    {
+        if (value is MessageType messageType)
+        {
+            return messageType switch
+            {
+                MessageType.Error => Color.FromArgb(255, 255, 107, 107),     // Red border
+                MessageType.Warning => Color.FromArgb(255, 255, 212, 59),   // Yellow border
+                MessageType.Success => Color.FromArgb(255, 81, 207, 102),   // Green border
+                MessageType.Information => Color.FromArgb(255, 100, 149, 237), // Blue border
+                _ => Color.FromArgb(255, 128, 128, 128)                     // Gray border
+            };
+        }
+        
+        return Color.FromArgb(255, 128, 128, 128);
     }
 
     public object ConvertBack(object value, Type targetType, object parameter, string language)
@@ -97,7 +154,7 @@ public class InverseBoolToVisibilityConverter : IValueConverter
 }
 
 /// <summary>
-/// Converts count to boolean (true if count > 0)
+/// Converts count to boolean (true if count > 0) or visibility based on parameter
 /// </summary>
 public class CountToBoolConverter : IValueConverter
 {
@@ -105,8 +162,45 @@ public class CountToBoolConverter : IValueConverter
     {
         if (value is int count)
         {
+            if (parameter is string paramStr)
+            {
+                // Handle special parameters
+                if (paramStr.Equals("Zero", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Return visibility for zero count
+                    if (targetType == typeof(Visibility))
+                        return count == 0 ? Visibility.Visible : Visibility.Collapsed;
+                    // Return boolean for zero count
+                    return count == 0;
+                }
+
+                // Try to parse as number for comparison
+                if (int.TryParse(paramStr, out int compareValue))
+                {
+                    if (targetType == typeof(Visibility))
+                        return count == compareValue ? Visibility.Visible : Visibility.Collapsed;
+                    return count == compareValue;
+                }
+            }
+
+            // Default behavior - true if count > 0
+            if (targetType == typeof(Visibility))
+                return count > 0 ? Visibility.Visible : Visibility.Collapsed;
             return count > 0;
         }
+
+        // Handle string values (like for CurrentFile)
+        if (value is string stringValue)
+        {
+            var hasValue = !string.IsNullOrEmpty(stringValue);
+            if (targetType == typeof(Visibility))
+                return hasValue ? Visibility.Visible : Visibility.Collapsed;
+            return hasValue;
+        }
+
+        // Default fallback
+        if (targetType == typeof(Visibility))
+            return Visibility.Collapsed;
         return false;
     }
 

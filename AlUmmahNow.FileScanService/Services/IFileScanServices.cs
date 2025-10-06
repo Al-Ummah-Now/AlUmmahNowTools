@@ -45,17 +45,6 @@ namespace AlUmmahNow.FileScanService.Services
     }
 
     /// <summary>
-    /// Interface for WebSocket communication management
-    /// </summary>
-    public interface IWebSocketManager
-    {
-        Task BroadcastScanStatusUpdate(ScanSession scanSession);
-        Task BroadcastScanProgress(ScanSession scanSession, string operation, double progress);
-        Task BroadcastChannelUpdate(ScannedChannel channel);
-        Task BroadcastFileUpdate(ScannedVideoFile file);
-    }
-
-    /// <summary>
     /// Video metadata extracted from files
     /// </summary>
     public class VideoMetadata

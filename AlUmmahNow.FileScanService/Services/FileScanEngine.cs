@@ -1,6 +1,7 @@
 using AlUmmahNow.Data.Database;
 using AlUmmahNow.Data.Models.FileScanning;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using System.Security.Cryptography;
 using System.Text;
 

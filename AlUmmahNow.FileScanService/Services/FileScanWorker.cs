@@ -1,7 +1,10 @@
 using AlUmmahNow.Data.Database;
 using AlUmmahNow.Data.Models.FileScanning;
-using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.SignalR;
 using AlUmmahNow.FileScanService.Hubs;
 
 namespace AlUmmahNow.FileScanService.Services
