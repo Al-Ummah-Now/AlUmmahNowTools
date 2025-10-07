@@ -19,6 +19,10 @@ namespace AlUmmahNow.Data.Database
         public DbSet<ScanSession> ScanSessions { get; set; }
         public DbSet<ScannedVideoFile> ScannedVideoFiles { get; set; }
         public DbSet<ScannedChannel> ScannedChannels { get; set; }
+        
+        // Watch and approval models
+        public DbSet<ChannelWatch> ChannelWatches { get; set; }
+        public DbSet<PendingApproval> PendingApprovals { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -154,6 +158,59 @@ namespace AlUmmahNow.Data.Database
                 entity.HasOne(e => e.ScanSession)
                     .WithMany()
                     .HasForeignKey(e => e.ScanSessionId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // Configure watch and approval models
+            modelBuilder.Entity<ChannelWatch>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.ChannelName).IsRequired().HasMaxLength(500);
+                entity.Property(e => e.WatchPath).IsRequired().HasMaxLength(2000);
+                entity.Property(e => e.CreatedBy).HasMaxLength(256);
+                entity.Property(e => e.FileExtensions).HasMaxLength(500);
+                
+                entity.HasIndex(e => e.ChannelName);
+                entity.HasIndex(e => e.WatchPath);
+                entity.HasIndex(e => e.IsActive);
+                entity.HasIndex(e => e.CreatedAt);
+                entity.HasIndex(e => e.LastFileDetected);
+                
+                // Composite indexes for common queries
+                entity.HasIndex(e => new { e.IsActive, e.ChannelName });
+                entity.HasIndex(e => new { e.IsActive, e.LastFileDetected });
+            });
+
+            modelBuilder.Entity<PendingApproval>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.FilePath).IsRequired().HasMaxLength(2000);
+                entity.Property(e => e.FileName).IsRequired().HasMaxLength(500);
+                entity.Property(e => e.Extension).HasMaxLength(10);
+                entity.Property(e => e.ApprovedBy).HasMaxLength(256);
+                entity.Property(e => e.ApprovalNotes).HasMaxLength(1000);
+                entity.Property(e => e.ContentHash).HasMaxLength(64);
+                entity.Property(e => e.ThumbnailPath).HasMaxLength(2000);
+                
+                entity.HasIndex(e => e.ChannelWatchId);
+                entity.HasIndex(e => e.Status);
+                entity.HasIndex(e => e.DetectedAt);
+                entity.HasIndex(e => e.ApprovedAt);
+                entity.HasIndex(e => e.Priority);
+                entity.HasIndex(e => e.ExpiresAt);
+                entity.HasIndex(e => e.ContentHash);
+                entity.HasIndex(e => e.FileExists);
+                
+                // Composite indexes for common queries
+                entity.HasIndex(e => new { e.Status, e.Priority });
+                entity.HasIndex(e => new { e.Status, e.DetectedAt });
+                entity.HasIndex(e => new { e.ChannelWatchId, e.Status });
+                entity.HasIndex(e => new { e.Status, e.ExpiresAt });
+                
+                // Relationship to channel watch
+                entity.HasOne(e => e.ChannelWatch)
+                    .WithMany(w => w.PendingApprovals)
+                    .HasForeignKey(e => e.ChannelWatchId)
                     .OnDelete(DeleteBehavior.Cascade);
             });
         }

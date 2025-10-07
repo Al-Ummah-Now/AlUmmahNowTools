@@ -7,6 +7,7 @@ using AlUmmahNow.Data.Database;
 using AlUmmahNow.Data.Models.FileScanning;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using AlUmmahNow.FileScanService.Services;
 
 namespace AlUmmahNow.Tests.FileScanService.Hubs;
 
@@ -23,6 +24,8 @@ public class FileScanHubTests : IDisposable
     private readonly Mock<IGroupManager> _mockGroups;
     private readonly Mock<IClientProxy> _mockClientProxy;
     private readonly Mock<ISingleClientProxy> _mockSingleClientProxy;
+    private readonly Mock<IFileWatchService> _mockFileWatchService;
+    private readonly Mock<IApprovalService> _mockApprovalService;
     private readonly FileScanHub _hub;
 
     public FileScanHubTests()
@@ -40,6 +43,8 @@ public class FileScanHubTests : IDisposable
         _mockGroups = new Mock<IGroupManager>();
         _mockClientProxy = new Mock<IClientProxy>();
         _mockSingleClientProxy = new Mock<ISingleClientProxy>();
+        _mockFileWatchService = new Mock<IFileWatchService>();
+        _mockApprovalService = new Mock<IApprovalService>();
 
         // Setup default mock behaviors
         _mockClients.Setup(c => c.Group(It.IsAny<string>())).Returns(_mockClientProxy.Object);
@@ -47,7 +52,7 @@ public class FileScanHubTests : IDisposable
         _mockClients.Setup(c => c.Caller).Returns(_mockSingleClientProxy.Object);
 
         // Create hub instance
-        _hub = new FileScanHub(_mockLogger.Object, _dbContext)
+        _hub = new FileScanHub(_mockLogger.Object, _dbContext, _mockFileWatchService.Object, _mockApprovalService.Object)
         {
             Clients = _mockClients.Object,
             Context = _mockContext.Object,
