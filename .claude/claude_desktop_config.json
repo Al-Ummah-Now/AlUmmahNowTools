@@ -1,0 +1,35 @@
+{
+    "mcpServers":
+    {
+        "MCP_DOCKER":
+        {
+            "command": "docker",
+            "args":
+            [
+                "mcp",
+                "gateway",
+                "run"
+            ],
+            "env":
+            {
+                "LOCALAPPDATA": "C:\\Users\\MEYWD\\AppData\\Local",
+                "ProgramData": "C:\\ProgramData",
+                "ProgramFiles": "C:\\Program Files"
+            }
+        },
+        "penpot":
+        {
+            "command": "uvx",
+            "args":
+            [
+                "penpot-mcp"
+            ],
+            "env":
+            {
+                "PENPOT_API_URL": "https://design.penpot.app/api",
+                "PENPOT_USERNAME": "contact@mahmoudsdarwish.com",
+                "PENPOT_PASSWORD": "jqm!UAW_pfc5cnu9wzh"
+            }
+        }
+    }
+}

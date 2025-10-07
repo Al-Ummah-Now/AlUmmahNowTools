@@ -13,11 +13,16 @@ namespace AlUmmahNow.FileScanService.Hubs
     {
         private readonly ILogger<FileScanHub> _logger;
         private readonly ImportDbContext _dbContext;
+        private readonly IFileWatchService _fileWatchService;
+        private readonly IApprovalService _approvalService;
 
-        public FileScanHub(ILogger<FileScanHub> logger, ImportDbContext dbContext)
+        public FileScanHub(ILogger<FileScanHub> logger, ImportDbContext dbContext, 
+            IFileWatchService fileWatchService, IApprovalService approvalService)
         {
             _logger = logger;
             _dbContext = dbContext;
+            _fileWatchService = fileWatchService;
+            _approvalService = approvalService;
         }
 
         /// <summary>
@@ -57,6 +62,46 @@ namespace AlUmmahNow.FileScanService.Hubs
             await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"scan-{sessionId}");
             _logger.LogDebug("Client {ConnectionId} left scan session {SessionId}", Context.ConnectionId, sessionId);
         }
+
+        /// <summary>
+        /// Join a watch group for targeted updates
+        /// </summary>
+        /// <param name="watchId">Watch ID</param>
+        public async Task JoinWatchGroup(string watchId)
+        {
+            await Groups.AddToGroupAsync(Context.ConnectionId, $"watch-{watchId}");
+            _logger.LogDebug("Client {ConnectionId} joined watch group {WatchId}", Context.ConnectionId, watchId);
+        }
+
+        /// <summary>
+        /// Leave a watch group
+        /// </summary>
+        /// <param name="watchId">Watch ID</param>
+        public async Task LeaveWatchGroup(string watchId)
+        {
+            await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"watch-{watchId}");
+            _logger.LogDebug("Client {ConnectionId} left watch group {WatchId}", Context.ConnectionId, watchId);
+        }
+
+        /// <summary>
+        /// Join the approvals group for approval notifications
+        /// </summary>
+        public async Task JoinApprovalsGroup()
+        {
+            await Groups.AddToGroupAsync(Context.ConnectionId, "approvals");
+            _logger.LogDebug("Client {ConnectionId} joined approvals group", Context.ConnectionId);
+        }
+
+        /// <summary>
+        /// Leave the approvals group
+        /// </summary>
+        public async Task LeaveApprovalsGroup()
+        {
+            await Groups.RemoveFromGroupAsync(Context.ConnectionId, "approvals");
+            _logger.LogDebug("Client {ConnectionId} left approvals group", Context.ConnectionId);
+        }
+
+        #region Scan Operations
 
         /// <summary>
         /// Start a new scan
@@ -210,6 +255,271 @@ namespace AlUmmahNow.FileScanService.Hubs
             }
         }
 
+        #endregion
+
+        #region Watch Operations
+
+        /// <summary>
+        /// Start watching a channel directory
+        /// </summary>
+        /// <param name="request">Watch creation request</param>
+        /// <returns>Watch ID</returns>
+        public async Task<Guid> StartWatch(CreateWatchRequest request)
+        {
+            try
+            {
+                _logger.LogInformation("Starting watch request from {ConnectionId} for channel: {ChannelName}, path: {WatchPath}", 
+                    Context.ConnectionId, request.ChannelName, request.WatchPath);
+
+                var watchId = await _fileWatchService.StartWatchAsync(request);
+
+                // Join the watch group for updates
+                await Groups.AddToGroupAsync(Context.ConnectionId, $"watch-{watchId}");
+
+                _logger.LogInformation("Watch {WatchId} started successfully", watchId);
+                return watchId;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error starting watch for channel {ChannelName}", request.ChannelName);
+                throw new HubException($"Failed to start watch: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Stop watching a channel directory
+        /// </summary>
+        /// <param name="watchId">Watch ID to stop</param>
+        /// <returns>Success status</returns>
+        public async Task<bool> StopWatch(Guid watchId)
+        {
+            try
+            {
+                _logger.LogInformation("Stopping watch {WatchId} from {ConnectionId}", watchId, Context.ConnectionId);
+
+                var success = await _fileWatchService.StopWatchAsync(watchId);
+                
+                if (success)
+                {
+                    // Notify clients in the watch group
+                    await Clients.Group($"watch-{watchId}").SendAsync("WatchStopped", watchId);
+                    _logger.LogInformation("Watch {WatchId} stopped successfully", watchId);
+                }
+
+                return success;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error stopping watch {WatchId}", watchId);
+                throw new HubException($"Failed to stop watch: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Get all active watches
+        /// </summary>
+        /// <returns>List of active watches</returns>
+        public async Task<List<WatchStatusDto>> GetActiveWatches()
+        {
+            try
+            {
+                return await _fileWatchService.GetActiveWatchesAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting active watches");
+                throw new HubException($"Failed to get active watches: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Get watch status
+        /// </summary>
+        /// <param name="watchId">Watch ID</param>
+        /// <returns>Watch status</returns>
+        public async Task<WatchStatusDto?> GetWatchStatus(Guid watchId)
+        {
+            try
+            {
+                return await _fileWatchService.GetWatchStatusAsync(watchId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting watch status for {WatchId}", watchId);
+                throw new HubException($"Failed to get watch status: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Update watch configuration
+        /// </summary>
+        /// <param name="watchId">Watch ID</param>
+        /// <param name="request">Updated watch configuration</param>
+        /// <returns>Success status</returns>
+        public async Task<bool> UpdateWatch(Guid watchId, CreateWatchRequest request)
+        {
+            try
+            {
+                var success = await _fileWatchService.UpdateWatchAsync(watchId, request);
+                
+                if (success)
+                {
+                    await Clients.Group($"watch-{watchId}").SendAsync("WatchUpdated", watchId);
+                }
+
+                return success;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating watch {WatchId}", watchId);
+                throw new HubException($"Failed to update watch: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Delete a watch
+        /// </summary>
+        /// <param name="watchId">Watch ID</param>
+        /// <returns>Success status</returns>
+        public async Task<bool> DeleteWatch(Guid watchId)
+        {
+            try
+            {
+                var success = await _fileWatchService.DeleteWatchAsync(watchId);
+                
+                if (success)
+                {
+                    await Clients.Group($"watch-{watchId}").SendAsync("WatchDeleted", watchId);
+                }
+
+                return success;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deleting watch {WatchId}", watchId);
+                throw new HubException($"Failed to delete watch: {ex.Message}");
+            }
+        }
+
+        #endregion
+
+        #region Approval Operations
+
+        /// <summary>
+        /// Get pending approvals
+        /// </summary>
+        /// <returns>List of pending approvals</returns>
+        public async Task<List<PendingApprovalDto>> GetPendingApprovals()
+        {
+            try
+            {
+                return await _approvalService.GetPendingApprovalsAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting pending approvals");
+                throw new HubException($"Failed to get pending approvals: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Get pending approvals for a specific channel
+        /// </summary>
+        /// <param name="channelName">Channel name</param>
+        /// <returns>List of pending approvals for the channel</returns>
+        public async Task<List<PendingApprovalDto>> GetPendingApprovalsByChannel(string channelName)
+        {
+            try
+            {
+                return await _approvalService.GetPendingApprovalsByChannelAsync(channelName);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting pending approvals for channel {ChannelName}", channelName);
+                throw new HubException($"Failed to get pending approvals for channel: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Process approval decision
+        /// </summary>
+        /// <param name="request">Approval decision request</param>
+        /// <returns>Success status</returns>
+        public async Task<bool> ProcessApprovalDecision(ApprovalDecisionRequest request)
+        {
+            try
+            {
+                _logger.LogInformation("Processing approval decision from {ConnectionId}: {Decision} for {Count} items", 
+                    Context.ConnectionId, request.Decision, request.ApprovalIds.Count);
+
+                var success = await _approvalService.ProcessApprovalDecisionAsync(request);
+                
+                if (success)
+                {
+                    // Notify all clients in the approvals group
+                    await Clients.Group("approvals").SendAsync("ApprovalDecisionProcessed", request);
+                }
+
+                return success;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error processing approval decision");
+                throw new HubException($"Failed to process approval decision: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Process bulk approval
+        /// </summary>
+        /// <param name="request">Bulk approval request</param>
+        /// <returns>Number of items processed</returns>
+        public async Task<int> ProcessBulkApproval(BulkApprovalRequest request)
+        {
+            try
+            {
+                _logger.LogInformation("Processing bulk approval from {ConnectionId}: {Decision}", 
+                    Context.ConnectionId, request.Decision);
+
+                var processedCount = await _approvalService.ProcessBulkApprovalAsync(request);
+                
+                if (processedCount > 0)
+                {
+                    // Notify all clients in the approvals group
+                    await Clients.Group("approvals").SendAsync("BulkApprovalProcessed", request, processedCount);
+                }
+
+                return processedCount;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error processing bulk approval");
+                throw new HubException($"Failed to process bulk approval: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Get approval statistics
+        /// </summary>
+        /// <param name="channelWatchId">Optional channel watch ID filter</param>
+        /// <returns>Approval statistics</returns>
+        public async Task<ApprovalStatistics> GetApprovalStatistics(Guid? channelWatchId = null)
+        {
+            try
+            {
+                return await _approvalService.GetApprovalStatisticsAsync(channelWatchId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting approval statistics");
+                throw new HubException($"Failed to get approval statistics: {ex.Message}");
+            }
+        }
+
+        #endregion
+
+        #region SignalR Event Handlers
+
         /// <summary>
         /// Send progress update to clients in a session group
         /// </summary>
@@ -239,6 +549,49 @@ namespace AlUmmahNow.FileScanService.Hubs
         {
             await Clients.Group($"scan-{sessionId}").SendAsync("ScanFailed", sessionId, error);
         }
+
+        /// <summary>
+        /// Send file detected notification
+        /// </summary>
+        /// <param name="watchId">Watch ID</param>
+        /// <param name="channelName">Channel name</param>
+        /// <param name="fileName">File name</param>
+        /// <param name="filePath">File path</param>
+        /// <param name="fileSize">File size</param>
+        public async Task SendFileDetected(Guid watchId, string channelName, string fileName, string filePath, long fileSize)
+        {
+            await Clients.Group($"watch-{watchId}").SendAsync("FileDetected", watchId, channelName, fileName, filePath, fileSize);
+            await Clients.Group("approvals").SendAsync("NewFileForApproval", watchId, channelName, fileName, filePath, fileSize);
+        }
+
+        /// <summary>
+        /// Send watch status change notification
+        /// </summary>
+        /// <param name="watchId">Watch ID</param>
+        /// <param name="channelName">Channel name</param>
+        /// <param name="isActive">Whether watch is active</param>
+        /// <param name="statusMessage">Status message</param>
+        public async Task SendWatchStatusChanged(Guid watchId, string channelName, bool isActive, string? statusMessage = null)
+        {
+            await Clients.Group($"watch-{watchId}").SendAsync("WatchStatusChanged", watchId, channelName, isActive, statusMessage);
+        }
+
+        /// <summary>
+        /// Send approval status change notification
+        /// </summary>
+        /// <param name="approvalId">Approval ID</param>
+        /// <param name="channelName">Channel name</param>
+        /// <param name="fileName">File name</param>
+        /// <param name="oldStatus">Old status</param>
+        /// <param name="newStatus">New status</param>
+        /// <param name="approvedBy">Who approved it</param>
+        public async Task SendApprovalStatusChanged(Guid approvalId, string channelName, string fileName, 
+            ApprovalStatus oldStatus, ApprovalStatus newStatus, string? approvedBy = null)
+        {
+            await Clients.Group("approvals").SendAsync("ApprovalStatusChanged", approvalId, channelName, fileName, oldStatus, newStatus, approvedBy);
+        }
+
+        #endregion
 
         /// <summary>
         /// Calculate a hash of the folder path for quick lookup
