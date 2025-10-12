@@ -94,7 +94,7 @@ namespace AlUmmahNow.FileScanService.Services
                     }
 
                     // Subscribe to scan engine progress events
-                    scanEngine.ProgressChanged += async (sender, progress) =>
+                    EventHandler<ScanProgressEventArgs> progressHandler = async (sender, progress) =>
                     {
                         try
                         {
@@ -126,8 +126,18 @@ namespace AlUmmahNow.FileScanService.Services
                         }
                     };
 
-                    // Process the scan
-                    await scanEngine.ProcessScanAsync(scanSession, cancellationToken);
+                    scanEngine.ProgressChanged += progressHandler;
+
+                    try
+                    {
+                        // Process the scan
+                        await scanEngine.ProcessScanAsync(scanSession, cancellationToken);
+                    }
+                    finally
+                    {
+                        // Always unsubscribe to prevent memory leak
+                        scanEngine.ProgressChanged -= progressHandler;
+                    }
                     
                     // Update completion status
                     scanSession.Status = ScanStatus.Completed;
