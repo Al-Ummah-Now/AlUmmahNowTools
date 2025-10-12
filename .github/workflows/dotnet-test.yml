@@ -67,7 +67,6 @@ jobs:
         dotnet test AlUmmahNow.Tests/AlUmmahNow.Tests.csproj \
           --no-build \
           --configuration Release \
-          --filter "FullyQualifiedName!~FileWatchServiceTests&FullyQualifiedName!~FileWatchServiceIntegrationTests" \
           --collect:"XPlat Code Coverage" \
           --settings AlUmmahNow.Tests/coverage.runsettings \
           --results-directory ./coverage \
