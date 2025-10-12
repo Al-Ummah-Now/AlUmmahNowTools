@@ -8,6 +8,7 @@ using AlUmmahNow.Data.Models;
 using Polly;
 using Polly.Retry;
 using System.Net;
+using Microsoft.Extensions.Logging;
 
 namespace AlUmmahNow.Data.Storage
 {
@@ -16,12 +17,14 @@ namespace AlUmmahNow.Data.Storage
         private readonly BunnyCDNStorage bunnyCDNStorage;
         private readonly AsyncRetryPolicy _retryPolicy;
         private readonly SemaphoreSlim _rateLimiter;
+        private readonly ILogger<BunnyStorageClient<T>>? _logger;
 
-        public BunnyStorageClient(string zoneName, string key, string mainRegion, int maxConcurrentUploads = 10)
+        public BunnyStorageClient(string zoneName, string key, string mainRegion, int maxConcurrentUploads = 10, ILogger<BunnyStorageClient<T>>? logger = null)
         {
             bunnyCDNStorage = new BunnyCDNStorage(zoneName, key, mainRegion);
+            _logger = logger;
 
-            // Configure retry policy with exponential backoff
+            // Configure retry policy with exponential backoff (1s, 2s, 4s)
             _retryPolicy = Policy
                 .Handle<HttpRequestException>()
                 .Or<WebException>()
@@ -29,10 +32,11 @@ namespace AlUmmahNow.Data.Storage
                 .Or<TaskCanceledException>()
                 .WaitAndRetryAsync(
                     retryCount: 3,
-                    sleepDurationProvider: retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
+                    sleepDurationProvider: retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt - 1)),
                     onRetry: (exception, timeSpan, retryCount, context) =>
                     {
-                        Console.WriteLine($"Retry {retryCount} after {timeSpan.TotalSeconds}s due to: {exception.Message}");
+                        _logger?.LogWarning("Bunny.net upload retry {RetryCount} after {Delay}s due to: {ErrorMessage}",
+                            retryCount, timeSpan.TotalSeconds, exception.Message);
                     });
 
             // Rate limiter to prevent hitting API limits (max 100 concurrent, using 10 as safe default)
@@ -68,7 +72,7 @@ namespace AlUmmahNow.Data.Storage
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error listing objects in BunnyCDN: {ex.Message}");
+                _logger?.LogError(ex, "Error listing objects in BunnyCDN at path: {Path}", path);
                 return new List<StorageObject>();
             }
         }
@@ -92,7 +96,7 @@ namespace AlUmmahNow.Data.Storage
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error getting object from BunnyCDN: {ex.Message}");
+                _logger?.LogError(ex, "Error getting object from BunnyCDN at path: {Path}", path);
                 return null;
             }
         }
