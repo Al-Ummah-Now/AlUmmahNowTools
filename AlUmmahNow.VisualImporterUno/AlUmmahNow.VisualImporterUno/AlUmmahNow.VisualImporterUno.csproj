@@ -1,0 +1,46 @@
+<Project Sdk="Uno.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net9.0-windows10.0.26100</TargetFrameworks>
+
+    <OutputType>Exe</OutputType>
+    <UnoSingleProject>true</UnoSingleProject>
+
+    <!-- Display name -->
+    <ApplicationTitle>Al Ummah Now Visual Importer</ApplicationTitle>
+    <!-- App Identifier -->
+    <ApplicationId>com.alummahnow.visualimporter</ApplicationId>
+    <!-- Versions -->
+    <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+    <ApplicationVersion>1</ApplicationVersion>
+    <!-- Package Publisher -->
+    <ApplicationPublisher>Al Ummah Now</ApplicationPublisher>
+    <!-- Package Description -->
+    <Description>Al Ummah Now Visual Importer - File scanning and import management tool.</Description>
+
+    <!--
+      UnoFeatures let's you quickly add and manage implicit package references based on the features you want to use.
+      https://aka.platform.uno/singleproject-features
+    -->
+    <UnoFeatures>
+      Hosting;
+      Logging;
+      LoggingSerilog;
+      Mvvm;
+      Configuration;
+      Http;
+      Serialization;
+    </UnoFeatures>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\AlUmmahNow.Data\AlUmmahNow.Data.csproj" />
+    <ProjectReference Include="..\..\AlUmmahNow.Importer\AlUmmahNow.Importer.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" />
+    <PackageReference Include="System.Diagnostics.PerformanceCounter" />
+    <PackageReference Include="Uno.Toolkit.WinUI" />
+  </ItemGroup>
+
+</Project>

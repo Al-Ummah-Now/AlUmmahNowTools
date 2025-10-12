@@ -12,6 +12,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
 using Serilog;
+using Serilog.Events;
 using System;
 using System.IO;
 using System.Reflection;
@@ -69,12 +70,28 @@ namespace AlUmmahNow.VisualImporter
                     .AddUserSecrets<App>()
                     .Build();
 
-                // Configure Serilog
+                // Enable Serilog self-diagnostics
+                Serilog.Debugging.SelfLog.Enable(msg => System.Diagnostics.Debug.WriteLine($"Serilog: {msg}"));
+
+                // Configure log directory with proper path expansion for MSIX packaged apps
+                var logDirectory = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "AlUmmahNow", "VisualImporter", "Logs");
+
+                Directory.CreateDirectory(logDirectory);
+                var logPath = Path.Combine(logDirectory, "visual-importer-.txt");
+
+                // Configure Serilog programmatically to ensure proper path handling
                 Log.Logger = new LoggerConfiguration()
                     .ReadFrom.Configuration(configuration)
+                    .WriteTo.File(logPath,
+                        rollingInterval: RollingInterval.Day,
+                        retainedFileCountLimit: 7)
+                    .WriteTo.Debug()
                     .CreateLogger();
 
                 Log.Information("App starting from directory: {Directory}", appDirectory);
+                Log.Information("Logs will be written to: {LogPath}", logPath);
 
                 // Build host with services
                 _host = Host.CreateDefaultBuilder()

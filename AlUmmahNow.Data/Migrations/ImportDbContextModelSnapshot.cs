@@ -22,6 +22,164 @@ namespace AlUmmahNow.Data.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("AlUmmahNow.Data.Models.FileScanning.ChannelWatch", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ChannelName")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("FileExtensions")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<bool>("IncludeSubdirectories")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("LastFileDetected")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("LastUpdated")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("ProcessingDelayMs")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TotalFilesDetected")
+                        .HasColumnType("int");
+
+                    b.Property<string>("WatchPath")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChannelName");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("IsActive");
+
+                    b.HasIndex("LastFileDetected");
+
+                    b.HasIndex("WatchPath");
+
+                    b.HasIndex("IsActive", "ChannelName");
+
+                    b.HasIndex("IsActive", "LastFileDetected");
+
+                    b.ToTable("ChannelWatches");
+                });
+
+            modelBuilder.Entity("AlUmmahNow.Data.Models.FileScanning.PendingApproval", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ApprovalNotes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ApprovedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<Guid>("ChannelWatchId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ContentHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTime>("DetectedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Extension")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<bool>("FileExists")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("FileModifiedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("FilePath")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<long>("FileSize")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ThumbnailPath")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApprovedAt");
+
+                    b.HasIndex("ChannelWatchId");
+
+                    b.HasIndex("ContentHash");
+
+                    b.HasIndex("DetectedAt");
+
+                    b.HasIndex("ExpiresAt");
+
+                    b.HasIndex("FileExists");
+
+                    b.HasIndex("Priority");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("ChannelWatchId", "Status");
+
+                    b.HasIndex("Status", "DetectedAt");
+
+                    b.HasIndex("Status", "ExpiresAt");
+
+                    b.HasIndex("Status", "Priority");
+
+                    b.ToTable("PendingApprovals");
+                });
+
             modelBuilder.Entity("AlUmmahNow.Data.Models.FileScanning.ScanSession", b =>
                 {
                     b.Property<Guid>("Id")
@@ -541,6 +699,17 @@ namespace AlUmmahNow.Data.Migrations
                     b.ToTable("ImportVideos");
                 });
 
+            modelBuilder.Entity("AlUmmahNow.Data.Models.FileScanning.PendingApproval", b =>
+                {
+                    b.HasOne("AlUmmahNow.Data.Models.FileScanning.ChannelWatch", "ChannelWatch")
+                        .WithMany("PendingApprovals")
+                        .HasForeignKey("ChannelWatchId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ChannelWatch");
+                });
+
             modelBuilder.Entity("AlUmmahNow.Data.Models.FileScanning.ScannedChannel", b =>
                 {
                     b.HasOne("AlUmmahNow.Data.Models.FileScanning.ScannedChannel", "ParentChannel")
@@ -613,6 +782,11 @@ namespace AlUmmahNow.Data.Migrations
                     b.Navigation("Channel");
 
                     b.Navigation("Session");
+                });
+
+            modelBuilder.Entity("AlUmmahNow.Data.Models.FileScanning.ChannelWatch", b =>
+                {
+                    b.Navigation("PendingApprovals");
                 });
 
             modelBuilder.Entity("AlUmmahNow.Data.Models.FileScanning.ScanSession", b =>

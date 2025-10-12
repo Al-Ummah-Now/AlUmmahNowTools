@@ -11,6 +11,7 @@
     mc:Ignorable="d">
 
     <Page.Resources>
+        <converters:ColorConverter x:Key="ColorConverter"/>
         <converters:ServiceStatusToVisibilityConverter x:Key="ServiceStatusToVisibilityConverter"/>
         <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibilityConverter"/>
         <converters:CountToBoolConverter x:Key="CountToBoolConverter"/>
@@ -33,20 +34,20 @@
 
                 <StackPanel Grid.Column="0">
                     <TextBlock Text="AlUmmah Now Visual Importer" Style="{ThemeResource TitleTextBlockStyle}" Margin="0,0,0,8"/>
-                    <TextBlock Text="Service Status Dashboard" Style="{ThemeResource SubtitleTextBlockStyle}" 
+                    <TextBlock Text="Service Control Dashboard" Style="{ThemeResource SubtitleTextBlockStyle}"
                                Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
                 </StackPanel>
 
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12">
-                    <Button x:Name="StartNewImportButton" 
-                            Content="Start New Import" 
+                    <Button x:Name="StartNewImportButton"
+                            Content="Start New Import"
                             Style="{ThemeResource AccentButtonStyle}"
                             Click="StartNewImportButton_Click">
                         <Button.KeyboardAccelerators>
                             <KeyboardAccelerator Key="N" Modifiers="Control"/>
                         </Button.KeyboardAccelerators>
                     </Button>
-                    
+
                     <Button Command="{x:Bind ViewModel.RefreshStatusCommand}"
                             Style="{ThemeResource DefaultButtonStyle}">
                         <StackPanel Orientation="Horizontal" Spacing="8">
@@ -73,12 +74,11 @@
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <!-- Service Connection Status -->
-                    <Border Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
-                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" 
+                    <!-- Service Status & Connection -->
+                    <Border Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                             BorderThickness="1" CornerRadius="8" Padding="20" Margin="0,0,8,0">
                         <StackPanel>
                             <Grid Margin="0,0,0,12">
@@ -86,140 +86,76 @@
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                
+
                                 <TextBlock Grid.Column="0" Text="Service Status" Style="{ThemeResource BodyStrongTextBlockStyle}"/>
-                                
+
                                 <Ellipse Grid.Column="1" Width="12" Height="12" VerticalAlignment="Center">
                                     <Ellipse.Fill>
                                         <SolidColorBrush Color="{x:Bind ViewModel.ServiceStatusColor, Converter={StaticResource ColorConverter}, Mode=OneWay, FallbackValue=Gray}"/>
                                     </Ellipse.Fill>
                                 </Ellipse>
                             </Grid>
-                            
-                            <TextBlock Text="{x:Bind ViewModel.ServiceStatusMessage, Mode=OneWay, FallbackValue='Service status unavailable'}" 
-                                       Style="{ThemeResource BodyTextBlockStyle}" 
-                                       Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"
-                                       TextWrapping="Wrap"/>
-                            
-                            <!-- Connection Button -->
-                            <Button Content="Connect" 
-                                    Command="{x:Bind ViewModel.ConnectToServiceCommand, FallbackValue={x:Null}}"
-                                    Visibility="{x:Bind ViewModel.ServiceStatus, Converter={StaticResource ServiceStatusToVisibilityConverter}, ConverterParameter='Disconnected', Mode=OneWay, FallbackValue=Visible}"
-                                    Margin="0,8,0,0"
-                                    HorizontalAlignment="Left"/>
-                                    
-                            <Button Content="Disconnect" 
-                                    Command="{x:Bind ViewModel.DisconnectFromServiceCommand, FallbackValue={x:Null}}"
-                                    Visibility="{x:Bind ViewModel.ServiceStatus, Converter={StaticResource ServiceStatusToVisibilityConverter}, ConverterParameter='Connected', Mode=OneWay, FallbackValue=Collapsed}"
-                                    Margin="0,8,0,0"
-                                    HorizontalAlignment="Left"/>
-                                    
-                            <ProgressRing IsActive="{x:Bind ViewModel.IsConnecting, Mode=OneWay, FallbackValue=False}" 
-                                          Width="20" Height="20" 
-                                          Margin="0,8,0,0"
-                                          HorizontalAlignment="Left"
-                                          Visibility="{x:Bind ViewModel.IsConnecting, Mode=OneWay, FallbackValue=Collapsed}"/>
-                        </StackPanel>
-                    </Border>
 
-                    <!-- Service Management -->
-                    <Border Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
-                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" 
-                            BorderThickness="1" CornerRadius="8" Padding="20" Margin="4,0">
-                        <StackPanel>
-                            <Grid Margin="0,0,0,12">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                
-                                <TextBlock Grid.Column="0" Text="Service Management" Style="{ThemeResource BodyStrongTextBlockStyle}"/>
-                                
-                                <FontIcon Grid.Column="1" 
-                                          Glyph="&#xE7C3;" 
-                                          FontSize="16" 
-                                          Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
-                            </Grid>
-                            
-                            <TextBlock Text="{x:Bind ViewModel.ServiceHealthMessage, Mode=OneWay, FallbackValue='Service management unavailable'}" 
-                                       Style="{ThemeResource BodyTextBlockStyle}" 
+                            <TextBlock Text="{x:Bind ViewModel.ServiceStatusMessage, Mode=OneWay, FallbackValue='Not connected'}"
+                                       Style="{ThemeResource BodyTextBlockStyle}"
                                        Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"
                                        TextWrapping="Wrap"/>
-                            
-                            <!-- Service Management Buttons -->
-                            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
-                                <Button Content="🚀 Start" 
-                                        Command="{x:Bind ViewModel.StartServiceCommand, FallbackValue={x:Null}}"
-                                        IsEnabled="{x:Bind ViewModel.CanStartService, Mode=OneWay, FallbackValue=False}"
-                                        Style="{StaticResource AccentButtonStyle}"
-                                        FontSize="12"
-                                        Padding="12,4"/>
-                                        
-                                <Button Content="🛑 Stop" 
-                                        Command="{x:Bind ViewModel.StopServiceCommand, FallbackValue={x:Null}}"
-                                        IsEnabled="{x:Bind ViewModel.CanStopService, Mode=OneWay, FallbackValue=False}"
-                                        FontSize="12"
-                                        Padding="12,4"/>
+
+                            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,12,0,0">
+                                <Button Content="Start Service"
+                                        Command="{x:Bind ViewModel.StartServiceCommand}"
+                                        IsEnabled="{x:Bind ViewModel.CanStartService, Mode=OneWay}"
+                                        Style="{StaticResource AccentButtonStyle}"/>
+
+                                <Button Content="Stop Service"
+                                        Command="{x:Bind ViewModel.StopServiceCommand}"
+                                        IsEnabled="{x:Bind ViewModel.CanStopService, Mode=OneWay}"/>
                             </StackPanel>
-                            
-                            <!-- Loading Indicator -->
-                            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0"
-                                        Visibility="{x:Bind ViewModel.IsStartingService, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}, FallbackValue=Collapsed}">
-                                <ProgressRing IsActive="True" Width="16" Height="16"/>
-                                <TextBlock Text="Starting service..." 
-                                           Style="{ThemeResource CaptionTextBlockStyle}"
-                                           Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
-                            </StackPanel>
+
+                            <ProgressRing IsActive="{x:Bind ViewModel.IsStartingService, Mode=OneWay}"
+                                          Width="20" Height="20"
+                                          Margin="0,8,0,0"
+                                          HorizontalAlignment="Left"/>
                         </StackPanel>
                     </Border>
 
                     <!-- Active Operations -->
-                    <Border Grid.Column="2" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
-                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" 
+                    <Border Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                             BorderThickness="1" CornerRadius="8" Padding="20" Margin="4,0">
                         <StackPanel>
                             <TextBlock Text="Active Operations" Style="{ThemeResource BodyStrongTextBlockStyle}" Margin="0,0,0,12"/>
-                            
-                            <!-- No Operations -->
+
                             <StackPanel Visibility="{x:Bind ViewModel.HasActiveOperation, Converter={StaticResource InverseBoolToVisibilityConverter}, Mode=OneWay}">
-                                <FontIcon Glyph="&#xE73E;" FontSize="24" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
-                                <TextBlock Text="No active operations" 
-                                           Style="{ThemeResource BodyTextBlockStyle}" 
+                                <TextBlock Text="No active operations"
+                                           Style="{ThemeResource BodyTextBlockStyle}"
                                            Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"
                                            HorizontalAlignment="Center"/>
                             </StackPanel>
-                            
-                            <!-- Current Operation -->
+
                             <StackPanel Visibility="{x:Bind ViewModel.HasActiveOperation, Mode=OneWay}">
-                                <TextBlock Text="{x:Bind ViewModel.CurrentOperation, Mode=OneWay}" 
-                                           Style="{ThemeResource BodyTextBlockStyle}" 
+                                <TextBlock Text="{x:Bind ViewModel.CurrentOperation, Mode=OneWay}"
+                                           Style="{ThemeResource BodyTextBlockStyle}"
                                            Margin="0,0,0,8"
                                            TextTrimming="CharacterEllipsis"/>
-                                           
-                                <ProgressBar Value="{x:Bind ViewModel.ProgressPercentage, Mode=OneWay}" 
+
+                                <ProgressBar Value="{x:Bind ViewModel.ProgressPercentage, Mode=OneWay}"
                                              Maximum="100" Height="4" Margin="0,0,0,8"/>
-                                             
-                                <TextBlock Text="{x:Bind ViewModel.ProgressPercentage, Mode=OneWay}" 
+
+                                <TextBlock Text="{x:Bind ViewModel.ProgressPercentage, Mode=OneWay}"
                                            Style="{ThemeResource CaptionTextBlockStyle}"
                                            Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
-                                           
-                                <TextBlock Text="{x:Bind ViewModel.CurrentFile, Mode=OneWay}" 
-                                           Style="{ThemeResource CaptionTextBlockStyle}"
-                                           Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
-                                           TextTrimming="CharacterEllipsis"
-                                           Margin="0,4,0,0"
-                                           Visibility="{x:Bind ViewModel.CurrentFile, Converter={StaticResource CountToBoolConverter}, Mode=OneWay}"/>
                             </StackPanel>
                         </StackPanel>
                     </Border>
 
                     <!-- Quick Stats -->
-                    <Border Grid.Column="3" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
-                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" 
+                    <Border Grid.Column="2" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                             BorderThickness="1" CornerRadius="8" Padding="20" Margin="8,0,0,0">
                         <StackPanel>
-                            <TextBlock Text="Quick Stats" Style="{ThemeResource BodyStrongTextBlockStyle}" Margin="0,0,0,12"/>
-                            
+                            <TextBlock Text="Statistics" Style="{ThemeResource BodyStrongTextBlockStyle}" Margin="0,0,0,12"/>
+
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
@@ -230,42 +166,20 @@
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                
+
                                 <TextBlock Grid.Row="0" Grid.Column="0" Text="Files Scanned:" Style="{ThemeResource CaptionTextBlockStyle}"/>
                                 <TextBlock Grid.Row="0" Grid.Column="1" Text="{x:Bind ViewModel.FilesScanned, Mode=OneWay, FallbackValue=0}" Style="{ThemeResource CaptionTextBlockStyle}" FontWeight="SemiBold"/>
-                                
-                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Ongoing Operations:" Style="{ThemeResource CaptionTextBlockStyle}" Margin="0,4,0,0"/>
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Ongoing:" Style="{ThemeResource CaptionTextBlockStyle}" Margin="0,4,0,0"/>
                                 <TextBlock Grid.Row="1" Grid.Column="1" Text="{x:Bind ViewModel.OngoingOperations.Count, Mode=OneWay, FallbackValue=0}" Style="{ThemeResource CaptionTextBlockStyle}" FontWeight="SemiBold" Margin="0,4,0,0"/>
-                                
-                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Recent Errors:" Style="{ThemeResource CaptionTextBlockStyle}" Margin="0,4,0,0"/>
+
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Errors:" Style="{ThemeResource CaptionTextBlockStyle}" Margin="0,4,0,0"/>
                                 <TextBlock Grid.Row="2" Grid.Column="1" Text="{x:Bind ViewModel.Errors.Count, Mode=OneWay, FallbackValue=0}" Style="{ThemeResource CaptionTextBlockStyle}" FontWeight="SemiBold" Margin="0,4,0,0"
                                            Foreground="{ThemeResource SystemFillColorCriticalBrush}"/>
                             </Grid>
                         </StackPanel>
                     </Border>
                 </Grid>
-
-                <!-- Simple information section for now -->
-                <Border Grid.Row="2" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
-                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" 
-                        BorderThickness="1" CornerRadius="8" Padding="20">
-                    <StackPanel>
-                        <TextBlock Text="Application Information" Style="{ThemeResource BodyStrongTextBlockStyle}" Margin="0,0,0,16"/>
-                        <TextBlock Text="Welcome to AlUmmah Now Visual Importer. This application helps you import and manage video content." 
-                                   Style="{ThemeResource BodyTextBlockStyle}" 
-                                   Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"
-                                   TextWrapping="Wrap" Margin="0,0,0,12"/>
-                        <TextBlock Text="• Use 'Start New Import' to begin importing video files" 
-                                   Style="{ThemeResource BodyTextBlockStyle}" 
-                                   Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" Margin="0,0,0,4"/>
-                        <TextBlock Text="• Check Service Status page for detailed service information" 
-                                   Style="{ThemeResource BodyTextBlockStyle}" 
-                                   Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" Margin="0,0,0,4"/>
-                        <TextBlock Text="• Configure settings if the service is not found automatically" 
-                                   Style="{ThemeResource BodyTextBlockStyle}" 
-                                   Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
-                    </StackPanel>
-                </Border>
             </Grid>
         </ScrollViewer>
     </Grid>

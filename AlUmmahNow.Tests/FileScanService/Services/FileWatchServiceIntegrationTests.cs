@@ -12,6 +12,7 @@ namespace AlUmmahNow.Tests.FileScanService.Services;
 public class FileWatchServiceIntegrationTests : FileSystemTestBase
 {
     private readonly Mock<ILogger<FileWatchService>> _mockLogger;
+    private readonly Mock<ILogger<ApprovalService>> _mockApprovalLogger;
     private readonly ImportDbContext _dbContext;
     private readonly Mock<IApprovalService> _mockApprovalService;
     private FileWatchService _fileWatchService;
@@ -19,6 +20,7 @@ public class FileWatchServiceIntegrationTests : FileSystemTestBase
     public FileWatchServiceIntegrationTests()
     {
         _mockLogger = new Mock<ILogger<FileWatchService>>();
+        _mockApprovalLogger = new Mock<ILogger<ApprovalService>>();
         
         var options = new DbContextOptionsBuilder<ImportDbContext>()
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
@@ -52,7 +54,7 @@ public class FileWatchServiceIntegrationTests : FileSystemTestBase
         };
 
         var mockApprovalService = new Mock<IApprovalService>();
-        var approvalService = new ApprovalService(_mockLogger.Object as ILogger<ApprovalService>, _dbContext);
+        var approvalService = new ApprovalService(_mockApprovalLogger.Object, _dbContext);
 
         var watchService = new FileWatchService(_mockLogger.Object, _dbContext, approvalService);
 
@@ -152,7 +154,7 @@ public class FileWatchServiceIntegrationTests : FileSystemTestBase
             ProcessingDelayMs = 100
         };
 
-        var approvalService = new ApprovalService(_mockLogger.Object as ILogger<ApprovalService>, _dbContext);
+        var approvalService = new ApprovalService(_mockApprovalLogger.Object, _dbContext);
         var watchService = new FileWatchService(_mockLogger.Object, _dbContext, approvalService);
 
         var detectedFiles = new List<string>();
@@ -195,7 +197,7 @@ public class FileWatchServiceIntegrationTests : FileSystemTestBase
     public async Task BulkApprovalWorkflow_ShouldProcessMultipleFilesWithFilters()
     {
         // Arrange - Set up approval service with test data
-        var approvalService = new ApprovalService(_mockLogger.Object as ILogger<ApprovalService>, _dbContext);
+        var approvalService = new ApprovalService(_mockApprovalLogger.Object, _dbContext);
 
         var channelWatch = new ChannelWatch
         {
@@ -256,7 +258,7 @@ public class FileWatchServiceIntegrationTests : FileSystemTestBase
     public async Task ExpiryCleanupWorkflow_ShouldExpireOldPendingApprovals()
     {
         // Arrange
-        var approvalService = new ApprovalService(_mockLogger.Object as ILogger<ApprovalService>, _dbContext);
+        var approvalService = new ApprovalService(_mockApprovalLogger.Object, _dbContext);
 
         var channelWatch = new ChannelWatch
         {
@@ -312,7 +314,7 @@ public class FileWatchServiceIntegrationTests : FileSystemTestBase
     public async Task ConcurrentWatchOperations_ShouldHandleMultipleWatchesCorrectly()
     {
         // Arrange
-        var approvalService = new ApprovalService(_mockLogger.Object as ILogger<ApprovalService>, _dbContext);
+        var approvalService = new ApprovalService(_mockApprovalLogger.Object, _dbContext);
         var watchService = new FileWatchService(_mockLogger.Object, _dbContext, approvalService);
 
         var requests = new List<CreateWatchRequest>
@@ -366,7 +368,7 @@ public class FileWatchServiceIntegrationTests : FileSystemTestBase
     public async Task CancellationToken_ShouldCancelOperationsCorrectly()
     {
         // Arrange
-        var approvalService = new ApprovalService(_mockLogger.Object as ILogger<ApprovalService>, _dbContext);
+        var approvalService = new ApprovalService(_mockApprovalLogger.Object, _dbContext);
         using var cts = new CancellationTokenSource();
 
         var channelWatch = new ChannelWatch

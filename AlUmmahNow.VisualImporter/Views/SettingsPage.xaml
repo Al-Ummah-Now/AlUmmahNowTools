@@ -6,7 +6,12 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:viewmodels="using:AlUmmahNow.VisualImporter.ViewModels"
+    xmlns:converters="using:AlUmmahNow.VisualImporter.Converters"
     mc:Ignorable="d">
+
+    <Page.Resources>
+        <converters:InverseBoolConverter x:Key="InverseBoolConverter"/>
+    </Page.Resources>
 
     <Grid Padding="24">
         <Grid.RowDefinitions>
@@ -24,63 +29,38 @@
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
             <StackPanel Spacing="24">
 
-                <!-- FileScan Service Configuration -->
+                <!-- Service Configuration -->
                 <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                         BorderThickness="1"
                         CornerRadius="8"
                         Padding="20">
                     <StackPanel Spacing="16">
-                        <TextBlock Text="FileScan Service Configuration" 
+                        <TextBlock Text="Service Configuration"
                                    Style="{StaticResource SubtitleTextBlockStyle}"/>
-                        
-                        <!-- Information Panel -->
-                        <Border Background="{ThemeResource AccentFillColorTertiaryBrush}"
-                                BorderBrush="{ThemeResource AccentFillColorSecondaryBrush}"
-                                BorderThickness="1"
-                                CornerRadius="4"
-                                Padding="12">
-                            <StackPanel Spacing="8">
-                                <TextBlock Text="?? Service Configuration Guide" 
-                                           FontWeight="SemiBold"
-                                           Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
-                                <TextBlock Text="� Service URL: HTTP endpoint for communication (e.g. http://localhost:5000)" 
-                                           FontSize="12"
-                                           Foreground="{ThemeResource AccentTextFillColorSecondaryBrush}"/>
-                                <TextBlock Text="� Executable Path: File system path to start the service (e.g. C:\...\FileScanService.exe)" 
-                                           FontSize="12"
-                                           Foreground="{ThemeResource AccentTextFillColorSecondaryBrush}"/>
-                            </StackPanel>
-                        </Border>
-                        
+
                         <!-- Service URL -->
                         <StackPanel Spacing="8">
                             <TextBlock Text="Service URL" FontWeight="SemiBold"/>
                             <TextBox x:Name="ServiceUrlTextBox"
                                      Text="{x:Bind ViewModel.FileScanServiceUrl, Mode=TwoWay}"
                                      PlaceholderText="http://localhost:5000"
-                                     Width="300"
-                                     HorizontalAlignment="Left"/>
-                            <TextBlock Text="The HTTP endpoint where the FileScan service runs (not a file path)" 
+                                     HorizontalAlignment="Left"
+                                     Width="400"/>
+                            <TextBlock Text="The HTTP endpoint where the FileScan service runs"
                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                        FontSize="12"/>
                         </StackPanel>
 
                         <!-- Test Connection -->
                         <StackPanel Orientation="Horizontal" Spacing="12">
-                            <Button Content="Test Connection" 
+                            <Button Content="Test Connection"
                                     Click="TestConnectionButton_Click"
                                     IsEnabled="{x:Bind ViewModel.IsTesting, Mode=OneWay, Converter={StaticResource InverseBoolConverter}}"/>
-                            <ProgressRing IsActive="{x:Bind ViewModel.IsTesting, Mode=OneWay}" 
-                                          Width="20" 
+                            <ProgressRing IsActive="{x:Bind ViewModel.IsTesting, Mode=OneWay}"
+                                          Width="20"
                                           Height="20"/>
                         </StackPanel>
-
-                        <!-- Test Results -->
-                        <TextBlock Text="{x:Bind ViewModel.TestResults, Mode=OneWay}"
-                                   Visibility="{x:Bind ViewModel.TestResults, Mode=OneWay, Converter={StaticResource StringToVisibilityConverter}}"
-                                   FontFamily="Consolas"
-                                   FontSize="12"/>
                     </StackPanel>
                 </Border>
 
@@ -91,14 +71,14 @@
                         CornerRadius="8"
                         Padding="20">
                     <StackPanel Spacing="16">
-                        <TextBlock Text="Service Management" 
+                        <TextBlock Text="Service Management"
                                    Style="{StaticResource SubtitleTextBlockStyle}"/>
-                        
+
                         <!-- Auto Start Service -->
                         <StackPanel Spacing="8">
                             <CheckBox Content="Automatically start FileScan service"
                                       IsChecked="{x:Bind ViewModel.AutoStartService, Mode=TwoWay}"/>
-                            <TextBlock Text="Start the FileScan service automatically when the application launches" 
+                            <TextBlock Text="Start the FileScan service automatically when the application launches"
                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                        FontSize="12"/>
                         </StackPanel>
@@ -108,30 +88,16 @@
                             <TextBlock Text="Service Executable Path" FontWeight="SemiBold"/>
                             <TextBox x:Name="ServicePathTextBox"
                                      Text="{x:Bind ViewModel.ServiceExecutablePath, Mode=TwoWay}"
-                                     PlaceholderText="C:\Path\To\AlUmmahNow.FileScanService.exe"
-                                     Width="400"
-                                     HorizontalAlignment="Left"/>
-                            <TextBlock Text="Full file path to the FileScan service executable (used to start the service automatically)" 
-                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                       FontSize="12"/>
-                        </StackPanel>
-
-                        <!-- Detected Service Paths -->
-                        <StackPanel Spacing="8" 
-                                    Visibility="{x:Bind ViewModel.DetectedServicePaths.Count, Mode=OneWay, Converter={StaticResource CountToVisibilityConverter}}">
-                            <TextBlock Text="Detected Service Paths" FontWeight="SemiBold"/>
-                            <ComboBox ItemsSource="{x:Bind ViewModel.DetectedServicePaths, Mode=OneWay}"
-                                      SelectedItem="{x:Bind ViewModel.SelectedDetectedPath, Mode=TwoWay}"
-                                      PlaceholderText="Select a detected path"
-                                      Width="400"
-                                      HorizontalAlignment="Left"/>
-                            <TextBlock Text="Automatically detected service executable locations" 
+                                     PlaceholderText="Path to AlUmmahNow.FileScanService.exe"
+                                     HorizontalAlignment="Left"
+                                     Width="400"/>
+                            <TextBlock Text="Full path to the FileScan service executable"
                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                        FontSize="12"/>
                         </StackPanel>
 
                         <!-- Browse for Service -->
-                        <Button Content="Browse for Service Executable" 
+                        <Button Content="Browse for Service Executable"
                                 Click="BrowseServiceButton_Click"
                                 HorizontalAlignment="Left"/>
                     </StackPanel>
@@ -144,18 +110,18 @@
                         CornerRadius="8"
                         Padding="20">
                     <StackPanel Spacing="16">
-                        <TextBlock Text="Database Configuration" 
+                        <TextBlock Text="Database Configuration"
                                    Style="{StaticResource SubtitleTextBlockStyle}"/>
-                        
+
                         <!-- Database Connection String -->
                         <StackPanel Spacing="8">
                             <TextBlock Text="Database Connection String" FontWeight="SemiBold"/>
                             <TextBox x:Name="DatabaseConnectionTextBox"
                                      Text="{x:Bind ViewModel.DatabaseConnectionString, Mode=TwoWay}"
-                                     PlaceholderText="Server=(localdb)\\MSSQLLocalDB;Database=AlUmmahNowFileScan;Trusted_Connection=true"
-                                     Width="500"
-                                     HorizontalAlignment="Left"/>
-                            <TextBlock Text="SQL Server connection string for the import database" 
+                                     PlaceholderText="Server=(localdb)\MSSQLLocalDB;Database=AlUmmahNowFileScan;Trusted_Connection=true"
+                                     HorizontalAlignment="Left"
+                                     Width="500"/>
+                            <TextBlock Text="SQL Server connection string for the import database"
                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                        FontSize="12"/>
                         </StackPanel>
@@ -163,37 +129,16 @@
                 </Border>
 
                 <!-- Actions -->
-                <StackPanel Spacing="12">
-                    <!-- Info about settings -->
-                    <Border Background="{ThemeResource AccentFillColorTertiaryBrush}"
-                            BorderBrush="{ThemeResource AccentFillColorSecondaryBrush}"
-                            BorderThickness="1"
-                            CornerRadius="4"
-                            Padding="12">
-                        <StackPanel Spacing="4">
-                            <TextBlock Text="🔄 Windows 11 Native Storage" 
-                                       FontWeight="SemiBold"
-                                       FontSize="12"
-                                       Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
-                            <TextBlock Text="Settings are stored using Windows ApplicationData and can roam across your devices when signed in with your Microsoft account." 
-                                       FontSize="11"
-                                       TextWrapping="Wrap"
-                                       Foreground="{ThemeResource AccentTextFillColorSecondaryBrush}"/>
-                        </StackPanel>
-                    </Border>
-                    
-                    <!-- Action buttons -->
-                    <StackPanel Orientation="Horizontal" Spacing="12">
-                        <Button Content="Save Settings" 
-                                Click="SaveSettingsButton_Click"
-                                Style="{StaticResource AccentButtonStyle}"
-                                IsEnabled="{x:Bind ViewModel.IsSaving, Mode=OneWay, Converter={StaticResource InverseBoolConverter}}"/>
-                        <Button Content="Reset to Defaults" 
-                                Click="ResetDefaultsButton_Click"/>
-                        <ProgressRing IsActive="{x:Bind ViewModel.IsSaving, Mode=OneWay}" 
-                                      Width="20" 
-                                      Height="20"/>
-                    </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <Button Content="Save Settings"
+                            Click="SaveSettingsButton_Click"
+                            Style="{StaticResource AccentButtonStyle}"
+                            IsEnabled="{x:Bind ViewModel.IsSaving, Mode=OneWay, Converter={StaticResource InverseBoolConverter}}"/>
+                    <Button Content="Reset to Defaults"
+                            Click="ResetDefaultsButton_Click"/>
+                    <ProgressRing IsActive="{x:Bind ViewModel.IsSaving, Mode=OneWay}"
+                                  Width="20"
+                                  Height="20"/>
                 </StackPanel>
 
             </StackPanel>

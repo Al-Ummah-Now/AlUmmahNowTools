@@ -46,9 +46,13 @@ namespace AlUmmahNow.FileScanService.Services
             // Phase 1: Count directories for progress tracking
             await UpdateScanProgress(scanSession, "Analyzing directory structure...", 0, 0, 0, 0);
             var totalDirectories = await CountDirectoriesAsync(scanSession.RootPath, cancellationToken);
-            
+
+            _logger.LogDebug("Updating scan session {SessionId} with total directories count: {TotalDirectories}",
+                scanSession.Id, totalDirectories);
             scanSession.TotalDirectories = totalDirectories;
             await _dbContext.SaveChangesAsync(cancellationToken);
+            _logger.LogDebug("Scan session {SessionId} updated successfully with {TotalDirectories} directories",
+                scanSession.Id, totalDirectories);
 
             // Phase 2: Scan directories and files
             var directoryQueue = new Queue<(DirectoryInfo dir, int depth, string channelName, Guid? parentChannelId)>();
@@ -154,16 +158,20 @@ namespace AlUmmahNow.FileScanService.Services
             await UpdateScanProgress(scanSession, "Finalizing scan results...", 95, totalFilesFound, processedDirectories, totalDirectories);
             scanSession.FilesFound = totalFilesFound;
             scanSession.DirectoriesProcessed = processedDirectories;
-            
+
             // Calculate total size
+            _logger.LogDebug("Calculating total size for scan session {SessionId}", scanSession.Id);
             var totalSize = await _dbContext.ScannedVideoFiles
                 .Where(f => f.ScanSessionId == scanSession.Id)
                 .SumAsync(f => f.FileSize, cancellationToken);
-            
+
+            _logger.LogDebug("Persisting final scan statistics for session {SessionId}: {FileCount} files, {TotalSize} bytes",
+                scanSession.Id, totalFilesFound, totalSize);
             scanSession.TotalSize = totalSize;
             await _dbContext.SaveChangesAsync(cancellationToken);
+            _logger.LogDebug("Final scan statistics saved for session {SessionId}", scanSession.Id);
 
-            _logger.LogInformation("Scan completed. Found {FileCount} files in {DirectoryCount} directories", 
+            _logger.LogInformation("Scan completed. Found {FileCount} files in {DirectoryCount} directories",
                 totalFilesFound, processedDirectories);
         }
 
@@ -230,8 +238,11 @@ namespace AlUmmahNow.FileScanService.Services
                 DirectoryExists = Directory.Exists(path)
             };
 
+            _logger.LogDebug("Creating new channel '{ChannelName}' for session {SessionId} at depth {Depth}",
+                channelName, scanSessionId, depth);
             _dbContext.ScannedChannels.Add(channel);
             await _dbContext.SaveChangesAsync();
+            _logger.LogDebug("Channel '{ChannelName}' created with ID {ChannelId}", channelName, channel.Id);
 
             return channel;
         }
@@ -320,9 +331,18 @@ namespace AlUmmahNow.FileScanService.Services
                 {
                     scannedFile.FirstScanned = DateTime.UtcNow;
                     _dbContext.ScannedVideoFiles.Add(scannedFile);
+                    _logger.LogDebug("Adding new video file to database: {FileName} ({FileSize} bytes)",
+                        videoFile.Name, videoFile.Length);
+                }
+                else
+                {
+                    _logger.LogDebug("Updating existing video file: {FileName} ({FileSize} bytes)",
+                        videoFile.Name, videoFile.Length);
                 }
 
                 await _dbContext.SaveChangesAsync(cancellationToken);
+                _logger.LogTrace("Video file {FileName} persisted successfully with ID {FileId}",
+                    videoFile.Name, scannedFile.Id);
             }
             catch (Exception ex)
             {
@@ -372,7 +392,10 @@ namespace AlUmmahNow.FileScanService.Services
 
         private async Task DetectDuplicatesAsync(Guid scanSessionId, CancellationToken cancellationToken)
         {
+            _logger.LogDebug("Starting duplicate detection for session {SessionId}", scanSessionId);
+
             // Reset duplicate flags
+            _logger.LogTrace("Resetting duplicate flags for session {SessionId}", scanSessionId);
             await _dbContext.ScannedVideoFiles
                 .Where(f => f.ScanSessionId == scanSessionId)
                 .ExecuteUpdateAsync(f => f
@@ -380,12 +403,17 @@ namespace AlUmmahNow.FileScanService.Services
                     .SetProperty(p => p.OriginalFileId, (Guid?)null), cancellationToken);
 
             // Group by content hash and file size
+            _logger.LogTrace("Grouping files by content hash and size for session {SessionId}", scanSessionId);
             var duplicateGroups = await _dbContext.ScannedVideoFiles
                 .Where(f => f.ScanSessionId == scanSessionId && f.FileExists)
                 .GroupBy(f => new { f.ContentHash, f.FileSize })
                 .Where(g => g.Count() > 1)
                 .ToListAsync(cancellationToken);
 
+            _logger.LogDebug("Found {GroupCount} duplicate groups in session {SessionId}",
+                duplicateGroups.Count, scanSessionId);
+
+            var totalDuplicates = 0;
             foreach (var group in duplicateGroups)
             {
                 var files = group.OrderBy(f => f.FilePath).ToList();
@@ -396,20 +424,36 @@ namespace AlUmmahNow.FileScanService.Services
                 {
                     files[i].IsDuplicate = true;
                     files[i].OriginalFileId = originalFile.Id;
+                    totalDuplicates++;
                 }
             }
 
+            _logger.LogDebug("Persisting duplicate detection results: {TotalDuplicates} duplicates marked",
+                totalDuplicates);
             await _dbContext.SaveChangesAsync(cancellationToken);
+            _logger.LogDebug("Duplicate detection completed for session {SessionId}: {DuplicateCount} duplicates found",
+                scanSessionId, totalDuplicates);
         }
 
         private async Task UpdateChannelStatisticsAsync(Guid channelId)
         {
-            var channel = await _dbContext.ScannedChannels.FindAsync(channelId);
-            if (channel == null) return;
+            _logger.LogTrace("Updating statistics for channel {ChannelId}", channelId);
 
+            var channel = await _dbContext.ScannedChannels.FindAsync(channelId);
+            if (channel == null)
+            {
+                _logger.LogWarning("Channel {ChannelId} not found, skipping statistics update", channelId);
+                return;
+            }
+
+            _logger.LogTrace("Loading files for channel '{ChannelName}' ({ChannelId})",
+                channel.Name, channelId);
             var files = await _dbContext.ScannedVideoFiles
                 .Where(f => f.ScanSessionId == channel.ScanSessionId && f.ChannelName == channel.Name && f.FileExists)
                 .ToListAsync();
+
+            _logger.LogDebug("Calculating statistics for channel '{ChannelName}': {FileCount} files",
+                channel.Name, files.Count);
 
             channel.TotalFiles = files.Count;
             channel.TotalSize = files.Sum(f => f.FileSize);
@@ -432,19 +476,28 @@ namespace AlUmmahNow.FileScanService.Services
             }
 
             channel.LastUpdated = DateTime.UtcNow;
+
+            _logger.LogDebug("Persisting channel statistics for '{ChannelName}': {UniqueFiles} unique, {Duplicates} duplicates",
+                channel.Name, channel.UniqueFiles, channel.DuplicateFiles);
             await _dbContext.SaveChangesAsync();
+            _logger.LogTrace("Channel statistics updated successfully for '{ChannelName}'", channel.Name);
         }
 
         private async Task UpdateScanProgress(ScanSession scanSession, string operation, double progress, int filesFound, int foldersProcessed, int totalFolders, string? currentFile = null)
         {
+            _logger.LogTrace("Updating scan progress for session {SessionId}: {Operation} ({Progress}%)",
+                scanSession.Id, operation, progress);
+
             scanSession.CurrentOperation = operation;
             scanSession.ProgressPercentage = progress;
             scanSession.FilesFound = filesFound;
             scanSession.DirectoriesProcessed = foldersProcessed;
             scanSession.LastUpdated = DateTime.UtcNow;
-            
+
             await _dbContext.SaveChangesAsync();
-            
+
+            _logger.LogTrace("Scan progress persisted for session {SessionId}", scanSession.Id);
+
             // Raise ProgressChanged event
             ProgressChanged?.Invoke(this, new ScanProgressEventArgs
             {

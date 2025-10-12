@@ -6,6 +6,13 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <UserSecretsId>4de61621-8c00-4020-a0b6-0ff95676f865</UserSecretsId>
+
+    <!-- Application icon and naming for Task Manager -->
+    <ApplicationIcon>app-icon.ico</ApplicationIcon>
+    <AssemblyTitle>AlUmmahNow Bunny Bulk Uploader</AssemblyTitle>
+    <Product>AlUmmahNow Bunny Bulk Uploader</Product>
+    <Company>AlUmmahNow</Company>
+    <AssemblyName>AlUmmahNow.BunnyBulkUploader</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
