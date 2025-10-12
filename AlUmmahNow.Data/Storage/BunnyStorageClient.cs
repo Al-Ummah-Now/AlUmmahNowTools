@@ -5,16 +5,38 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using AlUmmahNow.Data.Models;
+using Polly;
+using Polly.Retry;
+using System.Net;
 
 namespace AlUmmahNow.Data.Storage
 {
     public class BunnyStorageClient<T> : IStorageClient<T>
     {
-        BunnyCDNStorage bunnyCDNStorage;
+        private readonly BunnyCDNStorage bunnyCDNStorage;
+        private readonly AsyncRetryPolicy _retryPolicy;
+        private readonly SemaphoreSlim _rateLimiter;
 
-        public BunnyStorageClient(string zoneName, string key, string mainRegion)
+        public BunnyStorageClient(string zoneName, string key, string mainRegion, int maxConcurrentUploads = 10)
         {
             bunnyCDNStorage = new BunnyCDNStorage(zoneName, key, mainRegion);
+
+            // Configure retry policy with exponential backoff
+            _retryPolicy = Policy
+                .Handle<HttpRequestException>()
+                .Or<WebException>()
+                .Or<TimeoutException>()
+                .Or<TaskCanceledException>()
+                .WaitAndRetryAsync(
+                    retryCount: 3,
+                    sleepDurationProvider: retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
+                    onRetry: (exception, timeSpan, retryCount, context) =>
+                    {
+                        Console.WriteLine($"Retry {retryCount} after {timeSpan.TotalSeconds}s due to: {exception.Message}");
+                    });
+
+            // Rate limiter to prevent hitting API limits (max 100 concurrent, using 10 as safe default)
+            _rateLimiter = new SemaphoreSlim(maxConcurrentUploads, maxConcurrentUploads);
         }
 
         public async Task DeleteAsync(string path)
@@ -77,7 +99,24 @@ namespace AlUmmahNow.Data.Storage
 
         public async Task UploadAsync(Stream stream, string path)
         {
-            await bunnyCDNStorage.UploadAsync(stream, path);
+            await _rateLimiter.WaitAsync();
+            try
+            {
+                await _retryPolicy.ExecuteAsync(async () =>
+                {
+                    // Reset stream position if seekable
+                    if (stream.CanSeek)
+                    {
+                        stream.Position = 0;
+                    }
+
+                    await bunnyCDNStorage.UploadAsync(stream, path);
+                });
+            }
+            finally
+            {
+                _rateLimiter.Release();
+            }
         }
     }
 }
