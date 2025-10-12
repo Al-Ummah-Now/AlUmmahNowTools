@@ -38,7 +38,7 @@ namespace AlUmmahNow.FileScanService
                     return 0;
                 }
 
-                // Default: Run as SignalR Hub Host with background workers
+                // Default: Run as SignalR Hub Host with back2ground workers
                 return await RunAsSignalRServiceAsync(args);
             }
             catch (Exception ex)
@@ -48,7 +48,6 @@ namespace AlUmmahNow.FileScanService
             }
             finally
             {
-                // Ensure singleton lock is released
                 _singletonManager?.Dispose();
                 Log.CloseAndFlush();
             }
@@ -132,37 +131,24 @@ namespace AlUmmahNow.FileScanService
             // Initialize and check singleton status
             var loggerFactory = LoggerFactory.Create(builder => builder.AddSerilog());
             var singletonLogger = loggerFactory.CreateLogger<SingletonManager>();
-            
+
             _singletonManager = new SingletonManager(singletonLogger, port);
 
             Log.Information("Checking singleton status for FileScanService on port {Port}", port);
 
             if (_singletonManager.IsAnotherInstanceRunning())
             {
-                var lockInfo = _singletonManager.GetLockInfo();
-                Log.Warning("Another instance of FileScanService is already running");
-                Console.WriteLine("??  Another instance of FileScanService is already running!");
-                Console.WriteLine($"   Port: {lockInfo.Port}");
-                Console.WriteLine($"   Process ID: {lockInfo.LockHolderProcessId ?? 0}");
-                Console.WriteLine($"   Process Name: {lockInfo.LockHolderProcessName ?? "Unknown"}");
-                Console.WriteLine($"   Start Time: {lockInfo.LockHolderStartTime?.ToString("yyyy-MM-dd HH:mm:ss") ?? "Unknown"}");
-                Console.WriteLine($"   Machine: {lockInfo.LockHolderMachineName ?? Environment.MachineName}");
+                Log.Warning("Another instance of FileScanService is already running on port {Port}", port);
+                Console.WriteLine("⚠️  Another instance of FileScanService is already running!");
+                Console.WriteLine($"   Port: {port}");
                 Console.WriteLine();
-                Console.WriteLine("To view detailed information, use: --singleton-info");
                 Console.WriteLine("To stop the running instance, terminate its process or use the UI's service manager.");
-                
+
                 return 2; // Exit code 2 indicates another instance is running
             }
 
-            if (!_singletonManager.TryAcquireSingletonLock())
-            {
-                Log.Error("Failed to acquire singleton lock - service startup aborted");
-                Console.WriteLine("? Failed to acquire singleton lock. Another instance may have started concurrently.");
-                return 3; // Exit code 3 indicates lock acquisition failure
-            }
-
-            Log.Information("Singleton lock acquired successfully - starting FileScanService as SignalR Hub Host");
-            Console.WriteLine("? Singleton lock acquired - FileScanService starting...");
+            Log.Information("No other instance detected - starting FileScanService as SignalR Hub Host");
+            Console.WriteLine("✓ Starting FileScanService...");
 
             // Configure Serilog
             builder.Host.UseSerilog();
@@ -182,7 +168,9 @@ namespace AlUmmahNow.FileScanService
             builder.Services.AddScoped<IFileScanEngine, FileScanEngine>();
             builder.Services.AddScoped<IHashCalculator, HashCalculator>();
             builder.Services.AddScoped<IMetadataExtractor, MetadataExtractor>();
-            
+            builder.Services.AddScoped<IFileWatchService, FileWatchService>();
+            builder.Services.AddScoped<IApprovalService, ApprovalService>();
+
             // Register background services
             builder.Services.AddHostedService<FileScanWorker>();
             builder.Services.AddHostedService<ImportWorker>();
@@ -192,7 +180,13 @@ namespace AlUmmahNow.FileScanService
             {
                 options.AddDefaultPolicy(policy =>
                 {
-                    policy.WithOrigins("http://localhost:*", "https://localhost:*")
+                    policy.SetIsOriginAllowed(origin =>
+                          {
+                              // Allow any localhost origin in development
+                              if (string.IsNullOrEmpty(origin)) return false;
+                              var uri = new Uri(origin);
+                              return uri.Host == "localhost" || uri.Host == "127.0.0.1";
+                          })
                           .AllowAnyHeader()
                           .AllowAnyMethod()
                           .AllowCredentials();
@@ -208,16 +202,13 @@ namespace AlUmmahNow.FileScanService
             app.MapHub<FileScanHub>("/scanHub");
 
             // Add a simple health check endpoint
-            app.MapGet("/health", () => Results.Ok(new { 
-                status = "healthy", 
+            app.MapGet("/health", () => Results.Ok(new {
+                status = "healthy",
                 service = "FileScanService",
                 signalRHub = "/scanHub",
                 timestamp = DateTime.UtcNow,
                 processId = Environment.ProcessId,
-                singleton = new {
-                    isLockHeld = _singletonManager?.GetLockInfo().IsLockHeld ?? false,
-                    port = port
-                }
+                port = port
             }));
 
             // Add singleton status endpoint
@@ -305,7 +296,7 @@ namespace AlUmmahNow.FileScanService
             var port = 5000; // Default port
             var loggerFactory = LoggerFactory.Create(builder => builder.AddSerilog());
             var logger = loggerFactory.CreateLogger<SingletonManager>();
-            
+
             using var singletonManager = new SingletonManager(logger, port);
 
             var lockInfo = singletonManager.GetLockInfo();
@@ -315,34 +306,26 @@ namespace AlUmmahNow.FileScanService
             Console.WriteLine(new string('=', 50));
             Console.WriteLine();
             Console.WriteLine($"Service Port: {lockInfo.Port}");
+            Console.WriteLine($"Port In Use: {lockInfo.IsPortInUse}");
             Console.WriteLine($"Another Instance Running: {(isRunning ? "YES" : "NO")}");
             Console.WriteLine();
-            
+
             if (isRunning)
             {
-                Console.WriteLine("Running Instance Details:");
-                Console.WriteLine($"  Process ID: {lockInfo.LockHolderProcessId ?? 0}");
-                Console.WriteLine($"  Process Name: {lockInfo.LockHolderProcessName ?? "Unknown"}");
-                Console.WriteLine($"  Start Time: {lockInfo.LockHolderStartTime?.ToString("yyyy-MM-dd HH:mm:ss") ?? "Unknown"}");
-                Console.WriteLine($"  Machine: {lockInfo.LockHolderMachineName ?? "Unknown"}");
+                Console.WriteLine("Port is currently in use by another service instance.");
                 Console.WriteLine();
-                Console.WriteLine("Lock Mechanisms:");
-                Console.WriteLine($"  Mutex Name: {lockInfo.MutexName}");
-                Console.WriteLine($"  Lock File: {lockInfo.LockFilePath}");
-                Console.WriteLine($"  Lock File Exists: {File.Exists(lockInfo.LockFilePath)}");
+                Console.WriteLine("Current Process Info:");
+                Console.WriteLine($"  Process ID: {lockInfo.CurrentProcessId}");
+                Console.WriteLine($"  Process Name: {lockInfo.CurrentProcessName}");
+                Console.WriteLine($"  Machine: {lockInfo.MachineName}");
                 Console.WriteLine();
                 Console.WriteLine("To stop the running instance:");
                 Console.WriteLine("  - Use the VisualImporter's service management UI");
-                Console.WriteLine($"  - Kill process ID {lockInfo.LockHolderProcessId}");
-                Console.WriteLine($"  - Use task manager to end '{lockInfo.LockHolderProcessName}' process");
+                Console.WriteLine("  - Use task manager to find and end the FileScanService process");
             }
             else
             {
                 Console.WriteLine("No running instance detected.");
-                Console.WriteLine("Lock Mechanisms (available):");
-                Console.WriteLine($"  Mutex Name: {lockInfo.MutexName}");
-                Console.WriteLine($"  Lock File: {lockInfo.LockFilePath}");
-                Console.WriteLine();
                 Console.WriteLine("Service can be started normally.");
             }
         }

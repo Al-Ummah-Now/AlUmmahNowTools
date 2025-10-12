@@ -33,7 +33,7 @@ public class FileWatchService : IFileWatchService, IDisposable
 
     public async Task<Guid> StartWatchAsync(CreateWatchRequest request, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Starting watch for channel {ChannelName} at path {WatchPath}", 
+        _logger.LogInformation("Entered StartWatchAsync for channel {ChannelName} at path {WatchPath}",
             request.ChannelName, request.WatchPath);
 
         try
@@ -67,10 +67,14 @@ public class FileWatchService : IFileWatchService, IDisposable
                 IsActive = true
             };
 
+            _logger.LogDebug("Creating watch configuration for channel {ChannelName} at path {WatchPath}",
+                request.ChannelName, request.WatchPath);
             _dbContext.ChannelWatches.Add(channelWatch);
             await _dbContext.SaveChangesAsync(cancellationToken);
+            _logger.LogDebug("Watch configuration persisted with ID {WatchId}", channelWatch.Id);
 
             // Start the file system watcher
+            _logger.LogDebug("Starting file system watcher for watch {WatchId}", channelWatch.Id);
             await StartFileSystemWatcherAsync(channelWatch);
 
             _logger.LogInformation("Successfully started watch {WatchId} for channel {ChannelName}", 
@@ -79,11 +83,12 @@ public class FileWatchService : IFileWatchService, IDisposable
             WatchStatusChanged?.Invoke(this, new WatchStatusChangedEventArgs(
                 channelWatch.Id, request.ChannelName, true, "Watch started"));
 
+            _logger.LogInformation("Exiting StartWatchAsync successfully. Watch ID: {WatchId}", channelWatch.Id);
             return channelWatch.Id;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to start watch for channel {ChannelName} at path {WatchPath}", 
+            _logger.LogError(ex, "Exiting StartWatchAsync with error for channel {ChannelName} at path {WatchPath}",
                 request.ChannelName, request.WatchPath);
             throw;
         }
@@ -91,7 +96,7 @@ public class FileWatchService : IFileWatchService, IDisposable
 
     public async Task<bool> StopWatchAsync(Guid watchId, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Stopping watch {WatchId}", watchId);
+        _logger.LogInformation("Entered StopWatchAsync for watch {WatchId}", watchId);
 
         try
         {
@@ -100,7 +105,7 @@ public class FileWatchService : IFileWatchService, IDisposable
 
             if (channelWatch == null)
             {
-                _logger.LogWarning("Watch {WatchId} not found", watchId);
+                _logger.LogWarning("Watch {WatchId} not found, exiting StopWatchAsync with result: false", watchId);
                 return false;
             }
 
@@ -108,29 +113,34 @@ public class FileWatchService : IFileWatchService, IDisposable
             StopFileSystemWatcher(watchId);
 
             // Update database
+            _logger.LogDebug("Updating watch {WatchId} status to inactive", watchId);
             channelWatch.IsActive = false;
             channelWatch.LastUpdated = DateTime.UtcNow;
             await _dbContext.SaveChangesAsync(cancellationToken);
 
-            _logger.LogInformation("Successfully stopped watch {WatchId} for channel {ChannelName}", 
+            _logger.LogInformation("Successfully stopped watch {WatchId} for channel {ChannelName}",
                 watchId, channelWatch.ChannelName);
 
             WatchStatusChanged?.Invoke(this, new WatchStatusChangedEventArgs(
                 watchId, channelWatch.ChannelName, false, "Watch stopped"));
 
+            _logger.LogInformation("Exiting StopWatchAsync successfully. Result: true");
             return true;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to stop watch {WatchId}", watchId);
+            _logger.LogError(ex, "Exiting StopWatchAsync with error for watch {WatchId}. Result: false", watchId);
             return false;
         }
     }
 
     public async Task<List<WatchStatusDto>> GetActiveWatchesAsync(CancellationToken cancellationToken = default)
     {
+        _logger.LogDebug("Entered GetActiveWatchesAsync");
+
         try
         {
+            _logger.LogTrace("Querying database for active watches");
             var watches = await _dbContext.ChannelWatches
                 .Where(w => w.IsActive)
                 .Select(w => new WatchStatusDto
@@ -151,19 +161,23 @@ public class FileWatchService : IFileWatchService, IDisposable
                 })
                 .ToListAsync(cancellationToken);
 
+            _logger.LogDebug("Exiting GetActiveWatchesAsync. Found {WatchCount} active watches", watches.Count);
             return watches;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to get active watches");
+            _logger.LogError(ex, "Exiting GetActiveWatchesAsync with error. Returning empty list");
             return new List<WatchStatusDto>();
         }
     }
 
     public async Task<WatchStatusDto?> GetWatchStatusAsync(Guid watchId, CancellationToken cancellationToken = default)
     {
+        _logger.LogDebug("Entered GetWatchStatusAsync for watch {WatchId}", watchId);
+
         try
         {
+            _logger.LogTrace("Querying database for watch {WatchId} status", watchId);
             var watch = await _dbContext.ChannelWatches
                 .Where(w => w.Id == watchId)
                 .Select(w => new WatchStatusDto
@@ -184,18 +198,20 @@ public class FileWatchService : IFileWatchService, IDisposable
                 })
                 .FirstOrDefaultAsync(cancellationToken);
 
+            var found = watch != null;
+            _logger.LogDebug("Exiting GetWatchStatusAsync for watch {WatchId}. Found: {Found}", watchId, found);
             return watch;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to get watch status for {WatchId}", watchId);
+            _logger.LogError(ex, "Exiting GetWatchStatusAsync with error for watch {WatchId}. Returning null", watchId);
             return null;
         }
     }
 
     public async Task<bool> UpdateWatchAsync(Guid watchId, CreateWatchRequest request, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Updating watch {WatchId}", watchId);
+        _logger.LogInformation("Entered UpdateWatchAsync for watch {WatchId}", watchId);
 
         try
         {
@@ -204,7 +220,7 @@ public class FileWatchService : IFileWatchService, IDisposable
 
             if (channelWatch == null)
             {
-                _logger.LogWarning("Watch {WatchId} not found", watchId);
+                _logger.LogWarning("Watch {WatchId} not found, exiting UpdateWatchAsync with result: false", watchId);
                 return false;
             }
 
@@ -212,10 +228,13 @@ public class FileWatchService : IFileWatchService, IDisposable
             var pathChanged = channelWatch.WatchPath != request.WatchPath;
             if (pathChanged && channelWatch.IsActive)
             {
+                _logger.LogDebug("Watch path changed from {OldPath} to {NewPath}, stopping current watcher",
+                    channelWatch.WatchPath, request.WatchPath);
                 StopFileSystemWatcher(watchId);
             }
 
             // Update configuration
+            _logger.LogDebug("Updating watch {WatchId} configuration", watchId);
             channelWatch.ChannelName = request.ChannelName;
             channelWatch.WatchPath = request.WatchPath;
             channelWatch.IncludeSubdirectories = request.IncludeSubdirectories;
@@ -223,11 +242,13 @@ public class FileWatchService : IFileWatchService, IDisposable
             channelWatch.FileExtensions = request.FileExtensions ?? channelWatch.FileExtensions;
             channelWatch.LastUpdated = DateTime.UtcNow;
 
+            _logger.LogDebug("Persisting watch {WatchId} configuration changes", watchId);
             await _dbContext.SaveChangesAsync(cancellationToken);
 
             // Restart watcher if it was active and path changed
             if (pathChanged && channelWatch.IsActive)
             {
+                _logger.LogDebug("Restarting file system watcher for watch {WatchId} with new path", watchId);
                 await StartFileSystemWatcherAsync(channelWatch);
             }
 
@@ -236,49 +257,55 @@ public class FileWatchService : IFileWatchService, IDisposable
             WatchStatusChanged?.Invoke(this, new WatchStatusChangedEventArgs(
                 watchId, request.ChannelName, channelWatch.IsActive, "Watch updated"));
 
+            _logger.LogInformation("Exiting UpdateWatchAsync successfully. Result: true");
             return true;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to update watch {WatchId}", watchId);
+            _logger.LogError(ex, "Exiting UpdateWatchAsync with error for watch {WatchId}. Result: false", watchId);
             return false;
         }
     }
 
     public async Task<bool> DeleteWatchAsync(Guid watchId, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Deleting watch {WatchId}", watchId);
+        _logger.LogInformation("Entered DeleteWatchAsync for watch {WatchId}", watchId);
 
         try
         {
+            _logger.LogTrace("Loading watch {WatchId} with pending approvals", watchId);
             var channelWatch = await _dbContext.ChannelWatches
                 .Include(w => w.PendingApprovals)
                 .FirstOrDefaultAsync(w => w.Id == watchId, cancellationToken);
 
             if (channelWatch == null)
             {
-                _logger.LogWarning("Watch {WatchId} not found", watchId);
+                _logger.LogWarning("Watch {WatchId} not found, exiting DeleteWatchAsync with result: false", watchId);
                 return false;
             }
 
             // Stop the watcher
+            _logger.LogDebug("Stopping file system watcher for watch {WatchId}", watchId);
             StopFileSystemWatcher(watchId);
 
             // Remove from database (cascade delete will handle pending approvals)
+            _logger.LogDebug("Removing watch {WatchId} from database ({PendingCount} pending approvals will be cascade deleted)",
+                watchId, channelWatch.PendingApprovals.Count);
             _dbContext.ChannelWatches.Remove(channelWatch);
             await _dbContext.SaveChangesAsync(cancellationToken);
 
-            _logger.LogInformation("Successfully deleted watch {WatchId} for channel {ChannelName}", 
+            _logger.LogInformation("Successfully deleted watch {WatchId} for channel {ChannelName}",
                 watchId, channelWatch.ChannelName);
 
             WatchStatusChanged?.Invoke(this, new WatchStatusChangedEventArgs(
                 watchId, channelWatch.ChannelName, false, "Watch deleted"));
 
+            _logger.LogInformation("Exiting DeleteWatchAsync successfully. Result: true");
             return true;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to delete watch {WatchId}", watchId);
+            _logger.LogError(ex, "Exiting DeleteWatchAsync with error for watch {WatchId}. Result: false", watchId);
             return false;
         }
     }
@@ -424,12 +451,17 @@ public class FileWatchService : IFileWatchService, IDisposable
             }
 
             // Update watch statistics
+            _logger.LogDebug("Updating watch {WatchId} statistics for detected file: {FileName}",
+                channelWatch.Id, fileName);
             channelWatch.LastFileDetected = DateTime.UtcNow;
             channelWatch.TotalFilesDetected++;
             channelWatch.LastUpdated = DateTime.UtcNow;
             await _dbContext.SaveChangesAsync();
+            _logger.LogTrace("Watch {WatchId} statistics updated. Total files detected: {TotalFiles}",
+                channelWatch.Id, channelWatch.TotalFilesDetected);
 
             // Add to pending approvals
+            _logger.LogDebug("Adding file to pending approvals: {FilePath}", filePath);
             var approvalId = await _approvalService.AddPendingApprovalAsync(channelWatch.Id, filePath);
 
             // Raise file detected event

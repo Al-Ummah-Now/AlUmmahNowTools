@@ -29,7 +29,7 @@ public class ApprovalService : IApprovalService
             var approvals = await _dbContext.PendingApprovals
                 .Include(p => p.ChannelWatch)
                 .Where(p => p.Status == ApprovalStatus.Pending)
-                .OrderByDescending(p => p.Priority)
+                .OrderBy(p => p.Priority)
                 .ThenBy(p => p.DetectedAt)
                 .Select(p => new PendingApprovalDto
                 {
@@ -65,7 +65,7 @@ public class ApprovalService : IApprovalService
             var approvals = await _dbContext.PendingApprovals
                 .Include(p => p.ChannelWatch)
                 .Where(p => p.ChannelWatch.ChannelName == channelName && p.Status == ApprovalStatus.Pending)
-                .OrderByDescending(p => p.Priority)
+                .OrderBy(p => p.Priority)
                 .ThenBy(p => p.DetectedAt)
                 .Select(p => new PendingApprovalDto
                 {

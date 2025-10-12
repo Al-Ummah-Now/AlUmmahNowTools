@@ -8,7 +8,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
-    Title="AlUmmah Now Visual Importer"
+    Title="AlUmmah Now - Video Importer"
     Closed="Window_Closed">
 
     <Window.SystemBackdrop>
@@ -39,11 +39,11 @@
         </NavigationView>
 
         <!-- Status Bar -->
-        <Border Grid.Row="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
+        <Border Grid.Row="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" Padding="20,10">
             <StackPanel Orientation="Horizontal">
                 <Image Source="Assets/logo.png" Width="16" Height="16" Margin="0,0,10,0"/>
-                <TextBlock x:Name="StatusBarTextBlock" Text="Dashboard - Service monitoring active" 
+                <TextBlock x:Name="StatusBarTextBlock" Text="Ready"
                            Style="{ThemeResource CaptionTextBlockStyle}" VerticalAlignment="Center"/>
             </StackPanel>
         </Border>

@@ -14,6 +14,7 @@ This directory contains configuration and documentation for AI-assisted developm
 - **`CUSTOM_MCP_GUIDE.md`** - Complete guide to creating custom MCP servers
 - **`MCP_CONFIGURATION_GUIDE.md`** - Complete guide to MCP setup and configuration
 - **`testing-workflow.md`** - Quick reference for testing in AI coding workflow
+- **`LOGS.md`** - Quick reference for application log locations and commands
 - **`README.md`** - This file
 
 ## 🚀 Quick Start
@@ -119,6 +120,14 @@ Read **`testing-workflow.md`** for:
 - Common assertions
 - Test troubleshooting
 
+### For Log Locations
+Read **`LOGS.md`** for:
+- Application log file paths
+- Quick access commands
+- Log search examples
+- What's logged in each service
+- Recent logging changes
+
 ## 🔐 Security Notes
 
 **Important**: Never commit your actual `claude_desktop_config.json` to Git if it contains tokens!
@@ -131,6 +140,21 @@ Always use:
 - Template files for sharing
 - Environment variables for tokens
 - Minimal token scopes
+
+## ✅ Development Workflow
+
+**IMPORTANT**: After making any code changes, you must verify a successful build:
+
+```powershell
+# Build the entire solution
+dotnet build
+
+# Or build specific project
+dotnet build AlUmmahNow.FileScanService
+dotnet build AlUmmahNow.VisualImporter
+```
+
+**Required**: All changes must compile successfully before committing or considering the work complete.
 
 ## 💡 Usage Examples
 
@@ -204,6 +228,89 @@ To update your MCP configuration:
 
 4. **Restart Claude Desktop**
 
+## 📝 Log Locations
+
+Application logs are critical for debugging and monitoring. Here are the log file locations:
+
+### FileScanService Logs
+**Location**: `F:\Code\Repos\AlUmmahNowTools\AlUmmahNow.FileScanService\logs\`
+
+**Pattern**: `filescan-service-YYYYMMDD.txt`
+
+**Example**: `filescan-service-20251008.txt`
+
+**Contains**:
+- SignalR connection/disconnection events
+- Hub method invocations with parameters
+- Outbound SignalR messages sent to clients
+- Hub method return values
+- Scan operations and progress
+- File watch operations
+- Approval workflow events
+- Errors and warnings
+
+**Quick Access**:
+```powershell
+# View latest log
+Get-Content "F:\Code\Repos\AlUmmahNowTools\AlUmmahNow.FileScanService\logs\filescan-service-$(Get-Date -Format 'yyyyMMdd').txt" -Tail 50 -Wait
+
+# Search for errors
+Select-String -Path "F:\Code\Repos\AlUmmahNowTools\AlUmmahNow.FileScanService\logs\*.txt" -Pattern "ERR"
+```
+
+### VisualImporter Logs
+**Location**: `C:\Users\MEYWD\AppData\Local\AlUmmahNow\VisualImporter\Logs\`
+
+**Pattern**: `visual-importer-YYYYMMDD_NNN.txt`
+
+**Example**: `visual-importer-20251008_001.txt`
+
+**Contains**:
+- Application startup/shutdown events
+- FileScanService connection status
+- Database initialization
+- Service status changes
+- Settings loading
+- UI operations
+- Errors and warnings
+
+**Quick Access**:
+```powershell
+# View latest log
+Get-ChildItem "$env:LOCALAPPDATA\AlUmmahNow\VisualImporter\Logs\" | Sort-Object LastWriteTime -Descending | Select-Object -First 1 | Get-Content -Tail 50 -Wait
+
+# Search for errors in all logs
+Select-String -Path "$env:LOCALAPPDATA\AlUmmahNow\VisualImporter\Logs\*.txt" -Pattern "ERR"
+```
+
+### Log Levels
+
+Logs use Serilog structured logging with the following levels:
+
+- **TRACE**: Very detailed diagnostic information
+- **DEBUG**: Detailed information for debugging (method parameters, return values, message details)
+- **INF** (Information): General informational messages about application flow
+- **WRN** (Warning): Warning messages for potentially harmful situations
+- **ERR** (Error): Error messages for failures and exceptions
+- **FTL** (Fatal): Critical errors that cause application termination
+
+### Viewing Logs in Claude
+
+To view logs, use:
+```
+Read the latest FileScanService log
+```
+
+Or for specific dates:
+```
+Read F:\Code\Repos\AlUmmahNowTools\AlUmmahNow.FileScanService\logs\filescan-service-20251008.txt
+```
+
+For VisualImporter:
+```
+Read C:\Users\MEYWD\AppData\Local\AlUmmahNow\VisualImporter\Logs\visual-importer-20251008_001.txt
+```
+
 ## 📖 Additional Resources
 
 ### Official Documentation
@@ -222,8 +329,9 @@ To update your MCP configuration:
 3. ✅ Test MCP by asking Claude to search your codebase
 4. ✅ Read testing workflow for efficient AI-assisted development
 5. ✅ Explore advanced MCP servers as needed
+6. ✅ **Always run `dotnet build` after making code changes to verify successful compilation**
 
 ---
 
-*Last Updated: 2025-10-06*
+*Last Updated: 2025-10-08*
 *For the AlUmmahNowTools Project*

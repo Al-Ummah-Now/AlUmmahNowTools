@@ -320,6 +320,35 @@ namespace AlUmmahNow.VisualImporter.ViewModels
             }
         }
 
+        private int _selectedFileCount = 0;
+        public int SelectedFileCount
+        {
+            get => _selectedFileCount;
+            set
+            {
+                if (SetProperty(ref _selectedFileCount, value))
+                {
+                    OnPropertyChanged(nameof(HasSelectedFiles));
+                }
+            }
+        }
+
+        public bool HasSelectedFiles => SelectedFileCount > 0;
+
+        private bool _hasDatabaseStats = false;
+        public bool HasDatabaseStats
+        {
+            get => _hasDatabaseStats;
+            set => SetProperty(ref _hasDatabaseStats, value);
+        }
+
+        private string _databaseStatusMessage = string.Empty;
+        public string DatabaseStatusMessage
+        {
+            get => _databaseStatusMessage;
+            set => SetProperty(ref _databaseStatusMessage, value);
+        }
+
         // Collections
         public ObservableCollection<ImportSession> ImportSessions { get; } = new();
         public ObservableCollection<ImportVideo> SessionVideos { get; } = new();
@@ -811,6 +840,8 @@ namespace AlUmmahNow.VisualImporter.ViewModels
                     VideoFiles.Clear();
                     foreach (var file in videoFiles)
                     {
+                        // Subscribe to property changes to track selection
+                        file.PropertyChanged += OnVideoFilePropertyChanged;
                         VideoFiles.Add(file);
                     }
 
@@ -829,7 +860,9 @@ namespace AlUmmahNow.VisualImporter.ViewModels
                     // Apply initial sorting and filtering
                     ApplySortingAndFiltering();
                     UpdateStatistics();
-                    
+                    UpdateSelectedFileCount();
+                    LoadDatabaseStats();
+
                     HasScannedFiles = videoFiles.Count > 0;
                 }, "ScanFolder.UpdateCollections");
 
@@ -1014,6 +1047,7 @@ namespace AlUmmahNow.VisualImporter.ViewModels
                         file.IsSelected = true;
                     }
                     ApplySortingAndFiltering();
+                    UpdateSelectedFileCount();
                 }
                 catch (Exception ex)
                 {
@@ -1033,6 +1067,7 @@ namespace AlUmmahNow.VisualImporter.ViewModels
                         file.IsSelected = false;
                     }
                     ApplySortingAndFiltering();
+                    UpdateSelectedFileCount();
                 }
                 catch (Exception ex)
                 {
@@ -1134,6 +1169,40 @@ namespace AlUmmahNow.VisualImporter.ViewModels
                 StatusMessage = $"Error resuming import: {ex.Message}";
                 WindowsEventLogger.LogCriticalCrash(ex, "ResumeImportAsync");
                 IsImporting = false;
+            }
+        }
+
+        private void UpdateSelectedFileCount()
+        {
+            SelectedFileCount = FilteredVideoFiles.Count(f => f.IsSelected);
+        }
+
+        private void OnVideoFilePropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(VideoFileInfo.IsSelected))
+            {
+                UpdateSelectedFileCount();
+            }
+        }
+
+        private async void LoadDatabaseStats()
+        {
+            try
+            {
+                // TODO: Get actual database stats from service
+                // For now, show a placeholder to indicate database integration
+                await Task.Delay(100); // Placeholder async call
+
+                // This will be implemented when database service methods are available
+                HasDatabaseStats = false;
+                DatabaseStatusMessage = string.Empty;
+            }
+            catch (Exception ex)
+            {
+                // Don't show error to user, just log it
+                WindowsEventLogger.LogEvent(EventLogEntryType.Warning, 2210,
+                    "Database Stats Error", $"Failed to load database stats: {ex.Message}");
+                HasDatabaseStats = false;
             }
         }
 

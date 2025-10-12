@@ -414,6 +414,13 @@ namespace AlUmmahNow.VisualImporter.Services
             {
                 if (File.Exists(_serviceExecutablePath))
                 {
+                    // Check if it's a .csproj file - if so, return dotnet run command
+                    if (_serviceExecutablePath.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase))
+                    {
+                        _logger.LogDebug("Using configured FileScanService project: {Path}", _serviceExecutablePath);
+                        return $"dotnet|run|--project|{Path.GetFullPath(_serviceExecutablePath)}";
+                    }
+
                     _logger.LogDebug("Using configured FileScanService executable: {Path}", _serviceExecutablePath);
                     return Path.GetFullPath(_serviceExecutablePath);
                 }

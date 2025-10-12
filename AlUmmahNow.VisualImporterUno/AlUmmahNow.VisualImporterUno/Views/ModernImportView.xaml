@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="AlUmmahNow.VisualImporterUno.Views.ModernImportView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:AlUmmahNow.VisualImporterUno.Views"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Background="#F8F9FA">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="80"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Background="White">
+            <Border.Shadow>
+                <ThemeShadow/>
+            </Border.Shadow>
+            <Grid Padding="50,0">
+                <StackPanel Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
+                    <Ellipse Width="40" Height="40" Fill="#16A34A"/>
+                    <TextBlock Text="Al Ummah Now" FontSize="20" Foreground="#1F2937" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Main Content -->
+        <ScrollViewer Grid.Row="1">
+            <Grid Padding="40,40,40,40">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Upload Area -->
+                <Border Grid.Row="0"
+                        Height="300"
+                        Background="White"
+                        BorderBrush="#16A34A"
+                        BorderThickness="3"
+                        CornerRadius="12"
+                        Margin="0,0,0,32"
+                        AllowDrop="True">
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="16">
+                        <TextBlock Text="Drag and drop files here"
+                                   FontSize="24"
+                                   Foreground="#111827"
+                                   FontWeight="SemiBold"
+                                   TextAlignment="Center"/>
+
+                        <TextBlock Text="or click to browse"
+                                   FontSize="16"
+                                   Foreground="#6B7280"
+                                   TextAlignment="Center"/>
+
+                        <Button Background="#16A34A"
+                                Foreground="White"
+                                Height="50"
+                                MinWidth="170"
+                                CornerRadius="8"
+                                Margin="0,16,0,0">
+                            <TextBlock Text="Browse Files" FontSize="15"/>
+                        </Button>
+                    </StackPanel>
+                </Border>
+
+                <!-- Upload Queue -->
+                <Border Grid.Row="1" Background="White" CornerRadius="12" Padding="32">
+                    <Border.Shadow>
+                        <ThemeShadow/>
+                    </Border.Shadow>
+                    <StackPanel>
+                        <TextBlock Text="Upload Queue (3 files)"
+                                   FontSize="20"
+                                   Foreground="#111827"
+                                   FontWeight="SemiBold"
+                                   Margin="0,0,0,24"/>
+
+                        <!-- File Items -->
+                        <ListView SelectionMode="None">
+                            <!-- File 1 - Uploading -->
+                            <ListViewItem Background="#F9FAFB" Padding="20" Margin="0,0,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="islamic-history-ep25.mp4" FontSize="16" Foreground="#111827" Margin="0,0,0,8"/>
+                                    <TextBlock Text="245 MB • Uploading... 67%" FontSize="14" Foreground="#6B7280" Margin="0,0,0,8"/>
+                                    <ProgressBar Value="67" Maximum="100" Height="8" CornerRadius="4" Foreground="#16A34A"/>
+                                </StackPanel>
+                            </ListViewItem>
+
+                            <!-- File 2 - Completed -->
+                            <ListViewItem Background="White" Padding="20" Margin="0,0,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="quran-recitation-surah-yaseen.mp4" FontSize="16" Foreground="#111827" Margin="0,0,0,8"/>
+                                    <TextBlock Text="189 MB • Completed" FontSize="14" Foreground="#16A34A"/>
+                                </StackPanel>
+                            </ListViewItem>
+
+                            <!-- File 3 - Queued -->
+                            <ListViewItem Background="#F9FAFB" Padding="20" Margin="0,0,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="lecture-fiqh-chapter-3.mp4" FontSize="16" Foreground="#111827" Margin="0,0,0,8"/>
+                                    <TextBlock Text="412 MB • Queued" FontSize="14" Foreground="#6B7280"/>
+                                </StackPanel>
+                            </ListViewItem>
+                        </ListView>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </ScrollViewer>
+    </Grid>
+</Page>

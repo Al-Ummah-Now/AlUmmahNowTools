@@ -5,6 +5,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:AlUmmahNow.VisualImporter.Views"
     xmlns:vm="using:AlUmmahNow.VisualImporter.ViewModels"
+    xmlns:models="using:AlUmmahNow.VisualImporter.Models"
     xmlns:converters="using:AlUmmahNow.VisualImporter.Converters"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -24,71 +25,187 @@
         </Grid.RowDefinitions>
 
         <!-- Header -->
-        <Border Grid.Row="0" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
-                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,0,0,1" Padding="20">
-            <StackPanel>
-                <!-- App Header with Back Button -->
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                    <Button x:Name="BackToDashboardButton" 
-                            Content="&#xE72B;" FontFamily="Segoe MDL2 Assets" 
-                            Style="{ThemeResource DefaultButtonStyle}"
-                            Width="32" Height="32" Padding="0"
-                            ToolTipService.ToolTip="Back to Dashboard"
-                            Click="BackToDashboardButton_Click" 
-                            Margin="0,0,16,0"/>
-                    <Image Source="/Assets/logo.png" Width="32" Height="32" Margin="0,0,10,0"/>
-                    <TextBlock Text="Video Import" Style="{ThemeResource TitleTextBlockStyle}" VerticalAlignment="Center"/>
-                </StackPanel>
-                
+        <Border Grid.Row="0" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,0,0,1" Padding="24">
+            <StackPanel Spacing="16">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0" Text="Import Videos" Style="{ThemeResource TitleTextBlockStyle}"/>
+
+                    <!-- Import Button - Always visible when files are scanned -->
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" Visibility="{x:Bind ViewModel.HasScannedFiles, Mode=OneWay}">
+                        <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                            <TextBlock Text="{x:Bind ViewModel.SelectedFileCount, Mode=OneWay}"
+                                       Style="{ThemeResource SubtitleTextBlockStyle}"
+                                       HorizontalAlignment="Right"/>
+                            <TextBlock Text="files selected"
+                                       Style="{ThemeResource CaptionTextBlockStyle}"
+                                       Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"
+                                       HorizontalAlignment="Right"/>
+                        </StackPanel>
+                        <Button Content="Import Selected"
+                                Command="{x:Bind ViewModel.StartImportCommand}"
+                                Style="{ThemeResource AccentButtonStyle}"
+                                IsEnabled="{x:Bind ViewModel.HasSelectedFiles, Mode=OneWay}"/>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Database Status -->
+                <Border Background="{ThemeResource AccentFillColorTertiaryBrush}"
+                        BorderBrush="{ThemeResource AccentFillColorSecondaryBrush}"
+                        BorderThickness="1"
+                        CornerRadius="4"
+                        Padding="12"
+                        Visibility="{x:Bind ViewModel.HasDatabaseStats, Mode=OneWay}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <FontIcon Grid.Column="0" Glyph="&#xE946;" FontSize="16" Margin="0,0,12,0"
+                                  Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="{x:Bind ViewModel.DatabaseStatusMessage, Mode=OneWay, FallbackValue='Loading database status...'}"
+                                       FontSize="12"
+                                       Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
                 <!-- Folder Selection -->
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                    <TextBlock Text="Import Folder:" VerticalAlignment="Center" Margin="0,0,10,0" MinWidth="100"/>
-                    <TextBox x:Name="FolderPathTextBox" 
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBox Grid.Column="0"
+                             PlaceholderText="Select a folder containing video files..."
                              Text="{x:Bind ViewModel.SelectedFolderPath, Mode=TwoWay}"
-                             Width="300" Margin="0,0,10,0"/>
-                    <Button x:Name="BrowseButton" Content="Browse..." 
+                             IsReadOnly="True"
+                             Margin="0,0,12,0"/>
+
+                    <Button Grid.Column="1"
+                            Content="Browse"
                             Command="{x:Bind ViewModel.SelectFolderCommand}"
-                            Margin="0,0,10,0"/>
-                    <Button x:Name="ScanButton" Content="Scan Folder" 
+                            Margin="0,0,12,0"/>
+
+                    <Button Grid.Column="2"
+                            Content="Scan Folder"
                             Command="{x:Bind ViewModel.ScanFolderCommand}"
-                            Margin="0,0,10,0"
-                            Style="{ThemeResource DefaultButtonStyle}"/>
-                    <Button x:Name="StartImportButton" Content="Start Import" 
-                            Command="{x:Bind ViewModel.StartImportCommand}"
                             Style="{ThemeResource AccentButtonStyle}"/>
-                </StackPanel>
+                </Grid>
 
                 <!-- Progress -->
-                <StackPanel x:Name="ProgressPanel" 
-                            Visibility="{x:Bind ViewModel.IsScanning, Mode=OneWay}">
-                    <ProgressBar x:Name="ImportProgressBar" 
-                                 Value="{x:Bind ViewModel.ProgressPercentage, Mode=OneWay}" 
-                                 Maximum="100" Height="6" Margin="0,5"/>
-                    <TextBlock x:Name="StatusTextBlock" 
-                               Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" 
-                               Style="{ThemeResource CaptionTextBlockStyle}" Margin="0,5,0,0"/>
+                <StackPanel Visibility="{x:Bind ViewModel.IsScanning, Mode=OneWay}" Spacing="8">
+                    <ProgressBar Value="{x:Bind ViewModel.ProgressPercentage, Mode=OneWay}"
+                                 Maximum="100" Height="6"/>
+                    <TextBlock Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
+                               Style="{ThemeResource CaptionTextBlockStyle}"
+                               Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
+                </StackPanel>
+
+                <!-- Import Progress -->
+                <StackPanel Visibility="{x:Bind ViewModel.IsImporting, Mode=OneWay}" Spacing="8">
+                    <TextBlock Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
+                               Style="{ThemeResource BodyTextBlockStyle}"/>
+                    <ProgressBar Value="{x:Bind ViewModel.ProgressPercentage, Mode=OneWay}" Maximum="100"/>
                 </StackPanel>
             </StackPanel>
         </Border>
 
-        <!-- Simplified Main Content for now -->
+        <!-- Main Content -->
         <ScrollViewer Grid.Row="1" Padding="24">
-            <StackPanel>
-                <TextBlock Text="Import Functionality" Style="{ThemeResource BodyStrongTextBlockStyle}" Margin="0,0,0,16"/>
-                <TextBlock Text="This page will contain the import functionality. Use the navigation to explore other parts of the application." 
-                           Style="{ThemeResource BodyTextBlockStyle}" 
-                           Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"
-                           TextWrapping="Wrap" Margin="0,0,0,12"/>
-                <TextBlock Text="• Select a folder to scan for video files" 
-                           Style="{ThemeResource BodyTextBlockStyle}" 
-                           Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" Margin="0,0,0,4"/>
-                <TextBlock Text="• Configure import settings" 
-                           Style="{ThemeResource BodyTextBlockStyle}" 
-                           Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" Margin="0,0,0,4"/>
-                <TextBlock Text="• Monitor import progress" 
-                           Style="{ThemeResource BodyTextBlockStyle}" 
-                           Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
-            </StackPanel>
+            <Grid Visibility="{x:Bind ViewModel.HasScannedFiles, Mode=OneWay}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- File Statistics & Actions -->
+                <Grid Grid.Row="0" Margin="0,0,0,16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- File Statistics -->
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="20" VerticalAlignment="Center">
+                        <TextBlock Text="{x:Bind ViewModel.FileStatistics.TotalFiles, Mode=OneWay, FallbackValue='0'}"
+                                   Style="{ThemeResource SubtitleTextBlockStyle}"/>
+                        <TextBlock Text="files found" Style="{ThemeResource BodyTextBlockStyle}" VerticalAlignment="Center"/>
+
+                        <TextBlock Text="|" Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" VerticalAlignment="Center"/>
+
+                        <TextBlock Text="{x:Bind ViewModel.FileStatistics.TotalSizeFormatted, Mode=OneWay, FallbackValue='0 B'}"
+                                   Style="{ThemeResource SubtitleTextBlockStyle}"/>
+                    </StackPanel>
+
+                    <!-- Filter Options -->
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                        <Button Content="Select All"
+                                Command="{x:Bind ViewModel.SelectAllFilesCommand}"/>
+                        <Button Content="Deselect All"
+                                Command="{x:Bind ViewModel.DeselectAllFilesCommand}"/>
+                        <CheckBox Content="Show only selected"
+                                  IsChecked="{x:Bind ViewModel.ShowOnlySelected, Mode=TwoWay}"
+                                  VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Files List -->
+                <ListView Grid.Row="2"
+                          ItemsSource="{x:Bind ViewModel.FilteredVideoFiles, Mode=OneWay}"
+                          SelectedItem="{x:Bind ViewModel.SelectedVideoFile, Mode=TwoWay}"
+                          SelectionMode="Single">
+                    <ListView.ItemTemplate>
+                        <DataTemplate x:DataType="models:VideoFileInfo">
+                            <Grid Margin="0,8" Padding="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <CheckBox Grid.Column="0"
+                                          IsChecked="{x:Bind IsSelected, Mode=TwoWay}"
+                                          Margin="0,0,16,0"/>
+
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock Text="{x:Bind FileName}"
+                                               Style="{ThemeResource BodyStrongTextBlockStyle}"/>
+                                    <TextBlock Text="{x:Bind RelativePath}"
+                                               Style="{ThemeResource CaptionTextBlockStyle}"
+                                               Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
+                                </StackPanel>
+
+                                <TextBlock Grid.Column="2"
+                                           Text="{x:Bind FileSizeFormatted}"
+                                           Style="{ThemeResource CaptionTextBlockStyle}"
+                                           VerticalAlignment="Center"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+            </Grid>
         </ScrollViewer>
+
+        <!-- Loading Indicator -->
+        <Grid Grid.RowSpan="2"
+              Background="{ThemeResource SystemControlAcrylicWindowBrush}"
+              Visibility="{x:Bind ViewModel.IsScanning, Mode=OneWay}">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="20">
+                <ProgressRing IsActive="True" Width="60" Height="60"/>
+                <TextBlock Text="Scanning for video files..."
+                           Style="{ThemeResource SubtitleTextBlockStyle}"
+                           HorizontalAlignment="Center"/>
+            </StackPanel>
+        </Grid>
     </Grid>
 </Page>

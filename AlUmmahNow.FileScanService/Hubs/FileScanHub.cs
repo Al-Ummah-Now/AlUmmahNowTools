@@ -39,7 +39,14 @@ namespace AlUmmahNow.FileScanService.Hubs
         /// </summary>
         public override async Task OnDisconnectedAsync(Exception? exception)
         {
-            _logger.LogInformation("Client disconnected: {ConnectionId}", Context.ConnectionId);
+            if (exception != null)
+            {
+                _logger.LogWarning(exception, "Client disconnected with exception: {ConnectionId}", Context.ConnectionId);
+            }
+            else
+            {
+                _logger.LogInformation("Client disconnected: {ConnectionId}", Context.ConnectionId);
+            }
             await base.OnDisconnectedAsync(exception);
         }
 
@@ -141,10 +148,13 @@ namespace AlUmmahNow.FileScanService.Hubs
                 await Groups.AddToGroupAsync(Context.ConnectionId, $"scan-{scanSession.Id}");
 
                 // Signal that scan has been queued
+                _logger.LogDebug("Sending ScanStarted message to group scan-{SessionId}: SessionId={SessionId}, FolderPath={FolderPath}",
+                    scanSession.Id, scanSession.Id, folderPath);
                 await Clients.Group($"scan-{scanSession.Id}").SendAsync("ScanStarted", scanSession.Id, folderPath);
 
-                _logger.LogInformation("Scan session {SessionId} created and queued for {FolderPath}", 
+                _logger.LogInformation("Scan session {SessionId} created and queued for {FolderPath}",
                     scanSession.Id, folderPath);
+                _logger.LogDebug("StartScan returning SessionId: {SessionId}", scanSession.Id);
 
                 return scanSession.Id;
             }
@@ -170,7 +180,7 @@ namespace AlUmmahNow.FileScanService.Hubs
                     throw new ArgumentException($"Scan session {sessionId} not found");
                 }
 
-                return new ScanStatusDto
+                var statusDto = new ScanStatusDto
                 {
                     SessionId = session.Id,
                     Status = session.Status.ToString(),
@@ -180,6 +190,10 @@ namespace AlUmmahNow.FileScanService.Hubs
                     ProgressPercentage = session.ProgressPercentage,
                     CurrentOperation = session.CurrentOperation ?? "Unknown"
                 };
+
+                _logger.LogDebug("GetScanStatus returning: SessionId={SessionId}, Status={Status}, Progress={Progress}%",
+                    statusDto.SessionId, statusDto.Status, statusDto.ProgressPercentage);
+                return statusDto;
             }
             catch (Exception ex)
             {
@@ -210,6 +224,7 @@ namespace AlUmmahNow.FileScanService.Hubs
                     })
                     .ToListAsync();
 
+                _logger.LogDebug("GetAllSessions returning {Count} sessions", sessions.Count);
                 return sessions;
             }
             catch (Exception ex)
@@ -244,6 +259,8 @@ namespace AlUmmahNow.FileScanService.Hubs
                 await _dbContext.SaveChangesAsync();
 
                 // Notify all clients in this session group
+                _logger.LogDebug("Sending ScanCancelled message to group scan-{SessionId}: SessionId={SessionId}",
+                    sessionId, sessionId);
                 await Clients.Group($"scan-{sessionId}").SendAsync("ScanCancelled", sessionId);
 
                 _logger.LogInformation("Scan session {SessionId} cancelled", sessionId);
@@ -277,6 +294,7 @@ namespace AlUmmahNow.FileScanService.Hubs
                 await Groups.AddToGroupAsync(Context.ConnectionId, $"watch-{watchId}");
 
                 _logger.LogInformation("Watch {WatchId} started successfully", watchId);
+                _logger.LogDebug("StartWatch returning WatchId: {WatchId}", watchId);
                 return watchId;
             }
             catch (Exception ex)
@@ -298,14 +316,17 @@ namespace AlUmmahNow.FileScanService.Hubs
                 _logger.LogInformation("Stopping watch {WatchId} from {ConnectionId}", watchId, Context.ConnectionId);
 
                 var success = await _fileWatchService.StopWatchAsync(watchId);
-                
+
                 if (success)
                 {
                     // Notify clients in the watch group
+                    _logger.LogDebug("Sending WatchStopped message to group watch-{WatchId}: WatchId={WatchId}",
+                        watchId, watchId);
                     await Clients.Group($"watch-{watchId}").SendAsync("WatchStopped", watchId);
                     _logger.LogInformation("Watch {WatchId} stopped successfully", watchId);
                 }
 
+                _logger.LogDebug("StopWatch returning: {Success}", success);
                 return success;
             }
             catch (Exception ex)
@@ -323,7 +344,9 @@ namespace AlUmmahNow.FileScanService.Hubs
         {
             try
             {
-                return await _fileWatchService.GetActiveWatchesAsync();
+                var watches = await _fileWatchService.GetActiveWatchesAsync();
+                _logger.LogDebug("GetActiveWatches returning {Count} watches", watches.Count);
+                return watches;
             }
             catch (Exception ex)
             {
@@ -341,7 +364,10 @@ namespace AlUmmahNow.FileScanService.Hubs
         {
             try
             {
-                return await _fileWatchService.GetWatchStatusAsync(watchId);
+                var status = await _fileWatchService.GetWatchStatusAsync(watchId);
+                _logger.LogDebug("GetWatchStatus returning: WatchId={WatchId}, IsActive={IsActive}",
+                    watchId, status?.IsActive ?? false);
+                return status;
             }
             catch (Exception ex)
             {
@@ -361,12 +387,15 @@ namespace AlUmmahNow.FileScanService.Hubs
             try
             {
                 var success = await _fileWatchService.UpdateWatchAsync(watchId, request);
-                
+
                 if (success)
                 {
+                    _logger.LogDebug("Sending WatchUpdated message to group watch-{WatchId}: WatchId={WatchId}",
+                        watchId, watchId);
                     await Clients.Group($"watch-{watchId}").SendAsync("WatchUpdated", watchId);
                 }
 
+                _logger.LogDebug("UpdateWatch returning: {Success}", success);
                 return success;
             }
             catch (Exception ex)
@@ -386,12 +415,15 @@ namespace AlUmmahNow.FileScanService.Hubs
             try
             {
                 var success = await _fileWatchService.DeleteWatchAsync(watchId);
-                
+
                 if (success)
                 {
+                    _logger.LogDebug("Sending WatchDeleted message to group watch-{WatchId}: WatchId={WatchId}",
+                        watchId, watchId);
                     await Clients.Group($"watch-{watchId}").SendAsync("WatchDeleted", watchId);
                 }
 
+                _logger.LogDebug("DeleteWatch returning: {Success}", success);
                 return success;
             }
             catch (Exception ex)
@@ -413,7 +445,9 @@ namespace AlUmmahNow.FileScanService.Hubs
         {
             try
             {
-                return await _approvalService.GetPendingApprovalsAsync();
+                var approvals = await _approvalService.GetPendingApprovalsAsync();
+                _logger.LogDebug("GetPendingApprovals returning {Count} approvals", approvals.Count);
+                return approvals;
             }
             catch (Exception ex)
             {
@@ -431,7 +465,10 @@ namespace AlUmmahNow.FileScanService.Hubs
         {
             try
             {
-                return await _approvalService.GetPendingApprovalsByChannelAsync(channelName);
+                var approvals = await _approvalService.GetPendingApprovalsByChannelAsync(channelName);
+                _logger.LogDebug("GetPendingApprovalsByChannel returning {Count} approvals for channel {ChannelName}",
+                    approvals.Count, channelName);
+                return approvals;
             }
             catch (Exception ex)
             {
@@ -453,13 +490,16 @@ namespace AlUmmahNow.FileScanService.Hubs
                     Context.ConnectionId, request.Decision, request.ApprovalIds.Count);
 
                 var success = await _approvalService.ProcessApprovalDecisionAsync(request);
-                
+
                 if (success)
                 {
                     // Notify all clients in the approvals group
+                    _logger.LogDebug("Sending ApprovalDecisionProcessed message to group approvals: Decision={Decision}, Count={Count}",
+                        request.Decision, request.ApprovalIds.Count);
                     await Clients.Group("approvals").SendAsync("ApprovalDecisionProcessed", request);
                 }
 
+                _logger.LogDebug("ProcessApprovalDecision returning: {Success}", success);
                 return success;
             }
             catch (Exception ex)
@@ -482,13 +522,16 @@ namespace AlUmmahNow.FileScanService.Hubs
                     Context.ConnectionId, request.Decision);
 
                 var processedCount = await _approvalService.ProcessBulkApprovalAsync(request);
-                
+
                 if (processedCount > 0)
                 {
                     // Notify all clients in the approvals group
+                    _logger.LogDebug("Sending BulkApprovalProcessed message to group approvals: Decision={Decision}, ProcessedCount={Count}",
+                        request.Decision, processedCount);
                     await Clients.Group("approvals").SendAsync("BulkApprovalProcessed", request, processedCount);
                 }
 
+                _logger.LogDebug("ProcessBulkApproval returning: {ProcessedCount}", processedCount);
                 return processedCount;
             }
             catch (Exception ex)
@@ -507,7 +550,10 @@ namespace AlUmmahNow.FileScanService.Hubs
         {
             try
             {
-                return await _approvalService.GetApprovalStatisticsAsync(channelWatchId);
+                var stats = await _approvalService.GetApprovalStatisticsAsync(channelWatchId);
+                _logger.LogDebug("GetApprovalStatistics returning: Pending={Pending}, Approved={Approved}, Rejected={Rejected}",
+                    stats.TotalPending, stats.TotalApproved, stats.TotalRejected);
+                return stats;
             }
             catch (Exception ex)
             {
@@ -527,6 +573,7 @@ namespace AlUmmahNow.FileScanService.Hubs
         /// <param name="progress">Progress data</param>
         public async Task SendProgressUpdate(Guid sessionId, object progress)
         {
+            _logger.LogDebug("Sending ScanProgress message to group scan-{SessionId}", sessionId);
             await Clients.Group($"scan-{sessionId}").SendAsync("ScanProgress", sessionId, progress);
         }
 
@@ -537,6 +584,8 @@ namespace AlUmmahNow.FileScanService.Hubs
         /// <param name="fileCount">Number of files found</param>
         public async Task SendScanCompleted(Guid sessionId, int fileCount)
         {
+            _logger.LogInformation("Sending ScanCompleted message to group scan-{SessionId}: FileCount={FileCount}",
+                sessionId, fileCount);
             await Clients.Group($"scan-{sessionId}").SendAsync("ScanCompleted", sessionId, fileCount);
         }
 
@@ -547,6 +596,8 @@ namespace AlUmmahNow.FileScanService.Hubs
         /// <param name="error">Error message</param>
         public async Task SendScanFailed(Guid sessionId, string error)
         {
+            _logger.LogWarning("Sending ScanFailed message to group scan-{SessionId}: Error={Error}",
+                sessionId, error);
             await Clients.Group($"scan-{sessionId}").SendAsync("ScanFailed", sessionId, error);
         }
 
@@ -560,7 +611,12 @@ namespace AlUmmahNow.FileScanService.Hubs
         /// <param name="fileSize">File size</param>
         public async Task SendFileDetected(Guid watchId, string channelName, string fileName, string filePath, long fileSize)
         {
+            _logger.LogInformation("Sending FileDetected message to group watch-{WatchId}: Channel={Channel}, File={File}, Size={Size}",
+                watchId, channelName, fileName, fileSize);
             await Clients.Group($"watch-{watchId}").SendAsync("FileDetected", watchId, channelName, fileName, filePath, fileSize);
+
+            _logger.LogDebug("Sending NewFileForApproval message to group approvals: Watch={WatchId}, Channel={Channel}, File={File}",
+                watchId, channelName, fileName);
             await Clients.Group("approvals").SendAsync("NewFileForApproval", watchId, channelName, fileName, filePath, fileSize);
         }
 
@@ -573,6 +629,8 @@ namespace AlUmmahNow.FileScanService.Hubs
         /// <param name="statusMessage">Status message</param>
         public async Task SendWatchStatusChanged(Guid watchId, string channelName, bool isActive, string? statusMessage = null)
         {
+            _logger.LogInformation("Sending WatchStatusChanged message to group watch-{WatchId}: Channel={Channel}, IsActive={IsActive}, Status={Status}",
+                watchId, channelName, isActive, statusMessage ?? "N/A");
             await Clients.Group($"watch-{watchId}").SendAsync("WatchStatusChanged", watchId, channelName, isActive, statusMessage);
         }
 
@@ -585,9 +643,11 @@ namespace AlUmmahNow.FileScanService.Hubs
         /// <param name="oldStatus">Old status</param>
         /// <param name="newStatus">New status</param>
         /// <param name="approvedBy">Who approved it</param>
-        public async Task SendApprovalStatusChanged(Guid approvalId, string channelName, string fileName, 
+        public async Task SendApprovalStatusChanged(Guid approvalId, string channelName, string fileName,
             ApprovalStatus oldStatus, ApprovalStatus newStatus, string? approvedBy = null)
         {
+            _logger.LogInformation("Sending ApprovalStatusChanged message to group approvals: Approval={ApprovalId}, Channel={Channel}, File={File}, OldStatus={OldStatus}, NewStatus={NewStatus}, By={ApprovedBy}",
+                approvalId, channelName, fileName, oldStatus, newStatus, approvedBy ?? "N/A");
             await Clients.Group("approvals").SendAsync("ApprovalStatusChanged", approvalId, channelName, fileName, oldStatus, newStatus, approvedBy);
         }
 
