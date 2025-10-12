@@ -13,7 +13,7 @@ namespace AlUmmahNow.VisualImporterUno.Services
     /// Manages the FileScanService lifecycle for the VisualImporter
     /// Ensures the service is running as a singleton and provides health monitoring
     /// </summary>
-    public class FileScanServiceManager : IDisposable
+    public class FileScanServiceManager : IAsyncDisposable, IDisposable
     {
         private readonly ILogger<FileScanServiceManager> _logger;
         private readonly string _serviceUrl;
@@ -21,7 +21,7 @@ namespace AlUmmahNow.VisualImporterUno.Services
         private readonly HttpClient _httpClient;
         private readonly Timer _healthCheckTimer;
         private readonly object _lockObject = new object();
-        
+
         private Process? _serviceProcess;
         private bool _isServiceManaged = false;
         private bool _isDisposed = false;
@@ -626,23 +626,21 @@ namespace AlUmmahNow.VisualImporterUno.Services
         }
 
         /// <summary>
-        /// Disposes of resources
+        /// Disposes of resources asynchronously
         /// </summary>
-        public void Dispose()
+        public async ValueTask DisposeAsync()
         {
             if (_isDisposed) return;
-
             _isDisposed = true;
 
             try
             {
                 _healthCheckTimer?.Dispose();
-                
+
                 // Stop the service if we're managing it
                 if (_isServiceManaged)
                 {
-                    var stopTask = StopServiceAsync();
-                    stopTask.Wait(TimeSpan.FromSeconds(10));
+                    await StopServiceAsync().WaitAsync(TimeSpan.FromSeconds(10));
                 }
 
                 CleanupProcess();
@@ -654,6 +652,24 @@ namespace AlUmmahNow.VisualImporterUno.Services
             }
 
             _logger.LogInformation("FileScanServiceManager disposed");
+            GC.SuppressFinalize(this);
+        }
+
+        /// <summary>
+        /// Disposes of resources synchronously (calls async version)
+        /// </summary>
+        public void Dispose()
+        {
+            // Synchronous dispose - calls async version
+            // This is a compromise for IDisposable compatibility
+            try
+            {
+                DisposeAsync().AsTask().GetAwaiter().GetResult();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in synchronous dispose");
+            }
         }
     }
 
