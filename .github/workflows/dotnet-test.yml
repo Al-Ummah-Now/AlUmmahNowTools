@@ -1,0 +1,192 @@
+name: .NET Tests and Coverage
+
+on:
+  push:
+    branches: [ master, main, develop ]
+  pull_request:
+    branches: [ master, main, develop ]
+
+jobs:
+  test:
+    name: Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        # Optionally add: windows-latest, macos-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Restore dependencies
+      run: dotnet restore AlUmmahNow.sln
+
+    - name: Build solution
+      run: dotnet build AlUmmahNow.sln --no-restore --configuration Release
+
+    - name: Run Unit Tests
+      run: |
+        dotnet test AlUmmahNow.Tests/AlUmmahNow.Tests.csproj \
+          --no-build \
+          --configuration Release \
+          --filter "Category=Unit" \
+          --logger "trx;LogFileName=unit-tests.trx" \
+          --logger "console;verbosity=detailed"
+
+    - name: Run Integration Tests
+      run: |
+        dotnet test AlUmmahNow.Tests/AlUmmahNow.Tests.csproj \
+          --no-build \
+          --configuration Release \
+          --filter "Category=Integration" \
+          --logger "trx;LogFileName=integration-tests.trx" \
+          --logger "console;verbosity=detailed"
+
+    - name: Run All Tests with Coverage
+      run: |
+        dotnet test AlUmmahNow.Tests/AlUmmahNow.Tests.csproj \
+          --no-build \
+          --configuration Release \
+          --collect:"XPlat Code Coverage" \
+          --settings AlUmmahNow.Tests/coverage.runsettings \
+          --results-directory ./coverage \
+          --logger "trx;LogFileName=all-tests.trx"
+
+    - name: Install ReportGenerator
+      run: dotnet tool install -g dotnet-reportgenerator-globaltool
+
+    - name: Generate Coverage Report
+      run: |
+        reportgenerator \
+          -reports:"./coverage/**/coverage.cobertura.xml" \
+          -targetdir:"./coveragereport" \
+          -reporttypes:"Html;Badges;Cobertura" \
+          -verbosity:"Info"
+
+    - name: Upload Coverage Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report-${{ matrix.os }}
+        path: ./coveragereport
+        retention-days: 30
+
+    - name: Upload Test Results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results-${{ matrix.os }}
+        path: |
+          **/*.trx
+          ./coverage/**/coverage.cobertura.xml
+        retention-days: 30
+
+    - name: Test Report
+      uses: dorny/test-reporter@v1
+      if: always()
+      with:
+        name: .NET Tests (${{ matrix.os }})
+        path: '**/*.trx'
+        reporter: dotnet-trx
+        fail-on-error: true
+
+    - name: Code Coverage Report
+      uses: irongut/CodeCoverageSummary@v1.3.0
+      with:
+        filename: ./coverage/**/coverage.cobertura.xml
+        badge: true
+        fail_below_min: false
+        format: markdown
+        hide_branch_rate: false
+        hide_complexity: false
+        indicators: true
+        output: both
+        thresholds: '60 80'
+
+    - name: Add Coverage Comment to PR
+      uses: marocchino/sticky-pull-request-comment@v2
+      if: github.event_name == 'pull_request'
+      with:
+        recreate: true
+        path: code-coverage-results.md
+
+  # Optional: Upload to Codecov
+  codecov:
+    name: Upload to Codecov
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Restore and Build
+      run: |
+        dotnet restore AlUmmahNow.sln
+        dotnet build AlUmmahNow.sln --no-restore --configuration Release
+
+    - name: Run Tests with Coverage
+      run: |
+        dotnet test AlUmmahNow.Tests/AlUmmahNow.Tests.csproj \
+          --no-build \
+          --configuration Release \
+          --collect:"XPlat Code Coverage" \
+          --settings AlUmmahNow.Tests/coverage.runsettings \
+          --results-directory ./coverage
+
+    - name: Upload to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        files: ./coverage/**/coverage.cobertura.xml
+        fail_ci_if_error: false
+        verbose: true
+        token: ${{ secrets.CODECOV_TOKEN }}
+
+  # Optional: Quality Gate - fail if coverage below threshold
+  quality-gate:
+    name: Quality Gate
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Restore and Build
+      run: |
+        dotnet restore AlUmmahNow.sln
+        dotnet build AlUmmahNow.sln --no-restore --configuration Release
+
+    - name: Run Tests with Coverage Threshold
+      run: |
+        dotnet test AlUmmahNow.Tests/AlUmmahNow.Tests.csproj \
+          --no-build \
+          --configuration Release \
+          /p:CollectCoverage=true \
+          /p:CoverletOutputFormat=cobertura \
+          /p:Threshold=60 \
+          /p:ThresholdType=line \
+          /p:ThresholdStat=total
+
+    - name: Check for Test Failures
+      if: failure()
+      run: |
+        echo "❌ Quality gate failed!"
+        echo "Tests failed or code coverage is below 60%"
+        exit 1

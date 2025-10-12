@@ -18,7 +18,7 @@ namespace AlUmmahNow.VisualImporterUno.Services
     /// Service for managing database-based file scanning operations
     /// Replaces the direct file scanning with database and service communication
     /// </summary>
-    public class DatabaseFileScanService : IDisposable
+    public class DatabaseFileScanService : IAsyncDisposable, IDisposable
     {
         private readonly ImportDbContext _dbContext;
         private readonly ILogger<DatabaseFileScanService> _logger;
@@ -412,26 +412,38 @@ namespace AlUmmahNow.VisualImporterUno.Services
             };
         }
 
-        public void Dispose()
+        public async ValueTask DisposeAsync()
         {
-            Dispose(true);
+            if (_disposed) return;
+            _disposed = true;
+
+            try
+            {
+                if (_hubConnection != null)
+                {
+                    await _hubConnection.DisposeAsync();
+                }
+                _httpClient?.Dispose();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error disposing DatabaseFileScanService");
+            }
+
             GC.SuppressFinalize(this);
         }
 
-        protected virtual void Dispose(bool disposing)
+        public void Dispose()
         {
-            if (!_disposed && disposing)
+            // Dispose pattern for IDisposable - calls async version synchronously
+            // This is a compromise - ideally all callers should use DisposeAsync
+            try
             {
-                try
-                {
-                    _hubConnection?.DisposeAsync().AsTask().Wait(5000);
-                    _httpClient?.Dispose();
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error disposing DatabaseFileScanService");
-                }
-                _disposed = true;
+                DisposeAsync().AsTask().GetAwaiter().GetResult();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in synchronous dispose");
             }
         }
     }
