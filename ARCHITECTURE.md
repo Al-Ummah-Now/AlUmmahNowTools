@@ -9,16 +9,18 @@ AlUmmahNowTools is a comprehensive .NET 8 solution for video content management,
 ```
 AlUmmahNowTools/
 ??? AlUmmahNow.Data/                    # Shared Data Library
-??? AlUmmahNow.Importer/                # Core Import Logic Library  
+??? AlUmmahNow.Importer/                # Core Import Logic Library
 ??? AlUmmahNow.DataImporter/            # CLI SignalR Client Application
 ??? AlUmmahNow.BunnyBulkUploader/       # CLI Bulk Upload Application
-??? AlUmmahNow.VisualImporter/          # WinUI 3 Visual Application
+??? AlUmmahNow.VisualImporterUno/       # Uno Platform Cross-Platform GUI (Windows, Linux, macOS, Web, Mobile)
 ??? AlUmmahNow.FileScanService/         # SignalR Hub & Background Processing Service
-??? AlUmmahNow.Tests/                   # Comprehensive Unit Tests
+??? AlUmmahNow.Tests/                   # Comprehensive Unit Tests (258 tests)
 ??? .github/copilot-instructions.md    # Development Guidelines
 ```
 
-**Note**: `AlUmmahNow.FileScanApi` has been **REMOVED** and replaced with SignalR-based real-time communication.
+**Recent Changes**:
+- `AlUmmahNow.FileScanApi` has been **REMOVED** and replaced with SignalR-based real-time communication
+- `AlUmmahNow.VisualImporter` (WinUI 3) has been **REMOVED** and replaced with `AlUmmahNow.VisualImporterUno` for cross-platform support
 
 ## ?? Core Principles
 
@@ -112,24 +114,34 @@ AlUmmahNow.DataImporter/
 
 **Replaced**: `FileScanApiClient.cs` ? `FileScanSignalRClient.cs` for real-time communication
 
-### **AlUmmahNow.VisualImporter** - GUI Interface
+### **AlUmmahNow.VisualImporterUno** - Cross-Platform GUI Interface
 ```
-AlUmmahNow.VisualImporter/
-??? Views/                      # UI Views (XAML)
+AlUmmahNow.VisualImporterUno/
+??? Views/                      # UI Views (XAML) - Traditional & Modern designs
 ??? ViewModels/                 # MVVM ViewModels
 ??? Services/                   # UI-specific services
+???   ??? FileScanSignalRClient.cs # SignalR real-time communication
+???   ??? FileScanServiceManager.cs # Service lifecycle management
+???   ??? FileDiscoveryService.cs   # Local file discovery
 ??? Models/                     # UI models
+??? Converters/                 # Value converters for XAML binding
 ??? App.xaml.cs                # Application entry point
 ```
 
 **Responsibilities:**
-- ?? WinUI 3 visual interface
-- ?? MVVM pattern implementation
+- ?? Cross-platform visual interface (Windows, Linux, macOS, Web, iOS, Android)
+- ?? Uno Platform Single Project architecture
+- ?? MVVM pattern implementation with CommunityToolkit.Mvvm
 - ?? Real-time progress visualization
 - ?? Session management UI
-- ?? **Future**: SignalR integration for real-time file watching
+- ?? SignalR integration for real-time file watching
+- ?? Modern and traditional UI designs
 
-**Current State**: Uses local `FileDiscoveryService`, planned migration to SignalR client
+**Technology Stack**:
+- Uno Platform 6.3.28 with .NET 9
+- SignalR client for real-time updates
+- Dependency injection with Microsoft.Extensions.Hosting
+- Serilog for logging
 
 ### **AlUmmahNow.FileScanService** - SignalR Hub & Background Processing
 ```
@@ -495,9 +507,10 @@ AlUmmahNowTools implements a modern, event-driven architecture centered around r
 - ?? **Extensibility**: Plugin architecture for storage and services
 - ?? **Reliability**: Comprehensive error handling, logging, and resource management
 
-**Current State vs. Future Plans:**
+**Current State:**
 - **DataImporter**: ? Full SignalR integration complete
 - **FileScanService**: ? Complete with watch and approval features
-- **VisualImporter**: ?? Planned migration to SignalR client
-- **Testing**: ? Comprehensive test suite with high coverage
+- **VisualImporterUno**: ? Cross-platform Uno Platform GUI with SignalR client
+- **Testing**: ? Comprehensive test suite (258 tests, 97.7% pass rate)
 - **Documentation**: ? Updated architecture documentation
+- **Platform Support**: ? Windows, Linux, macOS (Web and Mobile ready)
