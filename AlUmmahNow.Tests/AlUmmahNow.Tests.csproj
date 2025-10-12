@@ -58,4 +58,9 @@
     <Folder Include="Integration\" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Exclude EXAMPLE template files from compilation -->
+    <Compile Remove="Examples\EXAMPLE_*.cs" />
+  </ItemGroup>
+
 </Project>
