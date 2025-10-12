@@ -318,7 +318,10 @@ public class FileWatchService : IFileWatchService, IDisposable
             {
                 IncludeSubdirectories = channelWatch.IncludeSubdirectories,
                 NotifyFilter = NotifyFilters.FileName | NotifyFilters.Size | NotifyFilters.LastWrite,
-                EnableRaisingEvents = false
+                EnableRaisingEvents = false,
+                // Set to maximum buffer size (64KB) to prevent InternalBufferOverflowException
+                // This helps handle scenarios with rapid file changes
+                InternalBufferSize = 64 * 1024
             };
 
             // Parse file extensions
@@ -334,9 +337,31 @@ public class FileWatchService : IFileWatchService, IDisposable
 
             watcher.Error += (sender, e) =>
             {
-                _logger.LogError(e.GetException(), "File watcher error for watch {WatchId}", channelWatch.Id);
-                WatchStatusChanged?.Invoke(this, new WatchStatusChangedEventArgs(
-                    channelWatch.Id, channelWatch.ChannelName, false, $"Watcher error: {e.GetException()?.Message}"));
+                var exception = e.GetException();
+
+                // Check if this is a buffer overflow exception
+                if (exception is InternalBufferOverflowException)
+                {
+                    _logger.LogError(exception,
+                        "FileSystemWatcher buffer overflow for watch {WatchId}. " +
+                        "File changes occurring faster than they can be processed. " +
+                        "Some file change notifications may have been lost. " +
+                        "Consider reducing activity in the watched directory or increasing the ProcessingDelayMs.",
+                        channelWatch.Id);
+
+                    // Notify about buffer overflow but don't stop the watcher
+                    WatchStatusChanged?.Invoke(this, new WatchStatusChangedEventArgs(
+                        channelWatch.Id,
+                        channelWatch.ChannelName,
+                        true,
+                        "Buffer overflow - some file notifications may have been missed"));
+                }
+                else
+                {
+                    _logger.LogError(exception, "File watcher error for watch {WatchId}", channelWatch.Id);
+                    WatchStatusChanged?.Invoke(this, new WatchStatusChangedEventArgs(
+                        channelWatch.Id, channelWatch.ChannelName, false, $"Watcher error: {exception?.Message}"));
+                }
             };
 
             _watchers[channelWatch.Id] = watcher;
