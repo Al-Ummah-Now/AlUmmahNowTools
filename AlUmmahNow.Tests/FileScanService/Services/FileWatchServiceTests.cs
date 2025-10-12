@@ -389,14 +389,17 @@ public class FileWatchServiceTests : FileSystemTestBase
         _mockApprovalService.Setup(x => x.AddPendingApprovalAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Guid.NewGuid());
 
-        // Act
+        // Act - Create files with delays between them for FileSystemWatcher
         await CreateTestVideoFileAsync(TestChannel1Directory, "video1.mp4", 1024);  // Should be detected
+        await Task.Delay(300); // Space out file creation
         await CreateTestVideoFileAsync(TestChannel1Directory, "video2.mkv", 1024);  // Should be detected
+        await Task.Delay(300);
         await CreateTestVideoFileAsync(TestChannel1Directory, "video3.avi", 1024);  // Should NOT be detected
+        await Task.Delay(300);
         await CreateTestVideoFileAsync(TestChannel1Directory, "document.txt", 1024); // Should NOT be detected
 
-        // Wait for processing (longer for CI environments)
-        await Task.Delay(2000);
+        // Wait for processing (longer for CI environments + processing delay)
+        await Task.Delay(3000);
 
         // Assert
         fileDetectedCount.Should().Be(2); // Only .mp4 and .mkv files should be detected

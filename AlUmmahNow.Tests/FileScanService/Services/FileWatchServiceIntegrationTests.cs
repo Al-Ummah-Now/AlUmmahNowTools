@@ -165,15 +165,19 @@ public class FileWatchServiceIntegrationTests : FileSystemTestBase
             // Start watching
             var watchId = await watchService.StartWatchAsync(request);
 
-            // Create files of different formats
+            // Create files of different formats with spacing for FileSystemWatcher
             await CreateTestVideoFileAsync(TestChannel1Directory, "video1.mp4", 1024);
+            await Task.Delay(300);
             await CreateTestVideoFileAsync(TestChannel1Directory, "video2.mkv", 2048);
+            await Task.Delay(300);
             await CreateTestVideoFileAsync(TestChannel1Directory, "video3.avi", 3072);
+            await Task.Delay(300);
             await CreateTestVideoFileAsync(TestChannel1Directory, "video4.mov", 4096);
+            await Task.Delay(300);
             await CreateTestVideoFileAsync(TestChannel1Directory, "document.txt", 1024); // Should be ignored
 
-            // Wait for processing (longer delay for CI environments)
-            await Task.Delay(3000);
+            // Wait for processing (longer delay for CI environments + processing delay)
+            await Task.Delay(4000);
 
             // Verify only video files were detected
             detectedFiles.Should().HaveCount(4);
