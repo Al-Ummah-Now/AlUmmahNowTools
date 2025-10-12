@@ -58,4 +58,10 @@
     <Folder Include="Integration\" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Exclude example/template files from compilation -->
+    <Compile Remove="Examples\**" />
+    <None Include="Examples\**" />
+  </ItemGroup>
+
 </Project>
