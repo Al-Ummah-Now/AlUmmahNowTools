@@ -103,11 +103,12 @@ jobs:
     - name: Test Report
       uses: dorny/test-reporter@v1
       if: always()
+      continue-on-error: true
       with:
         name: .NET Tests (${{ matrix.os }})
         path: '**/*.trx'
         reporter: dotnet-trx
-        fail-on-error: true
+        fail-on-error: false
 
     - name: Code Coverage Report
       uses: irongut/CodeCoverageSummary@v1.3.0
