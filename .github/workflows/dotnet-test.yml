@@ -25,10 +25,24 @@ jobs:
         dotnet-version: '8.0.x'
 
     - name: Restore dependencies
-      run: dotnet restore AlUmmahNow.sln
+      run: |
+        # Restore all projects except VisualImporterUno (has circular dependency issue on Linux)
+        dotnet restore AlUmmahNow.Data/AlUmmahNow.Data.csproj
+        dotnet restore AlUmmahNow.Importer/AlUmmahNow.Importer.csproj
+        dotnet restore AlUmmahNow.FileScanService/AlUmmahNow.FileScanService.csproj
+        dotnet restore AlUmmahNow.DataImporter/AlUmmahNow.DataImporter.csproj
+        dotnet restore AlUmmahNow.BunnyBulkUploader/AlUmmahNow.BunnyBulkUploader.csproj
+        dotnet restore AlUmmahNow.Tests/AlUmmahNow.Tests.csproj
 
     - name: Build solution
-      run: dotnet build AlUmmahNow.sln --no-restore --configuration Release
+      run: |
+        # Build all projects except VisualImporterUno
+        dotnet build AlUmmahNow.Data/AlUmmahNow.Data.csproj --no-restore --configuration Release
+        dotnet build AlUmmahNow.Importer/AlUmmahNow.Importer.csproj --no-restore --configuration Release
+        dotnet build AlUmmahNow.FileScanService/AlUmmahNow.FileScanService.csproj --no-restore --configuration Release
+        dotnet build AlUmmahNow.DataImporter/AlUmmahNow.DataImporter.csproj --no-restore --configuration Release
+        dotnet build AlUmmahNow.BunnyBulkUploader/AlUmmahNow.BunnyBulkUploader.csproj --no-restore --configuration Release
+        dotnet build AlUmmahNow.Tests/AlUmmahNow.Tests.csproj --no-restore --configuration Release
 
     - name: Run Unit Tests
       run: |
@@ -133,8 +147,15 @@ jobs:
 
     - name: Restore and Build
       run: |
-        dotnet restore AlUmmahNow.sln
-        dotnet build AlUmmahNow.sln --no-restore --configuration Release
+        # Restore and build all projects except VisualImporterUno
+        dotnet restore AlUmmahNow.Data/AlUmmahNow.Data.csproj
+        dotnet restore AlUmmahNow.Importer/AlUmmahNow.Importer.csproj
+        dotnet restore AlUmmahNow.FileScanService/AlUmmahNow.FileScanService.csproj
+        dotnet restore AlUmmahNow.Tests/AlUmmahNow.Tests.csproj
+        dotnet build AlUmmahNow.Data/AlUmmahNow.Data.csproj --no-restore --configuration Release
+        dotnet build AlUmmahNow.Importer/AlUmmahNow.Importer.csproj --no-restore --configuration Release
+        dotnet build AlUmmahNow.FileScanService/AlUmmahNow.FileScanService.csproj --no-restore --configuration Release
+        dotnet build AlUmmahNow.Tests/AlUmmahNow.Tests.csproj --no-restore --configuration Release
 
     - name: Run Tests with Coverage
       run: |
@@ -170,8 +191,15 @@ jobs:
 
     - name: Restore and Build
       run: |
-        dotnet restore AlUmmahNow.sln
-        dotnet build AlUmmahNow.sln --no-restore --configuration Release
+        # Restore and build all projects except VisualImporterUno
+        dotnet restore AlUmmahNow.Data/AlUmmahNow.Data.csproj
+        dotnet restore AlUmmahNow.Importer/AlUmmahNow.Importer.csproj
+        dotnet restore AlUmmahNow.FileScanService/AlUmmahNow.FileScanService.csproj
+        dotnet restore AlUmmahNow.Tests/AlUmmahNow.Tests.csproj
+        dotnet build AlUmmahNow.Data/AlUmmahNow.Data.csproj --no-restore --configuration Release
+        dotnet build AlUmmahNow.Importer/AlUmmahNow.Importer.csproj --no-restore --configuration Release
+        dotnet build AlUmmahNow.FileScanService/AlUmmahNow.FileScanService.csproj --no-restore --configuration Release
+        dotnet build AlUmmahNow.Tests/AlUmmahNow.Tests.csproj --no-restore --configuration Release
 
     - name: Run Tests with Coverage Threshold
       run: |
