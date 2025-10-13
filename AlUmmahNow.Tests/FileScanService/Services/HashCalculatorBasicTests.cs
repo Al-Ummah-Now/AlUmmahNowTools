@@ -15,6 +15,9 @@ namespace AlUmmahNow.Tests.FileScanService.Services
         private readonly HashCalculator _hashCalculator;
         private readonly Mock<ILogger<HashCalculator>> _mockLogger;
 
+        // SHA256 hash of an empty string
+        private const string EmptyStringSha256Hash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+
         public HashCalculatorBasicTests()
         {
             _mockLogger = new Mock<ILogger<HashCalculator>>();
@@ -65,8 +68,7 @@ namespace AlUmmahNow.Tests.FileScanService.Services
             // Assert
             hash.Should().NotBeNullOrEmpty();
             hash.Should().HaveLength(64);
-            // SHA256 hash of empty string
-            hash.Should().Be("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+            hash.Should().Be(EmptyStringSha256Hash);
         }
 
         [Fact]
