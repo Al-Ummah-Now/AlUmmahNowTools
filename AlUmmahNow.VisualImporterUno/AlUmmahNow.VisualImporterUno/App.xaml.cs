@@ -2,6 +2,7 @@ using AlUmmahNow.Data.Database;
 using AlUmmahNow.Data.Repository;
 using AlUmmahNow.Data.Storage;
 using AlUmmahNow.Data.Video;
+using AlUmmahNow.Data.Services;
 using AlUmmahNow.Importer;
 using AlUmmahNow.Importer.Core;
 using AlUmmahNow.VisualImporterUno.Services;
@@ -235,6 +236,15 @@ public partial class App : Application
                         // Register import service (uses FileDiscoveryService and VideoImporter)
                         services.AddTransient<ImportService>();
 
+                        // Register filter preset service
+                        services.AddSingleton<IFilterPresetService, FilterPresetService>();
+
+                        // Register notification service
+                        services.AddSingleton<INotificationService, NotificationService>();
+
+                        // Register video thumbnail service
+                        services.AddSingleton<VideoThumbnailService>();
+
                         // Register view models with safe initialization
                         services.AddTransient<MainViewModel>();
                         services.AddTransient<ServiceStatusViewModel>();
@@ -245,6 +255,7 @@ public partial class App : Application
                         // (they manage SignalR connection and need to maintain state)
                         services.AddSingleton<WatchViewModel>();
                         services.AddSingleton<ApprovalViewModel>();
+                        services.AddSingleton<AnalyticsDashboardViewModel>();
                     })
                 );
 
