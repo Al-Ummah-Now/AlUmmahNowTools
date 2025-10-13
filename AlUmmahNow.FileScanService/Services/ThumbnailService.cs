@@ -83,6 +83,9 @@ namespace AlUmmahNow.FileScanService.Services
                 var mediaInfo = await FFProbe.AnalyseAsync(videoPath, cancellationToken: cancellationToken);
                 var duration = mediaInfo.Duration.TotalSeconds;
 
+                // Adjust count if video duration is shorter than requested thumbnail count
+                // This prevents trying to capture thumbnails beyond the video length
+                // For very short videos (< 1 second), we still generate at least 1 thumbnail
                 if (duration < count)
                 {
                     count = Math.Max(1, (int)duration);
@@ -118,21 +121,5 @@ namespace AlUmmahNow.FileScanService.Services
                 return thumbnails;
             }
         }
-    }
-
-    /// <summary>
-    /// Interface for thumbnail generation service
-    /// </summary>
-    public interface IThumbnailService
-    {
-        /// <summary>
-        /// Generates a single thumbnail from the video at approximately the middle timestamp
-        /// </summary>
-        Task<string?> GenerateThumbnailAsync(string videoPath, string outputDirectory, CancellationToken cancellationToken = default);
-
-        /// <summary>
-        /// Generates multiple thumbnails at evenly spaced intervals throughout the video
-        /// </summary>
-        Task<List<string>> GenerateMultipleThumbnailsAsync(string videoPath, string outputDirectory, int count = 5, CancellationToken cancellationToken = default);
     }
 }

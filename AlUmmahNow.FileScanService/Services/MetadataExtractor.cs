@@ -208,7 +208,7 @@ namespace AlUmmahNow.FileScanService.Services
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to extract metadata from video file {VideoPath} using FFMpeg. File may not be a valid video.", videoPath);
+                _logger.LogWarning(ex, "Failed to extract metadata from video file {VideoPath} using FFmpeg. File may not be a valid video.", videoPath);
                 // Don't throw - allow partial metadata extraction to succeed
             }
         }
