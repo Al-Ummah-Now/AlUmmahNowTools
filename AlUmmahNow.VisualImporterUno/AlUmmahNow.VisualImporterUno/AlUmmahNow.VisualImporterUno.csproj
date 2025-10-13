@@ -1,6 +1,6 @@
 <Project Sdk="Uno.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>net9.0-windows10.0.26100</TargetFrameworks>
+    <TargetFrameworks>net9.0-desktop;net9.0-windows10.0.26100</TargetFrameworks>
 
     <OutputType>Exe</OutputType>
     <UnoSingleProject>true</UnoSingleProject>
@@ -41,6 +41,11 @@
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" />
     <PackageReference Include="System.Diagnostics.PerformanceCounter" />
     <PackageReference Include="Uno.Toolkit.WinUI" />
+  </ItemGroup>
+
+  <!-- Skia Desktop support for Linux -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net9.0-desktop'">
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux" />
   </ItemGroup>
 
 </Project>
