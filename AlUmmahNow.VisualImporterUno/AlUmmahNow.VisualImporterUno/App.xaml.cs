@@ -240,6 +240,11 @@ public partial class App : Application
                         services.AddTransient<ServiceStatusViewModel>();
                         services.AddTransient<SettingsViewModel>();
                         services.AddTransient<DatabaseMainViewModel>();
+
+                        // Register Watch Management and Approval Workflow ViewModels as singletons
+                        // (they manage SignalR connection and need to maintain state)
+                        services.AddSingleton<WatchViewModel>();
+                        services.AddSingleton<ApprovalViewModel>();
                     })
                 );
 

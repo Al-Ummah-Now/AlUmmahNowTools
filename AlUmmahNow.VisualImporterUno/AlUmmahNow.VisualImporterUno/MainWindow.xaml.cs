@@ -17,6 +17,8 @@ namespace AlUmmahNow.VisualImporterUno
         {
             Dashboard,
             Import,
+            WatchManagement,
+            ApprovalWorkflow,
             ServiceStatus,
             Settings
         }
@@ -98,6 +100,14 @@ namespace AlUmmahNow.VisualImporterUno
                         case "Import":
                             _currentView = ViewState.Import;
                             ContentFrame.Navigate(typeof(ImportView));
+                            break;
+                        case "WatchManagement":
+                            _currentView = ViewState.WatchManagement;
+                            ContentFrame.Navigate(typeof(WatchManagementPage));
+                            break;
+                        case "ApprovalWorkflow":
+                            _currentView = ViewState.ApprovalWorkflow;
+                            ContentFrame.Navigate(typeof(ApprovalWorkflowPage));
                             break;
                         case "ServiceStatus":
                             _currentView = ViewState.ServiceStatus;
@@ -213,6 +223,56 @@ namespace AlUmmahNow.VisualImporterUno
         }
 
         /// <summary>
+        /// Navigate to the watch management view
+        /// </summary>
+        public void NavigateToWatchManagementView()
+        {
+            if (_isClosing) return;
+
+            try
+            {
+                // Update navigation view selection
+                foreach (var item in NavView.MenuItems)
+                {
+                    if (item is NavigationViewItem navItem && navItem.Tag?.ToString() == "WatchManagement")
+                    {
+                        NavView.SelectedItem = navItem;
+                        break;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error navigating to watch management view: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Navigate to the approval workflow view
+        /// </summary>
+        public void NavigateToApprovalWorkflowView()
+        {
+            if (_isClosing) return;
+
+            try
+            {
+                // Update navigation view selection
+                foreach (var item in NavView.MenuItems)
+                {
+                    if (item is NavigationViewItem navItem && navItem.Tag?.ToString() == "ApprovalWorkflow")
+                    {
+                        NavView.SelectedItem = navItem;
+                        break;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error navigating to approval workflow view: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// Update status bar text based on current view and service status
         /// </summary>
         private void UpdateStatusBarForCurrentView()
@@ -225,6 +285,8 @@ namespace AlUmmahNow.VisualImporterUno
                 {
                     ViewState.Dashboard => "Dashboard",
                     ViewState.Import => "Import",
+                    ViewState.WatchManagement => "Watch Management",
+                    ViewState.ApprovalWorkflow => "Approval Workflow",
                     ViewState.ServiceStatus => "Service Status",
                     ViewState.Settings => "Settings",
                     _ => "Ready"

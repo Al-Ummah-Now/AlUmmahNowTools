@@ -1,0 +1,589 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="AlUmmahNow.VisualImporterUno.Views.WatchManagementPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:AlUmmahNow.VisualImporterUno.Views"
+    xmlns:vm="using:AlUmmahNow.VisualImporterUno.ViewModels"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Background="#F8F9FA">
+
+    <Page.Resources>
+        <!-- Converters -->
+        <local:StatusColorConverter x:Key="StatusColorConverter"/>
+        <local:FileSizeConverter x:Key="FileSizeConverter"/>
+        <local:DateTimeConverter x:Key="DateTimeConverter"/>
+        <local:ZeroToVisibilityConverter x:Key="ZeroToVisibilityConverter"/>
+        <local:StringToVisibilityConverter x:Key="StringToVisibilityConverter"/>
+        <local:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+
+        <!-- Card Styles -->
+        <Style x:Key="StatCardStyle" TargetType="Border">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="24"/>
+            <Setter Property="Shadow">
+                <Setter.Value>
+                    <ThemeShadow/>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ContentCardStyle" TargetType="Border">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="32"/>
+            <Setter Property="Shadow">
+                <Setter.Value>
+                    <ThemeShadow/>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Text Styles -->
+        <Style x:Key="PageTitleStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="32"/>
+            <Setter Property="Foreground" Value="#111827"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+        </Style>
+
+        <Style x:Key="CardTitleStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Foreground" Value="#6B7280"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+        </Style>
+
+        <Style x:Key="StatNumberStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="36"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#111827"/>
+        </Style>
+
+        <Style x:Key="SectionTitleStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="20"/>
+            <Setter Property="Foreground" Value="#111827"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+
+        <!-- Button Styles -->
+        <Style x:Key="PrimaryButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#16A34A"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Height" Value="48"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Shadow">
+                <Setter.Value>
+                    <ThemeShadow/>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SecondaryButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="Foreground" Value="#374151"/>
+            <Setter Property="Height" Value="48"/>
+            <Setter Property="BorderBrush" Value="#E5E7EB"/>
+            <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="FontSize" Value="15"/>
+        </Style>
+
+        <Style x:Key="DangerButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#DC2626"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Height" Value="48"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+
+        <!-- List Item Style -->
+        <Style x:Key="ListItemCardStyle" TargetType="Border">
+            <Setter Property="Background" Value="#F9FAFB"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="20"/>
+            <Setter Property="Margin" Value="0,0,0,12"/>
+            <Setter Property="BorderBrush" Value="#E5E7EB"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+    </Page.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header Section -->
+        <Border Grid.Row="0" Background="White" Padding="40,32">
+            <Border.Shadow>
+                <ThemeShadow/>
+            </Border.Shadow>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Page Title -->
+                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                    <TextBlock Text="Watch Management" Style="{StaticResource PageTitleStyle}" Margin="0,0,0,8"/>
+                    <TextBlock Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
+                               FontSize="16"
+                               Foreground="#6B7280"/>
+                </StackPanel>
+
+                <!-- Action Buttons -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                    <Button Content="Create New Watch"
+                            Style="{StaticResource PrimaryButtonStyle}"
+                            Command="{x:Bind ViewModel.OpenCreateWatchDialogCommand}"
+                            MinWidth="160">
+                        <Button.Content>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Text="+" FontSize="20" FontWeight="Bold"/>
+                                <TextBlock Text="Create Watch" FontSize="15"/>
+                            </StackPanel>
+                        </Button.Content>
+                    </Button>
+                    <Button Content="Refresh"
+                            Style="{StaticResource SecondaryButtonStyle}"
+                            Command="{x:Bind ViewModel.RefreshWatchesCommand}"
+                            MinWidth="120"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Main Content -->
+        <ScrollViewer Grid.Row="1">
+            <Grid Padding="40,40,40,40">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Statistics Cards -->
+                <Grid Grid.Row="0" Margin="0,0,0,32">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Total Watches Card -->
+                    <Border Grid.Column="0" Style="{StaticResource StatCardStyle}" Margin="0,0,12,0">
+                        <StackPanel>
+                            <Grid Margin="0,0,0,16">
+                                <Border Width="60" Height="60" Background="#DBEAFE" CornerRadius="8" HorizontalAlignment="Left">
+                                    <TextBlock Text="&#xE8B7;" FontFamily="Segoe MDL2 Assets" FontSize="24" Foreground="#3B82F6"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                            </Grid>
+                            <TextBlock Text="Total Watches" Style="{StaticResource CardTitleStyle}"/>
+                            <TextBlock Text="{x:Bind ViewModel.TotalWatches, Mode=OneWay}" Style="{StaticResource StatNumberStyle}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Active Watches Card -->
+                    <Border Grid.Column="1" Style="{StaticResource StatCardStyle}" Margin="6,0">
+                        <StackPanel>
+                            <Grid Margin="0,0,0,16">
+                                <Border Width="60" Height="60" Background="#DCFCE7" CornerRadius="8" HorizontalAlignment="Left">
+                                    <TextBlock Text="&#xE768;" FontFamily="Segoe MDL2 Assets" FontSize="24" Foreground="#16A34A"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                            </Grid>
+                            <TextBlock Text="Active Watches" Style="{StaticResource CardTitleStyle}"/>
+                            <TextBlock Text="{x:Bind ViewModel.ActiveWatchesCount, Mode=OneWay}" Style="{StaticResource StatNumberStyle}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Files Detected Card -->
+                    <Border Grid.Column="2" Style="{StaticResource StatCardStyle}" Margin="6,0">
+                        <StackPanel>
+                            <Grid Margin="0,0,0,16">
+                                <Border Width="60" Height="60" Background="#FEF3C7" CornerRadius="8" HorizontalAlignment="Left">
+                                    <TextBlock Text="&#xE8B7;" FontFamily="Segoe MDL2 Assets" FontSize="24" Foreground="#F59E0B"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                            </Grid>
+                            <TextBlock Text="Files Detected" Style="{StaticResource CardTitleStyle}"/>
+                            <TextBlock Text="{x:Bind ViewModel.TotalFilesDetected, Mode=OneWay}" Style="{StaticResource StatNumberStyle}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Pending Approvals Card -->
+                    <Border Grid.Column="3" Style="{StaticResource StatCardStyle}" Margin="12,0,0,0">
+                        <StackPanel>
+                            <Grid Margin="0,0,0,16">
+                                <Border Width="60" Height="60" Background="#FCE7F3" CornerRadius="8" HorizontalAlignment="Left">
+                                    <TextBlock Text="&#xE8C8;" FontFamily="Segoe MDL2 Assets" FontSize="24" Foreground="#DB2777"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                            </Grid>
+                            <TextBlock Text="Pending Approvals" Style="{StaticResource CardTitleStyle}"/>
+                            <TextBlock Text="{x:Bind ViewModel.PendingApprovalsCount, Mode=OneWay}" Style="{StaticResource StatNumberStyle}"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <!-- Active Watches Section -->
+                <Border Grid.Row="1" Style="{StaticResource ContentCardStyle}" Margin="0,0,0,24">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,20">
+                            <TextBlock Text="Active Watches" Style="{StaticResource SectionTitleStyle}" VerticalAlignment="Center"/>
+                        </Grid>
+
+                        <Border BorderBrush="#E5E7EB" BorderThickness="0,1,0,0" Padding="0,20,0,0"/>
+
+                        <!-- Watches ListView -->
+                        <ListView ItemsSource="{x:Bind ViewModel.ActiveWatches, Mode=OneWay}"
+                                  SelectedItem="{x:Bind ViewModel.SelectedWatch, Mode=TwoWay}"
+                                  SelectionMode="Single"
+                                  IsItemClickEnabled="False"
+                                  MaxHeight="400">
+                            <ListView.ItemTemplate>
+                                <DataTemplate x:DataType="vm:WatchStatusDto">
+                                    <Border Style="{StaticResource ListItemCardStyle}">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <!-- Status Indicator -->
+                                            <Ellipse Grid.Column="0"
+                                                     Width="12"
+                                                     Height="12"
+                                                     Margin="0,0,16,0"
+                                                     VerticalAlignment="Center">
+                                                <Ellipse.Fill>
+                                                    <SolidColorBrush Color="{x:Bind IsActive, Mode=OneWay, Converter={StaticResource StatusColorConverter}}"/>
+                                                </Ellipse.Fill>
+                                            </Ellipse>
+
+                                            <!-- Watch Details -->
+                                            <StackPanel Grid.Column="1" Spacing="8">
+                                                <TextBlock Text="{x:Bind ChannelName}"
+                                                           FontSize="16"
+                                                           Foreground="#111827"
+                                                           FontWeight="SemiBold"/>
+                                                <TextBlock Text="{x:Bind WatchPath}"
+                                                           FontSize="14"
+                                                           Foreground="#6B7280"/>
+                                                <StackPanel Orientation="Horizontal" Spacing="16">
+                                                    <TextBlock FontSize="13" Foreground="#6B7280">
+                                                        <Run Text="Status:"/>
+                                                        <Run Text="{x:Bind StatusMessage, Mode=OneWay}" FontWeight="SemiBold"/>
+                                                    </TextBlock>
+                                                    <TextBlock FontSize="13" Foreground="#6B7280">
+                                                        <Run Text="Files:"/>
+                                                        <Run Text="{x:Bind TotalFilesDetected, Mode=OneWay}" FontWeight="SemiBold"/>
+                                                    </TextBlock>
+                                                </StackPanel>
+                                            </StackPanel>
+
+                                            <!-- Action Buttons -->
+                                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                <Button Content="View Details"
+                                                        Background="#DBEAFE"
+                                                        Foreground="#1E40AF"
+                                                        BorderThickness="0"
+                                                        Height="36"
+                                                        CornerRadius="6"
+                                                        Padding="16,0"/>
+                                                <Button Content="Stop"
+                                                        Background="#FEF3C7"
+                                                        Foreground="#D97706"
+                                                        BorderThickness="0"
+                                                        Height="36"
+                                                        CornerRadius="6"
+                                                        Padding="16,0"
+                                                        Visibility="{x:Bind IsActive, Mode=OneWay, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+
+                        <!-- Empty State -->
+                        <StackPanel Visibility="{x:Bind ViewModel.ActiveWatches.Count, Mode=OneWay, Converter={StaticResource ZeroToVisibilityConverter}}"
+                                    Padding="40"
+                                    HorizontalAlignment="Center">
+                            <TextBlock Text="&#xE8B7;"
+                                       FontFamily="Segoe MDL2 Assets"
+                                       FontSize="48"
+                                       Foreground="#E5E7EB"
+                                       HorizontalAlignment="Center"/>
+                            <TextBlock Text="No active watches"
+                                       FontSize="18"
+                                       Foreground="#6B7280"
+                                       Margin="0,16,0,8"
+                                       HorizontalAlignment="Center"/>
+                            <TextBlock Text="Create a new watch to start monitoring directories"
+                                       FontSize="14"
+                                       Foreground="#9CA3AF"
+                                       HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- Pending Approvals Section -->
+                <Border Grid.Row="2" Style="{StaticResource ContentCardStyle}">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,20">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Grid.Column="0"
+                                       Style="{StaticResource SectionTitleStyle}"
+                                       VerticalAlignment="Center">
+                                <Run Text="Pending Approvals"/>
+                                <Run Text=" (" Foreground="#6B7280"/>
+                                <Run Text="{x:Bind ViewModel.FilteredPendingApprovals.Count, Mode=OneWay}" Foreground="#6B7280"/>
+                                <Run Text=")" Foreground="#6B7280"/>
+                            </TextBlock>
+
+                            <!-- Filters and Actions -->
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12">
+                                <Button Content="Refresh"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Command="{x:Bind ViewModel.RefreshPendingApprovalsCommand}"
+                                        Height="40"
+                                        MinWidth="100"/>
+                                <Button Content="Approve Selected"
+                                        Style="{StaticResource PrimaryButtonStyle}"
+                                        Command="{x:Bind ViewModel.ApproveSelectedItemsCommand}"
+                                        Height="40"
+                                        MinWidth="140"
+                                        IsEnabled="{x:Bind ViewModel.HasSelectedApprovals, Mode=OneWay}"/>
+                                <Button Content="Reject Selected"
+                                        Background="#DC2626"
+                                        Foreground="White"
+                                        Height="40"
+                                        CornerRadius="8"
+                                        Command="{x:Bind ViewModel.RejectSelectedItemsCommand}"
+                                        MinWidth="130"
+                                        IsEnabled="{x:Bind ViewModel.HasSelectedApprovals, Mode=OneWay}"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <Border BorderBrush="#E5E7EB" BorderThickness="0,1,0,0" Padding="0,20,0,0"/>
+
+                        <!-- Approvals ListView -->
+                        <ListView ItemsSource="{x:Bind ViewModel.FilteredPendingApprovals, Mode=OneWay}"
+                                  SelectedItem="{x:Bind ViewModel.SelectedApproval, Mode=TwoWay}"
+                                  SelectionMode="Single"
+                                  IsItemClickEnabled="False"
+                                  MaxHeight="500">
+                            <ListView.ItemTemplate>
+                                <DataTemplate x:DataType="vm:PendingApprovalDto">
+                                    <Border Style="{StaticResource ListItemCardStyle}">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <!-- Checkbox -->
+                                            <CheckBox Grid.Column="0"
+                                                      Margin="0,0,16,0"
+                                                      VerticalAlignment="Center"/>
+
+                                            <!-- File Details -->
+                                            <StackPanel Grid.Column="1" Spacing="8">
+                                                <TextBlock Text="{x:Bind FileName}"
+                                                           FontSize="16"
+                                                           Foreground="#111827"
+                                                           FontWeight="SemiBold"/>
+                                                <StackPanel Orientation="Horizontal" Spacing="16">
+                                                    <TextBlock FontSize="13" Foreground="#6B7280">
+                                                        <Run Text="Channel:"/>
+                                                        <Run Text="{x:Bind ChannelName}" FontWeight="SemiBold"/>
+                                                    </TextBlock>
+                                                    <TextBlock FontSize="13" Foreground="#6B7280">
+                                                        <Run Text="Size:"/>
+                                                        <Run Text="{x:Bind FileSizeBytes, Mode=OneWay, Converter={StaticResource FileSizeConverter}}" FontWeight="SemiBold"/>
+                                                    </TextBlock>
+                                                    <TextBlock FontSize="13" Foreground="#6B7280">
+                                                        <Run Text="Detected:"/>
+                                                        <Run Text="{x:Bind DetectedAt, Mode=OneWay, Converter={StaticResource DateTimeConverter}}" FontWeight="SemiBold"/>
+                                                    </TextBlock>
+                                                </StackPanel>
+                                                <TextBlock Text="{x:Bind FilePath}"
+                                                           FontSize="12"
+                                                           Foreground="#9CA3AF"
+                                                           TextWrapping="Wrap"/>
+                                            </StackPanel>
+
+                                            <!-- Action Buttons -->
+                                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                <Button Content="Approve"
+                                                        Background="#16A34A"
+                                                        Foreground="White"
+                                                        BorderThickness="0"
+                                                        Height="36"
+                                                        CornerRadius="6"
+                                                        Padding="20,0"
+                                                        FontWeight="SemiBold"/>
+                                                <Button Content="Reject"
+                                                        Background="#DC2626"
+                                                        Foreground="White"
+                                                        BorderThickness="0"
+                                                        Height="36"
+                                                        CornerRadius="6"
+                                                        Padding="20,0"
+                                                        FontWeight="SemiBold"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+
+                        <!-- Empty State -->
+                        <StackPanel Visibility="{x:Bind ViewModel.FilteredPendingApprovals.Count, Mode=OneWay, Converter={StaticResource ZeroToVisibilityConverter}}"
+                                    Padding="40"
+                                    HorizontalAlignment="Center">
+                            <TextBlock Text="&#xE73E;"
+                                       FontFamily="Segoe MDL2 Assets"
+                                       FontSize="48"
+                                       Foreground="#E5E7EB"
+                                       HorizontalAlignment="Center"/>
+                            <TextBlock Text="No pending approvals"
+                                       FontSize="18"
+                                       Foreground="#6B7280"
+                                       Margin="0,16,0,8"
+                                       HorizontalAlignment="Center"/>
+                            <TextBlock Text="All files have been processed"
+                                       FontSize="14"
+                                       Foreground="#9CA3AF"
+                                       HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </ScrollViewer>
+
+        <!-- Create Watch Dialog -->
+        <ContentDialog x:Name="CreateWatchDialog"
+                       Title="Create New Watch"
+                       PrimaryButtonText="Create Watch"
+                       SecondaryButtonText="Cancel"
+                       DefaultButton="Primary"
+                       IsSecondaryButtonEnabled="True"
+                       PrimaryButtonCommand="{x:Bind ViewModel.CreateWatchCommand}"
+                       SecondaryButtonCommand="{x:Bind ViewModel.CloseCreateWatchDialogCommand}"
+                       Visibility="{x:Bind ViewModel.IsCreateDialogOpen, Mode=OneWay, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <ScrollViewer MaxHeight="600">
+                <StackPanel Spacing="20">
+                    <!-- Channel Name -->
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Channel Name" FontSize="14" FontWeight="SemiBold" Foreground="#374151"/>
+                        <TextBox Text="{x:Bind ViewModel.NewWatchChannelName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 PlaceholderText="e.g., Islamic Lectures"
+                                 Height="40"/>
+                        <TextBlock Text="{x:Bind ViewModel.ChannelNameValidationMessage, Mode=OneWay}"
+                                   Foreground="#DC2626"
+                                   FontSize="12"
+                                   Visibility="{x:Bind ViewModel.ChannelNameValidationMessage, Mode=OneWay, Converter={StaticResource StringToVisibilityConverter}}"/>
+                    </StackPanel>
+
+                    <!-- Watch Path -->
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Directory Path" FontSize="14" FontWeight="SemiBold" Foreground="#374151"/>
+                        <Grid ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBox Grid.Column="0"
+                                     Text="{x:Bind ViewModel.NewWatchPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     PlaceholderText="C:\Videos\Import"
+                                     Height="40"/>
+                            <Button Grid.Column="1"
+                                    Content="Browse"
+                                    Height="40"
+                                    MinWidth="80"
+                                    Style="{StaticResource SecondaryButtonStyle}"/>
+                        </Grid>
+                        <TextBlock Text="{x:Bind ViewModel.WatchPathValidationMessage, Mode=OneWay}"
+                                   Foreground="#DC2626"
+                                   FontSize="12"
+                                   Visibility="{x:Bind ViewModel.WatchPathValidationMessage, Mode=OneWay, Converter={StaticResource StringToVisibilityConverter}}"/>
+                    </StackPanel>
+
+                    <!-- Processing Delay -->
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Processing Delay (seconds)" FontSize="14" FontWeight="SemiBold" Foreground="#374151"/>
+                        <Slider Value="{x:Bind ViewModel.ProcessingDelaySeconds, Mode=TwoWay}"
+                                Minimum="1"
+                                Maximum="60"
+                                StepFrequency="1"
+                                TickFrequency="10"
+                                TickPlacement="BottomRight"/>
+                        <TextBlock FontSize="12" Foreground="#6B7280">
+                            <Run Text="Current delay:"/>
+                            <Run Text="{x:Bind ViewModel.ProcessingDelaySeconds, Mode=OneWay}"/>
+                            <Run Text="seconds"/>
+                        </TextBlock>
+                    </StackPanel>
+
+                    <!-- Include Subdirectories -->
+                    <CheckBox Content="Include subdirectories"
+                              IsChecked="{x:Bind ViewModel.IncludeSubdirectories, Mode=TwoWay}"
+                              FontSize="14"
+                              Foreground="#374151"/>
+
+                    <!-- File Extensions -->
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="File Extensions (comma-separated)" FontSize="14" FontWeight="SemiBold" Foreground="#374151"/>
+                        <TextBox Text="{x:Bind ViewModel.SelectedExtensions, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 PlaceholderText=".mp4,.mkv,.avi"
+                                 Height="40"
+                                 TextWrapping="Wrap"/>
+                        <TextBlock Text="Common video extensions are pre-filled" FontSize="12" Foreground="#6B7280"/>
+                    </StackPanel>
+
+                    <!-- Error Message -->
+                    <Border Background="#FEE2E2"
+                            Padding="16"
+                            CornerRadius="8"
+                            Visibility="{x:Bind ViewModel.CreateWatchError, Mode=OneWay, Converter={StaticResource StringToVisibilityConverter}}">
+                        <TextBlock Text="{x:Bind ViewModel.CreateWatchError, Mode=OneWay}"
+                                   Foreground="#DC2626"
+                                   FontSize="14"
+                                   TextWrapping="Wrap"/>
+                    </Border>
+
+                    <!-- Loading Indicator -->
+                    <ProgressRing IsActive="{x:Bind ViewModel.IsCreatingWatch, Mode=OneWay}"
+                                  HorizontalAlignment="Center"
+                                  Width="40"
+                                  Height="40"/>
+                </StackPanel>
+            </ScrollViewer>
+        </ContentDialog>
+
+        <!-- Loading Overlay -->
+        <Border Grid.RowSpan="2"
+                Background="#80000000"
+                Visibility="{x:Bind ViewModel.IsLoading, Mode=OneWay, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="16">
+                <ProgressRing IsActive="True" Width="60" Height="60" Foreground="White"/>
+                <TextBlock Text="Loading..." FontSize="16" Foreground="White" FontWeight="SemiBold"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Page>

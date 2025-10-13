@@ -31,6 +31,8 @@
             <NavigationView.MenuItems>
                 <NavigationViewItem Content="Dashboard" Tag="Dashboard" Icon="Home" IsSelected="True"/>
                 <NavigationViewItem Content="Import" Tag="Import" Icon="Upload"/>
+                <NavigationViewItem Content="Watch Management" Tag="WatchManagement" Icon="View"/>
+                <NavigationViewItem Content="Approval Workflow" Tag="ApprovalWorkflow" Icon="Accept"/>
                 <NavigationViewItem Content="Service Status" Tag="ServiceStatus" Icon="Sync"/>
                 <NavigationViewItem Content="Settings" Tag="Settings" Icon="Setting"/>
             </NavigationView.MenuItems>
