@@ -133,7 +133,8 @@ namespace AlUmmahNow.Tests.Video
             Assert.Equal(0, response.TotalItems);
             Assert.Equal(0, response.CurrentPage);
             Assert.Equal(0, response.ItemsPerPage);
-            Assert.Null(response.Items);
+            Assert.NotNull(response.Items);
+            Assert.Empty(response.Items);
         }
 
         [Fact]
