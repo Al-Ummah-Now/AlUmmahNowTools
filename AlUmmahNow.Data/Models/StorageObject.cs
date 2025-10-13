@@ -2,9 +2,9 @@ namespace AlUmmahNow.Data.Models
 {
     public class StorageObject
     {
-        public string Guid { get; set; }
-        public string ObjectName { get; set; }
-        public string Path { get; set; }
+        public string Guid { get; set; } = string.Empty;
+        public string ObjectName { get; set; } = string.Empty;
+        public string Path { get; set; } = string.Empty;
         public long Length { get; set; }
         public bool IsDirectory { get; set; }
         public DateTime DateCreated { get; set; }
