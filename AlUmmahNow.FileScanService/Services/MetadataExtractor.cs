@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
+using FFMpegCore;
 
 namespace AlUmmahNow.FileScanService.Services
 {
@@ -29,9 +30,13 @@ namespace AlUmmahNow.FileScanService.Services
                     await ExtractFromInfoFileAsync(metadata, infoFilePath, cancellationToken);
                 }
 
-                // TODO: Add video file metadata extraction using FFMpeg or similar
-                // For now, we'll rely on .info files for metadata
-                
+                // Extract metadata directly from video file using FFMpegCore
+                // This provides fallback if no .info file exists, or fills in missing data
+                if (File.Exists(videoPath))
+                {
+                    await ExtractFromVideoFileAsync(metadata, videoPath, cancellationToken);
+                }
+
                 return metadata;
             }
             catch (Exception ex)
@@ -159,6 +164,53 @@ namespace AlUmmahNow.FileScanService.Services
             }
 
             return false;
+        }
+
+        private async Task ExtractFromVideoFileAsync(VideoMetadata metadata, string videoPath, CancellationToken cancellationToken)
+        {
+            try
+            {
+                // Use FFMpegCore to analyze the video file
+                var mediaInfo = await FFProbe.AnalyseAsync(videoPath, cancellationToken: cancellationToken);
+
+                // Only update fields that are not already set from .info file
+                if (metadata.DurationSeconds == null && mediaInfo.Duration != TimeSpan.Zero)
+                {
+                    metadata.DurationSeconds = mediaInfo.Duration.TotalSeconds;
+                }
+
+                var videoStream = mediaInfo.PrimaryVideoStream;
+                if (videoStream != null)
+                {
+                    if (metadata.Width == null)
+                    {
+                        metadata.Width = videoStream.Width;
+                    }
+
+                    if (metadata.Height == null)
+                    {
+                        metadata.Height = videoStream.Height;
+                    }
+
+                    if (metadata.Codec == null)
+                    {
+                        metadata.Codec = videoStream.CodecName;
+                    }
+
+                    if (metadata.Bitrate == null && videoStream.BitRate > 0)
+                    {
+                        metadata.Bitrate = videoStream.BitRate;
+                    }
+                }
+
+                _logger.LogDebug("Extracted metadata from video file {VideoPath}: Duration={Duration}s, Resolution={Width}x{Height}, Codec={Codec}",
+                    videoPath, metadata.DurationSeconds, metadata.Width, metadata.Height, metadata.Codec);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to extract metadata from video file {VideoPath} using FFmpeg. File may not be a valid video.", videoPath);
+                // Don't throw - allow partial metadata extraction to succeed
+            }
         }
     }
 }
