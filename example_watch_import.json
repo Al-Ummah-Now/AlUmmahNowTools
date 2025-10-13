@@ -1,0 +1,42 @@
+[
+  {
+    "ChannelName": "Islamic Lectures",
+    "WatchPath": "C:\\Videos\\Islamic_Lectures",
+    "IncludeSubdirectories": true,
+    "ProcessingDelayMs": 10000,
+    "FileExtensions": ".mp4,.mkv,.avi,.mov",
+    "CreatedBy": "Admin"
+  },
+  {
+    "ChannelName": "News Channel",
+    "WatchPath": "C:\\Videos\\News",
+    "IncludeSubdirectories": true,
+    "ProcessingDelayMs": 5000,
+    "FileExtensions": ".mp4,.mkv",
+    "CreatedBy": "Admin"
+  },
+  {
+    "ChannelName": "Sports Channel",
+    "WatchPath": "C:\\Videos\\Sports",
+    "IncludeSubdirectories": false,
+    "ProcessingDelayMs": 15000,
+    "FileExtensions": ".mp4",
+    "CreatedBy": "Admin"
+  },
+  {
+    "ChannelName": "Documentary Channel",
+    "WatchPath": "C:\\Videos\\Documentaries",
+    "IncludeSubdirectories": true,
+    "ProcessingDelayMs": 10000,
+    "FileExtensions": ".mp4,.mkv,.avi,.mov,.wmv",
+    "CreatedBy": "Admin"
+  },
+  {
+    "ChannelName": "Kids Content",
+    "WatchPath": "C:\\Videos\\Kids",
+    "IncludeSubdirectories": true,
+    "ProcessingDelayMs": 5000,
+    "FileExtensions": ".mp4,.mkv,.avi,.webm",
+    "CreatedBy": "Admin"
+  }
+]
