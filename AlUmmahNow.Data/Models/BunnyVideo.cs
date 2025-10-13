@@ -40,7 +40,7 @@ namespace AlUmmahNow.Data.Models
 
     public class MomentModel
     {
-        public string Label { get; set; }
+        public string Label { get; set; } = string.Empty;
         public int? Timestamp { get; set; }
     }
 
@@ -62,7 +62,7 @@ namespace AlUmmahNow.Data.Models
         public int VideoLibraryId { get; set; }
         public string? Guid { get; set; }
         public string? Title { get; set; }
-        public string Description { get; set; }
+        public string Description { get; set; } = string.Empty;
         public DateTime DateUploaded { get; set; }
         public int Views { get; set; }
         public bool IsPublic { get; set; }
