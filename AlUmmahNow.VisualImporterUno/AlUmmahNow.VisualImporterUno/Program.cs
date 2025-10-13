@@ -10,9 +10,9 @@ public class Program
     public static void Main(string[] args)
     {
         var host = UnoPlatformHostBuilder.Create()
-            .App(() => new App())
             .UseX11()
             .UseLinuxFrameBuffer()
+            .App(() => new App())
             .Build();
 
         host.Run();
