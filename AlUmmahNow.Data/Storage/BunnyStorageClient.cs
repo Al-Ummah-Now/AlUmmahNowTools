@@ -57,6 +57,12 @@ namespace AlUmmahNow.Data.Storage
             {
                 var result = await ListAsync(path);
                 var obj = result.FirstOrDefault();
+
+                if (obj == null)
+                {
+                    return null;
+                }
+
                 return new StorageObject
                 {
                     Guid = obj.Guid,
