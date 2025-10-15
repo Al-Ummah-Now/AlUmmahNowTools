@@ -36,6 +36,60 @@ public sealed partial class ApprovalWorkflowPage : Page
         base.OnNavigatedFrom(e);
         // Cleanup if needed
     }
+
+    private async void OnSavePresetClick(object sender, RoutedEventArgs e)
+    {
+        var dialog = new ContentDialog
+        {
+            Title = "Save Filter Preset",
+            PrimaryButtonText = "Save",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = (sender as FrameworkElement)?.XamlRoot ?? this.XamlRoot
+        };
+
+        var stackPanel = new StackPanel { Spacing = 12 };
+
+        var nameBox = new TextBox
+        {
+            Header = "Preset Name",
+            PlaceholderText = "Enter preset name...",
+            Text = ViewModel.NewPresetName
+        };
+
+        var descriptionBox = new TextBox
+        {
+            Header = "Description (Optional)",
+            PlaceholderText = "Enter description...",
+            Text = ViewModel.NewPresetDescription,
+            AcceptsReturn = true,
+            TextWrapping = TextWrapping.Wrap,
+            Height = 80
+        };
+
+        var defaultCheckBox = new CheckBox
+        {
+            Content = "Set as default preset",
+            IsChecked = ViewModel.SetAsDefault
+        };
+
+        stackPanel.Children.Add(nameBox);
+        stackPanel.Children.Add(descriptionBox);
+        stackPanel.Children.Add(defaultCheckBox);
+
+        dialog.Content = stackPanel;
+
+        var result = await dialog.ShowAsync();
+
+        if (result == ContentDialogResult.Primary)
+        {
+            ViewModel.NewPresetName = nameBox.Text;
+            ViewModel.NewPresetDescription = descriptionBox.Text;
+            ViewModel.SetAsDefault = defaultCheckBox.IsChecked ?? false;
+
+            await ViewModel.SavePresetCommand.ExecuteAsync(nameBox.Text);
+        }
+    }
 }
 
 #region Value Converters

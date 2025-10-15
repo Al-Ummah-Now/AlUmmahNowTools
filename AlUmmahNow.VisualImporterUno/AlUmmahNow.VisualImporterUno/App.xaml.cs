@@ -2,9 +2,11 @@ using AlUmmahNow.Data.Database;
 using AlUmmahNow.Data.Repository;
 using AlUmmahNow.Data.Storage;
 using AlUmmahNow.Data.Video;
+using AlUmmahNow.Data.Services;
 using AlUmmahNow.Importer;
 using AlUmmahNow.Importer.Core;
 using AlUmmahNow.VisualImporterUno.Services;
+using AlUmmahNow.VisualImporterUno.Services.Logging;
 using AlUmmahNow.VisualImporterUno.ViewModels;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.UI.Xaml;
@@ -35,6 +37,9 @@ public partial class App : Application
             // Initialize crash handling AFTER InitializeComponent
             CrashHandler.Initialize();
 
+            // Set up global exception handler with logging
+            SetupGlobalExceptionHandling();
+
             Log.Information("Application Initialized: AlUmmahNow Visual Importer (Uno) initialized successfully");
         }
         catch (Exception ex)
@@ -43,6 +48,73 @@ public partial class App : Application
             Log.Fatal(ex, "App Constructor failed");
             throw;
         }
+    }
+
+    /// <summary>
+    /// Set up global exception handling with comprehensive logging
+    /// </summary>
+    private void SetupGlobalExceptionHandling()
+    {
+        // Handle unhandled exceptions from current AppDomain
+        AppDomain.CurrentDomain.UnhandledException += (sender, args) =>
+        {
+            var exception = args.ExceptionObject as Exception;
+            var isTerminating = args.IsTerminating;
+
+            Log.Fatal(exception,
+                "Unhandled exception in AppDomain. IsTerminating: {IsTerminating}",
+                isTerminating);
+
+            if (exception != null)
+            {
+                LogStructuredException(exception, "AppDomain unhandled exception");
+            }
+        };
+
+        // Handle unobserved task exceptions
+        TaskScheduler.UnobservedTaskException += (sender, args) =>
+        {
+            Log.Error(args.Exception,
+                "Unobserved task exception. Observed: {Observed}",
+                args.Observed);
+
+            LogStructuredException(args.Exception, "Unobserved task exception");
+
+            // Mark as observed to prevent process termination
+            args.SetObserved();
+        };
+    }
+
+    /// <summary>
+    /// Log exception with structured properties for Splunk analysis
+    /// </summary>
+    private void LogStructuredException(Exception exception, string context)
+    {
+        var properties = new System.Collections.Generic.Dictionary<string, object>
+        {
+            ["Context"] = context,
+            ["ExceptionType"] = exception.GetType().FullName ?? "Unknown",
+            ["ExceptionMessage"] = exception.Message,
+            ["StackTrace"] = exception.StackTrace ?? "No stack trace",
+            ["MachineName"] = Environment.MachineName,
+            ["UserName"] = Environment.UserName,
+            ["OSVersion"] = Environment.OSVersion.ToString(),
+            ["ProcessId"] = Environment.ProcessId,
+            ["Timestamp"] = DateTime.UtcNow
+        };
+
+        if (exception.InnerException != null)
+        {
+            properties["InnerExceptionType"] = exception.InnerException.GetType().FullName ?? "Unknown";
+            properties["InnerExceptionMessage"] = exception.InnerException.Message;
+        }
+
+        var enrichedLogger = Log.Logger;
+        foreach (var kvp in properties)
+        {
+            enrichedLogger = enrichedLogger.ForContext(kvp.Key, kvp.Value);
+        }
+        enrichedLogger.Fatal(exception, "Structured exception log: {Context}", context);
     }
 
     public Window? MainWindow { get; private set; }
@@ -82,13 +154,15 @@ public partial class App : Application
             // Enable Serilog self-diagnostics
             Serilog.Debugging.SelfLog.Enable(msg => System.Diagnostics.Debug.WriteLine($"Serilog: {msg}"));
 
-            // Configure Serilog before builder
+            // Configure temporary logger before builder (will be replaced with full configuration)
             Log.Logger = new LoggerConfiguration()
                 .WriteTo.File(logPath,
                     rollingInterval: RollingInterval.Day,
                     retainedFileCountLimit: 7)
                 .WriteTo.Debug()
                 .CreateLogger();
+
+            Log.Information("Application starting with temporary logger configuration");
 
             var builder = this.CreateBuilder(args)
                 .Configure(host => host
@@ -122,6 +196,28 @@ public partial class App : Application
                     .ConfigureServices((context, services) =>
                     {
                         var configuration = context.Configuration;
+
+                        // Configure Splunk logging with full configuration
+                        try
+                        {
+                            var appVersion = Assembly.GetExecutingAssembly()
+                                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
+                                .InformationalVersion ?? "1.0.0";
+
+                            Log.Logger = SplunkLoggerConfiguration.ConfigureSplunkLogger(
+                                configuration,
+                                "AlUmmahNow.VisualImporter",
+                                appVersion);
+
+                            Log.Information("Splunk logging configured successfully");
+                        }
+                        catch (Exception ex)
+                        {
+                            Log.Warning(ex, "Failed to configure Splunk logging, continuing with file logging only");
+                        }
+
+                        // Register LoggingService for dependency injection
+                        services.AddSingleton<ILoggingService, LoggingService>();
 
                         // Register database with SQL Server - Use Scoped lifetime to prevent threading issues
                         services.AddDbContext<ImportDbContext>(options =>
@@ -235,6 +331,15 @@ public partial class App : Application
                         // Register import service (uses FileDiscoveryService and VideoImporter)
                         services.AddTransient<ImportService>();
 
+                        // Register filter preset service
+                        services.AddSingleton<IFilterPresetService, FilterPresetService>();
+
+                        // Register notification service
+                        services.AddSingleton<INotificationService, NotificationService>();
+
+                        // Register video thumbnail service
+                        services.AddSingleton<VideoThumbnailService>();
+
                         // Register view models with safe initialization
                         services.AddTransient<MainViewModel>();
                         services.AddTransient<ServiceStatusViewModel>();
@@ -245,6 +350,7 @@ public partial class App : Application
                         // (they manage SignalR connection and need to maintain state)
                         services.AddSingleton<WatchViewModel>();
                         services.AddSingleton<ApprovalViewModel>();
+                        services.AddSingleton<AnalyticsDashboardViewModel>();
                     })
                 );
 

@@ -18,6 +18,7 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
         private readonly IConfiguration _configuration;
         private readonly ILogger<SettingsViewModel> _logger;
         private readonly FileScanServiceManager _serviceManager;
+        private readonly INotificationService _notificationService;
 
         private string _fileScanServiceUrl = "http://localhost:5000";
         private string _databaseConnectionString = "";
@@ -28,12 +29,15 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
         private bool _autoStartService = true;
         private ObservableCollection<string> _detectedServicePaths = new();
         private string? _selectedDetectedPath;
+        private bool _enableNotifications = true;
+        private bool _enableNotificationSound = true;
 
-        public SettingsViewModel(IConfiguration configuration, ILogger<SettingsViewModel> logger, FileScanServiceManager serviceManager)
+        public SettingsViewModel(IConfiguration configuration, ILogger<SettingsViewModel> logger, FileScanServiceManager serviceManager, INotificationService notificationService)
         {
             _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _serviceManager = serviceManager ?? throw new ArgumentNullException(nameof(serviceManager));
+            _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
 
             LoadSettings();
             DetectServicePaths();
@@ -79,6 +83,30 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
                 if (SetProperty(ref _selectedDetectedPath, value) && !string.IsNullOrEmpty(value))
                 {
                     ServiceExecutablePath = value;
+                }
+            }
+        }
+
+        public bool EnableNotifications
+        {
+            get => _enableNotifications;
+            set
+            {
+                if (SetProperty(ref _enableNotifications, value))
+                {
+                    _notificationService.IsEnabled = value;
+                }
+            }
+        }
+
+        public bool EnableNotificationSound
+        {
+            get => _enableNotificationSound;
+            set
+            {
+                if (SetProperty(ref _enableNotificationSound, value))
+                {
+                    _notificationService.IsSoundEnabled = value;
                 }
             }
         }
@@ -166,6 +194,8 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
                 settingsContainer.Values["FileScanServiceUrl"] = FileScanServiceUrl;
                 settingsContainer.Values["ServiceExecutablePath"] = ServiceExecutablePath;
                 settingsContainer.Values["AutoStartService"] = AutoStartService;
+                settingsContainer.Values["EnableNotifications"] = EnableNotifications;
+                settingsContainer.Values["EnableNotificationSound"] = EnableNotificationSound;
                 
                 _logger.LogInformation("Settings saved using Windows ApplicationData API");
                 
@@ -186,10 +216,15 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
                     var settings = new
                     {
                         FileScanService = new { Url = FileScanServiceUrl },
-                        ServiceInstallation = new 
-                        { 
+                        ServiceInstallation = new
+                        {
                             ExecutablePath = ServiceExecutablePath,
-                            StartAutomatically = AutoStartService 
+                            StartAutomatically = AutoStartService
+                        },
+                        Notifications = new
+                        {
+                            Enabled = EnableNotifications,
+                            SoundEnabled = EnableNotificationSound
                         }
                     };
                     
@@ -221,6 +256,8 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
             DatabaseConnectionString = "Server=(localdb)\\MSSQLLocalDB;Database=AlUmmahNowFileScan;Trusted_Connection=true;MultipleActiveResultSets=true;TrustServerCertificate=true";
             ServiceExecutablePath = "";
             AutoStartService = true;
+            EnableNotifications = true;
+            EnableNotificationSound = true;
             TestResults = "";
         }
 
@@ -246,7 +283,13 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
                         
                         if (settingsContainer.Values.ContainsKey("AutoStartService"))
                             AutoStartService = (bool)(settingsContainer.Values["AutoStartService"] ?? true);
-                        
+
+                        if (settingsContainer.Values.ContainsKey("EnableNotifications"))
+                            EnableNotifications = (bool)(settingsContainer.Values["EnableNotifications"] ?? true);
+
+                        if (settingsContainer.Values.ContainsKey("EnableNotificationSound"))
+                            EnableNotificationSound = (bool)(settingsContainer.Values["EnableNotificationSound"] ?? true);
+
                         _logger.LogInformation("Settings loaded from Windows ApplicationData");
                         
                         // Load database connection from configuration (security sensitive)
@@ -287,7 +330,20 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
                             AutoStartService = autoStart.GetBoolean();
                         }
                     }
-                    
+
+                    if (settings.TryGetProperty("Notifications", out var notifications))
+                    {
+                        if (notifications.TryGetProperty("Enabled", out var enabled))
+                        {
+                            EnableNotifications = enabled.GetBoolean();
+                        }
+
+                        if (notifications.TryGetProperty("SoundEnabled", out var soundEnabled))
+                        {
+                            EnableNotificationSound = soundEnabled.GetBoolean();
+                        }
+                    }
+
                     _logger.LogInformation("Settings loaded from JSON fallback file: {SettingsPath}", settingsPath);
                 }
                 else

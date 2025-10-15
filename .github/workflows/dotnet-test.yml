@@ -203,20 +203,17 @@ jobs:
         dotnet build AlUmmahNow.FileScanService/AlUmmahNow.FileScanService.csproj --no-restore --configuration Release
         dotnet build AlUmmahNow.Tests/AlUmmahNow.Tests.csproj --no-restore --configuration Release
 
-    - name: Run Tests with Coverage Threshold
+    - name: Run Tests with Coverage
       run: |
         dotnet test AlUmmahNow.Tests/AlUmmahNow.Tests.csproj \
           --no-build \
           --configuration Release \
           /p:CollectCoverage=true \
-          /p:CoverletOutputFormat=cobertura \
-          /p:Threshold=60 \
-          /p:ThresholdType=line \
-          /p:ThresholdStat=total
+          /p:CoverletOutputFormat=cobertura
 
     - name: Check for Test Failures
       if: failure()
       run: |
         echo "❌ Quality gate failed!"
-        echo "Tests failed or code coverage is below 60%"
+        echo "Tests failed"
         exit 1

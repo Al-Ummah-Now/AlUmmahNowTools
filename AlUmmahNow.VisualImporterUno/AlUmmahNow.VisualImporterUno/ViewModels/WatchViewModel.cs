@@ -17,6 +17,7 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels;
 public partial class WatchViewModel : ObservableObject, IDisposable
 {
     private readonly FileScanSignalRClient _signalRClient;
+    private readonly INotificationService _notificationService;
     private readonly DispatcherQueue? _dispatcherQueue;
     private bool _disposed = false;
 
@@ -109,19 +110,72 @@ public partial class WatchViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private string? _channelFilter = null;
 
+    // Observable Properties - Notification Settings
+    [ObservableProperty]
+    private bool _enableNotifications = true;
+
+    // Observable Properties - Batch Watch Creation
+    [ObservableProperty]
+    private bool _isBatchCreateDialogOpen = false;
+
+    [ObservableProperty]
+    private int _batchDialogTab = 0; // 0=Template, 1=Import
+
+    [ObservableProperty]
+    private WatchTemplate? _selectedTemplate;
+
+    [ObservableProperty]
+    private int _numberOfWatches = 3;
+
+    [ObservableProperty]
+    private int _startingNumber = 1;
+
+    [ObservableProperty]
+    private string _batchBasePath = "C:\\Videos";
+
+    [ObservableProperty]
+    private string _importFilePath = string.Empty;
+
+    [ObservableProperty]
+    private bool _isGeneratingPreview = false;
+
+    [ObservableProperty]
+    private bool _isCreatingBatch = false;
+
+    [ObservableProperty]
+    private bool _isImporting = false;
+
+    [ObservableProperty]
+    private string _batchCreateError = string.Empty;
+
+    [ObservableProperty]
+    private string _importError = string.Empty;
+
+    [ObservableProperty]
+    private int _batchCreateProgress = 0;
+
+    [ObservableProperty]
+    private int _batchCreateTotal = 0;
+
+    [ObservableProperty]
+    private WatchBatchImport? _importResult;
+
     // Collections
     public ObservableCollection<WatchStatusDto> ActiveWatches { get; } = new();
     public ObservableCollection<PendingApprovalDto> PendingApprovals { get; } = new();
     public ObservableCollection<PendingApprovalDto> FilteredPendingApprovals { get; } = new();
     public ObservableCollection<string> AvailableChannels { get; } = new();
     public ObservableCollection<string> SupportedExtensions { get; } = new();
+    public ObservableCollection<WatchTemplate> SavedTemplates { get; } = new();
+    public ObservableCollection<CreateWatchRequest> PreviewWatches { get; } = new();
 
     // Track selected approvals for bulk operations
     private readonly HashSet<Guid> _selectedApprovalIds = new();
 
-    public WatchViewModel(FileScanSignalRClient signalRClient)
+    public WatchViewModel(FileScanSignalRClient signalRClient, INotificationService notificationService)
     {
         _signalRClient = signalRClient ?? throw new ArgumentNullException(nameof(signalRClient));
+        _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
 
         // Get dispatcher queue for UI updates with enhanced safety
         try
@@ -266,6 +320,22 @@ public partial class WatchViewModel : ObservableObject, IDisposable
             {
                 watch.TotalFilesDetected++;
                 UpdateStatistics();
+            }
+
+            // Show notification if enabled
+            if (EnableNotifications)
+            {
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await _notificationService.ShowFileDetectedAsync(e.FileName, e.ChannelName, e.FileSize);
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Failed to show file detected notification: {ex.Message}");
+                    }
+                });
             }
 
             // Refresh pending approvals to show the new file
@@ -621,6 +691,7 @@ public partial class WatchViewModel : ObservableObject, IDisposable
             IsLoading = true;
             StatusMessage = "Approving file...";
 
+            var fileName = SelectedApproval.FileName;
             var request = new ApprovalDecisionRequest
             {
                 ApprovalIds = new List<Guid> { SelectedApproval.Id },
@@ -632,17 +703,32 @@ public partial class WatchViewModel : ObservableObject, IDisposable
 
             if (result)
             {
-                StatusMessage = $"File approved: {SelectedApproval.FileName}";
+                StatusMessage = $"File approved: {fileName}";
+
+                // Show notification if enabled
+                if (EnableNotifications)
+                {
+                    await _notificationService.ShowApprovalProcessedAsync(fileName, approved: true, count: 1);
+                }
+
                 await RefreshPendingApprovalsAsync();
             }
             else
             {
-                StatusMessage = $"Failed to approve file: {SelectedApproval.FileName}";
+                StatusMessage = $"Failed to approve file: {fileName}";
+                if (EnableNotifications)
+                {
+                    await _notificationService.ShowErrorAsync("Approval Failed", $"Failed to approve {fileName}");
+                }
             }
         }
         catch (Exception ex)
         {
             StatusMessage = $"Failed to approve file: {ex.Message}";
+            if (EnableNotifications)
+            {
+                await _notificationService.ShowErrorAsync("Approval Error", ex.Message);
+            }
         }
         finally
         {
@@ -660,6 +746,7 @@ public partial class WatchViewModel : ObservableObject, IDisposable
             IsLoading = true;
             StatusMessage = "Rejecting file...";
 
+            var fileName = SelectedApproval.FileName;
             var request = new ApprovalDecisionRequest
             {
                 ApprovalIds = new List<Guid> { SelectedApproval.Id },
@@ -671,17 +758,32 @@ public partial class WatchViewModel : ObservableObject, IDisposable
 
             if (result)
             {
-                StatusMessage = $"File rejected: {SelectedApproval.FileName}";
+                StatusMessage = $"File rejected: {fileName}";
+
+                // Show notification if enabled
+                if (EnableNotifications)
+                {
+                    await _notificationService.ShowApprovalProcessedAsync(fileName, approved: false, count: 1);
+                }
+
                 await RefreshPendingApprovalsAsync();
             }
             else
             {
-                StatusMessage = $"Failed to reject file: {SelectedApproval.FileName}";
+                StatusMessage = $"Failed to reject file: {fileName}";
+                if (EnableNotifications)
+                {
+                    await _notificationService.ShowErrorAsync("Rejection Failed", $"Failed to reject {fileName}");
+                }
             }
         }
         catch (Exception ex)
         {
             StatusMessage = $"Failed to reject file: {ex.Message}";
+            if (EnableNotifications)
+            {
+                await _notificationService.ShowErrorAsync("Rejection Error", ex.Message);
+            }
         }
         finally
         {
@@ -695,7 +797,8 @@ public partial class WatchViewModel : ObservableObject, IDisposable
         try
         {
             IsLoading = true;
-            StatusMessage = $"Approving {_selectedApprovalIds.Count} files...";
+            var count = _selectedApprovalIds.Count;
+            StatusMessage = $"Approving {count} files...";
 
             var request = new ApprovalDecisionRequest
             {
@@ -708,18 +811,33 @@ public partial class WatchViewModel : ObservableObject, IDisposable
 
             if (result)
             {
-                StatusMessage = $"Approved {_selectedApprovalIds.Count} files";
+                StatusMessage = $"Approved {count} files";
+
+                // Show notification if enabled
+                if (EnableNotifications)
+                {
+                    await _notificationService.ShowApprovalProcessedAsync(string.Empty, approved: true, count: count);
+                }
+
                 _selectedApprovalIds.Clear();
                 await RefreshPendingApprovalsAsync();
             }
             else
             {
-                StatusMessage = $"Failed to approve {_selectedApprovalIds.Count} files";
+                StatusMessage = $"Failed to approve {count} files";
+                if (EnableNotifications)
+                {
+                    await _notificationService.ShowErrorAsync("Bulk Approval Failed", $"Failed to approve {count} files");
+                }
             }
         }
         catch (Exception ex)
         {
             StatusMessage = $"Failed to approve files: {ex.Message}";
+            if (EnableNotifications)
+            {
+                await _notificationService.ShowErrorAsync("Bulk Approval Error", ex.Message);
+            }
         }
         finally
         {
@@ -733,7 +851,8 @@ public partial class WatchViewModel : ObservableObject, IDisposable
         try
         {
             IsLoading = true;
-            StatusMessage = $"Rejecting {_selectedApprovalIds.Count} files...";
+            var count = _selectedApprovalIds.Count;
+            StatusMessage = $"Rejecting {count} files...";
 
             var request = new ApprovalDecisionRequest
             {
@@ -746,18 +865,33 @@ public partial class WatchViewModel : ObservableObject, IDisposable
 
             if (result)
             {
-                StatusMessage = $"Rejected {_selectedApprovalIds.Count} files";
+                StatusMessage = $"Rejected {count} files";
+
+                // Show notification if enabled
+                if (EnableNotifications)
+                {
+                    await _notificationService.ShowApprovalProcessedAsync(string.Empty, approved: false, count: count);
+                }
+
                 _selectedApprovalIds.Clear();
                 await RefreshPendingApprovalsAsync();
             }
             else
             {
-                StatusMessage = $"Failed to reject {_selectedApprovalIds.Count} files";
+                StatusMessage = $"Failed to reject {count} files";
+                if (EnableNotifications)
+                {
+                    await _notificationService.ShowErrorAsync("Bulk Rejection Failed", $"Failed to reject {count} files");
+                }
             }
         }
         catch (Exception ex)
         {
             StatusMessage = $"Failed to reject files: {ex.Message}";
+            if (EnableNotifications)
+            {
+                await _notificationService.ShowErrorAsync("Bulk Rejection Error", ex.Message);
+            }
         }
         finally
         {
@@ -798,6 +932,353 @@ public partial class WatchViewModel : ObservableObject, IDisposable
         }
 
         UpdateSelectionState();
+    }
+
+    // Commands - Batch Watch Creation
+
+    [RelayCommand]
+    private async Task OpenBatchCreateDialogAsync()
+    {
+        IsBatchCreateDialogOpen = true;
+        BatchDialogTab = 0;
+        BatchCreateError = string.Empty;
+        ImportError = string.Empty;
+        PreviewWatches.Clear();
+
+        // Load templates when opening the dialog
+        await LoadTemplatesAsync();
+    }
+
+    [RelayCommand]
+    private void CloseBatchCreateDialog()
+    {
+        IsBatchCreateDialogOpen = false;
+        PreviewWatches.Clear();
+        ImportResult = null;
+    }
+
+    [RelayCommand]
+    private async Task GeneratePreviewAsync()
+    {
+        if (SelectedTemplate == null) return;
+
+        try
+        {
+            IsGeneratingPreview = true;
+            BatchCreateError = string.Empty;
+            PreviewWatches.Clear();
+
+            // Create a temp service instance (in prod, this should be injected)
+            var templateService = new AlUmmahNow.Data.Services.WatchTemplateService(
+                Microsoft.Extensions.Logging.Abstractions.NullLogger<AlUmmahNow.Data.Services.WatchTemplateService>.Instance);
+
+            // Clone template and update base path
+            var template = new WatchTemplate
+            {
+                Id = SelectedTemplate.Id,
+                Name = SelectedTemplate.Name,
+                Description = SelectedTemplate.Description,
+                BaseChannelNamePattern = SelectedTemplate.BaseChannelNamePattern,
+                BasePathPattern = BatchBasePath,
+                ProcessingDelayMs = SelectedTemplate.ProcessingDelayMs,
+                IncludeSubdirectories = SelectedTemplate.IncludeSubdirectories,
+                SupportedExtensions = SelectedTemplate.SupportedExtensions,
+                IsBuiltIn = SelectedTemplate.IsBuiltIn,
+                CreatedBy = SelectedTemplate.CreatedBy
+            };
+
+            var preview = await templateService.GenerateWatchesFromTemplateAsync(
+                template,
+                NumberOfWatches,
+                StartingNumber);
+
+            DispatcherExecute(() =>
+            {
+                foreach (var watch in preview.PreviewWatches)
+                {
+                    PreviewWatches.Add(watch);
+                }
+            });
+
+            StatusMessage = $"Generated preview for {preview.Count} watches";
+        }
+        catch (Exception ex)
+        {
+            BatchCreateError = $"Failed to generate preview: {ex.Message}";
+            StatusMessage = $"Failed to generate preview: {ex.Message}";
+        }
+        finally
+        {
+            IsGeneratingPreview = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task CreateWatchesFromTemplateAsync()
+    {
+        if (PreviewWatches.Count == 0)
+        {
+            BatchCreateError = "No watches to create. Generate preview first.";
+            return;
+        }
+
+        try
+        {
+            IsCreatingBatch = true;
+            BatchCreateError = string.Empty;
+            BatchCreateProgress = 0;
+            BatchCreateTotal = PreviewWatches.Count;
+
+            if (!_signalRClient.IsConnected)
+            {
+                BatchCreateError = "Not connected to FileScan service";
+                return;
+            }
+
+            var successCount = 0;
+            var failureCount = 0;
+
+            foreach (var watch in PreviewWatches)
+            {
+                try
+                {
+                    await _signalRClient.StartWatchAsync(watch);
+                    successCount++;
+                }
+                catch (Exception ex)
+                {
+                    failureCount++;
+                    System.Diagnostics.Debug.WriteLine($"Failed to create watch {watch.ChannelName}: {ex.Message}");
+                }
+
+                BatchCreateProgress++;
+                StatusMessage = $"Creating watches: {BatchCreateProgress}/{BatchCreateTotal}";
+            }
+
+            StatusMessage = $"Batch creation complete: {successCount} successful, {failureCount} failed";
+
+            if (successCount > 0)
+            {
+                IsBatchCreateDialogOpen = false;
+                await RefreshWatchesAsync();
+
+                if (EnableNotifications)
+                {
+                    await _notificationService.ShowSuccessAsync("Batch Creation Complete",
+                        $"Created {successCount} watch(es)");
+                }
+            }
+            else
+            {
+                BatchCreateError = "All watch creations failed. Check paths and permissions.";
+            }
+        }
+        catch (Exception ex)
+        {
+            BatchCreateError = $"Failed to create watches: {ex.Message}";
+            StatusMessage = $"Batch creation failed: {ex.Message}";
+        }
+        finally
+        {
+            IsCreatingBatch = false;
+            BatchCreateProgress = 0;
+            BatchCreateTotal = 0;
+        }
+    }
+
+    [RelayCommand]
+    private async Task ImportWatchesFromFileAsync()
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(ImportFilePath))
+            {
+                ImportError = "Please select a file to import";
+                return;
+            }
+
+            if (!System.IO.File.Exists(ImportFilePath))
+            {
+                ImportError = "File does not exist";
+                return;
+            }
+
+            IsImporting = true;
+            ImportError = string.Empty;
+
+            // Create a temp service instance (in prod, this should be injected)
+            var templateService = new AlUmmahNow.Data.Services.WatchTemplateService(
+                Microsoft.Extensions.Logging.Abstractions.NullLogger<AlUmmahNow.Data.Services.WatchTemplateService>.Instance);
+
+            WatchBatchImport? result;
+            var ext = System.IO.Path.GetExtension(ImportFilePath).ToLowerInvariant();
+
+            if (ext == ".csv")
+            {
+                result = await templateService.ImportFromCsvAsync(ImportFilePath);
+            }
+            else if (ext == ".json")
+            {
+                result = await templateService.ImportFromJsonAsync(ImportFilePath);
+            }
+            else
+            {
+                ImportError = "Unsupported file format. Use CSV or JSON.";
+                return;
+            }
+
+            ImportResult = result;
+
+            if (result.IsValid)
+            {
+                DispatcherExecute(() =>
+                {
+                    PreviewWatches.Clear();
+                    foreach (var watch in result.WatchConfigurations)
+                    {
+                        PreviewWatches.Add(watch);
+                    }
+                });
+
+                StatusMessage = $"Import successful: {result.Summary}";
+            }
+            else
+            {
+                ImportError = $"Import validation failed: {result.Summary}";
+                StatusMessage = $"Import has errors: {result.Summary}";
+            }
+        }
+        catch (Exception ex)
+        {
+            ImportError = $"Failed to import: {ex.Message}";
+            StatusMessage = $"Import failed: {ex.Message}";
+        }
+        finally
+        {
+            IsImporting = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task CreateImportedWatchesAsync()
+    {
+        if (ImportResult == null || !ImportResult.IsValid)
+        {
+            ImportError = "No valid watches to import";
+            return;
+        }
+
+        try
+        {
+            IsCreatingBatch = true;
+            ImportError = string.Empty;
+            BatchCreateProgress = 0;
+            BatchCreateTotal = ImportResult.WatchConfigurations.Count;
+
+            if (!_signalRClient.IsConnected)
+            {
+                ImportError = "Not connected to FileScan service";
+                return;
+            }
+
+            var successCount = 0;
+            var failureCount = 0;
+
+            foreach (var watch in ImportResult.WatchConfigurations)
+            {
+                try
+                {
+                    await _signalRClient.StartWatchAsync(watch);
+                    successCount++;
+                }
+                catch (Exception ex)
+                {
+                    failureCount++;
+                    System.Diagnostics.Debug.WriteLine($"Failed to create watch {watch.ChannelName}: {ex.Message}");
+                }
+
+                BatchCreateProgress++;
+                StatusMessage = $"Creating watches: {BatchCreateProgress}/{BatchCreateTotal}";
+            }
+
+            StatusMessage = $"Import complete: {successCount} successful, {failureCount} failed";
+
+            if (successCount > 0)
+            {
+                IsBatchCreateDialogOpen = false;
+                await RefreshWatchesAsync();
+
+                if (EnableNotifications)
+                {
+                    await _notificationService.ShowSuccessAsync("Import Complete",
+                        $"Imported {successCount} watch(es)");
+                }
+            }
+            else
+            {
+                ImportError = "All watch imports failed. Check paths and permissions.";
+            }
+        }
+        catch (Exception ex)
+        {
+            ImportError = $"Failed to import watches: {ex.Message}";
+            StatusMessage = $"Import failed: {ex.Message}";
+        }
+        finally
+        {
+            IsCreatingBatch = false;
+            BatchCreateProgress = 0;
+            BatchCreateTotal = 0;
+        }
+    }
+
+    [RelayCommand]
+    private async Task SaveAsTemplateAsync()
+    {
+        if (PreviewWatches.Count == 0)
+        {
+            StatusMessage = "No watches to save as template";
+            return;
+        }
+
+        try
+        {
+            // This would open a dialog to name the template
+            // For now, just show a message
+            StatusMessage = "Save as template functionality - coming soon";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Failed to save template: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    private async Task LoadTemplatesAsync()
+    {
+        try
+        {
+            // Create a temp service instance (in prod, this should be injected)
+            var templateService = new AlUmmahNow.Data.Services.WatchTemplateService(
+                Microsoft.Extensions.Logging.Abstractions.NullLogger<AlUmmahNow.Data.Services.WatchTemplateService>.Instance);
+
+            var templates = await templateService.GetTemplatesAsync();
+
+            DispatcherExecute(() =>
+            {
+                SavedTemplates.Clear();
+                foreach (var template in templates)
+                {
+                    SavedTemplates.Add(template);
+                }
+            });
+
+            StatusMessage = $"Loaded {templates.Count} template(s)";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Failed to load templates: {ex.Message}";
+        }
     }
 
     // Helper Methods - Validation
