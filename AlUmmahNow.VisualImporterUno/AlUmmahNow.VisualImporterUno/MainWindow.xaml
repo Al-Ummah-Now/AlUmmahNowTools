@@ -40,6 +40,11 @@
                 </NavigationViewItem>
                 <NavigationViewItem Content="Service Status" Tag="ServiceStatus" Icon="Sync"/>
                 <NavigationViewItem Content="Settings" Tag="Settings" Icon="Setting"/>
+                <NavigationViewItem Content="FFmpeg Configuration" Tag="FFmpegSettings">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE8B8;"/>
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
             </NavigationView.MenuItems>
 
             <Frame x:Name="ContentFrame" NavigationFailed="ContentFrame_NavigationFailed"/>

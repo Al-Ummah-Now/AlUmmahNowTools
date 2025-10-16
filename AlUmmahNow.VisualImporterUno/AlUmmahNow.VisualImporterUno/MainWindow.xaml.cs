@@ -21,7 +21,8 @@ namespace AlUmmahNow.VisualImporterUno
             ApprovalWorkflow,
             Analytics,
             ServiceStatus,
-            Settings
+            Settings,
+            FFmpegSettings
         }
 
         private ViewState _currentView = ViewState.Dashboard;
@@ -122,8 +123,12 @@ namespace AlUmmahNow.VisualImporterUno
                             _currentView = ViewState.Settings;
                             ContentFrame.Navigate(typeof(SettingsPage));
                             break;
+                        case "FFmpegSettings":
+                            _currentView = ViewState.FFmpegSettings;
+                            ContentFrame.Navigate(typeof(FFmpegSettingsPage));
+                            break;
                     }
-                    
+
                     UpdateStatusBarForCurrentView();
                 }
             }
@@ -320,6 +325,7 @@ namespace AlUmmahNow.VisualImporterUno
                     ViewState.Analytics => "Analytics",
                     ViewState.ServiceStatus => "Service Status",
                     ViewState.Settings => "Settings",
+                    ViewState.FFmpegSettings => "FFmpeg Configuration",
                     _ => "Ready"
                 };
 

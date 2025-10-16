@@ -351,6 +351,10 @@ public partial class App : Application
                         services.AddSingleton<WatchViewModel>();
                         services.AddSingleton<ApprovalViewModel>();
                         services.AddSingleton<AnalyticsDashboardViewModel>();
+
+                        // Register FFmpeg services
+                        services.AddSingleton<IFFmpegManagerService, FFmpegManagerService>();
+                        services.AddTransient<FFmpegSettingsViewModel>();
                     })
                 );
 
