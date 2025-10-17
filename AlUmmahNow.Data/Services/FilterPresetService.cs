@@ -83,7 +83,7 @@ public class FilterPresetService : IFilterPresetService
 
     public async Task<List<FilterPreset>> GetAllPresetsAsync()
     {
-        await _fileLock.WaitAsync();
+        await _fileLock.WaitAsync().ConfigureAwait(false);
         try
         {
             if (_cachedPresets != null)
@@ -95,12 +95,12 @@ public class FilterPresetService : IFilterPresetService
 
             if (!File.Exists(_presetsFilePath))
             {
-                await InitializeBuiltInPresetsAsync();
+                await InitializeBuiltInPresetsAsync().ConfigureAwait(false);
                 return _cachedPresets?.OrderBy(p => p.DisplayOrder).ThenBy(p => p.Name).ToList()
                     ?? new List<FilterPreset>();
             }
 
-            var json = await File.ReadAllTextAsync(_presetsFilePath);
+            var json = await File.ReadAllTextAsync(_presetsFilePath).ConfigureAwait(false);
             _cachedPresets = JsonSerializer.Deserialize<List<FilterPreset>>(json) ?? new List<FilterPreset>();
 
             return _cachedPresets.OrderBy(p => p.DisplayOrder)
@@ -115,16 +115,16 @@ public class FilterPresetService : IFilterPresetService
 
     public async Task<FilterPreset?> GetPresetByIdAsync(Guid id)
     {
-        var presets = await GetAllPresetsAsync();
+        var presets = await GetAllPresetsAsync().ConfigureAwait(false);
         return presets.FirstOrDefault(p => p.Id == id);
     }
 
     public async Task SavePresetAsync(FilterPreset preset)
     {
-        await _fileLock.WaitAsync();
+        await _fileLock.WaitAsync().ConfigureAwait(false);
         try
         {
-            var presets = await GetAllPresetsAsync();
+            var presets = await GetAllPresetsAsync().ConfigureAwait(false);
             var existingIndex = presets.FindIndex(p => p.Id == preset.Id);
 
             preset.UpdatedAt = DateTime.UtcNow;
@@ -150,7 +150,7 @@ public class FilterPresetService : IFilterPresetService
                 }
             }
 
-            await SavePresetsToFileAsync(presets);
+            await SavePresetsToFileAsync(presets).ConfigureAwait(false);
             _cachedPresets = presets;
         }
         finally
@@ -161,10 +161,10 @@ public class FilterPresetService : IFilterPresetService
 
     public async Task DeletePresetAsync(Guid id)
     {
-        await _fileLock.WaitAsync();
+        await _fileLock.WaitAsync().ConfigureAwait(false);
         try
         {
-            var presets = await GetAllPresetsAsync();
+            var presets = await GetAllPresetsAsync().ConfigureAwait(false);
             var preset = presets.FirstOrDefault(p => p.Id == id);
 
             if (preset == null)
@@ -179,7 +179,7 @@ public class FilterPresetService : IFilterPresetService
             }
 
             presets.RemoveAll(p => p.Id == id);
-            await SavePresetsToFileAsync(presets);
+            await SavePresetsToFileAsync(presets).ConfigureAwait(false);
             _cachedPresets = presets;
         }
         finally
@@ -190,16 +190,16 @@ public class FilterPresetService : IFilterPresetService
 
     public async Task<FilterPreset?> GetDefaultPresetAsync()
     {
-        var presets = await GetAllPresetsAsync();
+        var presets = await GetAllPresetsAsync().ConfigureAwait(false);
         return presets.FirstOrDefault(p => p.IsDefault);
     }
 
     public async Task SetDefaultPresetAsync(Guid id)
     {
-        await _fileLock.WaitAsync();
+        await _fileLock.WaitAsync().ConfigureAwait(false);
         try
         {
-            var presets = await GetAllPresetsAsync();
+            var presets = await GetAllPresetsAsync().ConfigureAwait(false);
             var targetPreset = presets.FirstOrDefault(p => p.Id == id);
 
             if (targetPreset == null)
@@ -217,7 +217,7 @@ public class FilterPresetService : IFilterPresetService
                 }
             }
 
-            await SavePresetsToFileAsync(presets);
+            await SavePresetsToFileAsync(presets).ConfigureAwait(false);
             _cachedPresets = presets;
         }
         finally
@@ -228,16 +228,16 @@ public class FilterPresetService : IFilterPresetService
 
     public async Task ClearDefaultPresetAsync()
     {
-        await _fileLock.WaitAsync();
+        await _fileLock.WaitAsync().ConfigureAwait(false);
         try
         {
-            var presets = await GetAllPresetsAsync();
+            var presets = await GetAllPresetsAsync().ConfigureAwait(false);
             foreach (var preset in presets)
             {
                 preset.IsDefault = false;
             }
 
-            await SavePresetsToFileAsync(presets);
+            await SavePresetsToFileAsync(presets).ConfigureAwait(false);
             _cachedPresets = presets;
         }
         finally
@@ -248,7 +248,7 @@ public class FilterPresetService : IFilterPresetService
 
     public async Task InitializeBuiltInPresetsAsync()
     {
-        await _fileLock.WaitAsync();
+        await _fileLock.WaitAsync().ConfigureAwait(false);
         try
         {
             var presets = new List<FilterPreset>();
@@ -256,7 +256,7 @@ public class FilterPresetService : IFilterPresetService
             // Check if built-in presets already exist
             if (File.Exists(_presetsFilePath))
             {
-                var json = await File.ReadAllTextAsync(_presetsFilePath);
+                var json = await File.ReadAllTextAsync(_presetsFilePath).ConfigureAwait(false);
                 presets = JsonSerializer.Deserialize<List<FilterPreset>>(json) ?? new List<FilterPreset>();
             }
 
@@ -270,7 +270,7 @@ public class FilterPresetService : IFilterPresetService
                 }
             }
 
-            await SavePresetsToFileAsync(presets);
+            await SavePresetsToFileAsync(presets).ConfigureAwait(false);
             _cachedPresets = presets;
         }
         finally
@@ -287,7 +287,7 @@ public class FilterPresetService : IFilterPresetService
         };
 
         var json = JsonSerializer.Serialize(presets, options);
-        await File.WriteAllTextAsync(_presetsFilePath, json);
+        await File.WriteAllTextAsync(_presetsFilePath, json).ConfigureAwait(false);
     }
 
     private static List<FilterPreset> CreateBuiltInPresets()

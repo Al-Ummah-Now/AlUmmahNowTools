@@ -173,7 +173,7 @@ public class WatchTemplateService : IWatchTemplateService
             {
                 try
                 {
-                    var json = await File.ReadAllTextAsync(file, cancellationToken);
+                    var json = await File.ReadAllTextAsync(file, cancellationToken).ConfigureAwait(false);
                     var template = JsonSerializer.Deserialize<WatchTemplate>(json);
                     if (template != null && !template.IsBuiltIn)
                     {
@@ -213,7 +213,7 @@ public class WatchTemplateService : IWatchTemplateService
             var filePath = Path.Combine(_templatesDirectory, $"{id}.json");
             if (File.Exists(filePath))
             {
-                var json = await File.ReadAllTextAsync(filePath, cancellationToken);
+                var json = await File.ReadAllTextAsync(filePath, cancellationToken).ConfigureAwait(false);
                 return JsonSerializer.Deserialize<WatchTemplate>(json);
             }
 
@@ -245,7 +245,7 @@ public class WatchTemplateService : IWatchTemplateService
 
             var filePath = Path.Combine(_templatesDirectory, $"{template.Id}.json");
             var json = JsonSerializer.Serialize(template, new JsonSerializerOptions { WriteIndented = true });
-            await File.WriteAllTextAsync(filePath, json, cancellationToken);
+            await File.WriteAllTextAsync(filePath, json, cancellationToken).ConfigureAwait(false);
 
             _logger.LogInformation("Saved watch template: {TemplateName} ({TemplateId})", template.Name, template.Id);
 
@@ -378,7 +378,7 @@ public class WatchTemplateService : IWatchTemplateService
                 return result;
             }
 
-            var lines = await File.ReadAllLinesAsync(csvPath, cancellationToken);
+            var lines = await File.ReadAllLinesAsync(csvPath, cancellationToken).ConfigureAwait(false);
             if (lines.Length < 2)
             {
                 result.ValidationErrors[0] = new List<string> { "CSV file must contain header and at least one data row" };
@@ -496,7 +496,7 @@ public class WatchTemplateService : IWatchTemplateService
                 return result;
             }
 
-            var json = await File.ReadAllTextAsync(jsonPath, cancellationToken);
+            var json = await File.ReadAllTextAsync(jsonPath, cancellationToken).ConfigureAwait(false);
             var watches = JsonSerializer.Deserialize<List<CreateWatchRequest>>(json);
 
             if (watches == null || watches.Count == 0)
@@ -546,7 +546,7 @@ public class WatchTemplateService : IWatchTemplateService
                 WriteIndented = true
             });
 
-            await File.WriteAllTextAsync(outputPath, json, cancellationToken);
+            await File.WriteAllTextAsync(outputPath, json, cancellationToken).ConfigureAwait(false);
 
             _logger.LogInformation("Successfully exported watches to {OutputPath}", outputPath);
 
@@ -627,6 +627,10 @@ public class WatchTemplateService : IWatchTemplateService
         {
             errors.Add("Watch path is required");
         }
+        else if (!IsValidWatchPath(watch.WatchPath))
+        {
+            errors.Add("Watch path contains invalid or dangerous characters");
+        }
 
         if (watch.ProcessingDelayMs < 1000)
         {
@@ -639,5 +643,42 @@ public class WatchTemplateService : IWatchTemplateService
         }
 
         return errors;
+    }
+
+    /// <summary>
+    /// Validates a watch path to prevent path traversal and command injection attacks.
+    /// </summary>
+    /// <param name="watchPath">The watch path to validate.</param>
+    /// <returns>True if the path is valid and safe, false otherwise.</returns>
+    private bool IsValidWatchPath(string watchPath)
+    {
+        try
+        {
+            // Check for dangerous characters that could be used for command injection
+            var dangerousChars = new[] { ';', '|', '&', '$', '`', '<', '>', '\n', '\r' };
+            if (watchPath.Any(c => dangerousChars.Contains(c)))
+            {
+                _logger.LogWarning("Dangerous characters detected in watch path: {WatchPath}", watchPath);
+                return false;
+            }
+
+            // Check for excessive path traversal attempts
+            var normalizedPath = watchPath.Replace('\\', '/');
+            if (normalizedPath.Contains("../") || normalizedPath.Contains("/.."))
+            {
+                _logger.LogWarning("Path traversal detected in watch path: {WatchPath}", watchPath);
+                return false;
+            }
+
+            // Try to get the full path - this will throw if the path is invalid
+            var fullPath = Path.GetFullPath(watchPath);
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Invalid watch path: {WatchPath}", watchPath);
+            return false;
+        }
     }
 }
