@@ -335,34 +335,7 @@ public class FileWatchService : IFileWatchService, IDisposable
             watcher.Changed += (sender, e) => OnFileEvent(channelWatch, e, extensions, "changed");
             watcher.Renamed += (sender, e) => OnFileEvent(channelWatch, e, extensions, "renamed");
 
-            watcher.Error += (sender, e) =>
-            {
-                var exception = e.GetException();
-
-                // Check if this is a buffer overflow exception
-                if (exception is InternalBufferOverflowException)
-                {
-                    _logger.LogError(exception,
-                        "FileSystemWatcher buffer overflow for watch {WatchId}. " +
-                        "File changes occurring faster than they can be processed. " +
-                        "Some file change notifications may have been lost. " +
-                        "Consider reducing activity in the watched directory or increasing the ProcessingDelayMs.",
-                        channelWatch.Id);
-
-                    // Notify about buffer overflow but don't stop the watcher
-                    WatchStatusChanged?.Invoke(this, new WatchStatusChangedEventArgs(
-                        channelWatch.Id,
-                        channelWatch.ChannelName,
-                        true,
-                        "Buffer overflow - some file notifications may have been missed"));
-                }
-                else
-                {
-                    _logger.LogError(exception, "File watcher error for watch {WatchId}", channelWatch.Id);
-                    WatchStatusChanged?.Invoke(this, new WatchStatusChangedEventArgs(
-                        channelWatch.Id, channelWatch.ChannelName, false, $"Watcher error: {exception?.Message}"));
-                }
-            };
+            watcher.Error += (sender, e) => HandleFileWatcherError(channelWatch, e.GetException());
 
             _watchers[channelWatch.Id] = watcher;
             _watchConfigs[channelWatch.Id] = channelWatch;
@@ -397,6 +370,36 @@ public class FileWatchService : IFileWatchService, IDisposable
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Error stopping file system watcher for watch {WatchId}", watchId);
+        }
+    }
+
+    /// <summary>
+    /// Handles errors from FileSystemWatcher. Exposed as internal for testing.
+    /// </summary>
+    internal void HandleFileWatcherError(ChannelWatch channelWatch, Exception? exception)
+    {
+        // Check if this is a buffer overflow exception
+        if (exception is InternalBufferOverflowException)
+        {
+            _logger.LogError(exception,
+                "FileSystemWatcher buffer overflow for watch {WatchId}. " +
+                "File changes occurring faster than they can be processed. " +
+                "Some file change notifications may have been lost. " +
+                "Consider reducing activity in the watched directory or increasing the ProcessingDelayMs.",
+                channelWatch.Id);
+
+            // Notify about buffer overflow but don't stop the watcher
+            WatchStatusChanged?.Invoke(this, new WatchStatusChangedEventArgs(
+                channelWatch.Id,
+                channelWatch.ChannelName,
+                true,
+                "Buffer overflow - some file notifications may have been missed"));
+        }
+        else
+        {
+            _logger.LogError(exception, "File watcher error for watch {WatchId}", channelWatch.Id);
+            WatchStatusChanged?.Invoke(this, new WatchStatusChangedEventArgs(
+                channelWatch.Id, channelWatch.ChannelName, false, $"Watcher error: {exception?.Message}"));
         }
     }
 

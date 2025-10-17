@@ -84,26 +84,15 @@ public class FileWatchServiceBufferOverflowTests : IDisposable
         var statusChangeEvents = new List<WatchStatusChangedEventArgs>();
         _fileWatchService.WatchStatusChanged += (sender, e) => statusChangeEvents.Add(e);
 
-        // Get the watcher to simulate error
-        var watchersField = typeof(FileWatchService).GetField("_watchers",
-            BindingFlags.NonPublic | BindingFlags.Instance);
-        var watchers = watchersField?.GetValue(_fileWatchService) as System.Collections.Concurrent.ConcurrentDictionary<Guid, FileSystemWatcher>;
-        var watcher = watchers![watchId];
+        // Get the watch configuration
+        var watchConfig = await _dbContext.ChannelWatches.FindAsync(watchId);
+        watchConfig.Should().NotBeNull();
 
-        // Act - Trigger the error event with a buffer overflow exception
-        var errorEventArgs = Activator.CreateInstance(
-            typeof(ErrorEventArgs),
-            BindingFlags.NonPublic | BindingFlags.Instance,
-            null,
-            new object[] { new InternalBufferOverflowException("Buffer overflow simulation") },
-            null) as ErrorEventArgs;
+        // Act - Call the error handler directly with a buffer overflow exception
+        var bufferOverflowException = new InternalBufferOverflowException("Buffer overflow simulation");
+        _fileWatchService.HandleFileWatcherError(watchConfig!, bufferOverflowException);
 
-        watcher.GetType()
-            .GetEvent("Error", BindingFlags.Public | BindingFlags.Instance)
-            ?.GetRaiseMethod(true)
-            ?.Invoke(watcher, new object[] { watcher, errorEventArgs! });
-
-        await Task.Delay(200); // Give time for event to process
+        await Task.Delay(100); // Give time for event to process
 
         // Assert
         _mockLogger.Verify(
@@ -140,26 +129,20 @@ public class FileWatchServiceBufferOverflowTests : IDisposable
 
         var watchId = await _fileWatchService.StartWatchAsync(request);
 
-        // Get the watcher
+        // Get the watch configuration and watcher
+        var watchConfig = await _dbContext.ChannelWatches.FindAsync(watchId);
+        watchConfig.Should().NotBeNull();
+
         var watchersField = typeof(FileWatchService).GetField("_watchers",
             BindingFlags.NonPublic | BindingFlags.Instance);
         var watchers = watchersField?.GetValue(_fileWatchService) as System.Collections.Concurrent.ConcurrentDictionary<Guid, FileSystemWatcher>;
         var watcher = watchers![watchId];
 
-        // Act - Simulate buffer overflow
-        var errorEventArgs = Activator.CreateInstance(
-            typeof(ErrorEventArgs),
-            BindingFlags.NonPublic | BindingFlags.Instance,
-            null,
-            new object[] { new InternalBufferOverflowException("Buffer overflow") },
-            null) as ErrorEventArgs;
+        // Act - Call the error handler with buffer overflow exception
+        var bufferOverflowException = new InternalBufferOverflowException("Buffer overflow");
+        _fileWatchService.HandleFileWatcherError(watchConfig!, bufferOverflowException);
 
-        watcher.GetType()
-            .GetEvent("Error", BindingFlags.Public | BindingFlags.Instance)
-            ?.GetRaiseMethod(true)
-            ?.Invoke(watcher, new object[] { watcher, errorEventArgs! });
-
-        await Task.Delay(200);
+        await Task.Delay(100);
 
         // Assert - Watcher should still be active
         watcher.EnableRaisingEvents.Should().BeTrue("Watcher should remain active after buffer overflow");
@@ -185,26 +168,15 @@ public class FileWatchServiceBufferOverflowTests : IDisposable
 
         var watchId = await _fileWatchService.StartWatchAsync(request);
 
-        // Get the watcher
-        var watchersField = typeof(FileWatchService).GetField("_watchers",
-            BindingFlags.NonPublic | BindingFlags.Instance);
-        var watchers = watchersField?.GetValue(_fileWatchService) as System.Collections.Concurrent.ConcurrentDictionary<Guid, FileSystemWatcher>;
-        var watcher = watchers![watchId];
+        // Get the watch configuration
+        var watchConfig = await _dbContext.ChannelWatches.FindAsync(watchId);
+        watchConfig.Should().NotBeNull();
 
-        // Act - Simulate a different error (not buffer overflow)
-        var errorEventArgs = Activator.CreateInstance(
-            typeof(ErrorEventArgs),
-            BindingFlags.NonPublic | BindingFlags.Instance,
-            null,
-            new object[] { new InvalidOperationException("Some other error") },
-            null) as ErrorEventArgs;
+        // Act - Call the error handler with a different error (not buffer overflow)
+        var otherException = new InvalidOperationException("Some other error");
+        _fileWatchService.HandleFileWatcherError(watchConfig!, otherException);
 
-        watcher.GetType()
-            .GetEvent("Error", BindingFlags.Public | BindingFlags.Instance)
-            ?.GetRaiseMethod(true)
-            ?.Invoke(watcher, new object[] { watcher, errorEventArgs! });
-
-        await Task.Delay(200);
+        await Task.Delay(100);
 
         // Assert - Should log as generic file watcher error, not buffer overflow
         _mockLogger.Verify(
