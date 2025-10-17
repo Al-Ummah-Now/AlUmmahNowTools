@@ -12,12 +12,13 @@ using Microsoft.Extensions.Logging;
 
 namespace AlUmmahNow.Data.Storage
 {
-    public class BunnyStorageClient<T> : IStorageClient<T>
+    public class BunnyStorageClient<T> : IStorageClient<T>, IDisposable
     {
         private readonly BunnyCDNStorage bunnyCDNStorage;
         private readonly AsyncRetryPolicy _retryPolicy;
         private readonly SemaphoreSlim _rateLimiter;
         private readonly ILogger<BunnyStorageClient<T>>? _logger;
+        private bool _disposed = false;
 
         public BunnyStorageClient(string zoneName, string key, string mainRegion, int maxConcurrentUploads = 10, ILogger<BunnyStorageClient<T>>? logger = null)
         {
@@ -117,9 +118,36 @@ namespace AlUmmahNow.Data.Storage
                     await bunnyCDNStorage.UploadAsync(stream, path);
                 });
             }
+            catch (Exception ex)
+            {
+                // Log final error if all retries are exhausted
+                _logger?.LogError(ex,
+                    "Upload failed after all retry attempts for path: {Path}. " +
+                    "All 3 retry attempts exhausted.", path);
+                throw;
+            }
             finally
             {
                 _rateLimiter.Release();
+            }
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_disposed)
+            {
+                if (disposing)
+                {
+                    // Dispose managed resources
+                    _rateLimiter?.Dispose();
+                }
+                _disposed = true;
             }
         }
     }
