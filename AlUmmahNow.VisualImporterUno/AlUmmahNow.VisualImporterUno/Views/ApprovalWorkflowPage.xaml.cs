@@ -95,37 +95,6 @@ public sealed partial class ApprovalWorkflowPage : Page
 #region Value Converters
 
 /// <summary>
-/// Converts file size in bytes to human-readable format (KB, MB, GB)
-/// </summary>
-public class FileSizeConverter : IValueConverter
-{
-    public object Convert(object value, Type targetType, object parameter, string language)
-    {
-        if (value is long bytes)
-        {
-            string[] sizes = { "B", "KB", "MB", "GB", "TB" };
-            double len = bytes;
-            int order = 0;
-
-            while (len >= 1024 && order < sizes.Length - 1)
-            {
-                order++;
-                len = len / 1024;
-            }
-
-            return $"{len:0.##} {sizes[order]}";
-        }
-
-        return "0 B";
-    }
-
-    public object ConvertBack(object value, Type targetType, object parameter, string language)
-    {
-        throw new NotImplementedException();
-    }
-}
-
-/// <summary>
 /// Converts DateTime to relative time string (e.g., "2 hours ago")
 /// </summary>
 public class RelativeDateConverter : IValueConverter
@@ -148,27 +117,6 @@ public class RelativeDateConverter : IValueConverter
                 return $"{(int)(timeSpan.TotalDays / 7)} weeks ago";
 
             return dateTime.ToString("MMM dd, yyyy");
-        }
-
-        return string.Empty;
-    }
-
-    public object ConvertBack(object value, Type targetType, object parameter, string language)
-    {
-        throw new NotImplementedException();
-    }
-}
-
-/// <summary>
-/// Converts DateTime to formatted string
-/// </summary>
-public class DateTimeConverter : IValueConverter
-{
-    public object Convert(object value, Type targetType, object parameter, string language)
-    {
-        if (value is DateTime dateTime)
-        {
-            return dateTime.ToString("MMM dd, yyyy HH:mm");
         }
 
         return string.Empty;
@@ -210,32 +158,6 @@ public class PriorityColorConverter : IValueConverter
 }
 
 /// <summary>
-/// Converts boolean to Visibility
-/// </summary>
-public class BoolToVisibilityConverter : IValueConverter
-{
-    public object Convert(object value, Type targetType, object parameter, string language)
-    {
-        if (value is bool boolValue)
-        {
-            return boolValue ? Visibility.Visible : Visibility.Collapsed;
-        }
-
-        return Visibility.Collapsed;
-    }
-
-    public object ConvertBack(object value, Type targetType, object parameter, string language)
-    {
-        if (value is Visibility visibility)
-        {
-            return visibility == Visibility.Visible;
-        }
-
-        return false;
-    }
-}
-
-/// <summary>
 /// Converts null to Visibility (Visible if not null)
 /// </summary>
 public class NullToVisibilityConverter : IValueConverter
@@ -243,27 +165,6 @@ public class NullToVisibilityConverter : IValueConverter
     public object Convert(object value, Type targetType, object parameter, string language)
     {
         return value != null ? Visibility.Visible : Visibility.Collapsed;
-    }
-
-    public object ConvertBack(object value, Type targetType, object parameter, string language)
-    {
-        throw new NotImplementedException();
-    }
-}
-
-/// <summary>
-/// Converts zero count to Visibility (Visible if zero)
-/// </summary>
-public class ZeroToVisibilityConverter : IValueConverter
-{
-    public object Convert(object value, Type targetType, object parameter, string language)
-    {
-        if (value is int count)
-        {
-            return count == 0 ? Visibility.Visible : Visibility.Collapsed;
-        }
-
-        return Visibility.Collapsed;
     }
 
     public object ConvertBack(object value, Type targetType, object parameter, string language)
