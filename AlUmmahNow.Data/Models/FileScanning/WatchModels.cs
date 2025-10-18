@@ -330,3 +330,127 @@ public class BulkApprovalRequest
     public string? Notes { get; set; }
     public string? ApprovedBy { get; set; }
 }
+
+/// <summary>
+/// Watch template for batch creation
+/// </summary>
+public class WatchTemplate
+{
+    [Key]
+    public Guid Id { get; set; } = Guid.NewGuid();
+
+    /// <summary>
+    /// Template name
+    /// </summary>
+    [Required]
+    [MaxLength(200)]
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Template description
+    /// </summary>
+    [MaxLength(1000)]
+    public string? Description { get; set; }
+
+    /// <summary>
+    /// Base channel name pattern (e.g., "Channel_{number}")
+    /// Supports variables: {number}, {index}, {date}, {time}
+    /// </summary>
+    [Required]
+    [MaxLength(500)]
+    public string BaseChannelNamePattern { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Base path pattern (e.g., "/videos/{channel}")
+    /// Supports variables: {channel}, {number}, {index}, {date}, {time}
+    /// </summary>
+    [Required]
+    [MaxLength(2000)]
+    public string BasePathPattern { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Processing delay in milliseconds
+    /// </summary>
+    public int ProcessingDelayMs { get; set; } = 5000;
+
+    /// <summary>
+    /// Include subdirectories
+    /// </summary>
+    public bool IncludeSubdirectories { get; set; } = true;
+
+    /// <summary>
+    /// Supported file extensions
+    /// </summary>
+    [MaxLength(500)]
+    public string SupportedExtensions { get; set; } = ".mp4,.mkv,.avi,.mov,.wmv,.m4v,.flv,.webm";
+
+    /// <summary>
+    /// Whether this is a built-in template (cannot be deleted)
+    /// </summary>
+    public bool IsBuiltIn { get; set; } = false;
+
+    /// <summary>
+    /// When this template was created
+    /// </summary>
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    /// <summary>
+    /// When this template was last updated
+    /// </summary>
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+
+    /// <summary>
+    /// User who created this template
+    /// </summary>
+    [MaxLength(256)]
+    public string? CreatedBy { get; set; }
+}
+
+/// <summary>
+/// Result of batch import operation
+/// </summary>
+public class WatchBatchImport
+{
+    /// <summary>
+    /// List of watch configurations to create
+    /// </summary>
+    public List<CreateWatchRequest> WatchConfigurations { get; set; } = new();
+
+    /// <summary>
+    /// Validation errors by line/entry number
+    /// </summary>
+    public Dictionary<int, List<string>> ValidationErrors { get; set; } = new();
+
+    /// <summary>
+    /// Whether the import is valid and can be processed
+    /// </summary>
+    public bool IsValid => ValidationErrors.Count == 0 && WatchConfigurations.Count > 0;
+
+    /// <summary>
+    /// Total number of valid configurations
+    /// </summary>
+    public int ValidCount => WatchConfigurations.Count;
+
+    /// <summary>
+    /// Total number of invalid entries
+    /// </summary>
+    public int InvalidCount => ValidationErrors.Count;
+
+    /// <summary>
+    /// Import summary message
+    /// </summary>
+    public string Summary => IsValid
+        ? $"{ValidCount} watch configuration(s) ready to import"
+        : $"{ValidCount} valid, {InvalidCount} invalid configuration(s)";
+}
+
+/// <summary>
+/// DTO for watch template preview
+/// </summary>
+public class WatchTemplatePreview
+{
+    public Guid TemplateId { get; set; }
+    public string TemplateName { get; set; } = string.Empty;
+    public List<CreateWatchRequest> PreviewWatches { get; set; } = new();
+    public int Count => PreviewWatches.Count;
+}

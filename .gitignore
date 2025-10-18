@@ -365,3 +365,7 @@ FodyWeavers.xsd
 # Coverage reports
 coveragereport/
 TestResults/
+
+# Claude Code configuration with sensitive credentials
+.claude/claude_desktop_config.json
+.claude/settings.local.json
