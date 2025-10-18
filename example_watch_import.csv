@@ -1,0 +1,6 @@
+ChannelName,WatchPath,ProcessingDelay,IncludeSubdirs,Extensions
+Islamic Lectures,C:\Videos\Islamic_Lectures,10,true,"mp4,mkv,avi"
+News Channel,C:\Videos\News,5,true,"mp4,mkv"
+Sports Channel,C:\Videos\Sports,15,false,"mp4"
+Documentary Channel,C:\Videos\Documentaries,10,true,"mp4,mkv,avi,mov"
+Kids Content,C:\Videos\Kids,5,true,"mp4,mkv,avi,webm"

@@ -128,6 +128,75 @@
                     </StackPanel>
                 </Border>
 
+                <!-- Notifications Configuration -->
+                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Padding="20">
+                    <StackPanel Spacing="16">
+                        <TextBlock Text="Notifications"
+                                   Style="{StaticResource SubtitleTextBlockStyle}"/>
+
+                        <!-- Enable Notifications -->
+                        <StackPanel Spacing="8">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="Enable Notifications"
+                                               FontWeight="SemiBold"/>
+                                    <TextBlock Text="Show desktop notifications for file detection and approval actions"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                               FontSize="12"
+                                               Margin="0,4,0,0"/>
+                                </StackPanel>
+
+                                <ToggleSwitch Grid.Column="1"
+                                              IsOn="{x:Bind ViewModel.EnableNotifications, Mode=TwoWay}"
+                                              OffContent=""
+                                              OnContent=""/>
+                            </Grid>
+                        </StackPanel>
+
+                        <!-- Enable Notification Sound -->
+                        <StackPanel Spacing="8">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="Enable Notification Sound"
+                                               FontWeight="SemiBold"/>
+                                    <TextBlock Text="Play sound with notifications"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                               FontSize="12"
+                                               Margin="0,4,0,0"/>
+                                </StackPanel>
+
+                                <ToggleSwitch Grid.Column="1"
+                                              IsOn="{x:Bind ViewModel.EnableNotificationSound, Mode=TwoWay}"
+                                              IsEnabled="{x:Bind ViewModel.EnableNotifications, Mode=OneWay}"
+                                              OffContent=""
+                                              OnContent=""/>
+                            </Grid>
+                        </StackPanel>
+
+                        <!-- Notification Info -->
+                        <InfoBar
+                            Severity="Informational"
+                            IsOpen="True"
+                            IsClosable="False"
+                            Message="Notifications are shown when files are detected and when approval actions are performed. On Windows, notifications will appear in the Action Center."
+                            Margin="0,8,0,0"/>
+                    </StackPanel>
+                </Border>
+
                 <!-- Actions -->
                 <StackPanel Orientation="Horizontal" Spacing="12">
                     <Button Content="Save Settings"

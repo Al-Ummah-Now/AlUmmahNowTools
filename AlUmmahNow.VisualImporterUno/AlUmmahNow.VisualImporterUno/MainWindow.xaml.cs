@@ -17,8 +17,12 @@ namespace AlUmmahNow.VisualImporterUno
         {
             Dashboard,
             Import,
+            WatchManagement,
+            ApprovalWorkflow,
+            Analytics,
             ServiceStatus,
-            Settings
+            Settings,
+            FFmpegSettings
         }
 
         private ViewState _currentView = ViewState.Dashboard;
@@ -99,6 +103,18 @@ namespace AlUmmahNow.VisualImporterUno
                             _currentView = ViewState.Import;
                             ContentFrame.Navigate(typeof(ImportView));
                             break;
+                        case "WatchManagement":
+                            _currentView = ViewState.WatchManagement;
+                            ContentFrame.Navigate(typeof(WatchManagementPage));
+                            break;
+                        case "ApprovalWorkflow":
+                            _currentView = ViewState.ApprovalWorkflow;
+                            ContentFrame.Navigate(typeof(ApprovalWorkflowPage));
+                            break;
+                        case "Analytics":
+                            _currentView = ViewState.Analytics;
+                            ContentFrame.Navigate(typeof(AnalyticsDashboardPage));
+                            break;
                         case "ServiceStatus":
                             _currentView = ViewState.ServiceStatus;
                             ContentFrame.Navigate(typeof(ServiceStatusPage));
@@ -107,8 +123,12 @@ namespace AlUmmahNow.VisualImporterUno
                             _currentView = ViewState.Settings;
                             ContentFrame.Navigate(typeof(SettingsPage));
                             break;
+                        case "FFmpegSettings":
+                            _currentView = ViewState.FFmpegSettings;
+                            ContentFrame.Navigate(typeof(FFmpegSettingsPage));
+                            break;
                     }
-                    
+
                     UpdateStatusBarForCurrentView();
                 }
             }
@@ -213,6 +233,81 @@ namespace AlUmmahNow.VisualImporterUno
         }
 
         /// <summary>
+        /// Navigate to the watch management view
+        /// </summary>
+        public void NavigateToWatchManagementView()
+        {
+            if (_isClosing) return;
+
+            try
+            {
+                // Update navigation view selection
+                foreach (var item in NavView.MenuItems)
+                {
+                    if (item is NavigationViewItem navItem && navItem.Tag?.ToString() == "WatchManagement")
+                    {
+                        NavView.SelectedItem = navItem;
+                        break;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error navigating to watch management view: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Navigate to the approval workflow view
+        /// </summary>
+        public void NavigateToApprovalWorkflowView()
+        {
+            if (_isClosing) return;
+
+            try
+            {
+                // Update navigation view selection
+                foreach (var item in NavView.MenuItems)
+                {
+                    if (item is NavigationViewItem navItem && navItem.Tag?.ToString() == "ApprovalWorkflow")
+                    {
+                        NavView.SelectedItem = navItem;
+                        break;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error navigating to approval workflow view: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Navigate to the analytics view
+        /// </summary>
+        public void NavigateToAnalyticsView()
+        {
+            if (_isClosing) return;
+
+            try
+            {
+                // Update navigation view selection
+                foreach (var item in NavView.MenuItems)
+                {
+                    if (item is NavigationViewItem navItem && navItem.Tag?.ToString() == "Analytics")
+                    {
+                        NavView.SelectedItem = navItem;
+                        break;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error navigating to analytics view: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// Update status bar text based on current view and service status
         /// </summary>
         private void UpdateStatusBarForCurrentView()
@@ -225,8 +320,12 @@ namespace AlUmmahNow.VisualImporterUno
                 {
                     ViewState.Dashboard => "Dashboard",
                     ViewState.Import => "Import",
+                    ViewState.WatchManagement => "Watch Management",
+                    ViewState.ApprovalWorkflow => "Approval Workflow",
+                    ViewState.Analytics => "Analytics",
                     ViewState.ServiceStatus => "Service Status",
                     ViewState.Settings => "Settings",
+                    ViewState.FFmpegSettings => "FFmpeg Configuration",
                     _ => "Ready"
                 };
 

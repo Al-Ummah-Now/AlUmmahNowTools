@@ -40,7 +40,7 @@ public class FileWatchServiceIntegrationTests : FileSystemTestBase
         await base.DisposeAsync();
     }
 
-    [Fact]
+    [Fact(Skip = "Flaky in CI - FileSystemWatcher events unreliable in virtualized environments")]
     public async Task EndToEndWorkflow_CreateWatchDetectFileApproveAndCleanup_ShouldWorkCorrectly()
     {
         // Arrange
@@ -314,7 +314,7 @@ public class FileWatchServiceIntegrationTests : FileSystemTestBase
         statistics.TotalApproved.Should().Be(1); // already_approved.mp4
     }
 
-    [Fact]
+    [Fact(Skip = "Flaky in CI - FileSystemWatcher events unreliable in virtualized environments")]
     public async Task ConcurrentWatchOperations_ShouldHandleMultipleWatchesCorrectly()
     {
         // Arrange

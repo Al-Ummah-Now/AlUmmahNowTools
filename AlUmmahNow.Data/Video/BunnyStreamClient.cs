@@ -21,7 +21,7 @@ namespace AlUmmahNow.Data.Video
             _baseUrl = baseUrl;
         }
 
-        public async Task<BunnyVideoResponse> GetVideosAsync(string libraryId, int page, int itemsPerPage = 100, string? search = null, string? orderBy = "date")
+        public async Task<BunnyVideoResponse?> GetVideosAsync(string libraryId, int page, int itemsPerPage = 100, string? search = null, string? orderBy = "date")
         {
             try
             {
@@ -45,7 +45,10 @@ namespace AlUmmahNow.Data.Video
                     PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
                     WriteIndented = true
                 };
-                return response.Content is null ? null : JsonSerializer.Deserialize<BunnyVideoResponse>(response.Content, opt);
+                if (response.Content is null)
+                    return null;
+
+                return JsonSerializer.Deserialize<BunnyVideoResponse>(response.Content, opt);
             }
             catch (Exception ex)
             {
@@ -114,6 +117,6 @@ namespace AlUmmahNow.Data.Video
         public int TotalItems { get; set; }
         public int CurrentPage { get; set; }
         public int ItemsPerPage { get; set; }
-        public List<BunnyVideo> Items { get; set; }
+        public List<BunnyVideo> Items { get; set; } = new List<BunnyVideo>();
     }
 }
