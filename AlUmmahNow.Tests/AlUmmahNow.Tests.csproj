@@ -61,6 +61,8 @@
   <ItemGroup>
     <!-- Exclude EXAMPLE template files from compilation -->
     <Compile Remove="Examples\EXAMPLE_*.cs" />
+    <!-- Exclude VisualImporterUno tests (Uno Platform project not buildable in CI) -->
+    <Compile Remove="VisualImporterUno\**\*.cs" />
   </ItemGroup>
 
 </Project>
