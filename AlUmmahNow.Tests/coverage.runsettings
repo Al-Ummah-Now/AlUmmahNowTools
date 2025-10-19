@@ -4,7 +4,7 @@
     <DataCollectors>
       <DataCollector friendlyName="XPlat Code Coverage">
         <Configuration>
-          <Format>cobertura,lcov,html</Format>
+          <Format>cobertura,lcov,teamcity,html</Format>
           <Exclude>[*.Tests]*,[*.Test]*,[*]*.Program,[*]*.Startup</Exclude>
           <ExcludeByAttribute>GeneratedCode,ExcludeFromCodeCoverage</ExcludeByAttribute>
           <ExcludeByFile>**/Migrations/**/*.cs</ExcludeByFile>
