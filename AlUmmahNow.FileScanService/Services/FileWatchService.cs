@@ -21,6 +21,12 @@ public class FileWatchService : IFileWatchService, IDisposable
     private readonly object _lockObject = new object();
     private bool _disposed = false;
 
+    /// <summary>
+    /// Maximum buffer size for FileSystemWatcher (64KB).
+    /// This is the Windows API limit and helps prevent InternalBufferOverflowException.
+    /// </summary>
+    private const int MaxWatcherBufferSize = 64 * 1024;
+
     public event EventHandler<FileDetectedEventArgs>? FileDetected;
     public event EventHandler<WatchStatusChangedEventArgs>? WatchStatusChanged;
 
@@ -319,9 +325,9 @@ public class FileWatchService : IFileWatchService, IDisposable
                 IncludeSubdirectories = channelWatch.IncludeSubdirectories,
                 NotifyFilter = NotifyFilters.FileName | NotifyFilters.Size | NotifyFilters.LastWrite,
                 EnableRaisingEvents = false,
-                // Set to maximum buffer size (64KB) to prevent InternalBufferOverflowException
+                // Set to maximum buffer size to prevent InternalBufferOverflowException
                 // This helps handle scenarios with rapid file changes
-                InternalBufferSize = 64 * 1024
+                InternalBufferSize = MaxWatcherBufferSize
             };
 
             // Parse file extensions
