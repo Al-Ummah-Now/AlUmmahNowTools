@@ -53,9 +53,4 @@
     <PackageReference Include="SkiaSharp.NativeAssets.Linux" />
   </ItemGroup>
 
-  <!-- Skia Desktop support for Linux -->
-  <ItemGroup Condition="'$(TargetFramework)' == 'net9.0-desktop'">
-    <PackageReference Include="SkiaSharp.NativeAssets.Linux" />
-  </ItemGroup>
-
 </Project>
