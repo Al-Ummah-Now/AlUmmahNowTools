@@ -82,10 +82,14 @@ public static class SplunkLoggerConfiguration
                     eventCollectorToken: splunkToken,
                     index: splunkIndex,
                     restrictedToMinimumLevel: minimumLevel,
+#if DEBUG
                     messageHandler: new System.Net.Http.HttpClientHandler
                     {
                         ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true
                     },
+#else
+                    messageHandler: new System.Net.Http.HttpClientHandler(),
+#endif
                     renderTemplate: false,
                     batchIntervalInSeconds: 2,
                     batchSizeLimit: 100,

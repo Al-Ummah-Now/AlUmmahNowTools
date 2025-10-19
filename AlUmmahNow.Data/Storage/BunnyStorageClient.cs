@@ -14,11 +14,11 @@ namespace AlUmmahNow.Data.Storage
 {
     public class BunnyStorageClient<T> : IStorageClient<T>, IDisposable
     {
+        private const int RetryCount = 3;
         private readonly BunnyCDNStorage bunnyCDNStorage;
         private readonly AsyncRetryPolicy _retryPolicy;
         private readonly SemaphoreSlim _rateLimiter;
         private readonly ILogger<BunnyStorageClient<T>>? _logger;
-        private bool _disposed = false;
 
         public BunnyStorageClient(string zoneName, string key, string mainRegion, int maxConcurrentUploads = 10, ILogger<BunnyStorageClient<T>>? logger = null)
         {
@@ -32,7 +32,7 @@ namespace AlUmmahNow.Data.Storage
                 .Or<TimeoutException>()
                 .Or<TaskCanceledException>()
                 .WaitAndRetryAsync(
-                    retryCount: 3,
+                    retryCount: RetryCount,
                     sleepDurationProvider: retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt - 1)),
                     onRetry: (exception, timeSpan, retryCount, context) =>
                     {
@@ -113,24 +113,24 @@ namespace AlUmmahNow.Data.Storage
             await _rateLimiter.WaitAsync();
             try
             {
-                await _retryPolicy.ExecuteAsync(async () =>
+                try
                 {
-                    // Reset stream position if seekable
-                    if (stream.CanSeek)
+                    await _retryPolicy.ExecuteAsync(async () =>
                     {
-                        stream.Position = 0;
-                    }
+                        // Reset stream position if seekable
+                        if (stream.CanSeek)
+                        {
+                            stream.Position = 0;
+                        }
 
-                    await bunnyCDNStorage.UploadAsync(stream, path);
-                });
-            }
-            catch (Exception ex)
-            {
-                // Log final error if all retries are exhausted
-                _logger?.LogError(ex,
-                    "Upload failed after all retry attempts for path: {Path}. " +
-                    "All 3 retry attempts exhausted.", path);
-                throw;
+                        await bunnyCDNStorage.UploadAsync(stream, path);
+                    });
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "Bunny.net upload failed after {RetryCount} retry attempts for path: {Path}", RetryCount, path);
+                    throw;
+                }
             }
             finally
             {
@@ -140,21 +140,7 @@ namespace AlUmmahNow.Data.Storage
 
         public void Dispose()
         {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
-
-        protected virtual void Dispose(bool disposing)
-        {
-            if (!_disposed)
-            {
-                if (disposing)
-                {
-                    // Dispose managed resources
-                    _rateLimiter?.Dispose();
-                }
-                _disposed = true;
-            }
+            _rateLimiter?.Dispose();
         }
     }
 }
