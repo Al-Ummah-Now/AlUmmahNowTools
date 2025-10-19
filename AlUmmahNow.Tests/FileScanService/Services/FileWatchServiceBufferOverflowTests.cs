@@ -197,7 +197,7 @@ public class FileWatchServiceBufferOverflowTests : IDisposable
     public void FileWatcher_BufferSizeDocumentation()
     {
         // This test documents the buffer size choice
-        const int maxBufferSize = 64 * 1024;
+        const int maxBufferSize = FileWatchService.MaxWatcherBufferSize;
         const int defaultBufferSize = 8 * 1024;
 
         // Assert - Document the decision
