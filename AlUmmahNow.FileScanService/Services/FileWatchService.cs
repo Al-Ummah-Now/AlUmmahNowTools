@@ -25,7 +25,7 @@ public class FileWatchService : IFileWatchService, IDisposable
     /// Maximum buffer size for FileSystemWatcher (64KB).
     /// This is the Windows API limit and helps prevent InternalBufferOverflowException.
     /// </summary>
-    private const int MaxWatcherBufferSize = 64 * 1024;
+    internal const int MaxWatcherBufferSize = 64 * 1024;
 
     public event EventHandler<FileDetectedEventArgs>? FileDetected;
     public event EventHandler<WatchStatusChangedEventArgs>? WatchStatusChanged;
