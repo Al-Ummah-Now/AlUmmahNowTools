@@ -30,6 +30,9 @@
       Http;
       Serialization;
     </UnoFeatures>
+
+    <!-- Suppress package downgrade warning -->
+    <NoWarn>$(NoWarn);NU1605</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

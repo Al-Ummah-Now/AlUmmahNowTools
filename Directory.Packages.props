@@ -1,0 +1,7 @@
+<Project>
+  <ItemGroup>
+    <!-- Uno Platform 6.4 packages with .NET 9 support -->
+    <PackageVersion Include="Uno.Toolkit.WinUI" Version="8.3.2" />
+    <PackageVersion Include="Uno.WinUI" Version="6.4.24" />
+  </ItemGroup>
+</Project>

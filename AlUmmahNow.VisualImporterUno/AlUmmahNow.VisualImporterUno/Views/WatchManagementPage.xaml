@@ -1,9 +1,10 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Page
     x:Class="AlUmmahNow.VisualImporterUno.Views.WatchManagementPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:AlUmmahNow.VisualImporterUno.Views"
+    xmlns:converters="using:AlUmmahNow.VisualImporterUno.Converters"
     xmlns:vm="using:AlUmmahNow.VisualImporterUno.ViewModels"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -13,11 +14,11 @@
     <Page.Resources>
         <!-- Converters -->
         <local:StatusColorConverter x:Key="StatusColorConverter"/>
-        <local:FileSizeConverter x:Key="FileSizeConverter"/>
-        <local:DateTimeConverter x:Key="DateTimeConverter"/>
-        <local:ZeroToVisibilityConverter x:Key="ZeroToVisibilityConverter"/>
-        <local:StringToVisibilityConverter x:Key="StringToVisibilityConverter"/>
-        <local:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+        <converters:FileSizeConverter x:Key="FileSizeConverter"/>
+        <converters:DateTimeConverter x:Key="DateTimeConverter"/>
+        <converters:CountToVisibilityConverter x:Key="ZeroToVisibilityConverter"/>
+        <converters:StringToVisibilityConverter x:Key="StringToVisibilityConverter"/>
+        <converters:BoolToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
 
         <!-- Card Styles -->
         <Style x:Key="StatCardStyle" TargetType="Border">
@@ -139,8 +140,7 @@
 
                 <!-- Action Buttons -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-                    <Button Content="Create New Watch"
-                            Style="{StaticResource PrimaryButtonStyle}"
+                    <Button Style="{StaticResource PrimaryButtonStyle}"
                             Command="{x:Bind ViewModel.OpenCreateWatchDialogCommand}"
                             MinWidth="160">
                         <Button.Content>
@@ -249,7 +249,7 @@
                                   IsItemClickEnabled="False"
                                   MaxHeight="400">
                             <ListView.ItemTemplate>
-                                <DataTemplate x:DataType="vm:WatchStatusDto">
+                                <DataTemplate x:DataType="local:WatchStatusDto">
                                     <Border Style="{StaticResource ListItemCardStyle}">
                                         <Grid>
                                             <Grid.ColumnDefinitions>
@@ -387,7 +387,7 @@
                                   IsItemClickEnabled="False"
                                   MaxHeight="500">
                             <ListView.ItemTemplate>
-                                <DataTemplate x:DataType="vm:PendingApprovalDto">
+                                <DataTemplate x:DataType="local:PendingApprovalDto">
                                     <Border Style="{StaticResource ListItemCardStyle}">
                                         <Grid>
                                             <Grid.ColumnDefinitions>

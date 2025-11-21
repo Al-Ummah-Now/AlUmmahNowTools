@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Page
     x:Class="AlUmmahNow.VisualImporterUno.Views.ApprovalWorkflowPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -233,8 +233,7 @@
                     </StackPanel>
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-                        <Button Content="Refresh"
-                                Style="{StaticResource SecondaryButtonStyle}"
+                        <Button Style="{StaticResource SecondaryButtonStyle}"
                                 Command="{x:Bind ViewModel.RefreshApprovalsCommand}">
                             <Button.Content>
                                 <StackPanel Orientation="Horizontal" Spacing="8">

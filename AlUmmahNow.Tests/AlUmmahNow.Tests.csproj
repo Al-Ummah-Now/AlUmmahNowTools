@@ -59,6 +59,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Exclude VisualImporterUno specific tests that require Uno/WinUI runtime in this environment -->
+    <Compile Remove="VisualImporterUno\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Exclude EXAMPLE template files from compilation -->
     <Compile Remove="Examples\EXAMPLE_*.cs" />
   </ItemGroup>

@@ -1,6 +1,5 @@
 using AlUmmahNow.Data.Models.FileScanning;
 using AlUmmahNow.VisualImporterUno.Services;
-using AlUmmahNow.FileScanService.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using System;
