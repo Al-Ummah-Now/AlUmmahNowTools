@@ -30,9 +30,6 @@
       Http;
       Serialization;
     </UnoFeatures>
-
-    <!-- Suppress package downgrade warning -->
-    <NoWarn>$(NoWarn);NU1605</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -44,6 +41,11 @@
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" />
     <PackageReference Include="System.Diagnostics.PerformanceCounter" />
     <PackageReference Include="Uno.Toolkit.WinUI" />
+
+    <!-- Splunk Logging -->
+    <PackageReference Include="Serilog.Sinks.Splunk" />
+    <PackageReference Include="Serilog.Enrichers.Environment" />
+    <PackageReference Include="Serilog.Enrichers.Thread" />
   </ItemGroup>
 
   <!-- Skia Desktop support for Linux -->

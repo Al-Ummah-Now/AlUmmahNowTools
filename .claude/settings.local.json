@@ -46,7 +46,11 @@
       "Bash(Select-String \"error|Error\" -Context 2,2)",
       "Bash(dotnet add:*)",
       "Bash(dotnet list:*)",
-      "Bash(dotnet restore:*)"
+      "Bash(dotnet restore:*)",
+      "Bash(git checkout:*)",
+      "Bash(xargs -I {} git checkout --theirs {})",
+      "Bash(xargs -I {} git add \"{}\")",
+      "Bash(Select-String -Pattern \"error\" -Context 1,1)"
     ],
     "deny": [],
     "ask": []

@@ -184,12 +184,6 @@ public class ApprovalStatistics
     public long TotalSizePending { get; set; }
     public long TotalSizeApproved { get; set; }
     
-    // Aliases for XAML compatibility
-    public int PendingCount => TotalPending;
-    public int ApprovedCount => TotalApproved;
-    public int RejectedCount => TotalRejected;
-    public long TotalSize => TotalSizePending + TotalSizeApproved;
-    
     public string TotalSizePendingFormatted => FormatFileSize(TotalSizePending);
     public string TotalSizeApprovedFormatted => FormatFileSize(TotalSizeApproved);
     

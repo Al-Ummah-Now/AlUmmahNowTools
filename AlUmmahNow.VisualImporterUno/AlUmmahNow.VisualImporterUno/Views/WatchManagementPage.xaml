@@ -1,11 +1,12 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Page
     x:Class="AlUmmahNow.VisualImporterUno.Views.WatchManagementPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:AlUmmahNow.VisualImporterUno.Views"
-    xmlns:converters="using:AlUmmahNow.VisualImporterUno.Converters"
     xmlns:vm="using:AlUmmahNow.VisualImporterUno.ViewModels"
+    xmlns:models="using:AlUmmahNow.Data.Models.FileScanning"
+    xmlns:converters="using:AlUmmahNow.VisualImporterUno.Converters"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
@@ -16,9 +17,9 @@
         <local:StatusColorConverter x:Key="StatusColorConverter"/>
         <converters:FileSizeConverter x:Key="FileSizeConverter"/>
         <converters:DateTimeConverter x:Key="DateTimeConverter"/>
-        <converters:CountToVisibilityConverter x:Key="ZeroToVisibilityConverter"/>
+        <converters:ZeroToVisibilityConverter x:Key="ZeroToVisibilityConverter"/>
         <converters:StringToVisibilityConverter x:Key="StringToVisibilityConverter"/>
-        <converters:BoolToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+        <converters:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
 
         <!-- Card Styles -->
         <Style x:Key="StatCardStyle" TargetType="Border">
@@ -143,13 +144,20 @@
                     <Button Style="{StaticResource PrimaryButtonStyle}"
                             Command="{x:Bind ViewModel.OpenCreateWatchDialogCommand}"
                             MinWidth="160">
-                        <Button.Content>
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <TextBlock Text="+" FontSize="20" FontWeight="Bold"/>
-                                <TextBlock Text="Create Watch" FontSize="15"/>
-                            </StackPanel>
-                        </Button.Content>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="+" FontSize="20" FontWeight="Bold"/>
+                            <TextBlock Text="Create Watch" FontSize="15"/>
+                        </StackPanel>
                     </Button>
+                    <Button Content="Batch Create"
+                            Background="#7C3AED"
+                            Foreground="White"
+                            Height="48"
+                            CornerRadius="8"
+                            FontSize="15"
+                            FontWeight="SemiBold"
+                            Command="{x:Bind ViewModel.OpenBatchCreateDialogCommand}"
+                            MinWidth="140"/>
                     <Button Content="Refresh"
                             Style="{StaticResource SecondaryButtonStyle}"
                             Command="{x:Bind ViewModel.RefreshWatchesCommand}"
@@ -249,7 +257,7 @@
                                   IsItemClickEnabled="False"
                                   MaxHeight="400">
                             <ListView.ItemTemplate>
-                                <DataTemplate x:DataType="local:WatchStatusDto">
+                                <DataTemplate x:DataType="models:WatchStatusDto">
                                     <Border Style="{StaticResource ListItemCardStyle}">
                                         <Grid>
                                             <Grid.ColumnDefinitions>
@@ -280,12 +288,12 @@
                                                            Foreground="#6B7280"/>
                                                 <StackPanel Orientation="Horizontal" Spacing="16">
                                                     <TextBlock FontSize="13" Foreground="#6B7280">
-                                                        <Run Text="Status:"/>
-                                                        <Run Text="{x:Bind StatusMessage, Mode=OneWay}" FontWeight="SemiBold"/>
-                                                    </TextBlock>
-                                                    <TextBlock FontSize="13" Foreground="#6B7280">
                                                         <Run Text="Files:"/>
                                                         <Run Text="{x:Bind TotalFilesDetected, Mode=OneWay}" FontWeight="SemiBold"/>
+                                                    </TextBlock>
+                                                    <TextBlock FontSize="13" Foreground="#6B7280">
+                                                        <Run Text="Pending:"/>
+                                                        <Run Text="{x:Bind PendingApprovals, Mode=OneWay}" FontWeight="SemiBold"/>
                                                     </TextBlock>
                                                 </StackPanel>
                                             </StackPanel>
@@ -387,7 +395,7 @@
                                   IsItemClickEnabled="False"
                                   MaxHeight="500">
                             <ListView.ItemTemplate>
-                                <DataTemplate x:DataType="local:PendingApprovalDto">
+                                <DataTemplate x:DataType="models:PendingApprovalDto">
                                     <Border Style="{StaticResource ListItemCardStyle}">
                                         <Grid>
                                             <Grid.ColumnDefinitions>
@@ -414,7 +422,7 @@
                                                     </TextBlock>
                                                     <TextBlock FontSize="13" Foreground="#6B7280">
                                                         <Run Text="Size:"/>
-                                                        <Run Text="{x:Bind FileSizeBytes, Mode=OneWay, Converter={StaticResource FileSizeConverter}}" FontWeight="SemiBold"/>
+                                                        <Run Text="{x:Bind FileSize, Mode=OneWay, Converter={StaticResource FileSizeConverter}}" FontWeight="SemiBold"/>
                                                     </TextBlock>
                                                     <TextBlock FontSize="13" Foreground="#6B7280">
                                                         <Run Text="Detected:"/>
@@ -569,6 +577,213 @@
 
                     <!-- Loading Indicator -->
                     <ProgressRing IsActive="{x:Bind ViewModel.IsCreatingWatch, Mode=OneWay}"
+                                  HorizontalAlignment="Center"
+                                  Width="40"
+                                  Height="40"/>
+                </StackPanel>
+            </ScrollViewer>
+        </ContentDialog>
+
+        <!-- Batch Create Watch Dialog -->
+        <ContentDialog x:Name="BatchCreateDialog"
+                       Title="Batch Create Watches"
+                       PrimaryButtonText="Create All"
+                       SecondaryButtonText="Cancel"
+                       DefaultButton="Primary"
+                       IsSecondaryButtonEnabled="True"
+                       SecondaryButtonCommand="{x:Bind ViewModel.CloseBatchCreateDialogCommand}"
+                       Visibility="{x:Bind ViewModel.IsBatchCreateDialogOpen, Mode=OneWay, Converter={StaticResource BooleanToVisibilityConverter}}"
+                       MaxWidth="900">
+            <ScrollViewer MaxHeight="700">
+                <StackPanel Spacing="24">
+                    <!-- Tab Selection -->
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <Button Content="From Template"
+                                Background="{x:Bind ViewModel.BatchDialogTab, Mode=OneWay, Converter={StaticResource TabBackgroundConverter}}"
+                                MinWidth="150" Height="40"/>
+                        <Button Content="Import from File"
+                                Background="{x:Bind ViewModel.BatchDialogTab, Mode=OneWay, Converter={StaticResource TabBackgroundConverter}}"
+                                MinWidth="150" Height="40"/>
+                    </StackPanel>
+
+                    <!-- Tab 1: From Template -->
+                    <StackPanel Spacing="20" Visibility="{x:Bind ViewModel.BatchDialogTab, Mode=OneWay, Converter={StaticResource TabVisibilityConverter}}">
+                        <!-- Template Selection -->
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Select Template" FontSize="14" FontWeight="SemiBold" Foreground="#374151"/>
+                            <ComboBox ItemsSource="{x:Bind ViewModel.SavedTemplates, Mode=OneWay}"
+                                      SelectedItem="{x:Bind ViewModel.SelectedTemplate, Mode=TwoWay}"
+                                      DisplayMemberPath="Name"
+                                      Width="400"
+                                      HorizontalAlignment="Left"/>
+                            <TextBlock Text="{x:Bind ViewModel.SelectedTemplate.Description, Mode=OneWay}"
+                                       FontSize="12" Foreground="#6B7280"
+                                       Visibility="{x:Bind ViewModel.SelectedTemplate, Mode=OneWay, Converter={StaticResource NullToVisibilityConverter}}"/>
+                        </StackPanel>
+
+                        <!-- Configuration -->
+                        <Grid ColumnSpacing="20">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0" Spacing="8">
+                                <TextBlock Text="Number of Watches" FontSize="14" FontWeight="SemiBold" Foreground="#374151"/>
+                                <NumberBox Value="{x:Bind ViewModel.NumberOfWatches, Mode=TwoWay}"
+                                          Minimum="1"
+                                          Maximum="50"
+                                          SpinButtonPlacementMode="Inline"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1" Spacing="8">
+                                <TextBlock Text="Starting Number" FontSize="14" FontWeight="SemiBold" Foreground="#374151"/>
+                                <NumberBox Value="{x:Bind ViewModel.StartingNumber, Mode=TwoWay}"
+                                          Minimum="1"
+                                          Maximum="1000"
+                                          SpinButtonPlacementMode="Inline"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2" Spacing="8">
+                                <TextBlock Text="Base Path" FontSize="14" FontWeight="SemiBold" Foreground="#374151"/>
+                                <TextBox Text="{x:Bind ViewModel.BatchBasePath, Mode=TwoWay}"
+                                        PlaceholderText="C:\Videos"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Generate Preview Button -->
+                        <Button Content="Generate Preview"
+                                Style="{StaticResource PrimaryButtonStyle}"
+                                Command="{x:Bind ViewModel.GeneratePreviewCommand}"
+                                HorizontalAlignment="Left"
+                                MinWidth="180"/>
+
+                        <!-- Preview List -->
+                        <StackPanel Spacing="12" Visibility="{x:Bind ViewModel.PreviewWatches.Count, Mode=OneWay, Converter={StaticResource CountToVisibilityConverter}}">
+                            <TextBlock Text="Preview" FontSize="16" FontWeight="SemiBold" Foreground="#111827"/>
+                            <Border BorderBrush="#E5E7EB" BorderThickness="1" CornerRadius="8" Padding="12" MaxHeight="300">
+                                <ScrollViewer>
+                                    <ItemsRepeater ItemsSource="{x:Bind ViewModel.PreviewWatches, Mode=OneWay}">
+                                        <ItemsRepeater.ItemTemplate>
+                                            <DataTemplate x:DataType="models:CreateWatchRequest">
+                                                <StackPanel Spacing="4" Margin="0,8">
+                                                    <TextBlock Text="{x:Bind ChannelName}" FontWeight="SemiBold"/>
+                                                    <TextBlock Text="{x:Bind WatchPath}" FontSize="12" Foreground="#6B7280"/>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ItemsRepeater.ItemTemplate>
+                                    </ItemsRepeater>
+                                </ScrollViewer>
+                            </Border>
+                            <Button Content="Create All Watches"
+                                    Style="{StaticResource PrimaryButtonStyle}"
+                                    Command="{x:Bind ViewModel.CreateWatchesFromTemplateCommand}"
+                                    HorizontalAlignment="Left"
+                                    MinWidth="180"/>
+                        </StackPanel>
+
+                        <!-- Error Message -->
+                        <Border Background="#FEE2E2"
+                                Padding="16"
+                                CornerRadius="8"
+                                Visibility="{x:Bind ViewModel.BatchCreateError, Mode=OneWay, Converter={StaticResource StringToVisibilityConverter}}">
+                            <TextBlock Text="{x:Bind ViewModel.BatchCreateError, Mode=OneWay}"
+                                       Foreground="#DC2626"
+                                       FontSize="14"
+                                       TextWrapping="Wrap"/>
+                        </Border>
+
+                        <!-- Progress Bar -->
+                        <StackPanel Spacing="8" Visibility="{x:Bind ViewModel.IsCreatingBatch, Mode=OneWay, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <ProgressBar Value="{x:Bind ViewModel.BatchCreateProgress, Mode=OneWay}"
+                                        Maximum="{x:Bind ViewModel.BatchCreateTotal, Mode=OneWay}"/>
+                            <TextBlock FontSize="12" Foreground="#6B7280">
+                                <Run Text="Creating:"/>
+                                <Run Text="{x:Bind ViewModel.BatchCreateProgress, Mode=OneWay}"/>
+                                <Run Text="/"/>
+                                <Run Text="{x:Bind ViewModel.BatchCreateTotal, Mode=OneWay}"/>
+                            </TextBlock>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Tab 2: Import from File -->
+                    <StackPanel Spacing="20" Visibility="{x:Bind ViewModel.BatchDialogTab, Mode=OneWay, Converter={StaticResource TabVisibilityConverter}}">
+                        <!-- File Selection -->
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Import File" FontSize="14" FontWeight="SemiBold" Foreground="#374151"/>
+                            <Grid ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBox Grid.Column="0"
+                                        Text="{x:Bind ViewModel.ImportFilePath, Mode=TwoWay}"
+                                        PlaceholderText="Select CSV or JSON file"
+                                        Height="40"/>
+                                <Button Grid.Column="1"
+                                        Content="Browse"
+                                        Height="40"
+                                        MinWidth="100"
+                                        Style="{StaticResource SecondaryButtonStyle}"/>
+                            </Grid>
+                            <TextBlock Text="Supported formats: CSV, JSON" FontSize="12" Foreground="#6B7280"/>
+                        </StackPanel>
+
+                        <!-- Import Button -->
+                        <Button Content="Import and Validate"
+                                Style="{StaticResource PrimaryButtonStyle}"
+                                Command="{x:Bind ViewModel.ImportWatchesFromFileCommand}"
+                                HorizontalAlignment="Left"
+                                MinWidth="180"/>
+
+                        <!-- Import Results -->
+                        <StackPanel Spacing="12" Visibility="{x:Bind ViewModel.ImportResult, Mode=OneWay, Converter={StaticResource NullToVisibilityConverter}}">
+                            <TextBlock Text="{x:Bind ViewModel.ImportResult.Summary, Mode=OneWay}"
+                                       FontSize="14"
+                                       FontWeight="SemiBold"
+                                       Foreground="{x:Bind ViewModel.ImportResult.IsValid, Mode=OneWay, Converter={StaticResource ValidityColorConverter}}"/>
+
+                            <!-- Validation Errors -->
+                            <Border Background="#FEF3C7"
+                                    Padding="16"
+                                    CornerRadius="8"
+                                    Visibility="{x:Bind ViewModel.ImportResult.InvalidCount, Mode=OneWay, Converter={StaticResource CountToVisibilityConverter}}">
+                                <StackPanel Spacing="8">
+                                    <TextBlock Text="Validation Errors" FontWeight="SemiBold" Foreground="#D97706"/>
+                                    <ItemsRepeater ItemsSource="{x:Bind ViewModel.ImportResult.ValidationErrors, Mode=OneWay}">
+                                        <ItemsRepeater.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock FontSize="12" Foreground="#92400E" TextWrapping="Wrap"/>
+                                            </DataTemplate>
+                                        </ItemsRepeater.ItemTemplate>
+                                    </ItemsRepeater>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Create Button -->
+                            <Button Content="Create Valid Watches"
+                                    Style="{StaticResource PrimaryButtonStyle}"
+                                    Command="{x:Bind ViewModel.CreateImportedWatchesCommand}"
+                                    HorizontalAlignment="Left"
+                                    MinWidth="180"
+                                    IsEnabled="{x:Bind ViewModel.ImportResult.IsValid, Mode=OneWay}"/>
+                        </StackPanel>
+
+                        <!-- Import Error -->
+                        <Border Background="#FEE2E2"
+                                Padding="16"
+                                CornerRadius="8"
+                                Visibility="{x:Bind ViewModel.ImportError, Mode=OneWay, Converter={StaticResource StringToVisibilityConverter}}">
+                            <TextBlock Text="{x:Bind ViewModel.ImportError, Mode=OneWay}"
+                                       Foreground="#DC2626"
+                                       FontSize="14"
+                                       TextWrapping="Wrap"/>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- Loading Indicator -->
+                    <ProgressRing IsActive="{x:Bind ViewModel.IsImporting, Mode=OneWay}"
                                   HorizontalAlignment="Center"
                                   Width="40"
                                   Height="40"/>

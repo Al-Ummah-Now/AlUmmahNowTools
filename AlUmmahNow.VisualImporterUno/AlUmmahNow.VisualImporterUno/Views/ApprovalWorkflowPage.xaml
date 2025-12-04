@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Page
     x:Class="AlUmmahNow.VisualImporterUno.Views.ApprovalWorkflowPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -6,6 +6,7 @@
     xmlns:local="using:AlUmmahNow.VisualImporterUno.Views"
     xmlns:vm="using:AlUmmahNow.VisualImporterUno.ViewModels"
     xmlns:models="using:AlUmmahNow.Data.Models.FileScanning"
+    xmlns:dataModels="using:AlUmmahNow.Data.Models"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
@@ -235,12 +236,10 @@
                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
                         <Button Style="{StaticResource SecondaryButtonStyle}"
                                 Command="{x:Bind ViewModel.RefreshApprovalsCommand}">
-                            <Button.Content>
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <SymbolIcon Symbol="Refresh" Foreground="#374151"/>
-                                    <TextBlock Text="Refresh" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </Button.Content>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <SymbolIcon Symbol="Refresh" Foreground="#374151"/>
+                                <TextBlock Text="Refresh" VerticalAlignment="Center"/>
+                            </StackPanel>
                         </Button>
 
                         <Button Content="Select All"
@@ -290,7 +289,7 @@
                                 <Ellipse Width="12" Height="12" Fill="#F59E0B"/>
                                 <TextBlock Text="Pending" FontSize="13" Foreground="#92400E" FontWeight="SemiBold"/>
                             </StackPanel>
-                            <TextBlock Text="{x:Bind ViewModel.Statistics.PendingCount, Mode=OneWay}"
+                            <TextBlock Text="{x:Bind ViewModel.Statistics.TotalPending, Mode=OneWay}"
                                        FontSize="32" FontWeight="Bold" Foreground="#92400E"/>
                         </StackPanel>
                     </Border>
@@ -302,7 +301,7 @@
                                 <Ellipse Width="12" Height="12" Fill="#16A34A"/>
                                 <TextBlock Text="Approved" FontSize="13" Foreground="#14532D" FontWeight="SemiBold"/>
                             </StackPanel>
-                            <TextBlock Text="{x:Bind ViewModel.Statistics.ApprovedCount, Mode=OneWay}"
+                            <TextBlock Text="{x:Bind ViewModel.Statistics.TotalApproved, Mode=OneWay}"
                                        FontSize="32" FontWeight="Bold" Foreground="#14532D"/>
                         </StackPanel>
                     </Border>
@@ -314,7 +313,7 @@
                                 <Ellipse Width="12" Height="12" Fill="#DC2626"/>
                                 <TextBlock Text="Rejected" FontSize="13" Foreground="#7F1D1D" FontWeight="SemiBold"/>
                             </StackPanel>
-                            <TextBlock Text="{x:Bind ViewModel.Statistics.RejectedCount, Mode=OneWay}"
+                            <TextBlock Text="{x:Bind ViewModel.Statistics.TotalRejected, Mode=OneWay}"
                                        FontSize="32" FontWeight="Bold" Foreground="#7F1D1D"/>
                         </StackPanel>
                     </Border>
@@ -326,7 +325,7 @@
                                 <Ellipse Width="12" Height="12" Fill="#3B82F6"/>
                                 <TextBlock Text="Total Size" FontSize="13" Foreground="#1E3A8A" FontWeight="SemiBold"/>
                             </StackPanel>
-                            <TextBlock Text="{x:Bind ViewModel.Statistics.TotalSize, Mode=OneWay, Converter={StaticResource FileSizeConverter}}"
+                            <TextBlock Text="{x:Bind ViewModel.Statistics.TotalSizePending, Mode=OneWay, Converter={StaticResource FileSizeConverter}}"
                                        FontSize="32" FontWeight="Bold" Foreground="#1E3A8A"/>
                         </StackPanel>
                     </Border>
@@ -358,6 +357,110 @@
                                     HorizontalAlignment="Right"
                                     Command="{x:Bind ViewModel.ClearFiltersCommand}"/>
                         </Grid>
+                    </Border>
+
+                    <!-- Filter Presets Section -->
+                    <Border Style="{StaticResource FilterCardStyle}">
+                        <StackPanel Spacing="12">
+                            <TextBlock Text="Filter Presets" FontSize="13" FontWeight="SemiBold" Foreground="#374151"/>
+
+                            <!-- Preset Selector -->
+                            <ComboBox ItemsSource="{x:Bind ViewModel.SavedPresets, Mode=OneWay}"
+                                     SelectedItem="{x:Bind ViewModel.SelectedPreset, Mode=TwoWay}"
+                                     Style="{StaticResource FilterComboStyle}"
+                                     PlaceholderText="Select a preset...">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="dataModels:FilterPreset">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <FontIcon Glyph="&#xE735;" FontSize="12"
+                                                     Visibility="{x:Bind IsDefault, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                     Foreground="#F59E0B"/>
+                                            <TextBlock Text="{x:Bind Name}" FontWeight="SemiBold"/>
+                                            <Border Background="#E5E7EB" CornerRadius="3" Padding="4,2"
+                                                   Visibility="{x:Bind IsBuiltIn, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                <TextBlock Text="Built-in" FontSize="10" Foreground="#6B7280"/>
+                                            </Border>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+
+                            <!-- Preset Actions -->
+                            <Grid ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <Button Grid.Column="0"
+                                       Content="Load"
+                                       Background="#3B82F6"
+                                       Foreground="White"
+                                       HorizontalAlignment="Stretch"
+                                       CornerRadius="6"
+                                       Height="36"
+                                       FontSize="13"
+                                       Command="{x:Bind ViewModel.LoadPresetCommand}"
+                                       CommandParameter="{x:Bind ViewModel.SelectedPreset, Mode=OneWay}"/>
+
+                                <Button Grid.Column="1"
+                                       Content="Save Current"
+                                       Background="White"
+                                       Foreground="#374151"
+                                       BorderBrush="#E5E7EB"
+                                       BorderThickness="1"
+                                       HorizontalAlignment="Stretch"
+                                       CornerRadius="6"
+                                       Height="36"
+                                       FontSize="13"
+                                       Click="OnSavePresetClick"/>
+                            </Grid>
+
+                            <!-- Preset Management -->
+                            <StackPanel Spacing="6"
+                                       Visibility="{x:Bind ViewModel.SelectedPreset, Mode=OneWay, Converter={StaticResource NullToVisibilityConverter}}">
+                                <TextBlock Text="Selected Preset Actions" FontSize="11" Foreground="#6B7280" Margin="0,4,0,0"/>
+
+                                <Button Background="Transparent"
+                                       Foreground="#F59E0B"
+                                       BorderBrush="#F59E0B"
+                                       BorderThickness="1"
+                                       HorizontalAlignment="Stretch"
+                                       CornerRadius="6"
+                                       Height="32"
+                                       FontSize="12"
+                                       Command="{x:Bind ViewModel.SetDefaultPresetCommand}"
+                                       CommandParameter="{x:Bind ViewModel.SelectedPreset, Mode=OneWay}">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <FontIcon Glyph="&#xE735;" FontSize="12"/>
+                                        <TextBlock Text="Set as Default" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
+
+                                <Button Background="Transparent"
+                                       Foreground="#EF4444"
+                                       BorderBrush="#EF4444"
+                                       BorderThickness="1"
+                                       HorizontalAlignment="Stretch"
+                                       CornerRadius="6"
+                                       Height="32"
+                                       FontSize="12"
+                                       Command="{x:Bind ViewModel.DeletePresetCommand}"
+                                       CommandParameter="{x:Bind ViewModel.SelectedPreset, Mode=OneWay}">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <FontIcon Glyph="&#xE74D;" FontSize="12"/>
+                                        <TextBlock Text="Delete" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+
+                            <!-- Preset Description -->
+                            <TextBlock Text="{x:Bind ViewModel.SelectedPreset.Description, Mode=OneWay}"
+                                      FontSize="11"
+                                      Foreground="#6B7280"
+                                      TextWrapping="Wrap"
+                                      Visibility="{x:Bind ViewModel.SelectedPreset, Mode=OneWay, Converter={StaticResource NullToVisibilityConverter}}"/>
+                        </StackPanel>
                     </Border>
 
                     <!-- Channel Filter -->
@@ -543,18 +646,112 @@
                         <StackPanel Spacing="16">
                             <TextBlock Text="File Preview" Style="{StaticResource SectionTitleStyle}" Margin="0"/>
 
-                            <!-- Thumbnail Placeholder -->
-                            <Border Background="#F3F4F6"
-                                   Height="180"
+                            <!-- Video Thumbnail -->
+                            <Grid>
+                                <Border Background="#F3F4F6"
+                                       Height="180"
+                                       CornerRadius="6"
+                                       HorizontalAlignment="Stretch"
+                                       Visibility="{x:Bind ViewModel.CurrentThumbnailPath, Mode=OneWay, Converter={StaticResource NullToVisibilityConverter}, ConverterParameter=Inverse}">
+                                    <Grid>
+                                        <SymbolIcon Symbol="Video"
+                                                   Foreground="#9CA3AF"
+                                                   Visibility="{x:Bind ViewModel.IsGeneratingThumbnail, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Inverse}"
+                                                   RenderTransformOrigin="0.5,0.5">
+                                            <SymbolIcon.RenderTransform>
+                                                <ScaleTransform ScaleX="3" ScaleY="3"/>
+                                            </SymbolIcon.RenderTransform>
+                                        </SymbolIcon>
+                                        <ProgressRing IsActive="{x:Bind ViewModel.IsGeneratingThumbnail, Mode=OneWay}"
+                                                     Width="40"
+                                                     Height="40"
+                                                     Foreground="#3B82F6"/>
+                                    </Grid>
+                                </Border>
+
+                                <Border Height="180"
+                                       CornerRadius="6"
+                                       HorizontalAlignment="Stretch"
+                                       Visibility="{x:Bind ViewModel.CurrentThumbnailPath, Mode=OneWay, Converter={StaticResource NullToVisibilityConverter}}">
+                                    <Grid>
+                                        <Image Stretch="UniformToFill">
+                                            <Image.Source>
+                                                <BitmapImage UriSource="{x:Bind ViewModel.CurrentThumbnailPath, Mode=OneWay, Converter={StaticResource PathToUriConverter}}"/>
+                                            </Image.Source>
+                                        </Image>
+                                        <Border Background="#000000" Opacity="0.5" VerticalAlignment="Bottom">
+                                            <StackPanel Orientation="Horizontal" Spacing="8" Padding="8,6" HorizontalAlignment="Right">
+                                                <SymbolIcon Symbol="Refresh" Foreground="White" RenderTransformOrigin="0.5,0.5">
+                                                    <SymbolIcon.RenderTransform>
+                                                        <ScaleTransform ScaleX="0.8" ScaleY="0.8"/>
+                                                    </SymbolIcon.RenderTransform>
+                                                </SymbolIcon>
+                                                <Button Content="Refresh"
+                                                       Background="Transparent"
+                                                       Foreground="White"
+                                                       BorderThickness="0"
+                                                       Padding="0"
+                                                       FontSize="11"
+                                                       Command="{x:Bind ViewModel.RefreshThumbnailCommand}"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </Grid>
+                                </Border>
+                            </Grid>
+
+                            <!-- Video Metadata -->
+                            <Border Background="#F9FAFB"
                                    CornerRadius="6"
-                                   HorizontalAlignment="Stretch">
-                                <SymbolIcon Symbol="Video"
-                                           Foreground="#9CA3AF"
-                                           RenderTransformOrigin="0.5,0.5">
-                                    <SymbolIcon.RenderTransform>
-                                        <ScaleTransform ScaleX="3" ScaleY="3"/>
-                                    </SymbolIcon.RenderTransform>
-                                </SymbolIcon>
+                                   Padding="12"
+                                   Visibility="{x:Bind ViewModel.CurrentVideoMetadata, Mode=OneWay, Converter={StaticResource NullToVisibilityConverter}}">
+                                <StackPanel Spacing="8">
+                                    <TextBlock Text="Video Information" FontSize="12" FontWeight="SemiBold" Foreground="#374151" Margin="0,0,0,4"/>
+
+                                    <Grid>
+                                        <TextBlock Text="Duration" FontSize="11" Foreground="#6B7280"/>
+                                        <TextBlock Text="{x:Bind ViewModel.CurrentVideoMetadata.DurationFormatted, Mode=OneWay}"
+                                                  FontSize="11"
+                                                  Foreground="#111827"
+                                                  FontWeight="SemiBold"
+                                                  HorizontalAlignment="Right"/>
+                                    </Grid>
+
+                                    <Grid>
+                                        <TextBlock Text="Resolution" FontSize="11" Foreground="#6B7280"/>
+                                        <TextBlock Text="{x:Bind ViewModel.CurrentVideoMetadata.Resolution, Mode=OneWay}"
+                                                  FontSize="11"
+                                                  Foreground="#111827"
+                                                  FontWeight="SemiBold"
+                                                  HorizontalAlignment="Right"/>
+                                    </Grid>
+
+                                    <Grid>
+                                        <TextBlock Text="Codec" FontSize="11" Foreground="#6B7280"/>
+                                        <TextBlock Text="{x:Bind ViewModel.CurrentVideoMetadata.Codec, Mode=OneWay}"
+                                                  FontSize="11"
+                                                  Foreground="#111827"
+                                                  FontWeight="SemiBold"
+                                                  HorizontalAlignment="Right"/>
+                                    </Grid>
+
+                                    <Grid>
+                                        <TextBlock Text="Frame Rate" FontSize="11" Foreground="#6B7280"/>
+                                        <TextBlock Text="{x:Bind ViewModel.CurrentVideoMetadata.FrameRateFormatted, Mode=OneWay}"
+                                                  FontSize="11"
+                                                  Foreground="#111827"
+                                                  FontWeight="SemiBold"
+                                                  HorizontalAlignment="Right"/>
+                                    </Grid>
+
+                                    <Grid>
+                                        <TextBlock Text="Bit Rate" FontSize="11" Foreground="#6B7280"/>
+                                        <TextBlock Text="{x:Bind ViewModel.CurrentVideoMetadata.BitRateFormatted, Mode=OneWay}"
+                                                  FontSize="11"
+                                                  Foreground="#111827"
+                                                  FontWeight="SemiBold"
+                                                  HorizontalAlignment="Right"/>
+                                    </Grid>
+                                </StackPanel>
                             </Border>
 
                             <!-- File Details -->

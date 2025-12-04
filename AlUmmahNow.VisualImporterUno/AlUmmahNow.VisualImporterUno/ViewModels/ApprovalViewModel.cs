@@ -1,4 +1,8 @@
 using AlUmmahNow.Data.Models.FileScanning;
+using AlUmmahNow.Data.Models;
+using AlUmmahNow.Data.Services;
+using AlUmmahNow.Data.Models.Video;
+using AlUmmahNow.Data.Video;
 using AlUmmahNow.VisualImporterUno.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -18,6 +22,9 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels;
 public partial class ApprovalViewModel : ObservableObject, IDisposable
 {
     private readonly FileScanSignalRClient _signalRClient;
+    private readonly IFilterPresetService _filterPresetService;
+    private readonly INotificationService _notificationService;
+    private readonly VideoThumbnailService _videoThumbnailService;
     private readonly DispatcherQueue? _dispatcherQueue;
     private bool _disposed = false;
 
@@ -77,6 +84,33 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private bool _showOnlyPending = true;
 
+    [ObservableProperty]
+    private FilterPreset? _selectedPreset;
+
+    [ObservableProperty]
+    private bool _isLoadingPresets = false;
+
+    [ObservableProperty]
+    private string _newPresetName = string.Empty;
+
+    [ObservableProperty]
+    private string _newPresetDescription = string.Empty;
+
+    [ObservableProperty]
+    private bool _setAsDefault = false;
+
+    [ObservableProperty]
+    private bool _enableNotifications = true;
+
+    [ObservableProperty]
+    private string? _currentThumbnailPath;
+
+    [ObservableProperty]
+    private VideoMetadata? _currentVideoMetadata;
+
+    [ObservableProperty]
+    private bool _isGeneratingThumbnail = false;
+
     #endregion
 
     #region Collections
@@ -106,11 +140,19 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
     /// </summary>
     public ObservableCollection<ApprovalLogMessage> ActivityLog { get; } = new();
 
+    /// <summary>
+    /// Saved filter presets
+    /// </summary>
+    public ObservableCollection<FilterPreset> SavedPresets { get; } = new();
+
     #endregion
 
-    public ApprovalViewModel(FileScanSignalRClient signalRClient)
+    public ApprovalViewModel(FileScanSignalRClient signalRClient, IFilterPresetService filterPresetService, INotificationService notificationService, VideoThumbnailService videoThumbnailService)
     {
         _signalRClient = signalRClient ?? throw new ArgumentNullException(nameof(signalRClient));
+        _filterPresetService = filterPresetService ?? throw new ArgumentNullException(nameof(filterPresetService));
+        _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
+        _videoThumbnailService = videoThumbnailService ?? throw new ArgumentNullException(nameof(videoThumbnailService));
 
         // Get dispatcher queue for thread-safe UI updates
         try
@@ -177,6 +219,12 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
 
             // Load initial data
             await RefreshApprovalsAsync();
+
+            // Load filter presets
+            await LoadPresetsAsync();
+
+            // Apply default preset if exists
+            await ApplyDefaultPresetAsync();
 
             DispatcherExecute(() =>
             {
@@ -341,11 +389,20 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
 
             if (success)
             {
+                var count = selectedIds.Count;
+                var fileName = count == 1 ? SelectedApprovals.First().FileName : string.Empty;
+
                 DispatcherExecute(() =>
                 {
-                    StatusMessage = $"Successfully approved {selectedIds.Count} files";
-                    AddLog($"Approved {selectedIds.Count} files", LogType.Success);
+                    StatusMessage = $"Successfully approved {count} files";
+                    AddLog($"Approved {count} files", LogType.Success);
                 });
+
+                // Show notification if enabled
+                if (EnableNotifications)
+                {
+                    await _notificationService.ShowApprovalProcessedAsync(fileName, approved: true, count: count);
+                }
 
                 await RefreshApprovalsAsync();
             }
@@ -361,6 +418,11 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
                 StatusMessage = $"Error approving files: {ex.Message}";
                 AddLog($"Error approving files: {ex.Message}", LogType.Error);
             });
+
+            if (EnableNotifications)
+            {
+                await _notificationService.ShowErrorAsync("Approval Error", ex.Message);
+            }
         }
         finally
         {
@@ -391,11 +453,20 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
 
             if (success)
             {
+                var count = selectedIds.Count;
+                var fileName = count == 1 ? SelectedApprovals.First().FileName : string.Empty;
+
                 DispatcherExecute(() =>
                 {
-                    StatusMessage = $"Successfully rejected {selectedIds.Count} files";
-                    AddLog($"Rejected {selectedIds.Count} files", LogType.Warning);
+                    StatusMessage = $"Successfully rejected {count} files";
+                    AddLog($"Rejected {count} files", LogType.Warning);
                 });
+
+                // Show notification if enabled
+                if (EnableNotifications)
+                {
+                    await _notificationService.ShowApprovalProcessedAsync(fileName, approved: false, count: count);
+                }
 
                 await RefreshApprovalsAsync();
             }
@@ -411,6 +482,11 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
                 StatusMessage = $"Error rejecting files: {ex.Message}";
                 AddLog($"Error rejecting files: {ex.Message}", LogType.Error);
             });
+
+            if (EnableNotifications)
+            {
+                await _notificationService.ShowErrorAsync("Rejection Error", ex.Message);
+            }
         }
         finally
         {
@@ -438,6 +514,12 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
                 AddLog($"Bulk approved {processedCount} files matching filters", LogType.Success);
             });
 
+            // Show notification if enabled
+            if (EnableNotifications)
+            {
+                await _notificationService.ShowApprovalProcessedAsync(string.Empty, approved: true, count: processedCount);
+            }
+
             await RefreshApprovalsAsync();
         }
         catch (Exception ex)
@@ -447,6 +529,11 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
                 StatusMessage = $"Error in bulk approval: {ex.Message}";
                 AddLog($"Error in bulk approval: {ex.Message}", LogType.Error);
             });
+
+            if (EnableNotifications)
+            {
+                await _notificationService.ShowErrorAsync("Bulk Approval Error", ex.Message);
+            }
         }
         finally
         {
@@ -472,6 +559,12 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
                 AddLog($"Bulk rejected {processedCount} files matching filters", LogType.Warning);
             });
 
+            // Show notification if enabled
+            if (EnableNotifications)
+            {
+                await _notificationService.ShowApprovalProcessedAsync(string.Empty, approved: false, count: processedCount);
+            }
+
             await RefreshApprovalsAsync();
         }
         catch (Exception ex)
@@ -481,6 +574,11 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
                 StatusMessage = $"Error in bulk rejection: {ex.Message}";
                 AddLog($"Error in bulk rejection: {ex.Message}", LogType.Error);
             });
+
+            if (EnableNotifications)
+            {
+                await _notificationService.ShowErrorAsync("Bulk Rejection Error", ex.Message);
+            }
         }
         finally
         {
@@ -612,6 +710,228 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
 
     #endregion
 
+    #region Filter Preset Commands
+
+    [RelayCommand]
+    private async Task LoadPresetsAsync()
+    {
+        try
+        {
+            IsLoadingPresets = true;
+            var presets = await _filterPresetService.GetAllPresetsAsync();
+
+            DispatcherExecute(() =>
+            {
+                SavedPresets.Clear();
+                foreach (var preset in presets)
+                {
+                    SavedPresets.Add(preset);
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            DispatcherExecute(() =>
+            {
+                AddLog($"Error loading presets: {ex.Message}", LogType.Error);
+            });
+        }
+        finally
+        {
+            IsLoadingPresets = false;
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanLoadPreset))]
+    private async Task LoadPresetAsync(FilterPreset? preset)
+    {
+        if (preset == null) return;
+
+        try
+        {
+            DispatcherExecute(() =>
+            {
+                // Apply all filter values from the preset
+                ChannelFilter = preset.ChannelFilter;
+                PriorityFilter = preset.PriorityFilter;
+                MinSizeFilter = preset.MinSizeFilter;
+                MaxSizeFilter = preset.MaxSizeFilter;
+                DateFromFilter = preset.DateFromFilter;
+                DateToFilter = preset.DateToFilter;
+                ExtensionFilter = preset.ExtensionFilter;
+
+                SelectedPreset = preset;
+
+                AddLog($"Applied preset: {preset.Name}", LogType.Success);
+            });
+
+            await Task.CompletedTask;
+        }
+        catch (Exception ex)
+        {
+            DispatcherExecute(() =>
+            {
+                AddLog($"Error loading preset: {ex.Message}", LogType.Error);
+            });
+        }
+    }
+
+    private bool CanLoadPreset(FilterPreset? preset) => preset != null && !IsLoadingPresets;
+
+    [RelayCommand]
+    private async Task SaveCurrentFiltersAsPresetAsync()
+    {
+        // This will be triggered from the UI dialog
+        // The dialog will collect the name, description, and isDefault flag
+        await Task.CompletedTask;
+    }
+
+    [RelayCommand]
+    private async Task SavePresetAsync(string presetName)
+    {
+        if (string.IsNullOrWhiteSpace(presetName))
+        {
+            DispatcherExecute(() => AddLog("Preset name is required", LogType.Warning));
+            return;
+        }
+
+        try
+        {
+            var preset = new FilterPreset
+            {
+                Name = presetName,
+                Description = NewPresetDescription,
+                ChannelFilter = ChannelFilter,
+                PriorityFilter = PriorityFilter,
+                MinSizeFilter = MinSizeFilter,
+                MaxSizeFilter = MaxSizeFilter,
+                DateFromFilter = DateFromFilter,
+                DateToFilter = DateToFilter,
+                ExtensionFilter = ExtensionFilter,
+                IsDefault = SetAsDefault,
+                CreatedBy = Environment.UserName
+            };
+
+            await _filterPresetService.SavePresetAsync(preset);
+            await LoadPresetsAsync();
+
+            DispatcherExecute(() =>
+            {
+                AddLog($"Saved preset: {presetName}", LogType.Success);
+                NewPresetName = string.Empty;
+                NewPresetDescription = string.Empty;
+                SetAsDefault = false;
+            });
+        }
+        catch (Exception ex)
+        {
+            DispatcherExecute(() =>
+            {
+                AddLog($"Error saving preset: {ex.Message}", LogType.Error);
+            });
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanDeletePreset))]
+    private async Task DeletePresetAsync(FilterPreset? preset)
+    {
+        if (preset == null) return;
+
+        try
+        {
+            await _filterPresetService.DeletePresetAsync(preset.Id);
+            await LoadPresetsAsync();
+
+            DispatcherExecute(() =>
+            {
+                if (SelectedPreset?.Id == preset.Id)
+                {
+                    SelectedPreset = null;
+                }
+                AddLog($"Deleted preset: {preset.Name}", LogType.Success);
+            });
+        }
+        catch (Exception ex)
+        {
+            DispatcherExecute(() =>
+            {
+                AddLog($"Error deleting preset: {ex.Message}", LogType.Error);
+            });
+        }
+    }
+
+    private bool CanDeletePreset(FilterPreset? preset) =>
+        preset != null && !preset.IsBuiltIn && !IsLoadingPresets;
+
+    [RelayCommand(CanExecute = nameof(CanSetDefaultPreset))]
+    private async Task SetDefaultPresetAsync(FilterPreset? preset)
+    {
+        if (preset == null) return;
+
+        try
+        {
+            await _filterPresetService.SetDefaultPresetAsync(preset.Id);
+            await LoadPresetsAsync();
+
+            DispatcherExecute(() =>
+            {
+                AddLog($"Set default preset: {preset.Name}", LogType.Success);
+            });
+        }
+        catch (Exception ex)
+        {
+            DispatcherExecute(() =>
+            {
+                AddLog($"Error setting default preset: {ex.Message}", LogType.Error);
+            });
+        }
+    }
+
+    private bool CanSetDefaultPreset(FilterPreset? preset) => preset != null && !IsLoadingPresets;
+
+    [RelayCommand]
+    private async Task ClearDefaultPresetAsync()
+    {
+        try
+        {
+            await _filterPresetService.ClearDefaultPresetAsync();
+            await LoadPresetsAsync();
+
+            DispatcherExecute(() =>
+            {
+                AddLog("Cleared default preset", LogType.Success);
+            });
+        }
+        catch (Exception ex)
+        {
+            DispatcherExecute(() =>
+            {
+                AddLog($"Error clearing default preset: {ex.Message}", LogType.Error);
+            });
+        }
+    }
+
+    private async Task ApplyDefaultPresetAsync()
+    {
+        try
+        {
+            var defaultPreset = await _filterPresetService.GetDefaultPresetAsync();
+            if (defaultPreset != null)
+            {
+                await LoadPresetAsync(defaultPreset);
+            }
+        }
+        catch (Exception ex)
+        {
+            DispatcherExecute(() =>
+            {
+                AddLog($"Error applying default preset: {ex.Message}", LogType.Error);
+            });
+        }
+    }
+
+    #endregion
+
     #region Filtering and Sorting
 
     private void ApplyFiltersAndSorting()
@@ -714,6 +1034,13 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
     private void OnPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         // Trigger filter/sort when filter properties change
+        // Generate thumbnail when CurrentApproval changes
+        if (e.PropertyName == nameof(CurrentApproval))
+        {
+            _ = Task.Run(async () => await GenerateThumbnailForCurrentApprovalAsync());
+        }
+
+        // Trigger filter/sort when filter properties change
         if (e.PropertyName == nameof(ChannelFilter) ||
             e.PropertyName == nameof(PriorityFilter) ||
             e.PropertyName == nameof(MinSizeFilter) ||
@@ -728,6 +1055,107 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
             DispatcherExecute(() => ApplyFiltersAndSorting());
         }
     }
+
+    #region Thumbnail Generation
+
+    /// <summary>
+    /// Generates thumbnail for the current approval video file.
+    /// </summary>
+    private async Task GenerateThumbnailForCurrentApprovalAsync()
+    {
+        if (CurrentApproval == null)
+        {
+            DispatcherExecute(() =>
+            {
+                CurrentThumbnailPath = null;
+                CurrentVideoMetadata = null;
+            });
+            return;
+        }
+
+        try
+        {
+            DispatcherExecute(() => IsGeneratingThumbnail = true);
+
+            var filePath = CurrentApproval.FilePath;
+
+            if (string.IsNullOrWhiteSpace(filePath) || !System.IO.File.Exists(filePath))
+            {
+                DispatcherExecute(() =>
+                {
+                    AddLog($"Video file not found: {filePath}", LogType.Warning);
+                    CurrentThumbnailPath = null;
+                    CurrentVideoMetadata = null;
+                });
+                return;
+            }
+
+            // Generate thumbnail and extract metadata in parallel
+            var thumbnailTask = _videoThumbnailService.GenerateThumbnailAsync(filePath);
+            var metadataTask = _videoThumbnailService.GetVideoMetadataAsync(filePath);
+
+            await Task.WhenAll(thumbnailTask, metadataTask);
+
+            var thumbnailPath = await thumbnailTask;
+            var metadata = await metadataTask;
+
+            DispatcherExecute(() =>
+            {
+                CurrentThumbnailPath = thumbnailPath;
+                CurrentVideoMetadata = metadata;
+
+                if (thumbnailPath != null)
+                {
+                    AddLog($"Generated thumbnail for {CurrentApproval.FileName}", LogType.Success);
+                }
+                else
+                {
+                    AddLog($"Failed to generate thumbnail for {CurrentApproval.FileName}", LogType.Warning);
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            DispatcherExecute(() =>
+            {
+                AddLog($"Error generating thumbnail: {ex.Message}", LogType.Error);
+                CurrentThumbnailPath = null;
+                CurrentVideoMetadata = null;
+            });
+        }
+        finally
+        {
+            DispatcherExecute(() => IsGeneratingThumbnail = false);
+        }
+    }
+
+    /// <summary>
+    /// Command to refresh/regenerate the thumbnail for the current approval.
+    /// </summary>
+    [RelayCommand]
+    private async Task RefreshThumbnailAsync()
+    {
+        if (CurrentApproval == null) return;
+
+        try
+        {
+            DispatcherExecute(() =>
+            {
+                AddLog("Refreshing thumbnail...", LogType.Information);
+            });
+
+            await GenerateThumbnailForCurrentApprovalAsync();
+        }
+        catch (Exception ex)
+        {
+            DispatcherExecute(() =>
+            {
+                AddLog($"Error refreshing thumbnail: {ex.Message}", LogType.Error);
+            });
+        }
+    }
+
+    #endregion
 
     #endregion
 

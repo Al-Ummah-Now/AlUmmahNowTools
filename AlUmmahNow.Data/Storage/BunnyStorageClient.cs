@@ -12,8 +12,9 @@ using Microsoft.Extensions.Logging;
 
 namespace AlUmmahNow.Data.Storage
 {
-    public class BunnyStorageClient<T> : IStorageClient<T>
+    public class BunnyStorageClient<T> : IStorageClient<T>, IDisposable
     {
+        private const int RetryCount = 3;
         private readonly BunnyCDNStorage bunnyCDNStorage;
         private readonly AsyncRetryPolicy _retryPolicy;
         private readonly SemaphoreSlim _rateLimiter;
@@ -31,7 +32,7 @@ namespace AlUmmahNow.Data.Storage
                 .Or<TimeoutException>()
                 .Or<TaskCanceledException>()
                 .WaitAndRetryAsync(
-                    retryCount: 3,
+                    retryCount: RetryCount,
                     sleepDurationProvider: retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt - 1)),
                     onRetry: (exception, timeSpan, retryCount, context) =>
                     {
@@ -112,21 +113,34 @@ namespace AlUmmahNow.Data.Storage
             await _rateLimiter.WaitAsync();
             try
             {
-                await _retryPolicy.ExecuteAsync(async () =>
+                try
                 {
-                    // Reset stream position if seekable
-                    if (stream.CanSeek)
+                    await _retryPolicy.ExecuteAsync(async () =>
                     {
-                        stream.Position = 0;
-                    }
+                        // Reset stream position if seekable
+                        if (stream.CanSeek)
+                        {
+                            stream.Position = 0;
+                        }
 
-                    await bunnyCDNStorage.UploadAsync(stream, path);
-                });
+                        await bunnyCDNStorage.UploadAsync(stream, path);
+                    });
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "Bunny.net upload failed after {RetryCount} retry attempts for path: {Path}", RetryCount, path);
+                    throw;
+                }
             }
             finally
             {
                 _rateLimiter.Release();
             }
+        }
+
+        public void Dispose()
+        {
+            _rateLimiter?.Dispose();
         }
     }
 }

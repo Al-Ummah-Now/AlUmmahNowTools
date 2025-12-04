@@ -1,17 +1,21 @@
+#if !WINDOWS
 using Microsoft.UI.Xaml;
+using Uno.UI.Hosting;
 
 namespace AlUmmahNow.VisualImporterUno;
 
-#if DESKTOP || __SKIA__
 public class Program
 {
     [STAThread]
     public static void Main(string[] args)
     {
-        Microsoft.UI.Xaml.Application.Start((p) =>
-        {
-            var app = new App();
-        });
+        var host = UnoPlatformHostBuilder.Create()
+            .UseX11()
+            .UseLinuxFrameBuffer()
+            .App(() => new App())
+            .Build();
+
+        host.Run();
     }
 }
 #endif
