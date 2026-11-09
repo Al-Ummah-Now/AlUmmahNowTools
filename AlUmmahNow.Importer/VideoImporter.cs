@@ -675,82 +675,16 @@ namespace AlUmmahNow.Importer
                         continue;
                     }
 
-                    // Check if already exists in remote storage
-                    if (await CheckIfVideoExistsAsync(importVideo))
-                    {
-                        importVideo.Status = VideoImportStatus.Uploaded;
-                        await _dbContext.SaveChangesAsync();
-                        channelProcessed++;
-                        ProgressChanged?.Invoke(this, new ImportProgressEventArgs(
-                            totalVideosAcrossAllChannels, processedSoFar + channelProcessed,
-                            videoFile.Name, channelName, "Skipped (already exists)"));
-                        continue;
-                    }
-
-                    // Update status to uploading
-                    importVideo.Status = VideoImportStatus.Uploading;
-                    await _dbContext.SaveChangesAsync();
-
                     ProgressChanged?.Invoke(this, new ImportProgressEventArgs(
                         totalVideosAcrossAllChannels, processedSoFar + channelProcessed,
                         videoFile.Name, channelName, "Uploading"));
 
-                    // Upload video (keyed by its path inside the channel folder, never overwriting a different file)
-                    var videoKey = StorageKeys.VideoKey(channel, videoFile);
-                    await _videoStorageClient.UploadIfAbsentAsync(videoFile, channel.VideoStoreRoot + videoKey);
-                    
-                    // Upload thumbnail if exists
-                    if (thumbnailFile != null)
-                    {
-                        var thumbnailKey = StorageKeys.ThumbnailKey(videoKey, thumbnailFile);
-                        await _imageStorageClient.UploadIfAbsentAsync(thumbnailFile, channel.ImageStoreRoot + thumbnailKey);
-                        importVideo.ThumbnailUrl = $"{channel.ImageStoreUrl}{thumbnailKey}";
-                    }
-
-                    // Create video metadata
-                    var videoTitle = Path.GetFileNameWithoutExtension(videoFile.Name);
-                    var videoDescription = videoTitle; // Use title as description by default
-
-                    // Translate metadata if translation service is available
-                    var translatedMetadata = await TranslateVideoMetadataIfEnabledAsync(
-                        videoTitle, 
-                        videoDescription, 
-                        channelName);
-
-                    var video = new Video
-                    {
-                        Title = videoTitle,
-                        Description = videoDescription,
-                        UserId = (await _dbContext.ImportSessions.FindAsync(sessionId))?.UserId ?? "",
-                        VideoUrl = $"{channel.VideoStoreUrl}{videoKey}",
-                        ThumbnailUrl = importVideo.ThumbnailUrl ?? "",
-                        Channel = channelName,
-                        ChannelId = channel.ChannelId,
-                        DateModified = DateTime.UtcNow
-                    };
-
-                    // Save to repository
-                    await _repo.SaveObjectAsync("videos", video.ID.ToString(), video);
-
-                    // Update import video record
-                    importVideo.VideoId = video.ID.ToString();
-                    importVideo.VideoUrl = video.VideoUrl;
-                    importVideo.Status = VideoImportStatus.Uploaded;
-                    importVideo.ProcessedAt = DateTime.UtcNow;
-                    importVideo.UploadedAt = DateTime.UtcNow;
-                    
-                    // Store translated metadata if available
-                    if (translatedMetadata != null)
-                    {
-                        importVideo.VideoMetadata = SerializeTranslatedMetadata(translatedMetadata);
-                    }
-
-                    await _dbContext.SaveChangesAsync();
+                    var outcome = await UploadRecordAndMarkAsync(channel, importVideo, videoFile, thumbnailFile);
                     channelProcessed++;
-                    
+
                     ProgressChanged?.Invoke(this, new ImportProgressEventArgs(
                         totalVideosAcrossAllChannels, processedSoFar + channelProcessed,
-                        videoFile.Name, channelName, "Uploaded"));
+                        videoFile.Name, channelName, outcome == ItemOutcome.AlreadyDone ? "Skipped (already exists)" : "Uploaded"));
                 }
                 catch (Exception ex)
                 {
@@ -815,39 +749,19 @@ namespace AlUmmahNow.Importer
                         continue;
                     }
 
-                    var channel = importVideo.Channel;
-
-                    // Update status to uploading
-                    importVideo.Status = VideoImportStatus.Uploading;
-                    await _dbContext.SaveChangesAsync();
-
                     ProgressChanged?.Invoke(this, new ImportProgressEventArgs(
                         totalPending, processedSoFar + localProcessed,
                         videoFile.Name, channelName, "Uploading"));
 
-                    // Upload video (keyed by its path inside the channel folder, never overwriting a different file)
-                    var videoKey = StorageKeys.VideoKey(channel, videoFile);
-                    await _videoStorageClient.UploadIfAbsentAsync(videoFile, channel.VideoStoreRoot + videoKey);
-                    
-                    // Upload thumbnail if exists
-                    if (!string.IsNullOrEmpty(importVideo.ThumbnailPath) && File.Exists(importVideo.ThumbnailPath))
-                    {
-                        var thumbnailFile = new FileInfo(importVideo.ThumbnailPath);
-                        var thumbnailKey = StorageKeys.ThumbnailKey(videoKey, thumbnailFile);
-                        await _imageStorageClient.UploadIfAbsentAsync(thumbnailFile, channel.ImageStoreRoot + thumbnailKey);
-                        importVideo.ThumbnailUrl = $"{channel.ImageStoreUrl}{thumbnailKey}";
-                    }
-
-                    // Update status
-                    importVideo.Status = VideoImportStatus.Uploaded;
-                    importVideo.ProcessedAt = DateTime.UtcNow;
-                    importVideo.UploadedAt = DateTime.UtcNow;
-                    await _dbContext.SaveChangesAsync();
+                    var thumbnailFile = !string.IsNullOrEmpty(importVideo.ThumbnailPath) && File.Exists(importVideo.ThumbnailPath)
+                        ? new FileInfo(importVideo.ThumbnailPath)
+                        : null;
+                    var outcome = await UploadRecordAndMarkAsync(importVideo.Channel, importVideo, videoFile, thumbnailFile);
 
                     localProcessed++;
                     ProgressChanged?.Invoke(this, new ImportProgressEventArgs(
                         totalPending, processedSoFar + localProcessed,
-                        videoFile.Name, channelName, "Uploaded"));
+                        videoFile.Name, channelName, outcome == ItemOutcome.AlreadyDone ? "Skipped (already exists)" : "Uploaded"));
                 }
                 catch (Exception ex)
                 {
@@ -866,6 +780,73 @@ namespace AlUmmahNow.Importer
                         importVideo.FileName, importVideo.Channel.ChannelName, "Failed"));
                 }
             }
+        }
+
+        private enum ItemOutcome { Uploaded, AlreadyDone }
+
+        /// <summary>
+        /// The one path that imports a file, used by both the first run and Resume: upload the video and
+        /// thumbnail, write the <c>videos/&lt;id&gt;</c> catalogue record, then mark the row Uploaded.
+        /// The row is only marked Uploaded after the record is written, so a failure at any step leaves it
+        /// retryable and a row never says Uploaded without its record.
+        /// </summary>
+        private async Task<ItemOutcome> UploadRecordAndMarkAsync(ImportChannel channel, ImportVideo importVideo,
+            FileInfo videoFile, FileInfo? thumbnailFile)
+        {
+            if (_dbContext == null) throw new InvalidOperationException("Database context is required.");
+
+            // Check if already exists in remote storage
+            if (await CheckIfVideoExistsAsync(importVideo))
+            {
+                importVideo.Status = VideoImportStatus.Uploaded;
+                await _dbContext.SaveChangesAsync();
+                return ItemOutcome.AlreadyDone;
+            }
+
+            importVideo.Status = VideoImportStatus.Uploading;
+            await _dbContext.SaveChangesAsync();
+
+            // Upload video (keyed by its path inside the channel folder, never overwriting a different file)
+            var videoKey = StorageKeys.VideoKey(channel, videoFile);
+            await _videoStorageClient.UploadIfAbsentAsync(videoFile, channel.VideoStoreRoot + videoKey);
+
+            if (thumbnailFile != null)
+            {
+                var thumbnailKey = StorageKeys.ThumbnailKey(videoKey, thumbnailFile);
+                await _imageStorageClient.UploadIfAbsentAsync(thumbnailFile, channel.ImageStoreRoot + thumbnailKey);
+                importVideo.ThumbnailUrl = $"{channel.ImageStoreUrl}{thumbnailKey}";
+            }
+
+            var videoTitle = Path.GetFileNameWithoutExtension(videoFile.Name);
+            var videoDescription = videoTitle; // Use title as description by default
+            var translatedMetadata = await TranslateVideoMetadataIfEnabledAsync(videoTitle, videoDescription, channel.ChannelName);
+
+            var video = new Video
+            {
+                Title = videoTitle,
+                Description = videoDescription,
+                UserId = (await _dbContext.ImportSessions.FindAsync(importVideo.SessionId))?.UserId ?? "",
+                VideoUrl = $"{channel.VideoStoreUrl}{videoKey}",
+                ThumbnailUrl = importVideo.ThumbnailUrl ?? "",
+                Channel = channel.ChannelName,
+                ChannelId = channel.ChannelId,
+                DateModified = DateTime.UtcNow
+            };
+
+            await _repo.SaveObjectAsync("videos", video.ID.ToString(), video);
+
+            importVideo.VideoId = video.ID.ToString();
+            importVideo.VideoUrl = video.VideoUrl;
+            importVideo.Status = VideoImportStatus.Uploaded;
+            importVideo.ErrorMessage = null;
+            importVideo.ProcessedAt = DateTime.UtcNow;
+            importVideo.UploadedAt = DateTime.UtcNow;
+            if (translatedMetadata != null)
+            {
+                importVideo.VideoMetadata = SerializeTranslatedMetadata(translatedMetadata);
+            }
+            await _dbContext.SaveChangesAsync();
+            return ItemOutcome.Uploaded;
         }
 
         private async Task<bool> CheckIfVideoExistsAsync(ImportVideo importVideo)
