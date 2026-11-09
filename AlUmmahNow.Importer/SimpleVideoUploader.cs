@@ -93,6 +93,7 @@ namespace AlUmmahNow.Importer
         /// <param name="videoStoreRoot">Storage root path for videos</param>
         public async Task UploadAsync(string folder, string videoStoreRoot)
         {
+            ArgumentException.ThrowIfNullOrWhiteSpace(videoStoreRoot);
             if (!Directory.Exists(folder))
                 throw new DirectoryNotFoundException($"Folder not found: {folder}");
 
@@ -140,10 +141,11 @@ namespace AlUmmahNow.Importer
         /// </summary>
         /// <param name="file">Video file to upload</param>
         /// <param name="videoStoreRoot">Storage root path</param>
-        public async Task UploadVideoAsync(FileInfo file, string videoStoreRoot)
+        /// <returns>Whether the file was sent or an identical one was already stored at its key.</returns>
+        /// <exception cref="StorageKeyConflictException">A different file is already stored at the key; it is not overwritten.</exception>
+        public Task<UploadOutcome> UploadVideoAsync(FileInfo file, string videoStoreRoot)
         {
-            using var reader = file.OpenRead();
-            await _videoStorageClient.UploadAsync(reader, videoStoreRoot + file.Name);
+            return _videoStorageClient.UploadIfAbsentAsync(file, StorageUploads.EnsureTrailingSlash(videoStoreRoot) + file.Name);
         }
     }
 }

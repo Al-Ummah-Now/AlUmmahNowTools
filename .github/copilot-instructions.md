@@ -107,7 +107,8 @@ Applications require user secrets configuration before they can run successfully
   - Uses FileScanSignalRClient for real-time communication
 - **AlUmmahNow.BunnyBulkUploader** - Console application for bulk uploading to BunnyCDN
   - UserSecretsId: `4de61621-8c00-4020-a0b6-0ff95676f865`
-  - Requires folder path parameter: `-f|--folder <path>`
+  - Requires folder path parameter: `-f|--folder <path>` and the storage root `-r|--root </zone/folder/>` (no default: each channel/folder gets its own root)
+  - Never overwrites a different file at an existing key; `check-records` lists R2 records sharing one video URL (read-only)
   - Uses AlUmmahNow.Importer library for upload functionality
 - **AlUmmahNow.VisualImporter** - WinUI 3 visual interface for importing video content
   - UserSecretsId: `4803ba67-724e-4477-aeb0-1d38aa664f85`
@@ -152,7 +153,8 @@ dotnet run -- --wait                           # Wait for scan completion with r
 # Build and run BunnyBulkUploader (requires user secrets)
 cd AlUmmahNow.BunnyBulkUploader
 dotnet run -- --help                    # Shows usage (fails without config)
-dotnet run -- -f "/path/to/video/files" # Upload videos from folder
+dotnet run -- -f "/path/to/video/files" -r /my-zone/channel-name/ # Upload videos from folder
+dotnet run -- check-records             # List R2 records that share one video URL (read-only)
 ```
 
 ### VisualImporter Usage

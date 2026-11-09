@@ -322,7 +322,7 @@ namespace AlUmmahNow.Importer
 
                 try
                 {
-                    await UploadVideoFileAsync(file, videoStoreRoot);
+                    await _videoStorageClient.UploadIfAbsentAsync(file, StorageUploads.EnsureTrailingSlash(videoStoreRoot) + file.Name);
                     successfulUploads++;
                     
                     // Report progress after successful upload
@@ -606,7 +606,7 @@ namespace AlUmmahNow.Importer
                     FolderPath = channelDir.FullName,
                     VideoStoreRoot = $"/videos-{channelName.ToLowerInvariant()}/{channelName}/",
                     VideoStoreUrl = $"{baseVideoStoreUrl.TrimEnd('/')}/{channelName}/",
-                    ImageStoreRoot = $"/images-{channelName.ToLowerInvariant}/",
+                    ImageStoreRoot = $"/images-{channelName.ToLowerInvariant()}/",
                     ImageStoreUrl = $"{baseImageStoreUrl.TrimEnd('/')}/{channelName}/",
                     TotalVideos = channelGroup.Count()
                 };
@@ -691,14 +691,16 @@ namespace AlUmmahNow.Importer
                         totalVideosAcrossAllChannels, processedSoFar + channelProcessed,
                         videoFile.Name, channelName, "Uploading"));
 
-                    // Upload video
-                    await UploadVideoFileAsync(videoFile, channel.VideoStoreRoot);
+                    // Upload video (keyed by its path inside the channel folder, never overwriting a different file)
+                    var videoKey = StorageKeys.VideoKey(channel, videoFile);
+                    await _videoStorageClient.UploadIfAbsentAsync(videoFile, channel.VideoStoreRoot + videoKey);
                     
                     // Upload thumbnail if exists
                     if (thumbnailFile != null)
                     {
-                        await UploadThumbnailFileAsync(thumbnailFile, channel.ImageStoreRoot);
-                        importVideo.ThumbnailUrl = $"{channel.ImageStoreUrl}{thumbnailFile.Name}";
+                        var thumbnailKey = StorageKeys.ThumbnailKey(videoKey, thumbnailFile);
+                        await _imageStorageClient.UploadIfAbsentAsync(thumbnailFile, channel.ImageStoreRoot + thumbnailKey);
+                        importVideo.ThumbnailUrl = $"{channel.ImageStoreUrl}{thumbnailKey}";
                     }
 
                     // Create video metadata
@@ -716,7 +718,7 @@ namespace AlUmmahNow.Importer
                         Title = videoTitle,
                         Description = videoDescription,
                         UserId = (await _dbContext.ImportSessions.FindAsync(sessionId))?.UserId ?? "",
-                        VideoUrl = $"{channel.VideoStoreUrl}{videoFile.Name}",
+                        VideoUrl = $"{channel.VideoStoreUrl}{videoKey}",
                         ThumbnailUrl = importVideo.ThumbnailUrl ?? "",
                         Channel = channelName,
                         ChannelId = channel.ChannelId,
@@ -822,15 +824,17 @@ namespace AlUmmahNow.Importer
                         totalPending, processedSoFar + localProcessed,
                         videoFile.Name, channelName, "Uploading"));
 
-                    // Upload video
-                    await UploadVideoFileAsync(videoFile, channel.VideoStoreRoot);
+                    // Upload video (keyed by its path inside the channel folder, never overwriting a different file)
+                    var videoKey = StorageKeys.VideoKey(channel, videoFile);
+                    await _videoStorageClient.UploadIfAbsentAsync(videoFile, channel.VideoStoreRoot + videoKey);
                     
                     // Upload thumbnail if exists
                     if (!string.IsNullOrEmpty(importVideo.ThumbnailPath) && File.Exists(importVideo.ThumbnailPath))
                     {
                         var thumbnailFile = new FileInfo(importVideo.ThumbnailPath);
-                        await UploadThumbnailFileAsync(thumbnailFile, channel.ImageStoreRoot);
-                        importVideo.ThumbnailUrl = $"{channel.ImageStoreUrl}{thumbnailFile.Name}";
+                        var thumbnailKey = StorageKeys.ThumbnailKey(videoKey, thumbnailFile);
+                        await _imageStorageClient.UploadIfAbsentAsync(thumbnailFile, channel.ImageStoreRoot + thumbnailKey);
+                        importVideo.ThumbnailUrl = $"{channel.ImageStoreUrl}{thumbnailKey}";
                     }
 
                     // Update status
@@ -882,18 +886,6 @@ namespace AlUmmahNow.Importer
             {
                 return false;
             }
-        }
-
-        private async Task UploadVideoFileAsync(FileInfo videoFile, string videoStoreRoot)
-        {
-            using var reader = videoFile.OpenRead();
-            await _videoStorageClient.UploadAsync(reader, videoStoreRoot + videoFile.Name);
-        }
-
-        private async Task UploadThumbnailFileAsync(FileInfo thumbnailFile, string imageStoreRoot)
-        {
-            using var reader = thumbnailFile.OpenRead();
-            await _imageStorageClient.UploadAsync(reader, imageStoreRoot + thumbnailFile.Name);
         }
 
         private async Task UpdateSessionStatusAsync(Guid sessionId)

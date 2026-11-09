@@ -355,8 +355,11 @@ public class BunnyStorageClientRetryTests
 
     #region Get Tests
 
+    // GetAsync used to map every error to "not found" (null), so a failed lookup let callers
+    // overwrite an existing object. Errors now propagate; only a genuinely missing object is null.
+
     [Fact]
-    public async Task GetAsync_WithInvalidCredentials_ReturnsNull()
+    public async Task GetAsync_WhenTheLookupFails_Throws()
     {
         // Arrange
         var client = new BunnyStorageClient<TestVideo>(
@@ -366,53 +369,29 @@ public class BunnyStorageClientRetryTests
             logger: _mockLogger.Object);
 
         // Act
-        var result = await client.GetAsync("test.mp4");
+        var act = () => client.GetAsync("/invalid-zone/test.mp4");
 
         // Assert
-        result.Should().BeNull();
-
-        _mockLogger.Verify(
-            x => x.Log(
-                LogLevel.Error,
-                It.IsAny<EventId>(),
-                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("Error getting object") || v.ToString()!.Contains("Error listing objects")),
-                It.IsAny<Exception>(),
-                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
-            Times.AtLeastOnce);
+        await act.Should().ThrowAsync<Exception>();
     }
 
     [Fact]
-    public async Task GetAsync_WithNullPath_ReturnsNull()
+    public async Task GetAsync_WithNullPath_Throws()
     {
-        // Arrange
-        var client = new BunnyStorageClient<TestVideo>(
-            "invalid-zone",
-            "invalid-key",
-            "invalid-region",
-            logger: _mockLogger.Object);
-
-        // Act
-        var result = await client.GetAsync(null!);
-
-        // Assert
-        result.Should().BeNull();
+        var client = new BunnyStorageClient<TestVideo>("invalid-zone", "invalid-key", "invalid-region", logger: _mockLogger.Object);
+        var act = () => client.GetAsync(null!);
+        await act.Should().ThrowAsync<Exception>();
     }
 
-    [Fact]
-    public async Task GetAsync_WithEmptyPath_ReturnsNull()
+    [Theory]
+    [InlineData("")]
+    [InlineData("test.mp4")]
+    [InlineData("/invalid-zone/folder/")]
+    public async Task GetAsync_WithoutAFilePath_ThrowsArgumentException(string path)
     {
-        // Arrange
-        var client = new BunnyStorageClient<TestVideo>(
-            "invalid-zone",
-            "invalid-key",
-            "invalid-region",
-            logger: _mockLogger.Object);
-
-        // Act
-        var result = await client.GetAsync(string.Empty);
-
-        // Assert
-        result.Should().BeNull();
+        var client = new BunnyStorageClient<TestVideo>("invalid-zone", "invalid-key", "invalid-region", logger: _mockLogger.Object);
+        var act = () => client.GetAsync(path);
+        await act.Should().ThrowAsync<ArgumentException>();
     }
 
     #endregion
