@@ -646,14 +646,18 @@ namespace AlUmmahNow.Importer
 
             if (channel == null) return;
 
+            // This session's rows for this channel, keyed by path. Looking rows up by path alone would
+            // pick up another session's row for the same file (and update or skip based on it).
+            var sessionRows = await _dbContext.ImportVideos
+                .Where(v => v.SessionId == sessionId && v.ChannelId == channel.Id)
+                .ToDictionaryAsync(v => v.FilePath, StringComparer.Ordinal);
+
             int channelProcessed = 0;
             foreach (var (_, videoFile, thumbnailFile) in channelVideos)
             {
+                sessionRows.TryGetValue(videoFile.FullName, out var importVideo);
                 try
                 {
-                    var importVideo = await _dbContext.ImportVideos
-                        .FirstOrDefaultAsync(v => v.FilePath == videoFile.FullName);
-
                     if (importVideo == null) continue;
 
                     // Report progress
@@ -750,9 +754,6 @@ namespace AlUmmahNow.Importer
                 }
                 catch (Exception ex)
                 {
-                    var importVideo = await _dbContext.ImportVideos
-                        .FirstOrDefaultAsync(v => v.FilePath == videoFile.FullName);
-                    
                     if (importVideo != null)
                     {
                         importVideo.Status = VideoImportStatus.Failed;

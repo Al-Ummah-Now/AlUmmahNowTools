@@ -53,7 +53,26 @@ namespace AlUmmahNow.Data.Models
         public Guid SessionId { get; set; }
         public Guid ChannelId { get; set; }
         public string FileName { get; set; } = string.Empty;
-        public string FilePath { get; set; } = string.Empty;
+
+        private string _filePath = string.Empty;
+
+        /// <summary>Full path of the source file. Setting it also sets <see cref="FilePathHash"/>.</summary>
+        public string FilePath
+        {
+            get => _filePath;
+            set
+            {
+                _filePath = value ?? string.Empty;
+                FilePathHash = PathHash.Of(_filePath);
+            }
+        }
+
+        /// <summary>
+        /// SHA-256 of <see cref="FilePath"/> (see <see cref="PathHash"/>). <c>FilePath</c> is unbounded, so the
+        /// unique "one row per file per session" index is on <c>(SessionId, FilePathHash)</c> instead.
+        /// </summary>
+        public string FilePathHash { get; set; } = PathHash.Of(string.Empty);
+
         public long FileSize { get; set; }
         public string? VideoId { get; set; }
         public string? VideoUrl { get; set; }
