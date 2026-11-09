@@ -82,7 +82,7 @@ app.OnExecuteAsync(async (ct) =>
     try
     {
         // Ensure database connection works
-        await dbContext.Database.EnsureCreatedAsync(ct);
+        await ImportDbSchema.EnsureUpToDateAsync(dbContext, ct);
 
         // Handle daemon mode
         if (optionDaemon.HasValue())

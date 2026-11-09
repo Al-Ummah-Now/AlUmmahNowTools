@@ -401,7 +401,7 @@ public partial class App : Application
                 try
                 {
                     await dbContext.Database.CanConnectAsync();
-                    await dbContext.Database.EnsureCreatedAsync();
+                    await ImportDbSchema.EnsureUpToDateAsync(dbContext);
                     Log.Information("Database initialized successfully");
                 }
                 catch (Exception dbEx)

@@ -655,6 +655,11 @@ namespace AlUmmahNow.Data.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("FilePathHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
                     b.Property<long>("FileSize")
                         .HasColumnType("bigint");
 
@@ -695,6 +700,10 @@ namespace AlUmmahNow.Data.Migrations
                     b.HasIndex("SessionId");
 
                     b.HasIndex("Status");
+
+                    b.HasIndex("SessionId", "FilePathHash")
+                        .IsUnique()
+                        .HasDatabaseName("UX_ImportVideos_SessionId_FilePathHash");
 
                     b.ToTable("ImportVideos");
                 });

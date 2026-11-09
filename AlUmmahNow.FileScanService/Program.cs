@@ -195,6 +195,19 @@ namespace AlUmmahNow.FileScanService
 
             var app = builder.Build();
 
+            // Bring the shared database up to the current schema (creates it if missing; adds indexes
+            // introduced since it was created). The workers rely on these constraints.
+            try
+            {
+                using var schemaScope = app.Services.CreateScope();
+                await ImportDbSchema.EnsureUpToDateAsync(schemaScope.ServiceProvider.GetRequiredService<ImportDbContext>());
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Database schema upgrade failed");
+                return 1;
+            }
+
             // Enable CORS
             app.UseCors();
 

@@ -52,8 +52,14 @@ namespace AlUmmahNow.Data.Database
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.FileName).IsRequired();
                 entity.Property(e => e.FilePath).IsRequired();
+                entity.Property(e => e.FilePathHash).IsRequired().HasMaxLength(PathHash.Length);
                 entity.HasIndex(e => e.SessionId);
                 entity.HasIndex(e => e.ChannelId);
+                // One row per file per session: lookups are by (SessionId, path), and a second insert for
+                // the same file in the same session fails instead of creating a row nothing will process.
+                entity.HasIndex(e => new { e.SessionId, e.FilePathHash })
+                    .IsUnique()
+                    .HasDatabaseName(ImportDbSchema.ImportVideosSessionPathIndex);
                 entity.HasIndex(e => e.Status);
                 
                 // Configure relationships to avoid cascade path conflicts
