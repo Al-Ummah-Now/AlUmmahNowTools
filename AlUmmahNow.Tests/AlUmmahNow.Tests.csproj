@@ -40,6 +40,7 @@
     <ProjectReference Include="..\AlUmmahNow.DataImporter\AlUmmahNow.DataImporter.csproj" />
     <ProjectReference Include="..\AlUmmahNow.Importer\AlUmmahNow.Importer.csproj" />
     <ProjectReference Include="..\AlUmmahNow.FileScanService\AlUmmahNow.FileScanService.csproj" />
+    <ProjectReference Include="..\AlUmmahNow.BunnyBulkUploader\AlUmmahNow.BunnyBulkUploader.csproj" />
   </ItemGroup>
 
   <ItemGroup>

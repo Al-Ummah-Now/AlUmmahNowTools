@@ -37,12 +37,20 @@ namespace AlUmmahNow.Data.Storage
 
         public async Task<List<S3Object>> ListObjectsV2Async(string bucketName)
         {
+            // Follow continuation tokens: one response holds at most 1000 keys.
+            var objects = new List<S3Object>();
             var request = new ListObjectsV2Request
             {
                 BucketName = bucketName,
             };
-            var result = await s3Client.ListObjectsV2Async(request);
-            return result.S3Objects;
+            ListObjectsV2Response result;
+            do
+            {
+                result = await s3Client.ListObjectsV2Async(request);
+                if (result.S3Objects != null) objects.AddRange(result.S3Objects);
+                request.ContinuationToken = result.NextContinuationToken;
+            } while (result.IsTruncated == true && !string.IsNullOrEmpty(result.NextContinuationToken));
+            return objects;
         }
 
         public async Task PutObjectAsync(string bucketName, string key, string contentBody)

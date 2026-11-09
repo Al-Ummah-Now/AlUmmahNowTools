@@ -78,34 +78,48 @@ namespace AlUmmahNow.Data.Storage
             }
         }
 
+        /// <summary>
+        /// The object stored at <paramref name="path"/>, or <c>null</c> if there is none.
+        /// Lists the parent directory and matches the file name. Errors other than "not found" are thrown,
+        /// so a failed lookup is never mistaken for a missing object (which would let callers overwrite it).
+        /// </summary>
         public async Task<StorageObject?> GetAsync(string path)
         {
+            ArgumentNullException.ThrowIfNull(path);
+            var slash = path.LastIndexOf('/');
+            if (slash < 0 || slash == path.Length - 1)
+            {
+                throw new ArgumentException($"'{path}' is not a file path.", nameof(path));
+            }
+            var directory = path[..(slash + 1)];
+            var name = path[(slash + 1)..];
+
+            List<BunnyCDN.Net.Storage.Models.StorageObject> entries;
             try
             {
-                var result = await ListAsync(path);
-                var obj = result.FirstOrDefault();
-
-                if (obj == null)
-                {
-                    return null;
-                }
-
-                return new StorageObject
-                {
-                    Guid = obj.Guid,
-                    ObjectName = obj.ObjectName,
-                    DateCreated = obj.DateCreated,
-                    LastChanged = obj.LastChanged,
-                    Path = obj.Path,
-                    Length = obj.Length,
-                    IsDirectory = obj.IsDirectory
-                };
+                entries = await bunnyCDNStorage.GetStorageObjectsAsync(directory);
             }
-            catch (Exception ex)
+            catch (BunnyCDNStorageFileNotFoundException)
             {
-                _logger?.LogError(ex, "Error getting object from BunnyCDN at path: {Path}", path);
                 return null;
             }
+
+            var obj = entries.FirstOrDefault(o => !o.IsDirectory && string.Equals(o.ObjectName, name, StringComparison.Ordinal));
+            if (obj == null)
+            {
+                return null;
+            }
+
+            return new StorageObject
+            {
+                Guid = obj.Guid,
+                ObjectName = obj.ObjectName,
+                DateCreated = obj.DateCreated,
+                LastChanged = obj.LastChanged,
+                Path = obj.Path,
+                Length = obj.Length,
+                IsDirectory = obj.IsDirectory
+            };
         }
 
         public async Task UploadAsync(Stream stream, string path)
