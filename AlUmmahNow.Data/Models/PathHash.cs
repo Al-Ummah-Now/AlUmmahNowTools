@@ -16,5 +16,16 @@ namespace AlUmmahNow.Data.Models
         public const int Length = 64;
 
         public static string Of(string path) => Convert.ToHexString(SHA256.HashData(Encoding.Unicode.GetBytes(path ?? string.Empty)));
+
+        /// <summary>
+        /// Hash of a folder for "same folder" checks: full path, no trailing separator, case-insensitive
+        /// (Windows and default macOS file systems), so <c>D:\Channels</c> and <c>d:\channels\</c> match.
+        /// </summary>
+        public static string OfFolder(string folder)
+        {
+            if (string.IsNullOrWhiteSpace(folder)) return string.Empty;
+            var full = Path.GetFullPath(folder).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            return Of(full.ToUpperInvariant());
+        }
     }
 }

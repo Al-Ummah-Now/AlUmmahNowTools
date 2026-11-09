@@ -49,7 +49,7 @@ public class SessionScopedImportTests : IDisposable
     {
         using var db = _db.NewContext();
         var s1 = new ImportSession { RootFolder = _root, UserId = "u" };
-        var s2 = new ImportSession { RootFolder = _root, UserId = "u" };
+        var s2 = new ImportSession { RootFolder = _root, UserId = "u", Status = ImportStatus.Completed };
         var ch1 = new ImportChannel { Session = s1, ChannelName = "c", FolderPath = _root };
         var ch2 = new ImportChannel { Session = s2, ChannelName = "c", FolderPath = _root };
         db.AddRange(s1, s2, ch1, ch2,
@@ -90,29 +90,6 @@ public class SessionScopedImportTests : IDisposable
         Assert.Equal(10, _videos.Puts);
     }
 
-    [Fact]
-    public async Task Parallel_sessions_on_the_same_files_only_touch_their_own_rows()
-    {
-        const int sessions = 8;
-        var ids = await Task.WhenAll(Enumerable.Range(0, sessions).Select(_ => Task.Run(async () =>
-        {
-            using var db = _db.NewContext();
-            return await Importer(db).ImportMultiChannelAsync(_root, "u", "https://v/", "https://i/");
-        })));
-
-        using var check = _db.NewContext();
-        Assert.Equal(sessions, ids.Distinct().Count());
-        foreach (var id in ids)
-        {
-            var rows = await check.ImportVideos.Where(v => v.SessionId == id).ToListAsync();
-            Assert.Equal(10, rows.Count);
-            Assert.All(rows, r => Assert.Equal(VideoImportStatus.Uploaded, r.Status));
-            Assert.Equal(ImportStatus.Completed, (await check.ImportSessions.SingleAsync(s => s.Id == id)).Status);
-        }
-        Assert.Equal(sessions * 10, await check.ImportVideos.CountAsync());
-        Assert.Equal(10, _videos.Objects.Count);
-    }
-
     [SqlServerFact]
     public async Task Sql_server_upgrade_backfills_dedupes_and_adds_the_index_and_migrations_match()
     {
@@ -125,7 +102,9 @@ public class SessionScopedImportTests : IDisposable
             await using (var db = new ImportDbContext(options))
             {
                 await db.Database.EnsureCreatedAsync();
-                await db.Database.ExecuteSqlRawAsync($"DROP INDEX {ImportDbSchema.ImportVideosSessionPathIndex} ON dbo.ImportVideos; ALTER TABLE dbo.ImportVideos DROP COLUMN FilePathHash;");
+                await db.Database.ExecuteSqlRawAsync(
+                    $"DROP INDEX {ImportDbSchema.ImportVideosSessionPathIndex} ON dbo.ImportVideos; ALTER TABLE dbo.ImportVideos DROP COLUMN FilePathHash;" +
+                    $"DROP INDEX {ImportDbSchema.ImportSessionsOneRunningPerRootIndex} ON dbo.ImportSessions; ALTER TABLE dbo.ImportSessions DROP COLUMN RootFolderHash, HeartbeatAt;");
                 var s = Guid.NewGuid(); var c = Guid.NewGuid();
                 await db.Database.ExecuteSqlRawAsync(
                     "INSERT dbo.ImportSessions (Id, UserId, RootFolder, StartTime, Status, TotalVideosFound, VideosProcessed, VideosUploaded, VideosFailed) VALUES ({0}, N'u', N'C:\\r', SYSUTCDATETIME(), 0, 0, 0, 0, 0);" +
@@ -145,6 +124,15 @@ public class SessionScopedImportTests : IDisposable
                 Assert.Equal(2, rows.Count);
                 Assert.All(rows, r => Assert.Equal(PathHash.Of(r.FilePath), r.FilePathHash));
                 Assert.Equal(VideoImportStatus.Uploaded, rows.Single(r => r.FilePath.EndsWith("شريط.mp4")).Status);
+
+                // TOOLS-1: the legacy InProgress session keeps an empty hash and blocks nothing; two new
+                // InProgress sessions for one root can't coexist, a finished one doesn't count.
+                Assert.Equal("", (await db.ImportSessions.AsNoTracking().SingleAsync(x => x.Id == s)).RootFolderHash);
+                db.ImportSessions.Add(new ImportSession { RootFolder = @"C:\r", UserId = "u", Status = ImportStatus.InProgress });
+                db.ImportSessions.Add(new ImportSession { RootFolder = @"C:\r", UserId = "u", Status = ImportStatus.Completed });
+                await db.SaveChangesAsync();
+                db.ImportSessions.Add(new ImportSession { RootFolder = @"c:\R", UserId = "u", Status = ImportStatus.InProgress });
+                await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
             }
 
             // A fresh database built by the migrations has the same index.
@@ -153,8 +141,8 @@ public class SessionScopedImportTests : IDisposable
                 await db.Database.EnsureDeletedAsync();
                 await db.Database.MigrateAsync();
                 var exists = await db.Database.SqlQueryRaw<int>(
-                    $"SELECT COUNT(*) AS Value FROM sys.indexes WHERE name = N'{ImportDbSchema.ImportVideosSessionPathIndex}' AND is_unique = 1").SingleAsync();
-                Assert.Equal(1, exists);
+                    $"SELECT COUNT(*) AS Value FROM sys.indexes WHERE is_unique = 1 AND (name = N'{ImportDbSchema.ImportVideosSessionPathIndex}' OR (name = N'{ImportDbSchema.ImportSessionsOneRunningPerRootIndex}' AND has_filter = 1))").SingleAsync();
+                Assert.Equal(2, exists);
                 Assert.Empty(await db.Database.GetPendingMigrationsAsync());
             }
         }

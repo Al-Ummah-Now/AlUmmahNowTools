@@ -36,6 +36,15 @@ public class InMemoryR2Client : IR2Client
         return Task.CompletedTask;
     }
 
+    /// <summary>Atomic create-only put, like <c>If-None-Match: *</c>.</summary>
+    public virtual Task<bool> PutObjectIfAbsentAsync(string bucketName, string key, string contentBody)
+    {
+        BeforePut?.Invoke(bucketName, key);
+        var created = Store.TryAdd((bucketName, key), contentBody);
+        if (created) Interlocked.Increment(ref _puts);
+        return Task.FromResult(created);
+    }
+
     public Task<string> GetObjectAsync(string bucketName, string key)
         => Store.TryGetValue((bucketName, key), out var body)
             ? Task.FromResult(body)

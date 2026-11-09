@@ -186,22 +186,27 @@ namespace AlUmmahNow.Tests.Repository
             _mockR2Client.Verify(x => x.GetObjectAsync(bucketName, key), Times.Once);
         }
 
+        // A failed read used to come back as null ("missing"), which let callers overwrite the record.
+        // Only a missing key is null now; other errors propagate.
         [Fact]
-        public async Task GetObjectAsync_HandlesException_ReturnsNull()
+        public async Task GetObjectAsync_WhenTheReadFails_Throws()
         {
-            // Arrange
             var bucketName = "test-bucket";
             var key = "test-key";
 
             _mockR2Client.Setup(x => x.GetObjectAsync(bucketName, key))
                         .ThrowsAsync(new Exception("S3 error"));
 
-            // Act
-            var result = await _repository.GetObjectAsync(bucketName, key);
+            await Assert.ThrowsAsync<Exception>(() => _repository.GetObjectAsync(bucketName, key));
+        }
 
-            // Assert
-            Assert.Null(result);
-            _mockR2Client.Verify(x => x.GetObjectAsync(bucketName, key), Times.Once);
+        [Fact]
+        public async Task GetObjectAsync_WhenTheKeyDoesNotExist_ReturnsNull()
+        {
+            _mockR2Client.Setup(x => x.GetObjectAsync("b", "k"))
+                        .ThrowsAsync(new Amazon.S3.AmazonS3Exception("missing") { StatusCode = System.Net.HttpStatusCode.NotFound, ErrorCode = "NoSuchKey" });
+
+            Assert.Null(await _repository.GetObjectAsync("b", "k"));
         }
 
         // Test model class

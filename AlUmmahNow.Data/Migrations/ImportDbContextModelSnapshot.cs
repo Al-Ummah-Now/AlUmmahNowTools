@@ -597,9 +597,17 @@ namespace AlUmmahNow.Data.Migrations
                     b.Property<string>("ErrorMessage")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<DateTime?>("HeartbeatAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<string>("RootFolder")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("RootFolderHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
 
                     b.Property<DateTime>("StartTime")
                         .HasColumnType("datetime2");
@@ -624,6 +632,11 @@ namespace AlUmmahNow.Data.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("RootFolderHash")
+                        .IsUnique()
+                        .HasDatabaseName("UX_ImportSessions_RootFolderHash_InProgress")
+                        .HasFilter("[Status] = 0 AND [RootFolderHash] <> ''");
 
                     b.HasIndex("StartTime");
 

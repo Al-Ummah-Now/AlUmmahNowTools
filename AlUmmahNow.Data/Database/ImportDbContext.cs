@@ -34,7 +34,14 @@ namespace AlUmmahNow.Data.Database
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.UserId).IsRequired();
                 entity.Property(e => e.RootFolder).IsRequired();
+                entity.Property(e => e.RootFolderHash).IsRequired().HasMaxLength(PathHash.Length);
                 entity.HasIndex(e => e.Status);
+                // At most one running import per folder (Status 0 = InProgress). Sessions created before
+                // RootFolderHash existed have an empty hash and are excluded.
+                entity.HasIndex(e => e.RootFolderHash)
+                    .IsUnique()
+                    .HasFilter("[Status] = 0 AND [RootFolderHash] <> ''")
+                    .HasDatabaseName(ImportDbSchema.ImportSessionsOneRunningPerRootIndex);
                 entity.HasIndex(e => e.StartTime);
             });
 

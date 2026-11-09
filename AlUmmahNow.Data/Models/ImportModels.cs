@@ -9,7 +9,32 @@ namespace AlUmmahNow.Data.Models
     {
         [Key]
         public Guid Id { get; set; } = Guid.NewGuid();
-        public string RootFolder { get; set; } = string.Empty;
+
+        private string _rootFolder = string.Empty;
+
+        /// <summary>The imported folder. Setting it also sets <see cref="RootFolderHash"/>.</summary>
+        public string RootFolder
+        {
+            get => _rootFolder;
+            set
+            {
+                _rootFolder = value ?? string.Empty;
+                RootFolderHash = PathHash.OfFolder(_rootFolder);
+            }
+        }
+
+        /// <summary>
+        /// <see cref="PathHash.OfFolder"/> of <see cref="RootFolder"/>. A filtered unique index allows one
+        /// <see cref="ImportStatus.InProgress"/> session per root. Empty for sessions created before it existed.
+        /// </summary>
+        public string RootFolderHash { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Last time the runner of an <see cref="ImportStatus.InProgress"/> session reported it is alive. A session
+        /// whose heartbeat is older than the lease is treated as interrupted and can be resumed or replaced.
+        /// </summary>
+        public DateTime? HeartbeatAt { get; set; }
+
         public string UserId { get; set; } = string.Empty;
         public DateTime StartTime { get; set; } = DateTime.UtcNow;
         public DateTime? EndTime { get; set; }

@@ -19,6 +19,12 @@ namespace AlUmmahNow.Data.Storage
             });
         }
 
+        /// <summary>Wraps an existing S3 client (tests, or a client configured elsewhere).</summary>
+        public R2Client(IAmazonS3 client)
+        {
+            s3Client = client ?? throw new ArgumentNullException(nameof(client));
+        }
+
         public IAmazonS3 GetClient()
         {
             return s3Client;
@@ -74,6 +80,28 @@ namespace AlUmmahNow.Data.Storage
             {
                 Console.WriteLine($"Error putting object in S3 bucket: {ex.Message}");
                 throw;
+            }
+        }
+
+        public async Task<bool> PutObjectIfAbsentAsync(string bucketName, string key, string contentBody)
+        {
+            using var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(contentBody));
+            var request = new PutObjectRequest
+            {
+                BucketName = bucketName,
+                Key = key,
+                InputStream = stream,
+                DisablePayloadSigning = true,
+                IfNoneMatch = "*",
+            };
+            try
+            {
+                await s3Client.PutObjectAsync(request);
+                return true;
+            }
+            catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.PreconditionFailed)
+            {
+                return false;
             }
         }
 

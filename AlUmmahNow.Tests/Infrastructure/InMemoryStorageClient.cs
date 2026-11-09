@@ -19,8 +19,12 @@ public sealed class InMemoryStorageClient<T> : IStorageClient<T>
     /// <summary>Delay inside UploadAsync, to widen race windows in concurrency tests.</summary>
     public TimeSpan UploadDelay { get; set; }
 
+    /// <summary>Uploads wait for this task first, so a test can hold a run inside its first upload.</summary>
+    public Task Gate { get; set; } = Task.CompletedTask;
+
     public async Task UploadAsync(Stream stream, string path)
     {
+        await Gate;
         using var ms = new MemoryStream();
         await stream.CopyToAsync(ms);
         if (UploadDelay > TimeSpan.Zero) await Task.Delay(UploadDelay);

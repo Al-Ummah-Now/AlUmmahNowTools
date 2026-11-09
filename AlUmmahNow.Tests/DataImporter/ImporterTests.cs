@@ -15,16 +15,13 @@ namespace AlUmmahNow.Tests.DataImporter
     public class ImporterTests : IDisposable
     {
         private readonly ImportDbContext _dbContext;
+        // SQLite rather than the in-memory provider: the importer claims rows and sessions with
+        // ExecuteUpdate and relies on unique indexes, which the in-memory provider doesn't support.
+        private readonly AlUmmahNow.Tests.Infrastructure.SqliteImportDb _sqlite = new();
 
         public ImporterTests()
         {
-            // Setup in-memory database for testing
-            var options = new DbContextOptionsBuilder<ImportDbContext>()
-                .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
-                .Options;
-            
-            _dbContext = new ImportDbContext(options);
-            _dbContext.Database.EnsureCreated();
+            _dbContext = _sqlite.NewContext();
         }
 
         [Fact]
@@ -289,6 +286,7 @@ namespace AlUmmahNow.Tests.DataImporter
         public void Dispose()
         {
             _dbContext?.Dispose();
+            _sqlite.Dispose();
         }
     }
 }
