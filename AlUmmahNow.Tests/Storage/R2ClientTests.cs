@@ -335,6 +335,9 @@ namespace AlUmmahNow.Tests.Storage
                 }
             }
 
+            public Task<bool> PutObjectIfAbsentAsync(string bucketName, string key, string contentBody)
+                => new R2Client(_s3Client).PutObjectIfAbsentAsync(bucketName, key, contentBody);
+
             public async Task<string> GetObjectAsync(string bucketName, string key)
             {
                 var request = new GetObjectRequest

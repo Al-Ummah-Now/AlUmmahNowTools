@@ -101,8 +101,8 @@ public class StorageKeyTests : IDisposable
         Write("B/Season1/ep1.mp4", "s1");
         Write("B/Season2/ep1.mp4", "s2 longer");
 
-        var options = new DbContextOptionsBuilder<ImportDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options;
-        using var db = new ImportDbContext(options);
+        using var sqlite = new SqliteImportDb();
+        using var db = sqlite.NewContext();
         var videos = new InMemoryStorageClient<CoreVideo>();
         var images = new InMemoryStorageClient<CoreImage>();
         var r2 = new Mock<IR2Client>();

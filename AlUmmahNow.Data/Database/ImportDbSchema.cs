@@ -39,8 +39,27 @@ DELETE FROM ranked WHERE rn > 1;",
     CREATE UNIQUE INDEX {ImportVideosSessionPathIndex} ON dbo.ImportVideos (SessionId, FilePathHash);",
         };
 
+        public const string ImportSessionsOneRunningPerRootIndex = "UX_ImportSessions_RootFolderHash_InProgress";
+
+        /// <summary>
+        /// TOOLS-1: ImportSessions.RootFolderHash and HeartbeatAt, and a filtered unique index allowing one
+        /// InProgress session per root. Existing sessions keep an empty hash (excluded by the filter); the
+        /// importer sets it when it resumes one.
+        /// </summary>
+        public static readonly string[] ImportSessionsOneRunningPerRoot =
+        {
+            @"IF COL_LENGTH(N'dbo.ImportSessions', N'RootFolderHash') IS NULL
+    ALTER TABLE dbo.ImportSessions ADD RootFolderHash nvarchar(64) NOT NULL
+        CONSTRAINT DF_ImportSessions_RootFolderHash DEFAULT N'';",
+            @"IF COL_LENGTH(N'dbo.ImportSessions', N'HeartbeatAt') IS NULL
+    ALTER TABLE dbo.ImportSessions ADD HeartbeatAt datetime2 NULL;",
+            $@"IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'{ImportSessionsOneRunningPerRootIndex}' AND object_id = OBJECT_ID(N'dbo.ImportSessions'))
+    CREATE UNIQUE INDEX {ImportSessionsOneRunningPerRootIndex} ON dbo.ImportSessions (RootFolderHash)
+        WHERE [Status] = 0 AND [RootFolderHash] <> N'';",
+        };
+
         /// <summary>Every upgrade step, oldest first.</summary>
-        public static IEnumerable<string> SqlServerUpgradeSteps => ImportVideosSessionPathUnique;
+        public static IEnumerable<string> SqlServerUpgradeSteps => ImportVideosSessionPathUnique.Concat(ImportSessionsOneRunningPerRoot);
 
         /// <summary>Creates the database if needed and applies every upgrade step (SQL Server only).</summary>
         public static async Task EnsureUpToDateAsync(ImportDbContext db, CancellationToken ct = default)

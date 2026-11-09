@@ -28,6 +28,13 @@ namespace AlUmmahNow.Importer
         private readonly BunnyStreamClient _bunnyStreamClient;
         private readonly ImportDbContext? _dbContext;
         private readonly VideoTranslationService? _translationService;
+        private ImportSessionLease? _lease;
+
+        /// <summary>
+        /// How long a running session may go without a heartbeat before another run may take it over
+        /// (the runner refreshes it every quarter of this). Default 10 minutes.
+        /// </summary>
+        public TimeSpan SessionLease { get; set; } = TimeSpan.FromMinutes(10);
 
         /// <summary>
         /// Raised when import progress changes
@@ -104,16 +111,10 @@ namespace AlUmmahNow.Importer
             if (!Directory.Exists(rootFolder))
                 throw new DirectoryNotFoundException($"Root folder not found: {rootFolder}");
 
-            // Create import session
-            var session = new ImportSession
-            {
-                RootFolder = rootFolder,
-                UserId = userId,
-                Status = ImportStatus.InProgress
-            };
-
-            _dbContext.ImportSessions.Add(session);
-            await _dbContext.SaveChangesAsync();
+            // Create the session; refused if another run is importing this folder.
+            var (session, lease) = await ImportSessionLease.StartNewAsync(_dbContext, rootFolder, userId, SessionLease);
+            await using var _ = lease;
+            _lease = lease;
 
             try
             {
@@ -170,13 +171,20 @@ namespace AlUmmahNow.Importer
             }
             catch (Exception ex)
             {
-                session.Status = ImportStatus.Failed;
-                session.ErrorMessage = ex.Message;
-                session.EndTime = DateTime.UtcNow;
-                await _dbContext.SaveChangesAsync();
+                if (ex is not ImportLeaseLostException)
+                {
+                    session.Status = ImportStatus.Failed;
+                    session.ErrorMessage = ex.Message;
+                    session.EndTime = DateTime.UtcNow;
+                    await _dbContext.SaveChangesAsync();
+                }
                 
                 ImportCompleted?.Invoke(this, new ImportCompletedEventArgs(0, 0, 0, ex.Message));
                 throw;
+            }
+            finally
+            {
+                _lease = null;
             }
         }
 
@@ -200,8 +208,9 @@ namespace AlUmmahNow.Importer
             if (session.Status == ImportStatus.Completed)
                 return true;
 
-            session.Status = ImportStatus.InProgress;
-            await _dbContext.SaveChangesAsync();
+            // Take the session over; refused while another run holds it or imports the same folder.
+            await using var lease = await ImportSessionLease.ResumeAsync(_dbContext, session, SessionLease);
+            _lease = lease;
 
             try
             {
@@ -240,13 +249,20 @@ namespace AlUmmahNow.Importer
             }
             catch (Exception ex)
             {
-                session.Status = ImportStatus.Failed;
-                session.ErrorMessage = ex.Message;
-                session.EndTime = DateTime.UtcNow;
-                await _dbContext.SaveChangesAsync();
+                if (ex is not ImportLeaseLostException)
+                {
+                    session.Status = ImportStatus.Failed;
+                    session.ErrorMessage = ex.Message;
+                    session.EndTime = DateTime.UtcNow;
+                    await _dbContext.SaveChangesAsync();
+                }
                 
                 ImportCompleted?.Invoke(this, new ImportCompletedEventArgs(0, 0, 0, ex.Message));
                 return false;
+            }
+            finally
+            {
+                _lease = null;
             }
         }
 
@@ -424,7 +440,14 @@ namespace AlUmmahNow.Importer
                             AvailableResolutions = bunnyVideo.AvailableResolutions?.Split(',').ToList() ?? new List<string>()
                         };
 
-                        await _repo.SaveObjectAsync("videos", video.ID.ToString(), video);
+                        // Create-only: a parallel import of the same library can't overwrite the record.
+                        if (!await _repo.CreateObjectAsync("videos", video.ID.ToString(), video))
+                        {
+                            processedItems++;
+                            ProgressChanged?.Invoke(this, new ImportProgressEventArgs(
+                                totalItems, processedItems, bunnyVideo.Title ?? "Unknown", channelName, "Skipped (exists)"));
+                            continue;
+                        }
                         successfulImports++;
                         processedItems++;
                         
@@ -684,9 +707,9 @@ namespace AlUmmahNow.Importer
 
                     ProgressChanged?.Invoke(this, new ImportProgressEventArgs(
                         totalVideosAcrossAllChannels, processedSoFar + channelProcessed,
-                        videoFile.Name, channelName, outcome == ItemOutcome.AlreadyDone ? "Skipped (already exists)" : "Uploaded"));
+                        videoFile.Name, channelName, Describe(outcome)));
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not ImportLeaseLostException)
                 {
                     if (importVideo != null)
                     {
@@ -761,9 +784,9 @@ namespace AlUmmahNow.Importer
                     localProcessed++;
                     ProgressChanged?.Invoke(this, new ImportProgressEventArgs(
                         totalPending, processedSoFar + localProcessed,
-                        videoFile.Name, channelName, outcome == ItemOutcome.AlreadyDone ? "Skipped (already exists)" : "Uploaded"));
+                        videoFile.Name, channelName, Describe(outcome)));
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not ImportLeaseLostException)
                 {
                     importVideo.Status = VideoImportStatus.Failed;
                     importVideo.ErrorMessage = ex.Message;
@@ -782,7 +805,14 @@ namespace AlUmmahNow.Importer
             }
         }
 
-        private enum ItemOutcome { Uploaded, AlreadyDone }
+        private enum ItemOutcome { Uploaded, AlreadyDone, ClaimedElsewhere }
+
+        private static string Describe(ItemOutcome outcome) => outcome switch
+        {
+            ItemOutcome.AlreadyDone => "Skipped (already exists)",
+            ItemOutcome.ClaimedElsewhere => "Skipped (being imported by another run)",
+            _ => "Uploaded",
+        };
 
         /// <summary>
         /// The one path that imports a file, used by both the first run and Resume: upload the video and
@@ -794,21 +824,26 @@ namespace AlUmmahNow.Importer
             FileInfo videoFile, FileInfo? thumbnailFile)
         {
             if (_dbContext == null) throw new InvalidOperationException("Database context is required.");
+            _lease?.ThrowIfLost();
 
-            // Check if already exists in remote storage
-            if (await CheckIfVideoExistsAsync(importVideo))
+            // Claim the row: only one run moves it out of Pending/Failed.
+            var now = DateTime.UtcNow;
+            var claimed = await _dbContext.ImportVideos
+                .Where(v => v.Id == importVideo.Id
+                    && (v.Status == VideoImportStatus.Pending || v.Status == VideoImportStatus.Failed))
+                .ExecuteUpdateAsync(u => u
+                    .SetProperty(v => v.Status, VideoImportStatus.Uploading)
+                    .SetProperty(v => v.ProcessedAt, now));
+            await _dbContext.Entry(importVideo).ReloadAsync();
+            if (claimed == 0)
             {
-                importVideo.Status = VideoImportStatus.Uploaded;
-                await _dbContext.SaveChangesAsync();
-                return ItemOutcome.AlreadyDone;
+                return ItemOutcome.ClaimedElsewhere;
             }
 
-            importVideo.Status = VideoImportStatus.Uploading;
-            await _dbContext.SaveChangesAsync();
-
-            // Upload video (keyed by its path inside the channel folder, never overwriting a different file)
+            // Upload video (keyed by its path inside the channel folder; skipped when the same file is
+            // already stored there, refused when a different one is)
             var videoKey = StorageKeys.VideoKey(channel, videoFile);
-            await _videoStorageClient.UploadIfAbsentAsync(videoFile, channel.VideoStoreRoot + videoKey);
+            var videoUpload = await _videoStorageClient.UploadIfAbsentAsync(videoFile, channel.VideoStoreRoot + videoKey);
 
             if (thumbnailFile != null)
             {
@@ -821,19 +856,31 @@ namespace AlUmmahNow.Importer
             var videoDescription = videoTitle; // Use title as description by default
             var translatedMetadata = await TranslateVideoMetadataIfEnabledAsync(videoTitle, videoDescription, channel.ChannelName);
 
+            var videoUrl = $"{channel.VideoStoreUrl}{videoKey}";
             var video = new Video
             {
+                ID = await ResolveVideoIdAsync(importVideo, channel, videoKey, videoUrl),
                 Title = videoTitle,
                 Description = videoDescription,
                 UserId = (await _dbContext.ImportSessions.FindAsync(importVideo.SessionId))?.UserId ?? "",
-                VideoUrl = $"{channel.VideoStoreUrl}{videoKey}",
+                VideoUrl = videoUrl,
                 ThumbnailUrl = importVideo.ThumbnailUrl ?? "",
                 Channel = channel.ChannelName,
                 ChannelId = channel.ChannelId,
                 DateModified = DateTime.UtcNow
             };
 
-            await _repo.SaveObjectAsync("videos", video.ID.ToString(), video);
+            // Create-only: a rerun or a parallel run that reaches the same file finds the record already there.
+            var created = await _repo.CreateObjectAsync("videos", video.ID.ToString(), video);
+            if (!created)
+            {
+                var existing = await _repo.GetObjectAsync("videos", video.ID.ToString());
+                if (existing != null && !string.Equals(existing.VideoUrl, video.VideoUrl, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException(
+                        $"Record videos/{video.ID} already exists for '{existing.VideoUrl}', not '{video.VideoUrl}'.");
+                }
+            }
 
             importVideo.VideoId = video.ID.ToString();
             importVideo.VideoUrl = video.VideoUrl;
@@ -846,28 +893,26 @@ namespace AlUmmahNow.Importer
                 importVideo.VideoMetadata = SerializeTranslatedMetadata(translatedMetadata);
             }
             await _dbContext.SaveChangesAsync();
-            return ItemOutcome.Uploaded;
+            return !created && videoUpload == UploadOutcome.AlreadyPresent ? ItemOutcome.AlreadyDone : ItemOutcome.Uploaded;
         }
 
-        private async Task<bool> CheckIfVideoExistsAsync(ImportVideo importVideo)
+        /// <summary>
+        /// The record id for a file: the id an earlier session already recorded for this exact file and URL
+        /// (records written before ids were deterministic used random ids; reusing it avoids a second record),
+        /// otherwise <see cref="VideoIds.ForFile"/>.
+        /// </summary>
+        private async Task<Guid> ResolveVideoIdAsync(ImportVideo importVideo, ImportChannel channel, string videoKey, string videoUrl)
         {
-            try
-            {
-                // Check if video info file exists locally
-                var infoPath = Path.ChangeExtension(importVideo.FilePath, ".r2.json");
-                if (File.Exists(infoPath))
-                {
-                    return true;
-                }
-
-                // Future enhancement: Check remote storage
-                await Task.Delay(1);
-                return false;
-            }
-            catch
-            {
-                return false;
-            }
+            var earlier = await _dbContext!.ImportVideos.AsNoTracking()
+                .Where(v => v.FilePathHash == importVideo.FilePathHash
+                    && v.Id != importVideo.Id
+                    && v.Status == VideoImportStatus.Uploaded
+                    && v.VideoId != null
+                    && v.VideoUrl == videoUrl)
+                .OrderBy(v => v.UploadedAt)
+                .Select(v => v.VideoId)
+                .FirstOrDefaultAsync();
+            return Guid.TryParse(earlier, out var id) ? id : VideoIds.ForFile(channel.ChannelName, videoKey);
         }
 
         private async Task UpdateSessionStatusAsync(Guid sessionId)

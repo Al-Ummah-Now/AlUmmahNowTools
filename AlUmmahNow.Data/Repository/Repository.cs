@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Amazon.S3;
 using Amazon.S3.Model;
 using AlUmmahNow.Data.Storage;
 using AlUmmahNow.Data.Models;
@@ -72,24 +73,36 @@ namespace AlUmmahNow.Data.Repository
             }
         }
 
-        // Method to retrieve and deserialize an object of type T from S3
+        private static readonly JsonSerializerOptions JsonOptions = new()
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            WriteIndented = true
+        };
+
+        /// <summary>
+        /// Writes <paramref name="obj"/> only if <paramref name="key"/> does not exist yet. Returns <c>false</c>
+        /// (and writes nothing) when it does, so concurrent or repeated imports of one video create exactly
+        /// one record.
+        /// </summary>
+        public Task<bool> CreateObjectAsync(string bucketName, string key, T obj)
+            => _r2Client.PutObjectIfAbsentAsync(bucketName, key, JsonSerializer.Serialize(obj, JsonOptions));
+
+        /// <summary>
+        /// Reads and deserializes an object; <c>null</c> only when the key does not exist. Other errors are
+        /// thrown, so a failed read is never taken as "missing" (which would let a caller overwrite it).
+        /// </summary>
         public async Task<T?> GetObjectAsync(string bucketName, string key)
         {
+            string jsonString;
             try
             {
-                var options = new JsonSerializerOptions
-                {
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                    WriteIndented = true
-                };
-                var jsonString = await _r2Client.GetObjectAsync(bucketName, key);
-                return jsonString is not null ? JsonSerializer.Deserialize<T>(jsonString, options) : null;
+                jsonString = await _r2Client.GetObjectAsync(bucketName, key);
             }
-            catch (Exception ex)
+            catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound || ex.ErrorCode == "NoSuchKey")
             {
-                Console.WriteLine($"Error getting object from S3: {ex.Message}");
                 return null;
             }
+            return jsonString is not null ? JsonSerializer.Deserialize<T>(jsonString, JsonOptions) : null;
         }
 
         // Method to delete an object from S3
