@@ -5,8 +5,6 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using AlUmmahNow.Data.Models;
-using Polly;
-using Polly.Retry;
 using System.Net;
 using Microsoft.Extensions.Logging;
 
@@ -16,29 +14,24 @@ namespace AlUmmahNow.Data.Storage
     {
         private const int RetryCount = 3;
         private readonly BunnyCDNStorage bunnyCDNStorage;
-        private readonly AsyncRetryPolicy _retryPolicy;
         private readonly SemaphoreSlim _rateLimiter;
         private readonly ILogger<BunnyStorageClient<T>>? _logger;
+        private readonly Func<TimeSpan, Task> _delay;
+        private readonly Random _random;
 
         public BunnyStorageClient(string zoneName, string key, string mainRegion, int maxConcurrentUploads = 10, ILogger<BunnyStorageClient<T>>? logger = null)
+            : this(zoneName, key, mainRegion, maxConcurrentUploads, logger, new HttpClientHandler(), Task.Delay, Random.Shared)
         {
-            bunnyCDNStorage = new BunnyCDNStorage(zoneName, key, mainRegion);
-            _logger = logger;
+        }
 
-            // Configure retry policy with exponential backoff (1s, 2s, 4s)
-            _retryPolicy = Policy
-                .Handle<HttpRequestException>()
-                .Or<WebException>()
-                .Or<TimeoutException>()
-                .Or<TaskCanceledException>()
-                .WaitAndRetryAsync(
-                    retryCount: RetryCount,
-                    sleepDurationProvider: retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt - 1)),
-                    onRetry: (exception, timeSpan, retryCount, context) =>
-                    {
-                        _logger?.LogWarning("Bunny.net upload retry {RetryCount} after {Delay}s due to: {ErrorMessage}",
-                            retryCount, timeSpan.TotalSeconds, exception.Message);
-                    });
+        /// <summary>For tests: the HTTP transport under the SDK, and the clock and randomness the retries use.</summary>
+        internal BunnyStorageClient(string zoneName, string key, string mainRegion, int maxConcurrentUploads, ILogger<BunnyStorageClient<T>>? logger,
+            HttpMessageHandler transport, Func<TimeSpan, Task> delay, Random random)
+        {
+            bunnyCDNStorage = new BunnyCDNStorage(zoneName, key, mainRegion, new BunnyTransientResponseHandler(transport));
+            _logger = logger;
+            _delay = delay;
+            _random = random;
 
             // Rate limiter to prevent hitting API limits (max 100 concurrent, using 10 as safe default)
             _rateLimiter = new SemaphoreSlim(maxConcurrentUploads, maxConcurrentUploads);
@@ -122,28 +115,40 @@ namespace AlUmmahNow.Data.Storage
             };
         }
 
+        /// <summary>
+        /// Uploads with up to <see cref="RetryCount"/> retries on network errors, timeouts, 429, 408 and 5xx, waiting
+        /// <see cref="BunnyBackoff.DelayFor"/> between attempts (jittered, or the server's Retry-After). A stream that
+        /// cannot seek is sent once: after a partial send it cannot be replayed from the start.
+        /// </summary>
         public async Task UploadAsync(Stream stream, string path)
         {
             await _rateLimiter.WaitAsync();
             try
             {
-                try
+                for (var attempt = 1; ; attempt++)
                 {
-                    await _retryPolicy.ExecuteAsync(async () =>
+                    try
                     {
-                        // Reset stream position if seekable
                         if (stream.CanSeek)
                         {
                             stream.Position = 0;
                         }
 
-                        await bunnyCDNStorage.UploadAsync(stream, path);
-                    });
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogError(ex, "Bunny.net upload failed after {RetryCount} retry attempts for path: {Path}", RetryCount, path);
-                    throw;
+                        await bunnyCDNStorage.UploadAsync(new LeaveOpenStream(stream), path);
+                        return;
+                    }
+                    catch (Exception ex) when (BunnyBackoff.IsTransient(ex) && attempt <= RetryCount && stream.CanSeek)
+                    {
+                        var wait = BunnyBackoff.DelayFor(attempt, ex, _random);
+                        _logger?.LogWarning("Bunny.net upload retry {RetryCount} after {Delay:0.0}s due to: {ErrorMessage}",
+                            attempt, wait.TotalSeconds, ex.Message);
+                        await _delay(wait);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogError(ex, "Bunny.net upload failed after {Attempts} attempt(s) for path: {Path}", attempt, path);
+                        throw;
+                    }
                 }
             }
             finally
