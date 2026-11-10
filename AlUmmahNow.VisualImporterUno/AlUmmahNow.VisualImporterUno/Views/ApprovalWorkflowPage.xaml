@@ -3,6 +3,7 @@
     x:Class="AlUmmahNow.VisualImporterUno.Views.ApprovalWorkflowPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:helpers="using:AlUmmahNow.VisualImporterUno.Helpers"
     xmlns:local="using:AlUmmahNow.VisualImporterUno.Views"
     xmlns:vm="using:AlUmmahNow.VisualImporterUno.ViewModels"
     xmlns:models="using:AlUmmahNow.Data.Models.FileScanning"
@@ -466,11 +467,14 @@
                     <!-- Channel Filter -->
                     <Border Style="{StaticResource FilterCardStyle}">
                         <StackPanel Spacing="8">
-                            <TextBlock Text="Channel" FontSize="13" FontWeight="SemiBold" Foreground="#374151"/>
-                            <ComboBox ItemsSource="{x:Bind ViewModel.AvailableChannels, Mode=OneWay}"
-                                     SelectedItem="{x:Bind ViewModel.ChannelFilter, Mode=TwoWay}"
-                                     Style="{StaticResource FilterComboStyle}"
-                                     PlaceholderText="All Channels"/>
+                            <TextBlock x:Name="ChannelFilterLabel" Text="Channel" FontSize="13" FontWeight="SemiBold" Foreground="#374151"/>
+                            <!-- Type to find a channel: suggestions as you type, Enter or a click applies it -->
+                            <AutoSuggestBox helpers:AutoSuggest.Candidates="{x:Bind ViewModel.AvailableChannels, Mode=OneWay}"
+                                            helpers:AutoSuggest.Value="{x:Bind ViewModel.ChannelFilter, Mode=TwoWay}"
+                                            AutomationProperties.LabeledBy="{Binding ElementName=ChannelFilterLabel}"
+                                            PlaceholderText="All Channels"
+                                            QueryIcon="Find"
+                                            MinHeight="40"/>
                         </StackPanel>
                     </Border>
 

@@ -3,6 +3,7 @@
     x:Class="AlUmmahNow.VisualImporterUno.Views.WatchManagementPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:helpers="using:AlUmmahNow.VisualImporterUno.Helpers"
     xmlns:local="using:AlUmmahNow.VisualImporterUno.Views"
     xmlns:vm="using:AlUmmahNow.VisualImporterUno.ViewModels"
     xmlns:models="using:AlUmmahNow.Data.Models.FileScanning"
@@ -498,10 +499,13 @@
                 <StackPanel Spacing="20">
                     <!-- Channel Name -->
                     <StackPanel Spacing="8">
-                        <TextBlock Text="Channel Name" FontSize="14" FontWeight="SemiBold" Foreground="#374151"/>
-                        <TextBox Text="{x:Bind ViewModel.NewWatchChannelName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                 PlaceholderText="e.g., Islamic Lectures"
-                                 Height="40"/>
+                        <TextBlock x:Name="NewWatchChannelLabel" Text="Channel Name" FontSize="14" FontWeight="SemiBold" Foreground="#374151"/>
+                        <!-- An existing channel name is suggested as you type; a new name can be typed in full -->
+                        <AutoSuggestBox Text="{x:Bind ViewModel.NewWatchChannelName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                        helpers:AutoSuggest.Candidates="{x:Bind ViewModel.KnownChannelNames, Mode=OneWay}"
+                                        AutomationProperties.LabeledBy="{Binding ElementName=NewWatchChannelLabel}"
+                                        PlaceholderText="e.g., Islamic Lectures"
+                                        MinHeight="40"/>
                         <TextBlock Text="{x:Bind ViewModel.ChannelNameValidationMessage, Mode=OneWay}"
                                    Foreground="#DC2626"
                                    FontSize="12"
