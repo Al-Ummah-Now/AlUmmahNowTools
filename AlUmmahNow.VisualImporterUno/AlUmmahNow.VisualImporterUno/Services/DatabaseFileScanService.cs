@@ -259,18 +259,20 @@ namespace AlUmmahNow.VisualImporterUno.Services
         }
 
         /// <summary>
-        /// Update file selection status
+        /// Update file selection status. Returns false, changing nothing, when the file is missing or an import has
+        /// already claimed it (Pending, Uploading or Uploaded): unticking can't override a running import and
+        /// re-ticking can't queue an imported file a second time.
         /// </summary>
-        public async Task UpdateFileSelectionAsync(Guid fileId, bool isSelected)
+        public async Task<bool> UpdateFileSelectionAsync(Guid fileId, bool isSelected)
         {
             try
             {
-                var file = await _dbContext.ScannedVideoFiles.FindAsync(fileId);
-                if (file != null)
+                var changed = await ScannedFileStatus.SetSelectedAsync(_dbContext, fileId, isSelected);
+                if (!changed)
                 {
-                    file.ImportStatus = isSelected ? FileImportStatus.Selected : FileImportStatus.NotImported;
-                    await _dbContext.SaveChangesAsync();
+                    _logger.LogWarning("Selection of file {FileId} not changed: it is missing or already being imported", fileId);
                 }
+                return changed;
             }
             catch (Exception ex)
             {
