@@ -168,7 +168,11 @@ namespace AlUmmahNow.FileScanService
             builder.Services.AddScoped<IFileScanEngine, FileScanEngine>();
             builder.Services.AddScoped<IHashCalculator, HashCalculator>();
             builder.Services.AddScoped<IMetadataExtractor, MetadataExtractor>();
-            builder.Services.AddScoped<IFileWatchService, FileWatchService>();
+            // One watcher registry per process: a singleton hosted service that restores active watches at
+            // startup and outlives hub calls (it opens a DI scope per operation and per file event).
+            builder.Services.AddSingleton<FileWatchService>();
+            builder.Services.AddSingleton<IFileWatchService>(sp => sp.GetRequiredService<FileWatchService>());
+            builder.Services.AddHostedService(sp => sp.GetRequiredService<FileWatchService>());
             builder.Services.AddScoped<IApprovalService, ApprovalService>();
 
             // Register background services

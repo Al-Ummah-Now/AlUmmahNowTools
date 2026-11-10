@@ -3,6 +3,7 @@ using Moq;
 using AlUmmahNow.Data.Database;
 using AlUmmahNow.Data.Models.FileScanning;
 using AlUmmahNow.FileScanService.Services;
+using AlUmmahNow.Tests.Infrastructure;
 using Microsoft.Extensions.Logging;
 using FluentAssertions;
 using System;
@@ -21,6 +22,7 @@ public class FileWatchServiceBufferOverflowTests : IDisposable
     private readonly Mock<ILogger<FileWatchService>> _mockLogger;
     private readonly Mock<IApprovalService> _mockApprovalService;
     private readonly ImportDbContext _dbContext;
+    private readonly DbContextOptions<ImportDbContext> _options;
     private readonly FileWatchService _fileWatchService;
     private readonly string _testDirectory;
 
@@ -32,9 +34,10 @@ public class FileWatchServiceBufferOverflowTests : IDisposable
         var options = new DbContextOptionsBuilder<ImportDbContext>()
             .UseInMemoryDatabase(databaseName: $"TestDb_BufferOverflow_{Guid.NewGuid()}")
             .Options;
+        _options = options;
         _dbContext = new ImportDbContext(options);
 
-        _fileWatchService = new FileWatchService(_mockLogger.Object, _dbContext, _mockApprovalService.Object);
+        _fileWatchService = new FileWatchService(_mockLogger.Object, TestScopes.For(_options, _mockApprovalService.Object));
 
         _testDirectory = Path.Combine(Path.GetTempPath(), "FileWatchBufferOverflowTests", Guid.NewGuid().ToString());
         Directory.CreateDirectory(_testDirectory);
