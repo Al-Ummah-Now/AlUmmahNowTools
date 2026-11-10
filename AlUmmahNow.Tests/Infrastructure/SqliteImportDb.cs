@@ -28,13 +28,12 @@ public sealed class SqliteImportDb : IDisposable
         db.Database.ExecuteSqlRaw("PRAGMA journal_mode=WAL;");
     }
 
-    public ImportDbContext NewContext()
-    {
-        var options = new DbContextOptionsBuilder<ImportDbContext>()
-            .UseSqlite(_connectionString)
-            .Options;
-        return new ImportDbContext(options);
-    }
+    /// <summary>Options for this database; every context built from them opens its own connection.</summary>
+    public DbContextOptions<ImportDbContext> Options => new DbContextOptionsBuilder<ImportDbContext>()
+        .UseSqlite(_connectionString)
+        .Options;
+
+    public ImportDbContext NewContext() => new(Options);
 
     public void Dispose()
     {

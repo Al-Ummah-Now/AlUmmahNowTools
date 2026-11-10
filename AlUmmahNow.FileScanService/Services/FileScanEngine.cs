@@ -404,11 +404,23 @@ namespace AlUmmahNow.FileScanService.Services
 
             // Group by content hash and file size
             _logger.LogTrace("Grouping files by content hash and size for session {SessionId}", scanSessionId);
-            var duplicateGroups = await _dbContext.ScannedVideoFiles
-                .Where(f => f.ScanSessionId == scanSessionId && f.FileExists)
+            // EF Core cannot return whole groups from SQL, so find the duplicated (hash, size) keys in the database
+            // and group just those files in memory.
+            var sessionFiles = _dbContext.ScannedVideoFiles
+                .Where(f => f.ScanSessionId == scanSessionId && f.FileExists);
+            var duplicateKeys = await sessionFiles
                 .GroupBy(f => new { f.ContentHash, f.FileSize })
                 .Where(g => g.Count() > 1)
+                .Select(g => g.Key)
                 .ToListAsync(cancellationToken);
+            var duplicateHashes = duplicateKeys.Select(k => k.ContentHash).Distinct().ToList();
+            var keySet = duplicateKeys.ToHashSet();
+            var duplicateGroups = (await sessionFiles
+                    .Where(f => duplicateHashes.Contains(f.ContentHash))
+                    .ToListAsync(cancellationToken))
+                .GroupBy(f => new { f.ContentHash, f.FileSize })
+                .Where(g => keySet.Contains(g.Key))
+                .ToList();
 
             _logger.LogDebug("Found {GroupCount} duplicate groups in session {SessionId}",
                 duplicateGroups.Count, scanSessionId);

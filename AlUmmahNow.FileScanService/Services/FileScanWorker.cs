@@ -55,7 +55,7 @@ namespace AlUmmahNow.FileScanService.Services
             _logger.LogInformation("File Scan Worker stopped");
         }
 
-        private async Task ProcessPendingScans(CancellationToken cancellationToken)
+        internal async Task ProcessPendingScans(CancellationToken cancellationToken)
         {
             using var scope = _serviceProvider.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<ImportDbContext>();
@@ -94,20 +94,14 @@ namespace AlUmmahNow.FileScanService.Services
                     }
 
                     // Subscribe to scan engine progress events
-                    // Store handler in variable to allow proper unsubscription and prevent memory leak
+                    // Store handler in variable to allow proper unsubscription and prevent memory leak.
+                    // The handler only forwards to SignalR. The engine has already saved these fields on the scoped
+                    // ImportDbContext before raising the event and carries straight on with its next query, so the
+                    // handler must neither touch that context nor modify the tracked scanSession (TOOLS-7).
                     EventHandler<ScanProgressEventArgs> progressHandler = async (sender, progress) =>
                     {
                         try
                         {
-                            // Update database
-                            scanSession.ProgressPercentage = progress.ProgressPercentage;
-                            scanSession.CurrentOperation = progress.CurrentOperation;
-                            scanSession.FilesFound = progress.FilesFound;
-                            scanSession.DirectoriesProcessed = progress.FoldersProcessed;
-                            scanSession.TotalDirectories = progress.TotalFolders;
-                            scanSession.LastUpdated = DateTime.UtcNow;
-                            await dbContext.SaveChangesAsync(cancellationToken);
-
                             // Notify clients via SignalR
                             await _hubContext.Clients.All.SendAsync(
                                 "ScanProgress",
