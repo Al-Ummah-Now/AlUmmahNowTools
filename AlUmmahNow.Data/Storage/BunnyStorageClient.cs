@@ -37,11 +37,6 @@ namespace AlUmmahNow.Data.Storage
             _rateLimiter = new SemaphoreSlim(maxConcurrentUploads, maxConcurrentUploads);
         }
 
-        public async Task DeleteAsync(string path)
-        {
-            await bunnyCDNStorage.DeleteObjectAsync(path);
-        }
-
         public async Task<Stream> DownloadAsync(string path)
         {
             return await bunnyCDNStorage.DownloadObjectAsStreamAsync(path);

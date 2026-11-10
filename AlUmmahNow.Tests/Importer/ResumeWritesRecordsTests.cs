@@ -44,7 +44,6 @@ public class ResumeWritesRecordsTests : IDisposable
         public Task<StorageObject?> GetAsync(string path) => _inner.GetAsync(path);
         public Task<List<StorageObject>> ListAsync(string path) => _inner.ListAsync(path);
         public Task<Stream> DownloadAsync(string path) => _inner.DownloadAsync(path);
-        public Task DeleteAsync(string path) => _inner.DeleteAsync(path);
     }
 
     [Fact]

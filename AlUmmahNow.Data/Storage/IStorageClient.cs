@@ -13,6 +13,5 @@ namespace AlUmmahNow.Data.Storage
         Task<StorageObject?> GetAsync(string path);
         Task<List<StorageObject>> ListAsync(string path);
         Task<Stream> DownloadAsync(string path);
-        Task DeleteAsync(string path);
     }
 }

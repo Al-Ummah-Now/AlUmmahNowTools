@@ -107,22 +107,6 @@ namespace AlUmmahNow.Tests.Video
         }
 
         [Fact]
-        public async Task DeleteVideoAsync_WithValidParameters_DoesNotThrowOnStructure()
-        {
-            // Arrange
-            var libraryId = "12345";
-            var videoId = "video-guid";
-
-            // Act & Assert
-            var exception = await Record.ExceptionAsync(async () =>
-            {
-                var result = await _client.DeleteVideoAsync(libraryId, videoId);
-            });
-
-            Assert.True(exception != null || exception == null);
-        }
-
-        [Fact]
         public void BunnyVideoResponse_InitializesCorrectly()
         {
             // Arrange & Act

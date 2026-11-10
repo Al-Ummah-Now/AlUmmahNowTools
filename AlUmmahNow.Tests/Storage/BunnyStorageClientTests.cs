@@ -93,22 +93,6 @@ namespace AlUmmahNow.Tests.Storage
         }
 
         [Fact]
-        public async Task DeleteAsync_WithValidPath_CallsStorageDelete()
-        {
-            // Arrange
-            var path = "videos/test-video.mp4";
-
-            _mockStorage.Setup(x => x.DeleteObjectAsync(path))
-                       .Returns(Task.CompletedTask);
-
-            // Act
-            await _testableClient.DeleteAsync(path);
-
-            // Assert
-            _mockStorage.Verify(x => x.DeleteObjectAsync(path), Times.Once);
-        }
-
-        [Fact]
         public async Task DownloadAsync_WithValidPath_ReturnsStream()
         {
             // Arrange
@@ -274,7 +258,6 @@ namespace AlUmmahNow.Tests.Storage
         public interface IBunnyCDNStorageWrapper
         {
             Task UploadAsync(Stream stream, string path);
-            Task DeleteObjectAsync(string path);
             Task<Stream> DownloadObjectAsStreamAsync(string path);
             Task<List<BunnyCDN.Net.Storage.Models.StorageObject>> GetStorageObjectsAsync(string path);
         }
@@ -287,11 +270,6 @@ namespace AlUmmahNow.Tests.Storage
             public TestableBunnyStorageClient(IBunnyCDNStorageWrapper storage)
             {
                 _storage = storage ?? throw new ArgumentNullException(nameof(storage));
-            }
-
-            public async Task DeleteAsync(string path)
-            {
-                await _storage.DeleteObjectAsync(path);
             }
 
             public async Task<Stream> DownloadAsync(string path)

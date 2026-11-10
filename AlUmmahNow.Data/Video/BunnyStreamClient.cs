@@ -92,24 +92,6 @@ namespace AlUmmahNow.Data.Video
                 throw;
             }
         }
-
-        public async Task<bool> DeleteVideoAsync(string libraryId, string videoId)
-        {
-            try
-            {
-                var options = new RestClientOptions($"{_baseUrl}/library/{libraryId}/videos/{videoId}");
-                var client = new RestClient(options);
-                var request = new RestRequest("", Method.Delete);
-                request.AddHeader("AccessKey", _apiKey);
-                var response = await client.ExecuteAsync(request);
-                return response.StatusCode == System.Net.HttpStatusCode.OK;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error deleting video from BunnyStream: {ex.Message}");
-                throw;
-            }
-        }
     }
     
     public class BunnyVideoResponse
