@@ -14,6 +14,7 @@ public class FileWatchServiceIntegrationTests : FileSystemTestBase
     private readonly Mock<ILogger<FileWatchService>> _mockLogger;
     private readonly Mock<ILogger<ApprovalService>> _mockApprovalLogger;
     private readonly ImportDbContext _dbContext;
+    private readonly DbContextOptions<ImportDbContext> _options;
     private readonly Mock<IApprovalService> _mockApprovalService;
     private FileWatchService _fileWatchService;
 
@@ -25,12 +26,13 @@ public class FileWatchServiceIntegrationTests : FileSystemTestBase
         var options = new DbContextOptionsBuilder<ImportDbContext>()
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
+        _options = options;
         _dbContext = new ImportDbContext(options);
         _dbContext.Database.EnsureCreated();
 
         _mockApprovalService = new Mock<IApprovalService>();
         
-        _fileWatchService = new FileWatchService(_mockLogger.Object, _dbContext, _mockApprovalService.Object);
+        _fileWatchService = new FileWatchService(_mockLogger.Object, TestScopes.For(_options, _mockApprovalService.Object));
     }
 
     public override async Task DisposeAsync()
@@ -56,7 +58,7 @@ public class FileWatchServiceIntegrationTests : FileSystemTestBase
         var mockApprovalService = new Mock<IApprovalService>();
         var approvalService = new ApprovalService(_mockApprovalLogger.Object, _dbContext);
 
-        var watchService = new FileWatchService(_mockLogger.Object, _dbContext, approvalService);
+        var watchService = new FileWatchService(_mockLogger.Object, TestScopes.For(_options, approvalService));
 
         var fileDetectedEvents = new List<FileDetectedEventArgs>();
         var watchStatusEvents = new List<WatchStatusChangedEventArgs>();
@@ -155,7 +157,7 @@ public class FileWatchServiceIntegrationTests : FileSystemTestBase
         };
 
         var approvalService = new ApprovalService(_mockApprovalLogger.Object, _dbContext);
-        var watchService = new FileWatchService(_mockLogger.Object, _dbContext, approvalService);
+        var watchService = new FileWatchService(_mockLogger.Object, TestScopes.For(_options, approvalService));
 
         var detectedFiles = new List<string>();
         watchService.FileDetected += (sender, e) => detectedFiles.Add(e.FileName);
@@ -319,7 +321,7 @@ public class FileWatchServiceIntegrationTests : FileSystemTestBase
     {
         // Arrange
         var approvalService = new ApprovalService(_mockApprovalLogger.Object, _dbContext);
-        var watchService = new FileWatchService(_mockLogger.Object, _dbContext, approvalService);
+        var watchService = new FileWatchService(_mockLogger.Object, TestScopes.For(_options, approvalService));
 
         var requests = new List<CreateWatchRequest>
         {

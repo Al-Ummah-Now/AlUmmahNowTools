@@ -3,18 +3,26 @@ using System.Security.Cryptography;
 using AlUmmahNow.Data.Database;
 using AlUmmahNow.Data.Models.FileScanning;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace AlUmmahNow.FileScanService.Services;
 
 /// <summary>
-/// Service for managing file system watchers and detecting new files
+/// Owns the process's file system watchers and turns detected files into pending approvals.
 /// </summary>
-public class FileWatchService : IFileWatchService, IDisposable
+/// <remarks>
+/// Registered as a singleton and hosted service: the watchers, their configurations and the debounce
+/// timers live as long as the process, not as long as one hub call. At startup it re-creates a watcher for
+/// every active <see cref="ChannelWatch"/> row, so watches survive restarts. It holds no DbContext: each
+/// operation and each file event opens its own DI scope (and with it a fresh <see cref="ImportDbContext"/>
+/// and <see cref="IApprovalService"/>), so timer callbacks never touch a disposed or shared context.
+/// </remarks>
+public class FileWatchService : IFileWatchService, IHostedService, IDisposable
 {
     private readonly ILogger<FileWatchService> _logger;
-    private readonly ImportDbContext _dbContext;
-    private readonly IApprovalService _approvalService;
+    private readonly IServiceScopeFactory _scopes;
     private readonly ConcurrentDictionary<Guid, FileSystemWatcher> _watchers = new();
     private readonly ConcurrentDictionary<Guid, ChannelWatch> _watchConfigs = new();
     private readonly ConcurrentDictionary<string, Timer> _pendingFiles = new();
@@ -30,11 +38,63 @@ public class FileWatchService : IFileWatchService, IDisposable
     public event EventHandler<FileDetectedEventArgs>? FileDetected;
     public event EventHandler<WatchStatusChangedEventArgs>? WatchStatusChanged;
 
-    public FileWatchService(ILogger<FileWatchService> logger, ImportDbContext dbContext, IApprovalService approvalService)
+    public FileWatchService(ILogger<FileWatchService> logger, IServiceScopeFactory scopes)
     {
         _logger = logger;
-        _dbContext = dbContext;
-        _approvalService = approvalService;
+        _scopes = scopes;
+    }
+
+    /// <summary>Watchers currently running in this process (for status and tests).</summary>
+    internal IReadOnlyCollection<Guid> RunningWatchIds => _watchers.Keys.ToList();
+
+    /// <summary>Starts a watcher for every active watch in the database.</summary>
+    public async Task StartAsync(CancellationToken cancellationToken)
+    {
+        List<ChannelWatch> active;
+        using (var scope = _scopes.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ImportDbContext>();
+            active = await db.ChannelWatches.AsNoTracking().Where(w => w.IsActive).ToListAsync(cancellationToken);
+        }
+
+        foreach (var watch in active)
+        {
+            if (!Directory.Exists(watch.WatchPath))
+            {
+                _logger.LogWarning("Active watch {WatchId} path {WatchPath} does not exist; not watching it until it is updated or restarted",
+                    watch.Id, watch.WatchPath);
+                continue;
+            }
+            try
+            {
+                await StartFileSystemWatcherAsync(watch);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Could not restore watch {WatchId} at {WatchPath}", watch.Id, watch.WatchPath);
+            }
+        }
+        _logger.LogInformation("Restored {Count} of {Total} active watches", _watchers.Count, active.Count);
+    }
+
+    /// <summary>Stops every watcher and pending timer (the rows stay active and are restored on the next start).</summary>
+    public Task StopAsync(CancellationToken cancellationToken)
+    {
+        StopAll();
+        return Task.CompletedTask;
+    }
+
+    private ScopeServices Scope()
+    {
+        var scope = _scopes.CreateScope();
+        return new ScopeServices(scope,
+            scope.ServiceProvider.GetRequiredService<ImportDbContext>(),
+            scope.ServiceProvider.GetRequiredService<IApprovalService>());
+    }
+
+    private sealed record ScopeServices(IServiceScope Scope, ImportDbContext Db, IApprovalService Approvals) : IDisposable
+    {
+        public void Dispose() => Scope.Dispose();
     }
 
     public async Task<Guid> StartWatchAsync(CreateWatchRequest request, CancellationToken cancellationToken = default)
@@ -50,14 +110,21 @@ public class FileWatchService : IFileWatchService, IDisposable
                 throw new DirectoryNotFoundException($"Watch path does not exist: {request.WatchPath}");
             }
 
+            using var scope = Scope();
+            var db = scope.Db;
+
             // Check if already watching this path
-            var existingWatch = await _dbContext.ChannelWatches
+            var existingWatch = await db.ChannelWatches
                 .FirstOrDefaultAsync(w => w.WatchPath == request.WatchPath && w.IsActive, cancellationToken);
 
             if (existingWatch != null)
             {
                 _logger.LogWarning("Already watching path {WatchPath} for channel {ChannelName}", 
                     request.WatchPath, existingWatch.ChannelName);
+                if (!_watchers.ContainsKey(existingWatch.Id))
+                {
+                    await StartFileSystemWatcherAsync(existingWatch);
+                }
                 return existingWatch.Id;
             }
 
@@ -75,8 +142,8 @@ public class FileWatchService : IFileWatchService, IDisposable
 
             _logger.LogDebug("Creating watch configuration for channel {ChannelName} at path {WatchPath}",
                 request.ChannelName, request.WatchPath);
-            _dbContext.ChannelWatches.Add(channelWatch);
-            await _dbContext.SaveChangesAsync(cancellationToken);
+            db.ChannelWatches.Add(channelWatch);
+            await db.SaveChangesAsync(cancellationToken);
             _logger.LogDebug("Watch configuration persisted with ID {WatchId}", channelWatch.Id);
 
             // Start the file system watcher
@@ -106,7 +173,9 @@ public class FileWatchService : IFileWatchService, IDisposable
 
         try
         {
-            var channelWatch = await _dbContext.ChannelWatches
+            using var scope = Scope();
+            var db = scope.Db;
+            var channelWatch = await db.ChannelWatches
                 .FindAsync(new object[] { watchId }, cancellationToken);
 
             if (channelWatch == null)
@@ -122,7 +191,7 @@ public class FileWatchService : IFileWatchService, IDisposable
             _logger.LogDebug("Updating watch {WatchId} status to inactive", watchId);
             channelWatch.IsActive = false;
             channelWatch.LastUpdated = DateTime.UtcNow;
-            await _dbContext.SaveChangesAsync(cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
 
             _logger.LogInformation("Successfully stopped watch {WatchId} for channel {ChannelName}",
                 watchId, channelWatch.ChannelName);
@@ -147,7 +216,8 @@ public class FileWatchService : IFileWatchService, IDisposable
         try
         {
             _logger.LogTrace("Querying database for active watches");
-            var watches = await _dbContext.ChannelWatches
+            using var scope = Scope();
+            var watches = await scope.Db.ChannelWatches
                 .Where(w => w.IsActive)
                 .Select(w => new WatchStatusDto
                 {
@@ -184,7 +254,8 @@ public class FileWatchService : IFileWatchService, IDisposable
         try
         {
             _logger.LogTrace("Querying database for watch {WatchId} status", watchId);
-            var watch = await _dbContext.ChannelWatches
+            using var scope = Scope();
+            var watch = await scope.Db.ChannelWatches
                 .Where(w => w.Id == watchId)
                 .Select(w => new WatchStatusDto
                 {
@@ -221,7 +292,9 @@ public class FileWatchService : IFileWatchService, IDisposable
 
         try
         {
-            var channelWatch = await _dbContext.ChannelWatches
+            using var scope = Scope();
+            var db = scope.Db;
+            var channelWatch = await db.ChannelWatches
                 .FindAsync(new object[] { watchId }, cancellationToken);
 
             if (channelWatch == null)
@@ -230,14 +303,8 @@ public class FileWatchService : IFileWatchService, IDisposable
                 return false;
             }
 
-            // Stop current watcher if path is changing
-            var pathChanged = channelWatch.WatchPath != request.WatchPath;
-            if (pathChanged && channelWatch.IsActive)
-            {
-                _logger.LogDebug("Watch path changed from {OldPath} to {NewPath}, stopping current watcher",
-                    channelWatch.WatchPath, request.WatchPath);
-                StopFileSystemWatcher(watchId);
-            }
+            // Any change (path, sub-folders, extensions, delay) is applied by restarting the watcher.
+            StopFileSystemWatcher(watchId);
 
             // Update configuration
             _logger.LogDebug("Updating watch {WatchId} configuration", watchId);
@@ -249,12 +316,11 @@ public class FileWatchService : IFileWatchService, IDisposable
             channelWatch.LastUpdated = DateTime.UtcNow;
 
             _logger.LogDebug("Persisting watch {WatchId} configuration changes", watchId);
-            await _dbContext.SaveChangesAsync(cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
 
-            // Restart watcher if it was active and path changed
-            if (pathChanged && channelWatch.IsActive)
+            if (channelWatch.IsActive)
             {
-                _logger.LogDebug("Restarting file system watcher for watch {WatchId} with new path", watchId);
+                _logger.LogDebug("Restarting file system watcher for watch {WatchId} with the new configuration", watchId);
                 await StartFileSystemWatcherAsync(channelWatch);
             }
 
@@ -280,7 +346,9 @@ public class FileWatchService : IFileWatchService, IDisposable
         try
         {
             _logger.LogTrace("Loading watch {WatchId} with pending approvals", watchId);
-            var channelWatch = await _dbContext.ChannelWatches
+            using var scope = Scope();
+            var db = scope.Db;
+            var channelWatch = await db.ChannelWatches
                 .Include(w => w.PendingApprovals)
                 .FirstOrDefaultAsync(w => w.Id == watchId, cancellationToken);
 
@@ -297,8 +365,8 @@ public class FileWatchService : IFileWatchService, IDisposable
             // Remove from database (cascade delete will handle pending approvals)
             _logger.LogDebug("Removing watch {WatchId} from database ({PendingCount} pending approvals will be cascade deleted)",
                 watchId, channelWatch.PendingApprovals.Count);
-            _dbContext.ChannelWatches.Remove(channelWatch);
-            await _dbContext.SaveChangesAsync(cancellationToken);
+            db.ChannelWatches.Remove(channelWatch);
+            await db.SaveChangesAsync(cancellationToken);
 
             _logger.LogInformation("Successfully deleted watch {WatchId} for channel {ChannelName}",
                 watchId, channelWatch.ChannelName);
@@ -343,6 +411,11 @@ public class FileWatchService : IFileWatchService, IDisposable
 
             watcher.Error += (sender, e) => HandleFileWatcherError(channelWatch, e.GetException());
 
+            if (_watchers.TryRemove(channelWatch.Id, out var previous))
+            {
+                previous.EnableRaisingEvents = false;
+                previous.Dispose();
+            }
             _watchers[channelWatch.Id] = watcher;
             _watchConfigs[channelWatch.Id] = channelWatch;
             
@@ -434,7 +507,7 @@ public class FileWatchService : IFileWatchService, IDisposable
                 }
 
                 // Create a new timer for delayed processing
-                var timer = new Timer(async _ => await ProcessDetectedFileAsync(channelWatch, e.FullPath, fileKey), 
+                var timer = new Timer(async _ => await ProcessDetectedFileAsync(channelWatch, e.FullPath, fileKey),
                     null, channelWatch.ProcessingDelayMs, Timeout.Infinite);
                 
                 _pendingFiles[fileKey] = timer;
@@ -447,7 +520,11 @@ public class FileWatchService : IFileWatchService, IDisposable
         }
     }
 
-    private async Task ProcessDetectedFileAsync(ChannelWatch channelWatch, string filePath, string fileKey)
+    /// <summary>
+    /// Records a detected file: runs in its own DI scope (a timer callback, outside any request), re-reads the
+    /// watch so a watch stopped or deleted in the meantime is ignored. Internal for tests.
+    /// </summary>
+    internal async Task ProcessDetectedFileAsync(ChannelWatch channelWatchConfig, string filePath, string fileKey)
     {
         try
         {
@@ -471,11 +548,20 @@ public class FileWatchService : IFileWatchService, IDisposable
             var fileName = fileInfo.Name;
             var fileSize = fileInfo.Length;
 
+            using var scope = Scope();
+            var db = scope.Db;
+            var channelWatch = await db.ChannelWatches.FirstOrDefaultAsync(w => w.Id == channelWatchConfig.Id && w.IsActive);
+            if (channelWatch == null)
+            {
+                _logger.LogDebug("Watch {WatchId} is no longer active; ignoring {FilePath}", channelWatchConfig.Id, filePath);
+                return;
+            }
+
             _logger.LogInformation("Processing detected file: {FileName} ({FileSize} bytes) for channel {ChannelName}", 
                 fileName, fileSize, channelWatch.ChannelName);
 
             // Check if this file is already in pending approvals
-            var existingApproval = await _dbContext.PendingApprovals
+            var existingApproval = await db.PendingApprovals
                 .AnyAsync(p => p.FilePath == filePath && p.Status == ApprovalStatus.Pending);
 
             if (existingApproval)
@@ -490,13 +576,13 @@ public class FileWatchService : IFileWatchService, IDisposable
             channelWatch.LastFileDetected = DateTime.UtcNow;
             channelWatch.TotalFilesDetected++;
             channelWatch.LastUpdated = DateTime.UtcNow;
-            await _dbContext.SaveChangesAsync();
+            await db.SaveChangesAsync();
             _logger.LogTrace("Watch {WatchId} statistics updated. Total files detected: {TotalFiles}",
                 channelWatch.Id, channelWatch.TotalFilesDetected);
 
             // Add to pending approvals
             _logger.LogDebug("Adding file to pending approvals: {FilePath}", filePath);
-            var approvalId = await _approvalService.AddPendingApprovalAsync(channelWatch.Id, filePath);
+            var approvalId = await scope.Approvals.AddPendingApprovalAsync(channelWatch.Id, filePath);
 
             // Raise file detected event
             FileDetected?.Invoke(this, new FileDetectedEventArgs(
@@ -507,8 +593,25 @@ public class FileWatchService : IFileWatchService, IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error processing detected file: {FilePath} for watch {WatchId}", 
-                filePath, channelWatch.Id);
+            _logger.LogError(ex, "Error processing detected file: {FilePath} for watch {WatchId}",
+                filePath, channelWatchConfig.Id);
+        }
+    }
+
+    private void StopAll()
+    {
+        foreach (var watchId in _watchers.Keys.ToList())
+        {
+            StopFileSystemWatcher(watchId);
+        }
+
+        lock (_lockObject)
+        {
+            foreach (var timer in _pendingFiles.Values)
+            {
+                timer.Dispose();
+            }
+            _pendingFiles.Clear();
         }
     }
 
@@ -517,23 +620,7 @@ public class FileWatchService : IFileWatchService, IDisposable
         if (!_disposed)
         {
             _logger.LogInformation("Disposing FileWatchService");
-
-            // Stop all watchers
-            foreach (var watchId in _watchers.Keys.ToList())
-            {
-                StopFileSystemWatcher(watchId);
-            }
-
-            // Dispose pending file timers
-            lock (_lockObject)
-            {
-                foreach (var timer in _pendingFiles.Values)
-                {
-                    timer.Dispose();
-                }
-                _pendingFiles.Clear();
-            }
-
+            StopAll();
             _disposed = true;
         }
     }

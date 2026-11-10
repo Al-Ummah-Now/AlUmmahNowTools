@@ -13,6 +13,7 @@ public class FileWatchServiceTests : FileSystemTestBase
 {
     private readonly Mock<ILogger<FileWatchService>> _mockLogger;
     private readonly ImportDbContext _dbContext;
+    private readonly DbContextOptions<ImportDbContext> _options;
     private readonly Mock<IApprovalService> _mockApprovalService;
     private FileWatchService _fileWatchService;
 
@@ -23,12 +24,13 @@ public class FileWatchServiceTests : FileSystemTestBase
         var options = new DbContextOptionsBuilder<ImportDbContext>()
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
+        _options = options;
         _dbContext = new ImportDbContext(options);
         _dbContext.Database.EnsureCreated();
 
         _mockApprovalService = new Mock<IApprovalService>();
         
-        _fileWatchService = new FileWatchService(_mockLogger.Object, _dbContext, _mockApprovalService.Object);
+        _fileWatchService = new FileWatchService(_mockLogger.Object, TestScopes.For(_options, _mockApprovalService.Object));
     }
 
     public override async Task DisposeAsync()
@@ -125,7 +127,8 @@ public class FileWatchServiceTests : FileSystemTestBase
         // Act
         var result = await _fileWatchService.StopWatchAsync(watch.Id);
 
-        // Assert
+        // Assert (the service writes through its own scope; drop this context's cached copies)
+        _dbContext.ChangeTracker.Clear();
         result.Should().BeTrue();
         
         var updatedWatch = await _dbContext.ChannelWatches.FindAsync(watch.Id);
@@ -203,7 +206,8 @@ public class FileWatchServiceTests : FileSystemTestBase
         // Act
         var result = await _fileWatchService.UpdateWatchAsync(watch.Id, updateRequest);
 
-        // Assert
+        // Assert (the service writes through its own scope; drop this context's cached copies)
+        _dbContext.ChangeTracker.Clear();
         result.Should().BeTrue();
         
         var updatedWatch = await _dbContext.ChannelWatches.FindAsync(watch.Id);
@@ -239,7 +243,8 @@ public class FileWatchServiceTests : FileSystemTestBase
         // Act
         var result = await _fileWatchService.DeleteWatchAsync(watch.Id);
 
-        // Assert
+        // Assert (the service writes through its own scope; drop this context's cached copies)
+        _dbContext.ChangeTracker.Clear();
         result.Should().BeTrue();
         
         var deletedWatch = await _dbContext.ChannelWatches.FindAsync(watch.Id);
