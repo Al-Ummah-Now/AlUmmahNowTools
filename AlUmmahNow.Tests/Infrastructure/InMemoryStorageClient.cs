@@ -50,10 +50,4 @@ public sealed class InMemoryStorageClient<T> : IStorageClient<T>
             .ToList());
 
     public Task<Stream> DownloadAsync(string path) => Task.FromResult<Stream>(new MemoryStream(_objects[path]));
-
-    public Task DeleteAsync(string path)
-    {
-        _objects.TryRemove(path, out _);
-        return Task.CompletedTask;
-    }
 }

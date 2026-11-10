@@ -104,24 +104,5 @@ namespace AlUmmahNow.Data.Repository
             }
             return jsonString is not null ? JsonSerializer.Deserialize<T>(jsonString, JsonOptions) : null;
         }
-
-        // Method to delete an object from S3
-        public async Task DeleteObjectAsync(string bucketName, string key)
-        {
-            try
-            {
-                var options = new JsonSerializerOptions
-                {
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                    WriteIndented = true
-                };
-                await _r2Client.DeleteObjectAsync(bucketName, key);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error deleting object from S3: {ex.Message}");
-                throw;
-            }
-        }
     }
 }

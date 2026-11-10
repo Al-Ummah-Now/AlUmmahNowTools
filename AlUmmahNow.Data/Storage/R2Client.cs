@@ -118,15 +118,5 @@ namespace AlUmmahNow.Data.Storage
                 return await reader.ReadToEndAsync();
             }
         }
-
-        public async Task DeleteObjectAsync(string bucketName, string key)
-        {
-            var request = new DeleteObjectRequest
-            {
-                BucketName = bucketName,
-                Key = key,
-            };
-            var result = await s3Client.DeleteObjectAsync(request);
-        }
     }
 }

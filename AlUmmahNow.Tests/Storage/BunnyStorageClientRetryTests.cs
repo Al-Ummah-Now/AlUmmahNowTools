@@ -188,55 +188,6 @@ public class BunnyStorageClientRetryTests
 
     #endregion
 
-    #region Delete Tests
-
-    [Fact]
-    public async Task DeleteAsync_WithInvalidCredentials_ThrowsException()
-    {
-        // Arrange
-        var client = new BunnyStorageClient<TestVideo>(
-            "invalid-zone",
-            "invalid-key",
-            "invalid-region",
-            logger: _mockLogger.Object);
-
-        // Act & Assert
-        await client.Invoking(c => c.DeleteAsync("test.mp4"))
-            .Should().ThrowAsync<Exception>();
-    }
-
-    [Fact]
-    public async Task DeleteAsync_WithEmptyPath_ThrowsException()
-    {
-        // Arrange
-        var client = new BunnyStorageClient<TestVideo>(
-            "invalid-zone",
-            "invalid-key",
-            "invalid-region",
-            logger: _mockLogger.Object);
-
-        // Act & Assert
-        await client.Invoking(c => c.DeleteAsync(string.Empty))
-            .Should().ThrowAsync<Exception>();
-    }
-
-    [Fact]
-    public async Task DeleteAsync_WithNullPath_ThrowsException()
-    {
-        // Arrange
-        var client = new BunnyStorageClient<TestVideo>(
-            "invalid-zone",
-            "invalid-key",
-            "invalid-region",
-            logger: _mockLogger.Object);
-
-        // Act & Assert
-        await client.Invoking(c => c.DeleteAsync(null!))
-            .Should().ThrowAsync<Exception>();
-    }
-
-    #endregion
-
     #region Download Tests
 
     [Fact]

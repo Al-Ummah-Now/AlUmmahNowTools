@@ -202,29 +202,6 @@ namespace AlUmmahNow.Tests.Storage
         }
 
         [Fact]
-        public async Task DeleteObjectAsync_WithValidParameters_CallsS3ClientWithCorrectRequest()
-        {
-            // Arrange
-            var bucketName = "test-bucket";
-            var key = "test-key";
-
-            var response = new DeleteObjectResponse();
-
-            _mockS3Client.Setup(x => x.DeleteObjectAsync(It.IsAny<DeleteObjectRequest>(), It.IsAny<CancellationToken>()))
-                        .ReturnsAsync(response);
-
-            // Act
-            await _testableR2Client.DeleteObjectAsync(bucketName, key);
-
-            // Assert
-            _mockS3Client.Verify(x => x.DeleteObjectAsync(
-                It.Is<DeleteObjectRequest>(r => 
-                    r.BucketName == bucketName && 
-                    r.Key == key),
-                It.IsAny<CancellationToken>()), Times.Once);
-        }
-
-        [Fact]
         public void GetClient_ReturnsUnderlyingS3Client()
         {
             // Act
@@ -350,16 +327,6 @@ namespace AlUmmahNow.Tests.Storage
                 {
                     return await reader.ReadToEndAsync();
                 }
-            }
-
-            public async Task DeleteObjectAsync(string bucketName, string key)
-            {
-                var request = new DeleteObjectRequest
-                {
-                    BucketName = bucketName,
-                    Key = key,
-                };
-                await _s3Client.DeleteObjectAsync(request);
             }
         }
     }

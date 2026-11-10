@@ -19,6 +19,5 @@ namespace AlUmmahNow.Data.Storage
         /// </summary>
         Task<bool> PutObjectIfAbsentAsync(string bucketName, string key, string contentBody);
         Task<string> GetObjectAsync(string bucketName, string key);
-        Task DeleteObjectAsync(string bucketName, string key);
     }
 }
