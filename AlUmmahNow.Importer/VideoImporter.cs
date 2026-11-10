@@ -57,6 +57,17 @@ namespace AlUmmahNow.Importer
         public event EventHandler<FileImportErrorEventArgs>? FileImportError;
 
         /// <summary>
+        /// Raised once per video when its thumbnail is chosen: the source kept, or replaced by a frame from
+        /// the video because the shapes differ (or there was no source).
+        /// </summary>
+        public event EventHandler<ThumbnailChoiceEventArgs>? ThumbnailChosen;
+
+        /// <summary>
+        /// Reads video / thumbnail sizes and takes frames. Defaults to ffprobe / ffmpeg on PATH.
+        /// </summary>
+        public IMediaProbe MediaProbe { get; set; } = new FfmpegMediaProbe();
+
+        /// <summary>
         /// Initializes a new instance with database session tracking and optional translation support
         /// </summary>
         public VideoImporter(
@@ -419,9 +430,10 @@ namespace AlUmmahNow.Importer
                         }
 
                         var thumbnail = thumbnails.FirstOrDefault(f => f.ObjectName == bunnyVideo.Title?.Replace(Path.GetExtension(bunnyVideo.Title), ".jpg"));
-                        var thumbnailUrl = thumbnail?.ObjectName != null ? 
-                            $"{imageStoreUrl}{thumbnail.ObjectName}" : 
-                            $"https://vz-215a1ffd-a5a.b-cdn.net/{bunnyVideo.Guid}/{bunnyVideo.ThumbnailFileName}";
+                        // Bunny's own thumbnail is a frame of the encoded video, so it has the video's shape.
+                        var frameUrl = $"https://vz-215a1ffd-a5a.b-cdn.net/{bunnyVideo.Guid}/{bunnyVideo.ThumbnailFileName}";
+                        var thumbnailUrl = await ChooseBunnyThumbnailAsync(channelName, bunnyVideo, thumbnail,
+                            imageStoreRoot, imageStoreUrl, frameUrl);
 
                         video = new Video
                         {
@@ -845,10 +857,10 @@ namespace AlUmmahNow.Importer
             var videoKey = StorageKeys.VideoKey(channel, videoFile);
             var videoUpload = await _videoStorageClient.UploadIfAbsentAsync(videoFile, channel.VideoStoreRoot + videoKey);
 
-            if (thumbnailFile != null)
+            var videoSize = await MediaProbe.GetVideoDisplaySizeAsync(videoFile.FullName);
+            var thumbnailKey = await UploadThumbnailAsync(channel, videoFile, videoKey, thumbnailFile, videoSize);
+            if (thumbnailKey != null)
             {
-                var thumbnailKey = StorageKeys.ThumbnailKey(videoKey, thumbnailFile);
-                await _imageStorageClient.UploadIfAbsentAsync(thumbnailFile, channel.ImageStoreRoot + thumbnailKey);
                 importVideo.ThumbnailUrl = $"{channel.ImageStoreUrl}{thumbnailKey}";
             }
 
@@ -867,6 +879,8 @@ namespace AlUmmahNow.Importer
                 ThumbnailUrl = importVideo.ThumbnailUrl ?? "",
                 Channel = channel.ChannelName,
                 ChannelId = channel.ChannelId,
+                Width = videoSize?.Width ?? 0,
+                Height = videoSize?.Height ?? 0,
                 DateModified = DateTime.UtcNow
             };
 
@@ -894,6 +908,122 @@ namespace AlUmmahNow.Importer
             }
             await _dbContext.SaveChangesAsync();
             return !created && videoUpload == UploadOutcome.AlreadyPresent ? ItemOutcome.AlreadyDone : ItemOutcome.Uploaded;
+        }
+
+        /// <summary>
+        /// The thumbnail for a video synced from Bunny: the image-store art when it has the video's shape,
+        /// otherwise Bunny's own thumbnail (a frame of the video).
+        /// </summary>
+        private async Task<string> ChooseBunnyThumbnailAsync(string channelName, BunnyVideo bunnyVideo,
+            StorageObject? thumbnail, string imageStoreRoot, string imageStoreUrl, string frameUrl)
+        {
+            (int Width, int Height)? videoSize = bunnyVideo.Width > 0 && bunnyVideo.Height > 0
+                ? (bunnyVideo.Width, bunnyVideo.Height)
+                : null;
+            (int Width, int Height)? thumbSize = null;
+            if (thumbnail?.ObjectName != null && videoSize != null)
+            {
+                thumbSize = await ReadStoredImageSizeAsync(imageStoreRoot + thumbnail.ObjectName);
+            }
+
+            var decision = ThumbnailShape.Choose(thumbnail?.ObjectName != null, thumbSize, videoSize);
+            ReportThumbnailChoice(new ThumbnailChoiceEventArgs(channelName, bunnyVideo.Title ?? bunnyVideo.Guid ?? "",
+                decision, thumbSize, videoSize, decision.UsesFrame() ? frameUrl : thumbnail!.ObjectName, frameFailed: false));
+            return decision.UsesFrame() ? frameUrl : $"{imageStoreUrl}{thumbnail!.ObjectName}";
+        }
+
+        private async Task<(int Width, int Height)?> ReadStoredImageSizeAsync(string path)
+        {
+            var local = Path.Combine(Path.GetTempPath(), $"aun-thumb-{Guid.NewGuid():N}{Path.GetExtension(path)}");
+            try
+            {
+                await using (var remote = await _imageStorageClient.DownloadAsync(path))
+                await using (var file = File.Create(local))
+                {
+                    await remote.CopyToAsync(file);
+                }
+                return await MediaProbe.GetImageSizeAsync(local);
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+            finally
+            {
+                try { File.Delete(local); } catch { /* best effort */ }
+            }
+        }
+
+        /// <summary>
+        /// Uploads the video's thumbnail and returns its key under the channel's image root, or null when
+        /// there is none. The source thumbnail is used only when it has the video's shape
+        /// (<see cref="ThumbnailShape.Matches"/>); otherwise, or when there is no thumbnail, a frame is taken
+        /// from the video at its own shape and uploaded under <c>&lt;video&gt;.frame.jpg</c>. Art is never
+        /// stretched or cropped.
+        /// </summary>
+        private async Task<string?> UploadThumbnailAsync(ImportChannel channel, FileInfo videoFile, string videoKey,
+            FileInfo? thumbnailFile, (int Width, int Height)? videoSize)
+        {
+            var thumbSize = thumbnailFile != null ? await MediaProbe.GetImageSizeAsync(thumbnailFile.FullName) : null;
+            var decision = ThumbnailShape.Choose(thumbnailFile != null, thumbSize, videoSize);
+
+            string? key = null;
+            if (!decision.UsesFrame())
+            {
+                key = StorageKeys.ThumbnailKey(videoKey, thumbnailFile!);
+                await _imageStorageClient.UploadIfAbsentAsync(thumbnailFile!, channel.ImageStoreRoot + key);
+            }
+            else if (videoSize is { } size)
+            {
+                key = await UploadFrameAsync(channel, videoFile, videoKey, size);
+                if (key == null && thumbnailFile != null && decision == ThumbnailDecision.FrameUnreadableThumbnail)
+                {
+                    // Neither size is known to differ; keep the source rather than leave the video without art.
+                    decision = ThumbnailDecision.KeepSourceUnverified;
+                    key = StorageKeys.ThumbnailKey(videoKey, thumbnailFile);
+                    await _imageStorageClient.UploadIfAbsentAsync(thumbnailFile, channel.ImageStoreRoot + key);
+                }
+            }
+
+            ReportThumbnailChoice(new ThumbnailChoiceEventArgs(channel.ChannelName, videoFile.Name, decision,
+                thumbSize, videoSize, key, frameFailed: decision.UsesFrame() && key == null));
+            return key;
+        }
+
+        /// <summary>
+        /// Takes a frame from the video (longest edge 1280, the video's shape) and uploads it, or reuses the
+        /// frame an earlier run already uploaded. Returns its key, or null when no frame could be taken.
+        /// </summary>
+        private async Task<string?> UploadFrameAsync(ImportChannel channel, FileInfo videoFile, string videoKey,
+            (int Width, int Height) videoSize)
+        {
+            var key = StorageKeys.FrameThumbnailKey(videoKey);
+            if (await _imageStorageClient.GetAsync(channel.ImageStoreRoot + key) != null)
+            {
+                return key;
+            }
+
+            var (width, height) = ThumbnailShape.FrameSize(videoSize.Width, videoSize.Height);
+            var framePath = Path.Combine(Path.GetTempPath(), $"aun-frame-{Guid.NewGuid():N}.jpg");
+            try
+            {
+                if (!await MediaProbe.ExtractFrameAsync(videoFile.FullName, framePath, width, height))
+                {
+                    return null;
+                }
+                await _imageStorageClient.UploadIfAbsentAsync(new FileInfo(framePath), channel.ImageStoreRoot + key);
+                return key;
+            }
+            finally
+            {
+                try { File.Delete(framePath); } catch { /* best effort */ }
+            }
+        }
+
+        private void ReportThumbnailChoice(ThumbnailChoiceEventArgs e)
+        {
+            Console.WriteLine(e.Describe());
+            ThumbnailChosen?.Invoke(this, e);
         }
 
         /// <summary>

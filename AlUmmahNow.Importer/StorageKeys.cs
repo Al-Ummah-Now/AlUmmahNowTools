@@ -31,5 +31,17 @@ namespace AlUmmahNow.Importer
             var name = slash < 0 ? videoKey : videoKey[(slash + 1)..];
             return directory + Path.GetFileNameWithoutExtension(name) + thumbnailFile.Extension;
         }
+
+        /// <summary>
+        /// The key of a frame taken from the video to stand in for its thumbnail: the video's key with
+        /// <c>.frame.jpg</c>, so it never collides with a source thumbnail already uploaded for the video.
+        /// </summary>
+        public static string FrameThumbnailKey(string videoKey)
+        {
+            var slash = videoKey.LastIndexOf('/');
+            var directory = slash < 0 ? "" : videoKey[..(slash + 1)];
+            var name = slash < 0 ? videoKey : videoKey[(slash + 1)..];
+            return directory + Path.GetFileNameWithoutExtension(name) + ".frame.jpg";
+        }
     }
 }
