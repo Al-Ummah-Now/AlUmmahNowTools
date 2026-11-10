@@ -496,6 +496,11 @@ namespace AlUmmahNow.Data.Migrations
                         .HasMaxLength(1500)
                         .HasColumnType("nvarchar(1500)");
 
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
                     b.Property<Guid>("ScanSessionId")
                         .HasColumnType("uniqueidentifier");
 

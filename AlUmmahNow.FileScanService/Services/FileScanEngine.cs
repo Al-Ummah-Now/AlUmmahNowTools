@@ -263,9 +263,15 @@ namespace AlUmmahNow.FileScanService.Services
 
                 if (!isNewFile && !hasChanged)
                 {
-                    // File hasn't changed, just update last scanned time
-                    existingFile!.LastScanned = DateTime.UtcNow;
-                    existingFile.FileExists = true;
+                    // File hasn't changed, just update last scanned time. Written directly rather than through the
+                    // tracked entity, which would otherwise be saved later by an unrelated SaveChanges and could
+                    // then conflict (rowversion) with an import status change made meanwhile.
+                    var now = DateTime.UtcNow;
+                    await _dbContext.ScannedVideoFiles
+                        .Where(f => f.Id == existingFile!.Id)
+                        .ExecuteUpdateAsync(u => u
+                            .SetProperty(f => f.LastScanned, now)
+                            .SetProperty(f => f.FileExists, true), cancellationToken);
                     return;
                 }
 
@@ -340,13 +346,44 @@ namespace AlUmmahNow.FileScanService.Services
                         videoFile.Name, videoFile.Length);
                 }
 
-                await _dbContext.SaveChangesAsync(cancellationToken);
+                await SaveScannedFileAsync(cancellationToken);
                 _logger.LogTrace("Video file {FileName} persisted successfully with ID {FileId}",
                     videoFile.Name, scannedFile.Id);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error processing video file {FilePath}", videoFile.FullName);
+            }
+        }
+
+        /// <summary>
+        /// Saves scan results. On SQL Server the row version makes the save fail if the import worker or the UI
+        /// changed the row since it was read; the scan only writes the columns it changed (never ImportStatus), so it
+        /// takes the current row version and saves again rather than failing the file.
+        /// </summary>
+        private async Task SaveScannedFileAsync(CancellationToken cancellationToken)
+        {
+            for (var attempt = 1; ; attempt++)
+            {
+                try
+                {
+                    await _dbContext.SaveChangesAsync(cancellationToken);
+                    return;
+                }
+                catch (DbUpdateConcurrencyException ex) when (attempt < 5)
+                {
+                    foreach (var entry in ex.Entries)
+                    {
+                        var current = await entry.GetDatabaseValuesAsync(cancellationToken);
+                        if (current == null)
+                        {
+                            // Deleted meanwhile: nothing left to update.
+                            entry.State = EntityState.Detached;
+                            continue;
+                        }
+                        entry.OriginalValues.SetValues(current);
+                    }
+                }
             }
         }
 
@@ -416,7 +453,9 @@ namespace AlUmmahNow.FileScanService.Services
             var duplicateHashes = duplicateKeys.Select(k => k.ContentHash).Distinct().ToList();
             var keySet = duplicateKeys.ToHashSet();
             var duplicateGroups = (await sessionFiles
+                    .AsNoTracking()
                     .Where(f => duplicateHashes.Contains(f.ContentHash))
+                    .Select(f => new { f.Id, f.FilePath, f.ContentHash, f.FileSize })
                     .ToListAsync(cancellationToken))
                 .GroupBy(f => new { f.ContentHash, f.FileSize })
                 .Where(g => keySet.Contains(g.Key))
@@ -429,20 +468,21 @@ namespace AlUmmahNow.FileScanService.Services
             foreach (var group in duplicateGroups)
             {
                 var files = group.OrderBy(f => f.FilePath).ToList();
-                var originalFile = files.First();
+                var originalId = files[0].Id;
+                var duplicateIds = files.Skip(1).Select(f => f.Id).ToList();
 
-                // Mark subsequent files as duplicates
-                for (int i = 1; i < files.Count; i++)
-                {
-                    files[i].IsDuplicate = true;
-                    files[i].OriginalFileId = originalFile.Id;
-                    totalDuplicates++;
-                }
+                // Mark subsequent files as duplicates (a direct update: it does not touch ImportStatus and cannot
+                // conflict with the import worker changing it)
+                await _dbContext.ScannedVideoFiles
+                    .Where(f => duplicateIds.Contains(f.Id))
+                    .ExecuteUpdateAsync(u => u
+                        .SetProperty(f => f.IsDuplicate, true)
+                        .SetProperty(f => f.OriginalFileId, (Guid?)originalId), cancellationToken);
+                totalDuplicates += duplicateIds.Count;
             }
 
-            _logger.LogDebug("Persisting duplicate detection results: {TotalDuplicates} duplicates marked",
+            _logger.LogDebug("Persisted duplicate detection results: {TotalDuplicates} duplicates marked",
                 totalDuplicates);
-            await _dbContext.SaveChangesAsync(cancellationToken);
             _logger.LogDebug("Duplicate detection completed for session {SessionId}: {DuplicateCount} duplicates found",
                 scanSessionId, totalDuplicates);
         }
@@ -460,7 +500,10 @@ namespace AlUmmahNow.FileScanService.Services
 
             _logger.LogTrace("Loading files for channel '{ChannelName}' ({ChannelId})",
                 channel.Name, channelId);
+            // Untracked: duplicate flags, import status and last-scanned times are written with direct updates,
+            // so instances tracked earlier in the scan may hold stale values.
             var files = await _dbContext.ScannedVideoFiles
+                .AsNoTracking()
                 .Where(f => f.ScanSessionId == channel.ScanSessionId && f.ChannelName == channel.Name && f.FileExists)
                 .ToListAsync();
 

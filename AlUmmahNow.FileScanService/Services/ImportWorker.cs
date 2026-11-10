@@ -49,42 +49,56 @@ namespace AlUmmahNow.FileScanService.Services
             _logger.LogInformation("Import Worker stopped");
         }
 
-        private async Task ProcessPendingImports(CancellationToken cancellationToken)
+        internal async Task ProcessPendingImports(CancellationToken cancellationToken)
         {
             using var scope = _serviceProvider.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<ImportDbContext>();
 
-            // Find files that are selected for import but not yet processed
-            var filesToImport = await dbContext.ScannedVideoFiles
+            // Find files that are selected for import but not yet processed. This read is only a candidate list:
+            // each file is claimed below, and only claims this worker wins are imported (TOOLS-8).
+            var candidates = await dbContext.ScannedVideoFiles
+                .AsNoTracking()
                 .Where(f => f.ImportStatus == FileImportStatus.Selected && f.FileExists)
                 .OrderBy(f => f.FirstScanned)
                 .Take(10) // Process up to 10 files at a time
                 .ToListAsync(cancellationToken);
 
-            if (filesToImport.Count == 0)
+            if (candidates.Count == 0)
             {
                 return; // No files to import
             }
 
-            _logger.LogInformation("Processing {Count} files for import", filesToImport.Count);
+            _logger.LogInformation("Processing {Count} files for import", candidates.Count);
 
-            foreach (var file in filesToImport)
+            foreach (var file in candidates)
             {
                 if (cancellationToken.IsCancellationRequested)
                     break;
+
+                // Selected -> Pending only if it is still Selected: the user may have unticked it since the read,
+                // or another worker (another service host on the same database) may have claimed it.
+                if (!await ScannedFileStatus.TransitionAsync(dbContext, file.Id, new[] { FileImportStatus.Selected }, FileImportStatus.Pending, cancellationToken))
+                {
+                    _logger.LogDebug("File {FilePath} was unselected or claimed elsewhere; skipping", file.FilePath);
+                    continue;
+                }
 
                 try
                 {
                     await ProcessSingleFileImport(file, dbContext, cancellationToken);
                 }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    // Give the claim back so the file is picked up again on the next start.
+                    await ScannedFileStatus.TransitionAsync(dbContext, file.Id,
+                        new[] { FileImportStatus.Pending, FileImportStatus.Uploading }, FileImportStatus.Selected, CancellationToken.None);
+                    throw;
+                }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Error importing file {FilePath}", file.FilePath);
-                    
-                    // Mark file as failed
-                    file.ImportStatus = FileImportStatus.Failed;
-                    file.LastScanned = DateTime.UtcNow;
-                    await dbContext.SaveChangesAsync(cancellationToken);
+                    await ScannedFileStatus.TransitionAsync(dbContext, file.Id,
+                        new[] { FileImportStatus.Pending, FileImportStatus.Uploading }, FileImportStatus.Failed, CancellationToken.None);
                 }
             }
         }
@@ -93,45 +107,36 @@ namespace AlUmmahNow.FileScanService.Services
         {
             _logger.LogInformation("Starting import for file {FileName}", file.FileName);
 
-            // Update status to pending
-            file.ImportStatus = FileImportStatus.Pending;
-            file.LastScanned = DateTime.UtcNow;
-            await dbContext.SaveChangesAsync(cancellationToken);
-
-            try
+            if (!await ScannedFileStatus.TransitionAsync(dbContext, file.Id, new[] { FileImportStatus.Pending }, FileImportStatus.Uploading, cancellationToken))
             {
-                // Update status to uploading
-                file.ImportStatus = FileImportStatus.Uploading;
-                file.LastScanned = DateTime.UtcNow;
-                await dbContext.SaveChangesAsync(cancellationToken);
-
-                // TODO: Implement actual import logic here
-                // This would involve:
-                // 1. Reading the file
-                // 2. Uploading to cloud storage (R2, BunnyCDN)
-                // 3. Creating video stream entries
-                // 4. Processing thumbnails
-                // 5. Handling translation if needed
-
-                // For now, simulate the import process
-                await SimulateImportProcess(file, cancellationToken);
-
-                // Mark as successfully uploaded
-                file.ImportStatus = FileImportStatus.Uploaded;
-                file.LastScanned = DateTime.UtcNow;
-                await dbContext.SaveChangesAsync(cancellationToken);
-
-                _logger.LogInformation("Successfully imported file {FileName}", file.FileName);
+                throw new InvalidOperationException($"Import claim on {file.FilePath} was lost before upload");
             }
-            catch (Exception ex)
+
+            await ImportFileAsync(file, cancellationToken);
+
+            if (!await ScannedFileStatus.TransitionAsync(dbContext, file.Id, new[] { FileImportStatus.Uploading }, FileImportStatus.Uploaded, cancellationToken))
             {
-                _logger.LogError(ex, "Failed to import file {FileName}", file.FileName);
-                
-                file.ImportStatus = FileImportStatus.Failed;
-                file.LastScanned = DateTime.UtcNow;
-                await dbContext.SaveChangesAsync(cancellationToken);
-                throw;
+                throw new InvalidOperationException($"Import claim on {file.FilePath} was lost during upload");
             }
+
+            _logger.LogInformation("Successfully imported file {FileName}", file.FileName);
+        }
+
+        /// <summary>
+        /// Imports one claimed file. Only the worker that won the file's claim calls this, once per claim.
+        /// </summary>
+        protected virtual Task ImportFileAsync(ScannedVideoFile file, CancellationToken cancellationToken)
+        {
+            // TODO: Implement actual import logic here
+            // This would involve:
+            // 1. Reading the file
+            // 2. Uploading to cloud storage (R2, BunnyCDN)
+            // 3. Creating video stream entries
+            // 4. Processing thumbnails
+            // 5. Handling translation if needed
+
+            // For now, simulate the import process
+            return SimulateImportProcess(file, cancellationToken);
         }
 
         private async Task SimulateImportProcess(ScannedVideoFile file, CancellationToken cancellationToken)

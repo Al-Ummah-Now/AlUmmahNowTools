@@ -95,11 +95,22 @@ DELETE FROM ranked WHERE rn > 1;",
     CREATE UNIQUE INDEX {PendingApprovalPathIndex} ON dbo.PendingApprovals (FilePathHash) WHERE [Status] = 0;",
         };
 
+        /// <summary>
+        /// TOOLS-8: a rowversion on ScannedVideoFiles so tracked updates detect concurrent changes. SQL Server fills
+        /// it for existing rows when the column is added.
+        /// </summary>
+        public static readonly string[] ScannedVideoFilesRowVersion =
+        {
+            @"IF COL_LENGTH(N'dbo.ScannedVideoFiles', N'RowVersion') IS NULL
+    ALTER TABLE dbo.ScannedVideoFiles ADD RowVersion rowversion NOT NULL;",
+        };
+
         /// <summary>Every upgrade step, oldest first.</summary>
         public static IEnumerable<string> SqlServerUpgradeSteps =>
             ImportVideosSessionPathUnique
                 .Concat(ImportSessionsOneRunningPerRoot)
-                .Concat(WatchesAndApprovalsUnique);
+                .Concat(WatchesAndApprovalsUnique)
+                .Concat(ScannedVideoFilesRowVersion);
 
         /// <summary>Creates the database if needed and applies every upgrade step (SQL Server only).</summary>
         public static async Task EnsureUpToDateAsync(ImportDbContext db, CancellationToken ct = default)

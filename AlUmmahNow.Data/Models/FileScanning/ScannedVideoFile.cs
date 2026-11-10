@@ -182,6 +182,12 @@ namespace AlUmmahNow.Data.Models.FileScanning
         /// Last known modification time for change detection
         /// </summary>
         public DateTime LastKnownModified { get; set; }
+
+        /// <summary>
+        /// SQL Server <c>rowversion</c>: a tracked update fails with <c>DbUpdateConcurrencyException</c> when the row
+        /// changed after it was read, instead of silently overwriting it. Not mapped on other providers.
+        /// </summary>
+        public byte[]? RowVersion { get; set; }
     }
     
     /// <summary>

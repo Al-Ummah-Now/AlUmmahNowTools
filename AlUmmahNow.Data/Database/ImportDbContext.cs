@@ -113,6 +113,15 @@ namespace AlUmmahNow.Data.Database
                 entity.Property(e => e.InfoFilePath).HasMaxLength(2000);
                 entity.Property(e => e.InfoFileHash).HasMaxLength(64);
                 entity.Property(e => e.Codec).HasMaxLength(50);
+                if (Database.IsSqlServer())
+                {
+                    entity.Property(e => e.RowVersion).IsRowVersion();
+                }
+                else
+                {
+                    // SQLite and the in-memory provider have no server-generated row version.
+                    entity.Ignore(e => e.RowVersion);
+                }
                 
                 entity.HasIndex(e => e.ScanSessionId);
                 entity.HasIndex(e => e.ChannelName);
