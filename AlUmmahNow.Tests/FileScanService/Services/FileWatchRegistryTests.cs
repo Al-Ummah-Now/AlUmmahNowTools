@@ -15,15 +15,14 @@ namespace AlUmmahNow.Tests.FileScanService.Services;
 [Trait("Category", "Integration")]
 public class FileWatchRegistryTests : FileSystemTestBase
 {
+    private readonly SqliteImportDb _sqlite = new();
     private DbContextOptions<ImportDbContext> _options = null!;
     private ServiceProvider _host = null!;
 
     public override async Task InitializeAsync()
     {
         await base.InitializeAsync();
-        _options = new DbContextOptionsBuilder<ImportDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
-            .Options;
+        _options = _sqlite.Options;
 
         // The same registrations as FileScanService/Program.cs.
         var services = new ServiceCollection();
@@ -39,6 +38,7 @@ public class FileWatchRegistryTests : FileSystemTestBase
     public override async Task DisposeAsync()
     {
         await _host.DisposeAsync();
+        _sqlite.Dispose();
         await base.DisposeAsync();
     }
 

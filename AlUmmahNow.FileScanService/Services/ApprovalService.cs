@@ -293,7 +293,7 @@ public class ApprovalService : IApprovalService
         }
     }
 
-    public async Task<Guid> AddPendingApprovalAsync(Guid channelWatchId, string filePath, CancellationToken cancellationToken = default)
+    public async Task<PendingApprovalAdded> AddPendingApprovalAsync(Guid channelWatchId, string filePath, CancellationToken cancellationToken = default)
     {
         _logger.LogDebug("Adding pending approval for file: {FilePath}", filePath);
 
@@ -327,12 +327,31 @@ public class ApprovalService : IApprovalService
             };
 
             _dbContext.PendingApprovals.Add(pendingApproval);
-            await _dbContext.SaveChangesAsync(cancellationToken);
+            try
+            {
+                await _dbContext.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException)
+            {
+                // The filtered unique index allows one Pending approval per file. If another watcher or event got
+                // there first, that row is the approval; anything else is a real failure.
+                _dbContext.Entry(pendingApproval).State = EntityState.Detached;
+                var existingId = await _dbContext.PendingApprovals
+                    .Where(p => p.FilePathHash == pendingApproval.FilePathHash && p.Status == ApprovalStatus.Pending)
+                    .Select(p => (Guid?)p.Id)
+                    .FirstOrDefaultAsync(cancellationToken);
+                if (existingId is null)
+                {
+                    throw;
+                }
+                _logger.LogDebug("File {FilePath} already has pending approval {ApprovalId}", filePath, existingId);
+                return new PendingApprovalAdded(existingId.Value, Created: false);
+            }
 
             _logger.LogInformation("Added pending approval {ApprovalId} for file {FileName}", 
                 pendingApproval.Id, fileInfo.Name);
 
-            return pendingApproval.Id;
+            return new PendingApprovalAdded(pendingApproval.Id, Created: true);
         }
         catch (Exception ex)
         {

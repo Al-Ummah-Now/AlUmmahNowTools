@@ -22,6 +22,7 @@ public class FileWatchServiceBufferOverflowTests : IDisposable
     private readonly Mock<ILogger<FileWatchService>> _mockLogger;
     private readonly Mock<IApprovalService> _mockApprovalService;
     private readonly ImportDbContext _dbContext;
+    private readonly SqliteImportDb _sqlite = new();
     private readonly DbContextOptions<ImportDbContext> _options;
     private readonly FileWatchService _fileWatchService;
     private readonly string _testDirectory;
@@ -31,9 +32,7 @@ public class FileWatchServiceBufferOverflowTests : IDisposable
         _mockLogger = new Mock<ILogger<FileWatchService>>();
         _mockApprovalService = new Mock<IApprovalService>();
 
-        var options = new DbContextOptionsBuilder<ImportDbContext>()
-            .UseInMemoryDatabase(databaseName: $"TestDb_BufferOverflow_{Guid.NewGuid()}")
-            .Options;
+        var options = _sqlite.Options;
         _options = options;
         _dbContext = new ImportDbContext(options);
 
@@ -217,6 +216,7 @@ public class FileWatchServiceBufferOverflowTests : IDisposable
     {
         _fileWatchService?.Dispose();
         _dbContext?.Dispose();
+        _sqlite.Dispose();
 
         if (Directory.Exists(_testDirectory))
         {

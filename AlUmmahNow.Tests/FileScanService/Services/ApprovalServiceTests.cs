@@ -250,7 +250,7 @@ public class ApprovalServiceTests : FileSystemTestBase
         var testFilePath = await CreateTestVideoFileAsync(TestChannel1Directory, "testvideo.mp4", 1024 * 1024 * 10); // 10MB
 
         // Act
-        var approvalId = await _approvalService.AddPendingApprovalAsync(channelWatch.Id, testFilePath);
+        var approvalId = (await _approvalService.AddPendingApprovalAsync(channelWatch.Id, testFilePath)).Id;
 
         // Assert
         approvalId.Should().NotBe(Guid.Empty);
@@ -295,7 +295,7 @@ public class ApprovalServiceTests : FileSystemTestBase
         var thumbnailPath = await CreateTestThumbnailAsync(TestThumbsDirectory, "videowithumb.jpg", 50 * 1024);
 
         // Act
-        var approvalId = await _approvalService.AddPendingApprovalAsync(channelWatch.Id, testFilePath);
+        var approvalId = (await _approvalService.AddPendingApprovalAsync(channelWatch.Id, testFilePath)).Id;
 
         // Assert
         var approval = await _dbContext.PendingApprovals.FindAsync(approvalId);

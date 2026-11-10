@@ -13,6 +13,7 @@ public class FileWatchServiceTests : FileSystemTestBase
 {
     private readonly Mock<ILogger<FileWatchService>> _mockLogger;
     private readonly ImportDbContext _dbContext;
+    private readonly SqliteImportDb _sqlite = new();
     private readonly DbContextOptions<ImportDbContext> _options;
     private readonly Mock<IApprovalService> _mockApprovalService;
     private FileWatchService _fileWatchService;
@@ -21,9 +22,7 @@ public class FileWatchServiceTests : FileSystemTestBase
     {
         _mockLogger = new Mock<ILogger<FileWatchService>>();
         
-        var options = new DbContextOptionsBuilder<ImportDbContext>()
-            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
-            .Options;
+        var options = _sqlite.Options;
         _options = options;
         _dbContext = new ImportDbContext(options);
         _dbContext.Database.EnsureCreated();
@@ -37,6 +36,7 @@ public class FileWatchServiceTests : FileSystemTestBase
     {
         _fileWatchService?.Dispose();
         await _dbContext.DisposeAsync();
+        _sqlite.Dispose();
         await base.DisposeAsync();
     }
 
@@ -332,7 +332,7 @@ public class FileWatchServiceTests : FileSystemTestBase
         _fileWatchService.FileDetected += (sender, e) => eventArgs = e;
 
         _mockApprovalService.Setup(x => x.AddPendingApprovalAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Guid.NewGuid());
+            .ReturnsAsync(new PendingApprovalAdded(Guid.NewGuid(), true));
 
         // Act
         var testFilePath = await CreateTestVideoFileAsync(TestChannel1Directory, "newvideo.mp4", 1024 * 1024);
@@ -392,7 +392,7 @@ public class FileWatchServiceTests : FileSystemTestBase
         _fileWatchService.FileDetected += (sender, e) => fileDetectedCount++;
 
         _mockApprovalService.Setup(x => x.AddPendingApprovalAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Guid.NewGuid());
+            .ReturnsAsync(new PendingApprovalAdded(Guid.NewGuid(), true));
 
         // Act - Create files with delays between them for FileSystemWatcher
         await CreateTestVideoFileAsync(TestChannel1Directory, "video1.mp4", 1024);  // Should be detected

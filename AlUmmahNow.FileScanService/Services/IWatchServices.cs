@@ -79,9 +79,11 @@ public interface IApprovalService
     Task<int> ProcessBulkApprovalAsync(BulkApprovalRequest request, CancellationToken cancellationToken = default);
     
     /// <summary>
-    /// Add a new file for approval (called by watch service)
+    /// Add a new file for approval (called by watch service). A file has at most one pending approval: when one
+    /// already exists (even one inserted concurrently by another watcher), its id is returned with
+    /// <see cref="PendingApprovalAdded.Created"/> false and nothing is inserted.
     /// </summary>
-    Task<Guid> AddPendingApprovalAsync(Guid channelWatchId, string filePath, CancellationToken cancellationToken = default);
+    Task<PendingApprovalAdded> AddPendingApprovalAsync(Guid channelWatchId, string filePath, CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Clean up expired approvals
@@ -200,3 +202,8 @@ public class ApprovalStatistics
         return $"{number:n1} {suffixes[counter]}";
     }
 }
+
+/// <summary>Result of <see cref="IApprovalService.AddPendingApprovalAsync"/>.</summary>
+/// <param name="Id">The pending approval for the file.</param>
+/// <param name="Created">True when this call inserted it; false when the file was already pending.</param>
+public sealed record PendingApprovalAdded(Guid Id, bool Created);

@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using AlUmmahNow.Data.Database;
+using AlUmmahNow.Data.Models;
 using AlUmmahNow.Data.Models.FileScanning;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -114,8 +115,9 @@ public class FileWatchService : IFileWatchService, IHostedService, IDisposable
             var db = scope.Db;
 
             // Check if already watching this path
+            var watchPathHash = PathHash.Of(request.WatchPath);
             var existingWatch = await db.ChannelWatches
-                .FirstOrDefaultAsync(w => w.WatchPath == request.WatchPath && w.IsActive, cancellationToken);
+                .FirstOrDefaultAsync(w => w.WatchPathHash == watchPathHash && w.IsActive, cancellationToken);
 
             if (existingWatch != null)
             {
@@ -143,7 +145,29 @@ public class FileWatchService : IFileWatchService, IHostedService, IDisposable
             _logger.LogDebug("Creating watch configuration for channel {ChannelName} at path {WatchPath}",
                 request.ChannelName, request.WatchPath);
             db.ChannelWatches.Add(channelWatch);
-            await db.SaveChangesAsync(cancellationToken);
+            try
+            {
+                await db.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException)
+            {
+                // One active watch per path (filtered unique index): a concurrent StartWatch for the same path
+                // won the insert, so this call returns that watch, exactly as if it had been found above.
+                db.Entry(channelWatch).State = EntityState.Detached;
+                var winner = await db.ChannelWatches.AsNoTracking()
+                    .FirstOrDefaultAsync(w => w.WatchPathHash == channelWatch.WatchPathHash && w.IsActive, cancellationToken);
+                if (winner == null)
+                {
+                    throw;
+                }
+                _logger.LogWarning("Path {WatchPath} was started concurrently as watch {WatchId}; using that watch",
+                    request.WatchPath, winner.Id);
+                if (!_watchers.ContainsKey(winner.Id))
+                {
+                    await StartFileSystemWatcherAsync(winner);
+                }
+                return winner.Id;
+            }
             _logger.LogDebug("Watch configuration persisted with ID {WatchId}", channelWatch.Id);
 
             // Start the file system watcher
@@ -303,9 +327,6 @@ public class FileWatchService : IFileWatchService, IHostedService, IDisposable
                 return false;
             }
 
-            // Any change (path, sub-folders, extensions, delay) is applied by restarting the watcher.
-            StopFileSystemWatcher(watchId);
-
             // Update configuration
             _logger.LogDebug("Updating watch {WatchId} configuration", watchId);
             channelWatch.ChannelName = request.ChannelName;
@@ -316,7 +337,27 @@ public class FileWatchService : IFileWatchService, IHostedService, IDisposable
             channelWatch.LastUpdated = DateTime.UtcNow;
 
             _logger.LogDebug("Persisting watch {WatchId} configuration changes", watchId);
-            await db.SaveChangesAsync(cancellationToken);
+            try
+            {
+                await db.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException)
+            {
+                // One active watch per path: moving this watch onto a path another active watch already monitors
+                // is refused. The running watcher was left untouched, so it keeps its previous configuration.
+                var pathTaken = channelWatch.IsActive && await db.ChannelWatches.AsNoTracking()
+                    .AnyAsync(w => w.Id != watchId && w.IsActive && w.WatchPathHash == channelWatch.WatchPathHash, cancellationToken);
+                if (!pathTaken)
+                {
+                    throw;
+                }
+                _logger.LogWarning("Not updating watch {WatchId}: another active watch already monitors {WatchPath}",
+                    watchId, request.WatchPath);
+                return false;
+            }
+
+            // Any change (path, sub-folders, extensions, delay) is applied by restarting the watcher.
+            StopFileSystemWatcher(watchId);
 
             if (channelWatch.IsActive)
             {
@@ -570,19 +611,25 @@ public class FileWatchService : IFileWatchService, IHostedService, IDisposable
                 return;
             }
 
-            // Update watch statistics
-            _logger.LogDebug("Updating watch {WatchId} statistics for detected file: {FileName}",
-                channelWatch.Id, fileName);
-            channelWatch.LastFileDetected = DateTime.UtcNow;
-            channelWatch.TotalFilesDetected++;
-            channelWatch.LastUpdated = DateTime.UtcNow;
-            await db.SaveChangesAsync();
-            _logger.LogTrace("Watch {WatchId} statistics updated. Total files detected: {TotalFiles}",
-                channelWatch.Id, channelWatch.TotalFilesDetected);
-
-            // Add to pending approvals
+            // Add to pending approvals. The check above is only a shortcut: two events (or two watches) can both
+            // pass it, and the unique index then lets exactly one of them create the approval.
             _logger.LogDebug("Adding file to pending approvals: {FilePath}", filePath);
-            var approvalId = await scope.Approvals.AddPendingApprovalAsync(channelWatch.Id, filePath);
+            var added = await scope.Approvals.AddPendingApprovalAsync(channelWatch.Id, filePath);
+            if (!added.Created)
+            {
+                _logger.LogDebug("File already has pending approval {ApprovalId}: {FilePath}", added.Id, filePath);
+                return;
+            }
+            var approvalId = added.Id;
+
+            // Count the detection in the database itself, so concurrent detections cannot overwrite each other.
+            var now = DateTime.UtcNow;
+            await db.ChannelWatches
+                .Where(w => w.Id == channelWatch.Id)
+                .ExecuteUpdateAsync(u => u
+                    .SetProperty(w => w.TotalFilesDetected, w => w.TotalFilesDetected + 1)
+                    .SetProperty(w => w.LastFileDetected, now)
+                    .SetProperty(w => w.LastUpdated, now));
 
             // Raise file detected event
             FileDetected?.Invoke(this, new FileDetectedEventArgs(

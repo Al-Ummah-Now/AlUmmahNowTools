@@ -58,8 +58,48 @@ DELETE FROM ranked WHERE rn > 1;",
         WHERE [Status] = 0 AND [RootFolderHash] <> N'';",
         };
 
+
+        public const string ActiveWatchPathIndex = "UX_ChannelWatches_WatchPathHash_Active";
+        public const string PendingApprovalPathIndex = "UX_PendingApprovals_FilePathHash_Pending";
+
+        /// <summary>
+        /// TOOLS-6: path hashes on ChannelWatches and PendingApprovals, backfilled; duplicate active watches of one
+        /// path deactivated and duplicate pending approvals of one file deleted (the oldest is kept in both cases);
+        /// then filtered unique indexes so concurrent detections and StartWatch calls cannot create them again.
+        /// </summary>
+        public static readonly string[] WatchesAndApprovalsUnique =
+        {
+            @"IF COL_LENGTH(N'dbo.ChannelWatches', N'WatchPathHash') IS NULL
+    ALTER TABLE dbo.ChannelWatches ADD WatchPathHash nvarchar(64) NOT NULL
+        CONSTRAINT DF_ChannelWatches_WatchPathHash DEFAULT N'';",
+            @"IF COL_LENGTH(N'dbo.PendingApprovals', N'FilePathHash') IS NULL
+    ALTER TABLE dbo.PendingApprovals ADD FilePathHash nvarchar(64) NOT NULL
+        CONSTRAINT DF_PendingApprovals_FilePathHash DEFAULT N'';",
+            @"UPDATE dbo.ChannelWatches
+    SET WatchPathHash = CONVERT(nvarchar(64), HASHBYTES('SHA2_256', WatchPath), 2)
+    WHERE WatchPathHash = N'';",
+            @"UPDATE dbo.PendingApprovals
+    SET FilePathHash = CONVERT(nvarchar(64), HASHBYTES('SHA2_256', FilePath), 2)
+    WHERE FilePathHash = N'';",
+            @"WITH ranked AS (
+    SELECT IsActive, ROW_NUMBER() OVER (PARTITION BY WatchPathHash ORDER BY CreatedAt, Id) AS rn
+    FROM dbo.ChannelWatches WHERE IsActive = 1)
+UPDATE ranked SET IsActive = 0 WHERE rn > 1;",
+            @"WITH ranked AS (
+    SELECT ROW_NUMBER() OVER (PARTITION BY FilePathHash ORDER BY DetectedAt, Id) AS rn
+    FROM dbo.PendingApprovals WHERE Status = 0)
+DELETE FROM ranked WHERE rn > 1;",
+            $@"IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'{ActiveWatchPathIndex}' AND object_id = OBJECT_ID(N'dbo.ChannelWatches'))
+    CREATE UNIQUE INDEX {ActiveWatchPathIndex} ON dbo.ChannelWatches (WatchPathHash) WHERE [IsActive] = 1;",
+            $@"IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'{PendingApprovalPathIndex}' AND object_id = OBJECT_ID(N'dbo.PendingApprovals'))
+    CREATE UNIQUE INDEX {PendingApprovalPathIndex} ON dbo.PendingApprovals (FilePathHash) WHERE [Status] = 0;",
+        };
+
         /// <summary>Every upgrade step, oldest first.</summary>
-        public static IEnumerable<string> SqlServerUpgradeSteps => ImportVideosSessionPathUnique.Concat(ImportSessionsOneRunningPerRoot);
+        public static IEnumerable<string> SqlServerUpgradeSteps =>
+            ImportVideosSessionPathUnique
+                .Concat(ImportSessionsOneRunningPerRoot)
+                .Concat(WatchesAndApprovalsUnique);
 
         /// <summary>Creates the database if needed and applies every upgrade step (SQL Server only).</summary>
         public static async Task EnsureUpToDateAsync(ImportDbContext db, CancellationToken ct = default)
