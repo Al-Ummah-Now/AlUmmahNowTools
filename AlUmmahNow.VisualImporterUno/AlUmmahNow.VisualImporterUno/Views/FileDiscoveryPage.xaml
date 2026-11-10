@@ -3,6 +3,7 @@
     x:Class="AlUmmahNow.VisualImporterUno.Views.FileDiscoveryPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:helpers="using:AlUmmahNow.VisualImporterUno.Helpers"
     xmlns:local="using:AlUmmahNow.VisualImporterUno.Views"
     xmlns:models="using:AlUmmahNow.VisualImporterUno.Models"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -88,10 +89,13 @@
                         Command="{x:Bind ViewModel.ToggleSortDirectionCommand}"
                         ToolTipService.ToolTip="Toggle sort direction"/>
                 
-                <ComboBox Header="Channel" 
-                          ItemsSource="{x:Bind ViewModel.AvailableChannels, Mode=OneWay}"
-                          SelectedItem="{x:Bind ViewModel.ChannelFilter, Mode=TwoWay}"
-                          MinWidth="150"/>
+                <!-- Type to find a channel: suggestions as you type, Enter or a click applies it -->
+                <AutoSuggestBox Header="Channel"
+                                helpers:AutoSuggest.Candidates="{x:Bind ViewModel.AvailableChannels, Mode=OneWay}"
+                                helpers:AutoSuggest.Value="{x:Bind ViewModel.ChannelFilter, Mode=TwoWay}"
+                                PlaceholderText="All Channels"
+                                QueryIcon="Find"
+                                MinWidth="200"/>
             </StackPanel>
         </Grid>
 

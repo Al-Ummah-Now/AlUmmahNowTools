@@ -165,6 +165,8 @@ public partial class WatchViewModel : ObservableObject, IDisposable
     public ObservableCollection<PendingApprovalDto> PendingApprovals { get; } = new();
     public ObservableCollection<PendingApprovalDto> FilteredPendingApprovals { get; } = new();
     public ObservableCollection<string> AvailableChannels { get; } = new();
+    /// <summary>Channel names already watched: suggested while typing a new watch's channel name.</summary>
+    public ObservableCollection<string> KnownChannelNames { get; } = new();
     public ObservableCollection<string> SupportedExtensions { get; } = new();
     public ObservableCollection<WatchTemplate> SavedTemplates { get; } = new();
     public ObservableCollection<CreateWatchRequest> PreviewWatches { get; } = new();
@@ -1425,8 +1427,8 @@ public partial class WatchViewModel : ObservableObject, IDisposable
             filtered = filtered.Where(a => a.Status == ApprovalStatus.Pending);
         }
 
-        // Filter by channel
-        if (!string.IsNullOrWhiteSpace(ChannelFilter))
+        // Filter by channel ("All Channels" is the list's own entry for no filter)
+        if (!string.IsNullOrWhiteSpace(ChannelFilter) && ChannelFilter != "All Channels")
         {
             filtered = filtered.Where(a => a.ChannelName.Equals(ChannelFilter, StringComparison.OrdinalIgnoreCase));
         }
@@ -1461,9 +1463,11 @@ public partial class WatchViewModel : ObservableObject, IDisposable
 
         AvailableChannels.Clear();
         AvailableChannels.Add("All Channels");
+        KnownChannelNames.Clear();
         foreach (var channel in channels)
         {
             AvailableChannels.Add(channel);
+            KnownChannelNames.Add(channel);
         }
     }
 
