@@ -23,7 +23,24 @@ public class ChannelWatch
     /// </summary>
     [Required]
     [MaxLength(2000)]
-    public string WatchPath { get; set; } = string.Empty;
+    public string WatchPath
+    {
+        get => _watchPath;
+        set
+        {
+            _watchPath = value ?? string.Empty;
+            WatchPathHash = PathHash.Of(_watchPath);
+        }
+    }
+
+    private string _watchPath = string.Empty;
+
+    /// <summary>
+    /// SHA-256 of <see cref="WatchPath"/> (see <see cref="PathHash"/>), kept in step by its setter. The path is
+    /// longer than an index key allows, so "one active watch per path" is a unique index on this column.
+    /// </summary>
+    [MaxLength(PathHash.Length)]
+    public string WatchPathHash { get; set; } = PathHash.Of(string.Empty);
     
     /// <summary>
     /// Whether this watch is currently active
@@ -96,7 +113,24 @@ public class PendingApproval
     /// </summary>
     [Required]
     [MaxLength(2000)]
-    public string FilePath { get; set; } = string.Empty;
+    public string FilePath
+    {
+        get => _filePath;
+        set
+        {
+            _filePath = value ?? string.Empty;
+            FilePathHash = PathHash.Of(_filePath);
+        }
+    }
+
+    private string _filePath = string.Empty;
+
+    /// <summary>
+    /// SHA-256 of <see cref="FilePath"/> (see <see cref="PathHash"/>), kept in step by its setter. Backs the
+    /// unique index that allows only one <see cref="ApprovalStatus.Pending"/> approval per file.
+    /// </summary>
+    [MaxLength(PathHash.Length)]
+    public string FilePathHash { get; set; } = PathHash.Of(string.Empty);
     
     /// <summary>
     /// File name only

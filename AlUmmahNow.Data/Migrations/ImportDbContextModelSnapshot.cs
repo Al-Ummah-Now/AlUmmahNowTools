@@ -68,6 +68,11 @@ namespace AlUmmahNow.Data.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
 
+                    b.Property<string>("WatchPathHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("ChannelName");
@@ -79,6 +84,11 @@ namespace AlUmmahNow.Data.Migrations
                     b.HasIndex("LastFileDetected");
 
                     b.HasIndex("WatchPath");
+
+                    b.HasIndex("WatchPathHash")
+                        .IsUnique()
+                        .HasDatabaseName("UX_ChannelWatches_WatchPathHash_Active")
+                        .HasFilter("[IsActive] = 1");
 
                     b.HasIndex("IsActive", "ChannelName");
 
@@ -138,6 +148,11 @@ namespace AlUmmahNow.Data.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
 
+                    b.Property<string>("FilePathHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
                     b.Property<long>("FileSize")
                         .HasColumnType("bigint");
 
@@ -164,6 +179,11 @@ namespace AlUmmahNow.Data.Migrations
                     b.HasIndex("ExpiresAt");
 
                     b.HasIndex("FileExists");
+
+                    b.HasIndex("FilePathHash")
+                        .IsUnique()
+                        .HasDatabaseName("UX_PendingApprovals_FilePathHash_Pending")
+                        .HasFilter("[Status] = 0");
 
                     b.HasIndex("Priority");
 

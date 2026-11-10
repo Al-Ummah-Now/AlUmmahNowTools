@@ -185,6 +185,11 @@ namespace AlUmmahNow.Data.Database
                 
                 entity.HasIndex(e => e.ChannelName);
                 entity.HasIndex(e => e.WatchPath);
+                entity.Property(e => e.WatchPathHash).IsRequired().HasMaxLength(PathHash.Length);
+                entity.HasIndex(e => e.WatchPathHash)
+                    .IsUnique()
+                    .HasFilter("[IsActive] = 1")
+                    .HasDatabaseName(ImportDbSchema.ActiveWatchPathIndex);
                 entity.HasIndex(e => e.IsActive);
                 entity.HasIndex(e => e.CreatedAt);
                 entity.HasIndex(e => e.LastFileDetected);
@@ -213,6 +218,11 @@ namespace AlUmmahNow.Data.Database
                 entity.HasIndex(e => e.ExpiresAt);
                 entity.HasIndex(e => e.ContentHash);
                 entity.HasIndex(e => e.FileExists);
+                entity.Property(e => e.FilePathHash).IsRequired().HasMaxLength(PathHash.Length);
+                entity.HasIndex(e => e.FilePathHash)
+                    .IsUnique()
+                    .HasFilter("[Status] = 0")
+                    .HasDatabaseName(ImportDbSchema.PendingApprovalPathIndex);
                 
                 // Composite indexes for common queries
                 entity.HasIndex(e => new { e.Status, e.Priority });

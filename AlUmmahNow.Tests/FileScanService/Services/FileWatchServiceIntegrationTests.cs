@@ -14,6 +14,7 @@ public class FileWatchServiceIntegrationTests : FileSystemTestBase
     private readonly Mock<ILogger<FileWatchService>> _mockLogger;
     private readonly Mock<ILogger<ApprovalService>> _mockApprovalLogger;
     private readonly ImportDbContext _dbContext;
+    private readonly SqliteImportDb _sqlite = new();
     private readonly DbContextOptions<ImportDbContext> _options;
     private readonly Mock<IApprovalService> _mockApprovalService;
     private FileWatchService _fileWatchService;
@@ -23,9 +24,7 @@ public class FileWatchServiceIntegrationTests : FileSystemTestBase
         _mockLogger = new Mock<ILogger<FileWatchService>>();
         _mockApprovalLogger = new Mock<ILogger<ApprovalService>>();
         
-        var options = new DbContextOptionsBuilder<ImportDbContext>()
-            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
-            .Options;
+        var options = _sqlite.Options;
         _options = options;
         _dbContext = new ImportDbContext(options);
         _dbContext.Database.EnsureCreated();
@@ -39,6 +38,7 @@ public class FileWatchServiceIntegrationTests : FileSystemTestBase
     {
         _fileWatchService?.Dispose();
         await _dbContext.DisposeAsync();
+        _sqlite.Dispose();
         await base.DisposeAsync();
     }
 
