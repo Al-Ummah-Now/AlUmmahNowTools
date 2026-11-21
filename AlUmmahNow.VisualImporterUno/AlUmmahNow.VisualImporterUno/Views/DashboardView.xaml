@@ -26,14 +26,14 @@
                         <HyperlinkButton x:Name="ReviewLink" Style="{StaticResource ToolsLinkButton}" Padding="0" Click="Approvals_Click" Visibility="Collapsed">
                             <TextBlock x:Uid="Dashboard_Review" Text="Review them" />
                         </HyperlinkButton>
-                        <TextBlock x:Name="WaitingHint" x:Uid="Dashboard_WaitingHint" Text="Videos from watched folders" Style="{StaticResource ToolsMuted}" />
+                        <TextBlock x:Name="WaitingHint" Style="{StaticResource ToolsMuted}" />
                     </StackPanel>
                 </Border>
                 <Border Style="{StaticResource ToolsCard}">
                     <StackPanel Spacing="6">
                         <TextBlock x:Uid="Dashboard_ArrivedLabel" Text="Videos arrived" Style="{StaticResource ToolsLabel}" />
                         <TextBlock x:Name="ArrivedValue" Text="–" Style="{StaticResource ToolsStatValue}" />
-                        <TextBlock x:Uid="Dashboard_ArrivedHint" Text="In watched folders" Style="{StaticResource ToolsMuted}" />
+                        <TextBlock x:Name="ArrivedHint" Style="{StaticResource ToolsMuted}" />
                     </StackPanel>
                 </Border>
                 <Border Style="{StaticResource ToolsCard}">
@@ -46,8 +46,13 @@
                 <Border Style="{StaticResource ToolsCard}">
                     <StackPanel Spacing="6">
                         <TextBlock x:Uid="Dashboard_ProblemsLabel" Text="Problems" Style="{StaticResource ToolsLabel}" />
-                        <TextBlock Text="{x:Bind ViewModel.ProblemCountText, Mode=OneWay}" Style="{StaticResource ToolsStatValue}" />
-                        <TextBlock x:Uid="Dashboard_ProblemsHint" Text="Each one can be tried again below" Style="{StaticResource ToolsMuted}" />
+                        <TextBlock Text="{x:Bind ViewModel.ProblemCountText, Mode=OneWay}" Style="{StaticResource ToolsStatValue}" Visibility="{x:Bind ViewModel.HasProblems, Mode=OneWay}" />
+                        <TextBlock x:Uid="Dashboard_ProblemsHint" Text="Each one can be tried again below" Style="{StaticResource ToolsMuted}" Visibility="{x:Bind ViewModel.HasProblems, Mode=OneWay}" />
+                        <!-- At zero a word, not a number: «٠» is a small dot and reads as a placeholder -->
+                        <StackPanel Orientation="Horizontal" Spacing="10" Visibility="{x:Bind ViewModel.HasProblems, Mode=OneWay, Converter={StaticResource InverseBoolToVisibility}}">
+                            <FontIcon Glyph="&#xE73E;" FontSize="22" Foreground="{ThemeResource FanousSuccessTextBrush}" VerticalAlignment="Center" />
+                            <TextBlock x:Uid="Dashboard_ProblemsNone" Text="No problems" Style="{StaticResource ToolsCardTitle}" FontSize="20" VerticalAlignment="Center" />
+                        </StackPanel>
                     </StackPanel>
                 </Border>
             </shell:TileGrid>

@@ -59,7 +59,11 @@ namespace AlUmmahNow.VisualImporterUno.Views
             WaitingValue.Text = waiting is int w ? Loc.Number(w) : "–";
             ArrivedValue.Text = arrived is int a ? Loc.Number(a) : "–";
             WatchingValue.Text = watching is int n ? Loc.Number(n) : "–";
-            WatchingHint.Text = folders is int f ? Loc.Format("Dashboard_WatchingOf", f) : Loc.Get("Dashboard_ScannerNeeded");
+            // While the scanner is off, every "–" tile says why
+            var needed = Loc.Get("Dashboard_ScannerNeeded");
+            WaitingHint.Text = waiting is null ? needed : Loc.Get("Dashboard_WaitingCaption");
+            ArrivedHint.Text = arrived is null ? needed : Loc.Get("Dashboard_ArrivedCaption");
+            WatchingHint.Text = folders is int f ? Loc.Format("Dashboard_WatchingOf", f) : needed;
             ReviewLink.Visibility = waiting > 0 ? Visibility.Visible : Visibility.Collapsed;
             WaitingHint.Visibility = waiting > 0 ? Visibility.Collapsed : Visibility.Visible;
         }
