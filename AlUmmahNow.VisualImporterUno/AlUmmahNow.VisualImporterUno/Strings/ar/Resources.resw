@@ -247,7 +247,7 @@
     <value>الإعدادات</value>
   </data>
   <data name="Nav_FFmpegSettings.Content" xml:space="preserve">
-    <value>أدوات الفيديو</value>
+    <value>أدوات المرئيات</value>
   </data>
   <data name="Status_Ready.Text" xml:space="preserve">
     <value>جاهز</value>
@@ -265,19 +265,19 @@
     <value>الاستيراد</value>
   </data>
   <data name="Page_Import_Subtitle" xml:space="preserve">
-    <value>ارفع مجلدًا من الفيديوهات إلى قناة مع ترجماتها وفصولها وصورها المصغّرة.</value>
+    <value>ارفع مجلدًا من المرئيات إلى قناة مع ترجماتها وفصولها وصورها المصغّرة.</value>
   </data>
   <data name="Page_WatchManagement_Title" xml:space="preserve">
     <value>المجلدات المراقبة</value>
   </data>
   <data name="Page_WatchManagement_Subtitle" xml:space="preserve">
-    <value>مجلدات تراقبها الأدوات وتستورد منها كلما وصلت فيديوهات جديدة.</value>
+    <value>مجلدات تراقبها الأدوات وتستورد منها كلما وصلت مرئيات جديدة.</value>
   </data>
   <data name="Page_ApprovalWorkflow_Title" xml:space="preserve">
     <value>الموافقات</value>
   </data>
   <data name="Page_ApprovalWorkflow_Subtitle" xml:space="preserve">
-    <value>فيديوهات وُجدت في المجلدات المراقبة وتنتظر الموافقة قبل رفعها.</value>
+    <value>مرئيات وُجدت في المجلدات المراقبة وتنتظر الموافقة قبل رفعها.</value>
   </data>
   <data name="Page_Analytics_Title" xml:space="preserve">
     <value>الإحصاءات</value>
@@ -289,22 +289,22 @@
     <value>فاحص المجلدات</value>
   </data>
   <data name="Page_ServiceStatus_Subtitle" xml:space="preserve">
-    <value>المساعد الذي يبحث في المجلدات عن الفيديوهات في الخلفية.</value>
+    <value>المساعد الذي يبحث في المجلدات عن المرئيات في الخلفية.</value>
   </data>
   <data name="Page_Settings_Title" xml:space="preserve">
     <value>الإعدادات</value>
   </data>
   <data name="Page_Settings_Subtitle" xml:space="preserve">
-    <value>كيف تستورد الأدوات فيديوهاتك وتسمّيها وتفحصها.</value>
+    <value>كيف تستورد الأدوات مرئياتك وتسمّيها وتفحصها.</value>
   </data>
   <data name="Page_FFmpegSettings_Title" xml:space="preserve">
-    <value>أدوات الفيديو</value>
+    <value>أدوات المرئيات</value>
   </data>
   <data name="Page_FFmpegSettings_Subtitle" xml:space="preserve">
-    <value>برامج الفيديو التي تستخدمها الأدوات لقراءة الملفات وتجهيزها.</value>
+    <value>برامج المرئيات التي تستخدمها الأدوات لقراءة الملفات وتجهيزها.</value>
   </data>
   <data name="Dashboard_FilesLabel.Text" xml:space="preserve">
-    <value>فيديوهات وُجدت</value>
+    <value>مرئيات وُجدت</value>
   </data>
   <data name="Dashboard_FilesHint.Text" xml:space="preserve">
     <value>عثر عليها فاحص المجلدات منذ فتح الأدوات</value>
@@ -313,7 +313,7 @@
     <value>عمليات فحص جارية</value>
   </data>
   <data name="Dashboard_ScansHint.Text" xml:space="preserve">
-    <value>مجلدات يجري البحث فيها عن فيديوهات الآن</value>
+    <value>مجلدات يجري البحث فيها عن مرئيات الآن</value>
   </data>
   <data name="Dashboard_ProblemsLabel.Text" xml:space="preserve">
     <value>مشكلات</value>
@@ -331,10 +331,10 @@
     <value>الاستيراد الجماعي</value>
   </data>
   <data name="Dashboard_ImportTitle.Text" xml:space="preserve">
-    <value>انقل مجلدًا من الفيديوهات إلى قناة</value>
+    <value>انقل مجلدًا من المرئيات إلى قناة</value>
   </data>
   <data name="Dashboard_ImportBody.Text" xml:space="preserve">
-    <value>اختر مجلدًا، فتجد الأدوات الفيديوهات وملفات ترجماتها وفصولها وصورها المصغّرة، ثم ترفعها إلى القناة التي تختارها دون حدود للرفع.</value>
+    <value>اختر مجلدًا، فتجد الأدوات المرئيات وملفات ترجماتها وفصولها وصورها المصغّرة، ثم ترفعها إلى القناة التي تختارها دون حدود للرفع.</value>
   </data>
   <data name="Dashboard_StartImport.Text" xml:space="preserve">
     <value>ابدأ استيرادًا جديدًا</value>
@@ -400,7 +400,7 @@
     <value>الفاحص يعمل</value>
   </data>
   <data name="Scanner_OnDetail" xml:space="preserve">
-    <value>يجري البحث في المجلدات المراقبة عن الفيديوهات الجديدة فور وصولها.</value>
+    <value>يجري البحث في المجلدات المراقبة عن المرئيات الجديدة فور وصولها.</value>
   </data>
   <data name="Scanner_OnExternalDetail" xml:space="preserve">
     <value>كان يعمل قبل فتح الأدوات، فتستخدمه الأدوات كما هو.</value>
@@ -409,7 +409,7 @@
     <value>الفاحص متوقف</value>
   </data>
   <data name="Scanner_OffDetail" xml:space="preserve">
-    <value>شغّله ليبحث في المجلدات المراقبة عن فيديوهات جديدة. الاستيراد الذي تبدؤه بنفسك يعمل على أي حال.</value>
+    <value>شغّله ليبحث في المجلدات المراقبة عن مرئيات جديدة. الاستيراد الذي تبدؤه بنفسك يعمل على أي حال.</value>
   </data>
   <data name="Scanner_StartingTitle" xml:space="preserve">
     <value>جارٍ تشغيل الفاحص</value>
@@ -507,14 +507,11 @@
   <data name="Operation_Scan" xml:space="preserve">
     <value>فحص مجلد</value>
   </data>
-  <data name="Operation_FilesFound" xml:space="preserve">
-    <value>وُجد {0} فيديو</value>
-  </data>
   <data name="Operation_Started" xml:space="preserve">
     <value>بدأ {0}</value>
   </data>
   <data name="Progress_Scanning" xml:space="preserve">
-    <value>جارٍ الفحص: فُحص {0} من {1} ملف، ووُجد {2} فيديو</value>
+    <value>جارٍ الفحص: الملف {0} من {1}. المرئيات التي وُجدت: {2}.</value>
   </data>
   <data name="Progress_Importing" xml:space="preserve">
     <value>جارٍ استيراد {0} من {1}</value>
@@ -535,7 +532,7 @@
     <value>المجلد</value>
   </data>
   <data name="Import_FolderBody.Text" xml:space="preserve">
-    <value>كل مجلد بداخله يصبح قناة. تجد الأدوات الفيديوهات وملفات الترجمة والفصول والصور المصغّرة المجاورة لها.</value>
+    <value>كل مجلد بداخله يصبح قناة. تجد الأدوات المرئيات وملفات الترجمة والفصول والصور المصغّرة المجاورة لها.</value>
   </data>
   <data name="Import_FolderBox.PlaceholderText" xml:space="preserve">
     <value>لم يُختر مجلد بعد</value>
@@ -544,16 +541,16 @@
     <value>اختر مجلدًا</value>
   </data>
   <data name="Import_Scan.Text" xml:space="preserve">
-    <value>ابحث عن الفيديوهات</value>
+    <value>ابحث عن المرئيات</value>
   </data>
   <data name="Import_EmptyTitle.Text" xml:space="preserve">
-    <value>تظهر الفيديوهات هنا</value>
+    <value>تظهر المرئيات هنا</value>
   </data>
   <data name="Import_EmptyBody.Text" xml:space="preserve">
-    <value>اختر مجلدًا وابحث عن فيديوهاته، ثم اختر ما تريد رفعه؛ لا يُرفع شيء حتى تقرر ذلك.</value>
+    <value>اختر مجلدًا وابحث عن مرئياته، ثم اختر ما تريد رفعه؛ لا يُرفع شيء حتى تقرر ذلك.</value>
   </data>
   <data name="Import_FoundTitle.Text" xml:space="preserve">
-    <value>الفيديوهات التي وُجدت</value>
+    <value>المرئيات التي وُجدت</value>
   </data>
   <data name="Import_SelectedLabel.Text" xml:space="preserve">
     <value>محدّد</value>
@@ -574,22 +571,19 @@
     <value>كل القنوات</value>
   </data>
   <data name="Import_Ready" xml:space="preserve">
-    <value>اختر مجلدًا للبحث عن فيديوهاته.</value>
+    <value>اختر مجلدًا للبحث عن مرئياته.</value>
   </data>
   <data name="Import_SafeMode" xml:space="preserve">
     <value>بدأت الأدوات في الوضع الآمن، فبعض الميزات غير متاحة. أعد تشغيل الأدوات للمحاولة مجددًا.</value>
   </data>
   <data name="Import_FolderChosen" xml:space="preserve">
-    <value>اختير المجلد. ابحث عن فيديوهاته الآن.</value>
+    <value>اختير المجلد. ابحث عن مرئياته الآن.</value>
   </data>
   <data name="Import_FolderFailed" xml:space="preserve">
     <value>تعذّر فتح المجلد</value>
   </data>
   <data name="Import_Scanning" xml:space="preserve">
-    <value>جارٍ البحث عن الفيديوهات…</value>
-  </data>
-  <data name="Import_Found" xml:space="preserve">
-    <value>وُجد {0} فيديو في {1} قناة.</value>
+    <value>جارٍ البحث عن المرئيات…</value>
   </data>
   <data name="Import_ScanCancelled" xml:space="preserve">
     <value>أُلغي البحث.</value>
@@ -601,10 +595,7 @@
     <value>جارٍ بدء الرفع…</value>
   </data>
   <data name="Import_NoneSelected" xml:space="preserve">
-    <value>حدّد فيديو واحدًا على الأقل لرفعه.</value>
-  </data>
-  <data name="Import_Processed" xml:space="preserve">
-    <value>أُرسل {0} فيديو للرفع.</value>
+    <value>حدّد مرئيًا واحدًا على الأقل لرفعه.</value>
   </data>
   <data name="Import_Failed" xml:space="preserve">
     <value>فشل الرفع</value>
@@ -643,7 +634,7 @@
     <value>تعذّر تحميل عمليات الاستيراد السابقة</value>
   </data>
   <data name="Import_Completed" xml:space="preserve">
-    <value>انتهى الرفع: رُفع {0} وفشل {1}.</value>
+    <value>انتهى الرفع. رُفع: {0}. تعذّر رفعه: {1}.</value>
   </data>
   <data name="Settings_ScannerTitle.Text" xml:space="preserve">
     <value>فاحص المجلدات</value>
@@ -651,11 +642,8 @@
   <data name="Settings_AddressLabel.Text" xml:space="preserve">
     <value>العنوان</value>
   </data>
-  <data name="Settings_AddressBox.PlaceholderText" xml:space="preserve">
-    <value>http://localhost:5000</value>
-  </data>
   <data name="Settings_AddressHint.Text" xml:space="preserve">
-    <value>المكان الذي تصل فيه الأدوات إلى الفاحص على هذا الجهاز. اتركه كما هو ما لم يطلب منك الدعم تغييره.</value>
+    <value>لا تغيّره إلا إذا طلب منك الدعم ذلك.</value>
   </data>
   <data name="Settings_Test.Text" xml:space="preserve">
     <value>اختبر الاتصال</value>
@@ -685,10 +673,10 @@
     <value>الإشعارات</value>
   </data>
   <data name="Settings_Notify.Text" xml:space="preserve">
-    <value>أعلمني عند وصول فيديوهات</value>
+    <value>أعلمني عند وصول مرئيات</value>
   </data>
   <data name="Settings_NotifyHint.Text" xml:space="preserve">
-    <value>إشعار على سطح المكتب عند وصول فيديو جديد إلى مجلد مراقب أو عند اتخاذ قرار موافقة.</value>
+    <value>إشعار على سطح المكتب عند وصول مرئي جديد إلى مجلد مراقَب أو عند اتخاذ قرار موافقة.</value>
   </data>
   <data name="Settings_Sound.Text" xml:space="preserve">
     <value>شغّل صوتًا</value>
@@ -742,10 +730,10 @@
     <value>الصور المصغّرة</value>
   </data>
   <data name="Video_UseThumbsBody.Text" xml:space="preserve">
-    <value>صورة مصغّرة من الفيديو عندما لا يكون في المجلد صورة.</value>
+    <value>صورة مصغّرة من المرئي عندما لا يكون في المجلد صورة.</value>
   </data>
   <data name="Video_UseDetailsTitle.Text" xml:space="preserve">
-    <value>تفاصيل الفيديو</value>
+    <value>تفاصيل المرئي</value>
   </data>
   <data name="Video_UseDetailsBody.Text" xml:space="preserve">
     <value>المدة وأبعاد الصورة والصيغة، تُقرأ قبل الرفع.</value>
@@ -763,10 +751,10 @@
     <value>يُعثر عليها تلقائيًا في الغالب. حدّدها بنفسك فقط إذا كانت البرامج في مكان غير معتاد.</value>
   </data>
   <data name="Video_ConverterLabel.Text" xml:space="preserve">
-    <value>محوّل الفيديو</value>
+    <value>محوّل المرئيات</value>
   </data>
   <data name="Video_ReaderLabel.Text" xml:space="preserve">
-    <value>قارئ الفيديو</value>
+    <value>قارئ المرئيات</value>
   </data>
   <data name="Video_Browse.Text" xml:space="preserve">
     <value>اختر</value>
@@ -787,43 +775,43 @@
     <value>طرق أخرى للتثبيت</value>
   </data>
   <data name="Video_Checking" xml:space="preserve">
-    <value>جارٍ التحقق من برامج الفيديو…</value>
+    <value>جارٍ التحقق من برامج المرئيات…</value>
   </data>
   <data name="Video_Detecting" xml:space="preserve">
-    <value>جارٍ البحث عن برامج الفيديو…</value>
+    <value>جارٍ البحث عن برامج المرئيات…</value>
   </data>
   <data name="Video_ReadyTitle" xml:space="preserve">
-    <value>برامج الفيديو جاهزة</value>
+    <value>برامج المرئيات جاهزة</value>
   </data>
   <data name="Video_ReadyBody" xml:space="preserve">
-    <value>الصور المصغّرة وتفاصيل الفيديو وفحص الملفات تعمل كلها.</value>
+    <value>الصور المصغّرة وتفاصيل المرئيات وفحص الملفات تعمل كلها.</value>
   </data>
   <data name="Video_MissingTitle" xml:space="preserve">
-    <value>برامج الفيديو غير مُعدّة</value>
+    <value>برامج المرئيات غير مُعدّة</value>
   </data>
   <data name="Video_ConverterMissing" xml:space="preserve">
-    <value>لم يُعثر على محوّل الفيديو.</value>
+    <value>لم يُعثر على محوّل المرئيات.</value>
   </data>
   <data name="Video_ConverterBroken" xml:space="preserve">
-    <value>عُثر على محوّل الفيديو لكنه لا يعمل.</value>
+    <value>عُثر على محوّل المرئيات لكنه لا يعمل.</value>
   </data>
   <data name="Video_ReaderMissing" xml:space="preserve">
-    <value>لم يُعثر على قارئ الفيديو.</value>
+    <value>لم يُعثر على قارئ المرئيات.</value>
   </data>
   <data name="Video_ReaderBroken" xml:space="preserve">
-    <value>عُثر على قارئ الفيديو لكنه لا يعمل.</value>
+    <value>عُثر على قارئ المرئيات لكنه لا يعمل.</value>
   </data>
   <data name="Video_NotDetected" xml:space="preserve">
     <value>ليست مثبّتة على هذا الجهاز. ثبّتها كما في الأسفل ثم أعد المحاولة.</value>
   </data>
   <data name="Video_CheckFailed" xml:space="preserve">
-    <value>تعذّر التحقق من برامج الفيديو</value>
+    <value>تعذّر التحقق من برامج المرئيات</value>
   </data>
   <data name="Video_NeedBoth" xml:space="preserve">
     <value>اختر البرنامجين قبل الحفظ.</value>
   </data>
   <data name="Video_PathsInvalid" xml:space="preserve">
-    <value>هذه الملفات لا تعمل كبرامج الفيديو. تحقّق من المواقع.</value>
+    <value>هذه الملفات لا تعمل كبرامج المرئيات. تحقّق من المواقع.</value>
   </data>
   <data name="Video_SaveFailed" xml:space="preserve">
     <value>تعذّر حفظ المواقع</value>
@@ -844,7 +832,7 @@
     <value>قيد المراقبة الآن</value>
   </data>
   <data name="Watch_StatFiles.Text" xml:space="preserve">
-    <value>فيديوهات وصلت</value>
+    <value>مرئيات وصلت</value>
   </data>
   <data name="Watch_StatPending.Text" xml:space="preserve">
     <value>بانتظار الموافقة</value>
@@ -856,7 +844,7 @@
     <value>راقب مجلدًا</value>
   </data>
   <data name="Watch_AddBody.Text" xml:space="preserve">
-    <value>الفيديوهات الجديدة التي تصل إلى المجلد تنتظر موافقتك، ثم تُرفع إلى القناة.</value>
+    <value>المرئيات الجديدة التي تصل إلى المجلد تنتظر موافقتك، ثم تُرفع إلى القناة.</value>
   </data>
   <data name="Watch_ChannelLabel.Text" xml:space="preserve">
     <value>القناة</value>
@@ -874,10 +862,10 @@
     <value>يشمل المجلدات التي بداخله</value>
   </data>
   <data name="Watch_DelayLabel.Text" xml:space="preserve">
-    <value>الانتظار قبل التقاط فيديو جديد</value>
+    <value>الانتظار قبل التقاط مرئي جديد</value>
   </data>
   <data name="Watch_ExtensionsLabel.Text" xml:space="preserve">
-    <value>أنواع ملفات الفيديو</value>
+    <value>أنواع ملفات المرئيات</value>
   </data>
   <data name="Watch_Start.Text" xml:space="preserve">
     <value>ابدأ المراقبة</value>
@@ -934,19 +922,10 @@
     <value>لا توجد مجلدات مراقبة بعد</value>
   </data>
   <data name="Watch_EmptyBody.Text" xml:space="preserve">
-    <value>راقب مجلدًا فيُعرض كل فيديو جديد فيه للرفع إلى قناته. يجب أن يكون فاحص المجلدات قيد التشغيل.</value>
+    <value>راقب مجلدًا فيُعرض كل مرئي جديد فيه للرفع إلى قناته. يجب أن يكون فاحص المجلدات قيد التشغيل.</value>
   </data>
   <data name="Watch_Stop.Text" xml:space="preserve">
     <value>أوقف المراقبة</value>
-  </data>
-  <data name="Watch_DelayValue" xml:space="preserve">
-    <value>{0} ثانية</value>
-  </data>
-  <data name="Watch_RowVideos" xml:space="preserve">
-    <value>وصل {0} فيديو</value>
-  </data>
-  <data name="Watch_RowWaiting" xml:space="preserve">
-    <value>{0} بانتظار الموافقة</value>
   </data>
   <data name="Watch_FileRow" xml:space="preserve">
     <value>الصف {0}</value>
@@ -970,7 +949,7 @@
     <value>أبلغ فاحص المجلدات عن مشكلة</value>
   </data>
   <data name="Watch_FileDetected" xml:space="preserve">
-    <value>وصل فيديو جديد</value>
+    <value>وصل مرئي جديد</value>
   </data>
   <data name="Watch_StatusChanged" xml:space="preserve">
     <value>تغيّرت حالة مجلد مراقب</value>
@@ -985,13 +964,10 @@
     <value>أُزيل المجلد المراقب</value>
   </data>
   <data name="Watch_NewForApproval" xml:space="preserve">
-    <value>فيديو جديد بانتظار الموافقة</value>
+    <value>مرئي جديد بانتظار الموافقة</value>
   </data>
   <data name="Watch_ApprovalChanged" xml:space="preserve">
     <value>تغيّرت حالة موافقة</value>
-  </data>
-  <data name="Watch_DecisionDone" xml:space="preserve">
-    <value>بُتّ في {0} فيديو.</value>
   </data>
   <data name="Watch_Creating" xml:space="preserve">
     <value>جارٍ بدء المراقبة…</value>
@@ -1018,16 +994,13 @@
     <value>جارٍ التحديث…</value>
   </data>
   <data name="Watch_Loaded" xml:space="preserve">
-    <value>{0} مجلد قيد المراقبة.</value>
+    <value>قائمة المجلدات محدّثة.</value>
   </data>
   <data name="Watch_RefreshFailed" xml:space="preserve">
     <value>تعذّر تحديث المجلدات المراقبة</value>
   </data>
   <data name="Watch_Viewing" xml:space="preserve">
     <value>عرض</value>
-  </data>
-  <data name="Watch_PreviewReady" xml:space="preserve">
-    <value>{0} مجلد جاهز للمراقبة.</value>
   </data>
   <data name="Watch_PreviewFailed" xml:space="preserve">
     <value>تعذّر تحديد المجلدات</value>
@@ -1039,13 +1012,10 @@
     <value>جارٍ بدء {0} من {1}…</value>
   </data>
   <data name="Watch_ManyDone" xml:space="preserve">
-    <value>بدأت مراقبة {0} مجلد وفشل {1}.</value>
+    <value>بدأت مراقبته: {0}. تعذّر بدؤه: {1}.</value>
   </data>
   <data name="Watch_ManyDoneTitle" xml:space="preserve">
     <value>بدأت المراقبة</value>
-  </data>
-  <data name="Watch_ManyCreated" xml:space="preserve">
-    <value>{0} مجلد قيد المراقبة الآن.</value>
   </data>
   <data name="Watch_ManyAllFailed" xml:space="preserve">
     <value>تعذّرت مراقبة أي منها. تأكد من وجود المجلدات وأن الأدوات تستطيع فتحها.</value>
@@ -1060,16 +1030,13 @@
     <value>استخدم ملف CSV أو JSON.</value>
   </data>
   <data name="Watch_FileChecked" xml:space="preserve">
-    <value>{0} صف صالح و{1} فيها مشكلات.</value>
+    <value>صفوف صالحة: {0}. صفوف فيها مشكلات: {1}.</value>
   </data>
   <data name="Watch_FileFailed" xml:space="preserve">
     <value>تعذّرت قراءة الملف</value>
   </data>
   <data name="Watch_FileNoneValid" xml:space="preserve">
     <value>لا يوجد صف صالح في الملف.</value>
-  </data>
-  <data name="Watch_TemplatesLoaded" xml:space="preserve">
-    <value>{0} قالب متاح.</value>
   </data>
   <data name="Watch_TemplatesFailed" xml:space="preserve">
     <value>تعذّر تحميل القوالب</value>
@@ -1102,7 +1069,7 @@
     <value>يجب أن يكون الانتظار بين ١ و٣٠٠ ثانية.</value>
   </data>
   <data name="Watch_ExtensionsNeeded" xml:space="preserve">
-    <value>أضف نوع ملف فيديو واحدًا على الأقل.</value>
+    <value>أضف نوع ملف مرئي واحدًا على الأقل.</value>
   </data>
   <data name="Watch_Refresh" xml:space="preserve">
     <value>تحديث</value>
@@ -1210,7 +1177,7 @@
     <value>لا شيء بانتظار القرار</value>
   </data>
   <data name="Approve_EmptyBody.Text" xml:space="preserve">
-    <value>الفيديوهات التي تصل إلى المجلدات المراقبة تنتظر هنا الموافقة أو الرفض. امسح عوامل التصفية إن كنت تتوقع وجود بعضها.</value>
+    <value>المرئيات التي تصل إلى المجلدات المراقبة تنتظر هنا الموافقة أو الرفض. امسح عوامل التصفية إن كنت تتوقع وجود بعضها.</value>
   </data>
   <data name="Approve_RowPreview.Text" xml:space="preserve">
     <value>معاينة</value>
@@ -1225,7 +1192,7 @@
     <value>المعاينة</value>
   </data>
   <data name="Approve_PreviewEmpty.Text" xml:space="preserve">
-    <value>اختر «معاينة» على فيديو لترى صورته وتفاصيله هنا.</value>
+    <value>اختر «معاينة» على مرئي لترى صورته وتفاصيله هنا.</value>
   </data>
   <data name="Approve_ThumbAgain.Text" xml:space="preserve">
     <value>أعد إنشاء الصورة</value>
@@ -1309,7 +1276,7 @@
     <value>{0} كيلوبت في الثانية</value>
   </data>
   <data name="Approve_Ready" xml:space="preserve">
-    <value>حدّد الفيديوهات ثم وافق عليها أو ارفضها.</value>
+    <value>حدّد المرئيات ثم وافق عليها أو ارفضها.</value>
   </data>
   <data name="Approve_StartFailed" xml:space="preserve">
     <value>تعذّر تحميل الموافقات</value>
@@ -1321,16 +1288,13 @@
     <value>الموافقات محدّثة.</value>
   </data>
   <data name="Approve_NewFile" xml:space="preserve">
-    <value>وصل فيديو جديد.</value>
+    <value>وصل مرئي جديد.</value>
   </data>
   <data name="Approve_Changed" xml:space="preserve">
     <value>تغيّرت حالة موافقة.</value>
   </data>
   <data name="Approve_Loading" xml:space="preserve">
     <value>جارٍ تحميل الموافقات…</value>
-  </data>
-  <data name="Approve_Loaded" xml:space="preserve">
-    <value>{0} فيديو بانتظار القرار.</value>
   </data>
   <data name="Approve_LoadFailed" xml:space="preserve">
     <value>تعذّر تحميل الموافقات</value>
@@ -1341,23 +1305,11 @@
   <data name="Approve_Rejecting" xml:space="preserve">
     <value>جارٍ الرفض…</value>
   </data>
-  <data name="Approve_ApprovingMany" xml:space="preserve">
-    <value>جارٍ الموافقة على {0} فيديو…</value>
-  </data>
-  <data name="Approve_RejectingMany" xml:space="preserve">
-    <value>جارٍ رفض {0} فيديو…</value>
-  </data>
   <data name="Approve_ApprovedOne" xml:space="preserve">
     <value>تمت الموافقة</value>
   </data>
   <data name="Approve_RejectedOne" xml:space="preserve">
     <value>تم الرفض</value>
-  </data>
-  <data name="Approve_ApprovedMany" xml:space="preserve">
-    <value>تمت الموافقة على {0} فيديو.</value>
-  </data>
-  <data name="Approve_RejectedMany" xml:space="preserve">
-    <value>رُفض {0} فيديو.</value>
   </data>
   <data name="Approve_ApproveFailed" xml:space="preserve">
     <value>تعذّرت الموافقة</value>
@@ -1365,17 +1317,8 @@
   <data name="Approve_RejectFailed" xml:space="preserve">
     <value>تعذّر الرفض</value>
   </data>
-  <data name="Approve_ApproveManyFailed" xml:space="preserve">
-    <value>تعذّرت الموافقة على {0} فيديو.</value>
-  </data>
-  <data name="Approve_RejectManyFailed" xml:space="preserve">
-    <value>تعذّر رفض {0} فيديو.</value>
-  </data>
   <data name="Approve_Previewing" xml:space="preserve">
     <value>معاينة</value>
-  </data>
-  <data name="Approve_SelectedAll" xml:space="preserve">
-    <value>حُدّد {0} فيديو.</value>
   </data>
   <data name="Approve_SelectionCleared" xml:space="preserve">
     <value>أُلغي التحديد.</value>
@@ -1411,7 +1354,7 @@
     <value>تعذّر تطبيق عوامل التصفية</value>
   </data>
   <data name="Approve_VideoMissing" xml:space="preserve">
-    <value>ملف الفيديو لم يعد موجودًا</value>
+    <value>ملف المرئي لم يعد موجودًا</value>
   </data>
   <data name="Approve_ThumbMade" xml:space="preserve">
     <value>أُنشئت الصورة.</value>
@@ -1459,7 +1402,7 @@
     <value>أنشط قناة في هذه الفترة</value>
   </data>
   <data name="Stats_DailyTitle.Text" xml:space="preserve">
-    <value>الفيديوهات التي وصلت حسب اليوم</value>
+    <value>المرئيات التي وصلت حسب اليوم</value>
   </data>
   <data name="Stats_LegendApproved.Text" xml:space="preserve">
     <value>موافق عليها</value>
@@ -1474,10 +1417,10 @@
     <value>حسب الأولوية</value>
   </data>
   <data name="Stats_HoursTitle.Text" xml:space="preserve">
-    <value>متى تصل الفيديوهات حسب الساعة</value>
+    <value>متى تصل المرئيات حسب الساعة</value>
   </data>
   <data name="Stats_RecentTitle.Text" xml:space="preserve">
-    <value>أحدث الفيديوهات</value>
+    <value>أحدث المرئيات</value>
   </data>
   <data name="Stats_RecentEmpty.Text" xml:space="preserve">
     <value>لم يصل شيء بعد في هذه الفترة.</value>
@@ -1506,14 +1449,8 @@
   <data name="Stats_TrendDown" xml:space="preserve">
     <value>وصل أقل بنسبة {0} من الفترة السابقة</value>
   </data>
-  <data name="Stats_ChannelSummary" xml:space="preserve">
-    <value>{0} فيديو، {1}</value>
-  </data>
   <data name="Stats_Priority" xml:space="preserve">
     <value>الأولوية {0}</value>
-  </data>
-  <data name="Stats_PriorityCount" xml:space="preserve">
-    <value>{0} فيديو، {1}</value>
   </data>
   <data name="Stats_StatusApproved" xml:space="preserve">
     <value>موافق عليه</value>
@@ -1554,9 +1491,6 @@
   <data name="When_Date" xml:space="preserve">
     <value>{0}، {1}</value>
   </data>
-  <data name="Watch_Stopped.Text" xml:space="preserve">
-    <value>غير مراقَب الآن</value>
-  </data>
   <data name="SignIn_WaitingBody.Text" xml:space="preserve">
     <value>فُتحت صفحة تسجيل الدخول في متصفحك. تتابع الأدوات تلقائيًا بعد أن تسجّل الدخول هناك.</value>
   </data>
@@ -1564,30 +1498,468 @@
     <value>افتح صفحة تسجيل الدخول مجددًا</value>
   </data>
   <data name="Notify_FileDetected" xml:space="preserve">
-    <value>فيديو جديد في مجلد مراقَب</value>
+    <value>مرئي جديد في مجلد مراقَب</value>
   </data>
   <data name="Notify_ApprovedOne" xml:space="preserve">
-    <value>تمت الموافقة على الفيديو</value>
+    <value>تمت الموافقة على المرئي</value>
   </data>
   <data name="Notify_RejectedOne" xml:space="preserve">
-    <value>رُفض الفيديو</value>
-  </data>
-  <data name="Notify_ApprovedMany" xml:space="preserve">
-    <value>تمت الموافقة على {0} فيديو</value>
-  </data>
-  <data name="Notify_RejectedMany" xml:space="preserve">
-    <value>رُفض {0} فيديو</value>
+    <value>رُفض المرئي</value>
   </data>
   <data name="Notify_Ok" xml:space="preserve">
     <value>حسنًا</value>
   </data>
   <data name="Import_StorageNotSet" xml:space="preserve">
-    <value>الرفع غير مُعدّ على هذا الجهاز بعد. البحث عن الفيديوهات وفحصها يعملان على أي حال.</value>
+    <value>الرفع غير مُعدّ على هذا الجهاز بعد. البحث عن المرئيات وفحصها يعملان على أي حال.</value>
   </data>
   <data name="Stats_ChannelApproved" xml:space="preserve">
     <value>{0} موافق عليها</value>
   </data>
   <data name="Stats_ChannelNoneDecided" xml:space="preserve">
     <value>لم يُبتّ في أي منها بعد</value>
+  </data>
+  <data name="Operation_FilesFound_One" xml:space="preserve">
+    <value>وُجد مرئي واحد</value>
+  </data>
+  <data name="Operation_FilesFound_Other" xml:space="preserve">
+    <value>وُجد {0} مرئي</value>
+  </data>
+  <data name="Operation_FilesFound_Zero" xml:space="preserve">
+    <value>لم يُعثر على مرئيات</value>
+  </data>
+  <data name="Operation_FilesFound_Two" xml:space="preserve">
+    <value>وُجد مرئيان</value>
+  </data>
+  <data name="Operation_FilesFound_Few" xml:space="preserve">
+    <value>وُجدت {0} مرئيات</value>
+  </data>
+  <data name="Operation_FilesFound_Many" xml:space="preserve">
+    <value>وُجد {0} مرئيًا</value>
+  </data>
+  <data name="Import_Found_One" xml:space="preserve">
+    <value>وُجد مرئي واحد في {1}.</value>
+  </data>
+  <data name="Import_Found_Other" xml:space="preserve">
+    <value>وُجد {0} مرئي في {1}.</value>
+  </data>
+  <data name="Import_Found_Zero" xml:space="preserve">
+    <value>لم يُعثر على مرئيات.</value>
+  </data>
+  <data name="Import_Found_Two" xml:space="preserve">
+    <value>وُجد مرئيان في {1}.</value>
+  </data>
+  <data name="Import_Found_Few" xml:space="preserve">
+    <value>وُجدت {0} مرئيات في {1}.</value>
+  </data>
+  <data name="Import_Found_Many" xml:space="preserve">
+    <value>وُجد {0} مرئيًا في {1}.</value>
+  </data>
+  <data name="Count_Channels_One" xml:space="preserve">
+    <value>قناة واحدة</value>
+  </data>
+  <data name="Count_Channels_Other" xml:space="preserve">
+    <value>{0} قناة</value>
+  </data>
+  <data name="Count_Channels_Zero" xml:space="preserve">
+    <value>{0} قناة</value>
+  </data>
+  <data name="Count_Channels_Two" xml:space="preserve">
+    <value>قناتين</value>
+  </data>
+  <data name="Count_Channels_Few" xml:space="preserve">
+    <value>{0} قنوات</value>
+  </data>
+  <data name="Count_Channels_Many" xml:space="preserve">
+    <value>{0} قناة</value>
+  </data>
+  <data name="Import_Processed_One" xml:space="preserve">
+    <value>أُرسل مرئي واحد للرفع.</value>
+  </data>
+  <data name="Import_Processed_Other" xml:space="preserve">
+    <value>أُرسل {0} مرئي للرفع.</value>
+  </data>
+  <data name="Import_Processed_Zero" xml:space="preserve">
+    <value>لم يُرسل أي مرئي للرفع.</value>
+  </data>
+  <data name="Import_Processed_Two" xml:space="preserve">
+    <value>أُرسل مرئيان للرفع.</value>
+  </data>
+  <data name="Import_Processed_Few" xml:space="preserve">
+    <value>أُرسلت {0} مرئيات للرفع.</value>
+  </data>
+  <data name="Import_Processed_Many" xml:space="preserve">
+    <value>أُرسل {0} مرئيًا للرفع.</value>
+  </data>
+  <data name="Watch_DelayValue_One" xml:space="preserve">
+    <value>ثانية واحدة</value>
+  </data>
+  <data name="Watch_DelayValue_Other" xml:space="preserve">
+    <value>{0} ثانية</value>
+  </data>
+  <data name="Watch_DelayValue_Zero" xml:space="preserve">
+    <value>{0} ثانية</value>
+  </data>
+  <data name="Watch_DelayValue_Two" xml:space="preserve">
+    <value>ثانيتان</value>
+  </data>
+  <data name="Watch_DelayValue_Few" xml:space="preserve">
+    <value>{0} ثوانٍ</value>
+  </data>
+  <data name="Watch_DelayValue_Many" xml:space="preserve">
+    <value>{0} ثانية</value>
+  </data>
+  <data name="Watch_RowVideos_One" xml:space="preserve">
+    <value>وصل مرئي واحد</value>
+  </data>
+  <data name="Watch_RowVideos_Other" xml:space="preserve">
+    <value>وصل {0} مرئي</value>
+  </data>
+  <data name="Watch_RowVideos_Zero" xml:space="preserve">
+    <value>لم يصل أي مرئي</value>
+  </data>
+  <data name="Watch_RowVideos_Two" xml:space="preserve">
+    <value>وصل مرئيان</value>
+  </data>
+  <data name="Watch_RowVideos_Few" xml:space="preserve">
+    <value>وصلت {0} مرئيات</value>
+  </data>
+  <data name="Watch_RowVideos_Many" xml:space="preserve">
+    <value>وصل {0} مرئيًا</value>
+  </data>
+  <data name="Watch_RowWaiting_One" xml:space="preserve">
+    <value>مرئي واحد بانتظار الموافقة</value>
+  </data>
+  <data name="Watch_RowWaiting_Other" xml:space="preserve">
+    <value>{0} مرئي بانتظار الموافقة</value>
+  </data>
+  <data name="Watch_RowWaiting_Zero" xml:space="preserve">
+    <value>لا شيء بانتظار الموافقة</value>
+  </data>
+  <data name="Watch_RowWaiting_Two" xml:space="preserve">
+    <value>مرئيان بانتظار الموافقة</value>
+  </data>
+  <data name="Watch_RowWaiting_Few" xml:space="preserve">
+    <value>{0} مرئيات بانتظار الموافقة</value>
+  </data>
+  <data name="Watch_RowWaiting_Many" xml:space="preserve">
+    <value>{0} مرئيًا بانتظار الموافقة</value>
+  </data>
+  <data name="Watch_DecisionDone_One" xml:space="preserve">
+    <value>بُتّ في مرئي واحد.</value>
+  </data>
+  <data name="Watch_DecisionDone_Other" xml:space="preserve">
+    <value>بُتّ في {0} مرئي.</value>
+  </data>
+  <data name="Watch_DecisionDone_Zero" xml:space="preserve">
+    <value>لم يُبتّ في أي مرئي.</value>
+  </data>
+  <data name="Watch_DecisionDone_Two" xml:space="preserve">
+    <value>بُتّ في مرئيين.</value>
+  </data>
+  <data name="Watch_DecisionDone_Few" xml:space="preserve">
+    <value>بُتّ في {0} مرئيات.</value>
+  </data>
+  <data name="Watch_DecisionDone_Many" xml:space="preserve">
+    <value>بُتّ في {0} مرئيًا.</value>
+  </data>
+  <data name="Watch_PreviewReady_One" xml:space="preserve">
+    <value>مجلد واحد جاهز للمراقبة.</value>
+  </data>
+  <data name="Watch_PreviewReady_Other" xml:space="preserve">
+    <value>{0} مجلد جاهز للمراقبة.</value>
+  </data>
+  <data name="Watch_PreviewReady_Zero" xml:space="preserve">
+    <value>لا مجلدات جاهزة للمراقبة.</value>
+  </data>
+  <data name="Watch_PreviewReady_Two" xml:space="preserve">
+    <value>مجلدان جاهزان للمراقبة.</value>
+  </data>
+  <data name="Watch_PreviewReady_Few" xml:space="preserve">
+    <value>{0} مجلدات جاهزة للمراقبة.</value>
+  </data>
+  <data name="Watch_PreviewReady_Many" xml:space="preserve">
+    <value>{0} مجلدًا جاهزًا للمراقبة.</value>
+  </data>
+  <data name="Watch_ManyCreated_One" xml:space="preserve">
+    <value>مجلد واحد قيد المراقبة الآن.</value>
+  </data>
+  <data name="Watch_ManyCreated_Other" xml:space="preserve">
+    <value>{0} مجلد قيد المراقبة الآن.</value>
+  </data>
+  <data name="Watch_ManyCreated_Zero" xml:space="preserve">
+    <value>لم تبدأ مراقبة أي مجلد.</value>
+  </data>
+  <data name="Watch_ManyCreated_Two" xml:space="preserve">
+    <value>مجلدان قيد المراقبة الآن.</value>
+  </data>
+  <data name="Watch_ManyCreated_Few" xml:space="preserve">
+    <value>{0} مجلدات قيد المراقبة الآن.</value>
+  </data>
+  <data name="Watch_ManyCreated_Many" xml:space="preserve">
+    <value>{0} مجلدًا قيد المراقبة الآن.</value>
+  </data>
+  <data name="Watch_TemplatesLoaded_One" xml:space="preserve">
+    <value>قالب واحد متاح.</value>
+  </data>
+  <data name="Watch_TemplatesLoaded_Other" xml:space="preserve">
+    <value>{0} قالب متاح.</value>
+  </data>
+  <data name="Watch_TemplatesLoaded_Zero" xml:space="preserve">
+    <value>لا قوالب متاحة.</value>
+  </data>
+  <data name="Watch_TemplatesLoaded_Two" xml:space="preserve">
+    <value>قالبان متاحان.</value>
+  </data>
+  <data name="Watch_TemplatesLoaded_Few" xml:space="preserve">
+    <value>{0} قوالب متاحة.</value>
+  </data>
+  <data name="Watch_TemplatesLoaded_Many" xml:space="preserve">
+    <value>{0} قالبًا متاحًا.</value>
+  </data>
+  <data name="Approve_Loaded_One" xml:space="preserve">
+    <value>مرئي واحد بانتظار القرار.</value>
+  </data>
+  <data name="Approve_Loaded_Other" xml:space="preserve">
+    <value>{0} مرئي بانتظار القرار.</value>
+  </data>
+  <data name="Approve_Loaded_Zero" xml:space="preserve">
+    <value>لا شيء بانتظار القرار.</value>
+  </data>
+  <data name="Approve_Loaded_Two" xml:space="preserve">
+    <value>مرئيان بانتظار القرار.</value>
+  </data>
+  <data name="Approve_Loaded_Few" xml:space="preserve">
+    <value>{0} مرئيات بانتظار القرار.</value>
+  </data>
+  <data name="Approve_Loaded_Many" xml:space="preserve">
+    <value>{0} مرئيًا بانتظار القرار.</value>
+  </data>
+  <data name="Approve_ApprovingMany_One" xml:space="preserve">
+    <value>جارٍ الموافقة على مرئي واحد…</value>
+  </data>
+  <data name="Approve_ApprovingMany_Other" xml:space="preserve">
+    <value>جارٍ الموافقة على {0} مرئي…</value>
+  </data>
+  <data name="Approve_ApprovingMany_Zero" xml:space="preserve">
+    <value>جارٍ الموافقة على {0} مرئي…</value>
+  </data>
+  <data name="Approve_ApprovingMany_Two" xml:space="preserve">
+    <value>جارٍ الموافقة على مرئيين…</value>
+  </data>
+  <data name="Approve_ApprovingMany_Few" xml:space="preserve">
+    <value>جارٍ الموافقة على {0} مرئيات…</value>
+  </data>
+  <data name="Approve_ApprovingMany_Many" xml:space="preserve">
+    <value>جارٍ الموافقة على {0} مرئيًا…</value>
+  </data>
+  <data name="Approve_RejectingMany_One" xml:space="preserve">
+    <value>جارٍ رفض مرئي واحد…</value>
+  </data>
+  <data name="Approve_RejectingMany_Other" xml:space="preserve">
+    <value>جارٍ رفض {0} مرئي…</value>
+  </data>
+  <data name="Approve_RejectingMany_Zero" xml:space="preserve">
+    <value>جارٍ رفض {0} مرئي…</value>
+  </data>
+  <data name="Approve_RejectingMany_Two" xml:space="preserve">
+    <value>جارٍ رفض مرئيين…</value>
+  </data>
+  <data name="Approve_RejectingMany_Few" xml:space="preserve">
+    <value>جارٍ رفض {0} مرئيات…</value>
+  </data>
+  <data name="Approve_RejectingMany_Many" xml:space="preserve">
+    <value>جارٍ رفض {0} مرئيًا…</value>
+  </data>
+  <data name="Approve_ApprovedMany_One" xml:space="preserve">
+    <value>تمت الموافقة على مرئي واحد.</value>
+  </data>
+  <data name="Approve_ApprovedMany_Other" xml:space="preserve">
+    <value>تمت الموافقة على {0} مرئي.</value>
+  </data>
+  <data name="Approve_ApprovedMany_Zero" xml:space="preserve">
+    <value>تمت الموافقة على {0} مرئي.</value>
+  </data>
+  <data name="Approve_ApprovedMany_Two" xml:space="preserve">
+    <value>تمت الموافقة على مرئيين.</value>
+  </data>
+  <data name="Approve_ApprovedMany_Few" xml:space="preserve">
+    <value>تمت الموافقة على {0} مرئيات.</value>
+  </data>
+  <data name="Approve_ApprovedMany_Many" xml:space="preserve">
+    <value>تمت الموافقة على {0} مرئيًا.</value>
+  </data>
+  <data name="Approve_RejectedMany_One" xml:space="preserve">
+    <value>رُفض مرئي واحد.</value>
+  </data>
+  <data name="Approve_RejectedMany_Other" xml:space="preserve">
+    <value>رُفض {0} مرئي.</value>
+  </data>
+  <data name="Approve_RejectedMany_Zero" xml:space="preserve">
+    <value>رُفض {0} مرئي.</value>
+  </data>
+  <data name="Approve_RejectedMany_Two" xml:space="preserve">
+    <value>رُفض مرئيان.</value>
+  </data>
+  <data name="Approve_RejectedMany_Few" xml:space="preserve">
+    <value>رُفضت {0} مرئيات.</value>
+  </data>
+  <data name="Approve_RejectedMany_Many" xml:space="preserve">
+    <value>رُفض {0} مرئيًا.</value>
+  </data>
+  <data name="Approve_ApproveManyFailed_One" xml:space="preserve">
+    <value>تعذّرت الموافقة على مرئي واحد.</value>
+  </data>
+  <data name="Approve_ApproveManyFailed_Other" xml:space="preserve">
+    <value>تعذّرت الموافقة على {0} مرئي.</value>
+  </data>
+  <data name="Approve_ApproveManyFailed_Zero" xml:space="preserve">
+    <value>تعذّرت الموافقة على {0} مرئي.</value>
+  </data>
+  <data name="Approve_ApproveManyFailed_Two" xml:space="preserve">
+    <value>تعذّرت الموافقة على مرئيين.</value>
+  </data>
+  <data name="Approve_ApproveManyFailed_Few" xml:space="preserve">
+    <value>تعذّرت الموافقة على {0} مرئيات.</value>
+  </data>
+  <data name="Approve_ApproveManyFailed_Many" xml:space="preserve">
+    <value>تعذّرت الموافقة على {0} مرئيًا.</value>
+  </data>
+  <data name="Approve_RejectManyFailed_One" xml:space="preserve">
+    <value>تعذّر رفض مرئي واحد.</value>
+  </data>
+  <data name="Approve_RejectManyFailed_Other" xml:space="preserve">
+    <value>تعذّر رفض {0} مرئي.</value>
+  </data>
+  <data name="Approve_RejectManyFailed_Zero" xml:space="preserve">
+    <value>تعذّر رفض {0} مرئي.</value>
+  </data>
+  <data name="Approve_RejectManyFailed_Two" xml:space="preserve">
+    <value>تعذّر رفض مرئيين.</value>
+  </data>
+  <data name="Approve_RejectManyFailed_Few" xml:space="preserve">
+    <value>تعذّر رفض {0} مرئيات.</value>
+  </data>
+  <data name="Approve_RejectManyFailed_Many" xml:space="preserve">
+    <value>تعذّر رفض {0} مرئيًا.</value>
+  </data>
+  <data name="Approve_SelectedAll_One" xml:space="preserve">
+    <value>حُدّد مرئي واحد.</value>
+  </data>
+  <data name="Approve_SelectedAll_Other" xml:space="preserve">
+    <value>حُدّد {0} مرئي.</value>
+  </data>
+  <data name="Approve_SelectedAll_Zero" xml:space="preserve">
+    <value>حُدّد {0} مرئي.</value>
+  </data>
+  <data name="Approve_SelectedAll_Two" xml:space="preserve">
+    <value>حُدّد مرئيان.</value>
+  </data>
+  <data name="Approve_SelectedAll_Few" xml:space="preserve">
+    <value>حُدّدت {0} مرئيات.</value>
+  </data>
+  <data name="Approve_SelectedAll_Many" xml:space="preserve">
+    <value>حُدّد {0} مرئيًا.</value>
+  </data>
+  <data name="Notify_ApprovedMany_One" xml:space="preserve">
+    <value>تمت الموافقة على مرئي واحد</value>
+  </data>
+  <data name="Notify_ApprovedMany_Other" xml:space="preserve">
+    <value>تمت الموافقة على {0} مرئي</value>
+  </data>
+  <data name="Notify_ApprovedMany_Zero" xml:space="preserve">
+    <value>تمت الموافقة على {0} مرئي</value>
+  </data>
+  <data name="Notify_ApprovedMany_Two" xml:space="preserve">
+    <value>تمت الموافقة على مرئيين</value>
+  </data>
+  <data name="Notify_ApprovedMany_Few" xml:space="preserve">
+    <value>تمت الموافقة على {0} مرئيات</value>
+  </data>
+  <data name="Notify_ApprovedMany_Many" xml:space="preserve">
+    <value>تمت الموافقة على {0} مرئيًا</value>
+  </data>
+  <data name="Notify_RejectedMany_One" xml:space="preserve">
+    <value>رُفض مرئي واحد</value>
+  </data>
+  <data name="Notify_RejectedMany_Other" xml:space="preserve">
+    <value>رُفض {0} مرئي</value>
+  </data>
+  <data name="Notify_RejectedMany_Zero" xml:space="preserve">
+    <value>رُفض {0} مرئي</value>
+  </data>
+  <data name="Notify_RejectedMany_Two" xml:space="preserve">
+    <value>رُفض مرئيان</value>
+  </data>
+  <data name="Notify_RejectedMany_Few" xml:space="preserve">
+    <value>رُفضت {0} مرئيات</value>
+  </data>
+  <data name="Notify_RejectedMany_Many" xml:space="preserve">
+    <value>رُفض {0} مرئيًا</value>
+  </data>
+  <data name="Stats_ChannelSummary_One" xml:space="preserve">
+    <value>مرئي واحد، {1}</value>
+  </data>
+  <data name="Stats_ChannelSummary_Other" xml:space="preserve">
+    <value>{0} مرئي، {1}</value>
+  </data>
+  <data name="Stats_ChannelSummary_Zero" xml:space="preserve">
+    <value>لا مرئيات، {1}</value>
+  </data>
+  <data name="Stats_ChannelSummary_Two" xml:space="preserve">
+    <value>مرئيان، {1}</value>
+  </data>
+  <data name="Stats_ChannelSummary_Few" xml:space="preserve">
+    <value>{0} مرئيات، {1}</value>
+  </data>
+  <data name="Stats_ChannelSummary_Many" xml:space="preserve">
+    <value>{0} مرئيًا، {1}</value>
+  </data>
+  <data name="Stats_PriorityCount_One" xml:space="preserve">
+    <value>مرئي واحد، {1}</value>
+  </data>
+  <data name="Stats_PriorityCount_Other" xml:space="preserve">
+    <value>{0} مرئي، {1}</value>
+  </data>
+  <data name="Stats_PriorityCount_Zero" xml:space="preserve">
+    <value>لا مرئيات، {1}</value>
+  </data>
+  <data name="Stats_PriorityCount_Two" xml:space="preserve">
+    <value>مرئيان، {1}</value>
+  </data>
+  <data name="Stats_PriorityCount_Few" xml:space="preserve">
+    <value>{0} مرئيات، {1}</value>
+  </data>
+  <data name="Stats_PriorityCount_Many" xml:space="preserve">
+    <value>{0} مرئيًا، {1}</value>
+  </data>
+  <data name="Watch_StoppedRow.Text" xml:space="preserve">
+    <value>غير مراقَب الآن</value>
+  </data>
+  <data name="Watch_Resume.Text" xml:space="preserve">
+    <value>راقبه مجددًا</value>
+  </data>
+  <data name="Watch_Resuming" xml:space="preserve">
+    <value>جارٍ استئناف المراقبة…</value>
+  </data>
+  <data name="Watch_Resumed" xml:space="preserve">
+    <value>استؤنفت المراقبة</value>
+  </data>
+  <data name="Watch_ResumeFailed" xml:space="preserve">
+    <value>تعذّر استئناف مراقبة هذا المجلد. ربما تراقبه مراقبة أخرى بالفعل.</value>
+  </data>
+  <data name="Settings_LocationLabel.Text" xml:space="preserve">
+    <value>يعمل على</value>
+  </data>
+  <data name="Settings_LocationHere" xml:space="preserve">
+    <value>هذا الجهاز</value>
+  </data>
+  <data name="Settings_LocationOther" xml:space="preserve">
+    <value>جهاز آخر، محدّد في الإعدادات المتقدمة</value>
+  </data>
+  <data name="Settings_LocationHint.Text" xml:space="preserve">
+    <value>تجد الأدوات الفاحص وتتصل به بنفسها.</value>
+  </data>
+  <data name="Settings_Advanced.Text" xml:space="preserve">
+    <value>إعدادات متقدمة</value>
   </data>
 </root>

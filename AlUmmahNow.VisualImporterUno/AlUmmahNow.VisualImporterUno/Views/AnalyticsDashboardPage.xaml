@@ -109,17 +109,17 @@
                             <TextBlock x:Uid="Stats_LegendWaiting" Text="Waiting" Style="{StaticResource ToolsMuted}" />
                         </StackPanel>
                     </StackPanel>
-                    <ScrollViewer HorizontalScrollMode="Auto" HorizontalScrollBarVisibility="Auto" VerticalScrollMode="Disabled">
+                    <ScrollViewer x:Name="DailyScroll" HorizontalScrollMode="Auto" HorizontalScrollBarVisibility="Auto" VerticalScrollMode="Disabled" SizeChanged="DailyScroll_SizeChanged">
                         <ItemsControl ItemsSource="{x:Bind ViewModel.ApprovalTrends, Mode=OneWay}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
-                                    <StackPanel Orientation="Horizontal" Spacing="10" />
+                                    <shell:BarStrip Loaded="DailyStrip_Loaded" />
                                 </ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:DailyTrendData">
-                                    <StackPanel Spacing="6" Width="54">
-                                        <Grid Height="140" ColumnSpacing="3">
+                                    <StackPanel Spacing="6" Padding="4,0">
+                                        <Grid Height="140" ColumnSpacing="4" MaxWidth="72" HorizontalAlignment="Stretch">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="*"/>

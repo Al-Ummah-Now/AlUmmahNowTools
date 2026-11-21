@@ -5,7 +5,8 @@ namespace AlUmmahNow.VisualImporterUno.Shell;
 
 /// <summary>
 /// The folder scanner as screenshot runs see it (TOOLS_DEMO=1 with TOOLS_DEMO_SCANNER=1): connected, with a fixed set
-/// of watched folders and videos so every run shows the same pages. Times are fixed hours on fixed days before today.
+/// of watched folders and videos so every run shows the same pages. Earlier days use fixed hours; today's arrivals are a
+/// fixed number of minutes before the run, so nothing arrives after the page's "Updated" time.
 /// </summary>
 public sealed class DemoScannerClient : FileScanSignalRClient
 {
@@ -82,12 +83,12 @@ public sealed class DemoScannerClient : FileScanSignalRClient
 
     private static List<PendingApprovalDto> Seed()
     {
-        // (days ago, hour, channel index, file, size in MB, status, priority)
+        // (days ago, hour — or for today, minutes before now as a negative number —, channel index, file, size in MB, status, priority)
         var rows = new (int Days, int Hour, int Channel, string File, int Mb, ApprovalStatus Status, int Priority)[]
         {
-            (0, 9, 0, "seerah-episode-24.mp4", 1840, ApprovalStatus.Pending, 2),
-            (0, 11, 1, "khutbah-patience-in-hardship.mp4", 920, ApprovalStatus.Pending, 1),
-            (0, 14, 2, "surah-al-kahf-full.mp4", 2410, ApprovalStatus.Pending, 2),
+            (0, -205, 0, "seerah-episode-24.mp4", 1840, ApprovalStatus.Pending, 2),
+            (0, -130, 1, "khutbah-patience-in-hardship.mp4", 920, ApprovalStatus.Pending, 1),
+            (0, -40, 2, "surah-al-kahf-full.mp4", 2410, ApprovalStatus.Pending, 2),
             (1, 10, 0, "seerah-episode-23.mp4", 1795, ApprovalStatus.Pending, 2),
             (1, 16, 3, "youth-circle-honesty.mp4", 640, ApprovalStatus.Pending, 3),
             (1, 20, 2, "surah-yasin.mp4", 860, ApprovalStatus.Approved, 1),
@@ -108,10 +109,11 @@ public sealed class DemoScannerClient : FileScanSignalRClient
             (11, 9, 2, "surah-maryam.mp4", 1020, ApprovalStatus.Approved, 1),
             (13, 15, 3, "youth-circle-duplicate.mp4", 640, ApprovalStatus.Rejected, 3),
         };
-        var today = DateTime.Today;
+        var now = DateTime.Now;
+        var today = now.Date;
         return rows.Select((r, i) =>
         {
-            var at = today.AddDays(-r.Days).AddHours(r.Hour).AddMinutes(7 * (i % 8));
+            var at = r.Days == 0 ? now.AddMinutes(r.Hour) : today.AddDays(-r.Days).AddHours(r.Hour).AddMinutes(7 * (i % 8));
             return new PendingApprovalDto
             {
                 Id = new Guid(100 + i, 0, 0, new byte[8]),

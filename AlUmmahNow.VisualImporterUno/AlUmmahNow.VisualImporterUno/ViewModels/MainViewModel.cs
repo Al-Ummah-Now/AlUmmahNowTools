@@ -859,7 +859,7 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
                     HasScannedFiles = videoFiles.Count > 0;
                 }, "ScanFolder.UpdateCollections");
 
-                StatusMessage = Loc.Format("Import_Found", videoFiles.Count, _allVideoFiles.Select(v => v.ChannelName).Distinct().Count());
+                StatusMessage = Loc.Format("Import_Found", videoFiles.Count, Loc.Plural("Count_Channels", _allVideoFiles.Select(v => v.ChannelName).Distinct().Count()));
                 
                 // Force UI update to show the file table immediately
                 SafeDispatcherExecute(() => {

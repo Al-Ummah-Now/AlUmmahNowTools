@@ -233,6 +233,56 @@ public class FileWatchService : IFileWatchService, IHostedService, IDisposable
         }
     }
 
+    public async Task<bool> ResumeWatchAsync(Guid watchId, CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Entered ResumeWatchAsync for watch {WatchId}", watchId);
+
+        try
+        {
+            using var scope = Scope();
+            var db = scope.Db;
+            var channelWatch = await db.ChannelWatches
+                .FindAsync(new object[] { watchId }, cancellationToken);
+
+            if (channelWatch == null)
+            {
+                _logger.LogWarning("Watch {WatchId} not found, exiting ResumeWatchAsync with result: false", watchId);
+                return false;
+            }
+
+            if (!channelWatch.IsActive)
+            {
+                // One active watch per path: a folder that another watch took over meanwhile stays with that watch
+                var pathTaken = await db.ChannelWatches.AsNoTracking()
+                    .AnyAsync(w => w.Id != watchId && w.IsActive && w.WatchPathHash == channelWatch.WatchPathHash, cancellationToken);
+                if (pathTaken)
+                {
+                    _logger.LogWarning("Not resuming watch {WatchId}: another active watch already monitors its folder", watchId);
+                    return false;
+                }
+
+                channelWatch.IsActive = true;
+                channelWatch.LastUpdated = DateTime.UtcNow;
+                await db.SaveChangesAsync(cancellationToken);
+            }
+
+            if (!_watchers.ContainsKey(watchId))
+            {
+                await StartFileSystemWatcherAsync(channelWatch);
+            }
+
+            _logger.LogInformation("Resumed watch {WatchId} for channel {ChannelName}", watchId, channelWatch.ChannelName);
+            WatchStatusChanged?.Invoke(this, new WatchStatusChangedEventArgs(
+                watchId, channelWatch.ChannelName, true, "Watch resumed"));
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Exiting ResumeWatchAsync with error for watch {WatchId}. Result: false", watchId);
+            return false;
+        }
+    }
+
     public async Task<List<WatchStatusDto>> GetActiveWatchesAsync(CancellationToken cancellationToken = default)
     {
         _logger.LogDebug("Entered GetActiveWatchesAsync");

@@ -519,14 +519,11 @@
   <data name="Operation_Scan" xml:space="preserve">
     <value>Folder scan</value>
   </data>
-  <data name="Operation_FilesFound" xml:space="preserve">
-    <value>{0} videos found</value>
-  </data>
   <data name="Operation_Started" xml:space="preserve">
     <value>Started {0}</value>
   </data>
   <data name="Progress_Scanning" xml:space="preserve">
-    <value>Scanning: {0} of {1} files checked, {2} videos found</value>
+    <value>Scanning: file {0} of {1}. Videos found: {2}.</value>
   </data>
   <data name="Progress_Importing" xml:space="preserve">
     <value>Importing {0} of {1}</value>
@@ -600,9 +597,6 @@
   <data name="Import_Scanning" xml:space="preserve">
     <value>Looking for videos…</value>
   </data>
-  <data name="Import_Found" xml:space="preserve">
-    <value>Found {0} videos in {1} channels.</value>
-  </data>
   <data name="Import_ScanCancelled" xml:space="preserve">
     <value>The search was cancelled.</value>
   </data>
@@ -614,9 +608,6 @@
   </data>
   <data name="Import_NoneSelected" xml:space="preserve">
     <value>Select at least one video to upload.</value>
-  </data>
-  <data name="Import_Processed" xml:space="preserve">
-    <value>{0} videos sent for upload.</value>
   </data>
   <data name="Import_Failed" xml:space="preserve">
     <value>The upload failed</value>
@@ -655,7 +646,7 @@
     <value>Couldn't load past imports</value>
   </data>
   <data name="Import_Completed" xml:space="preserve">
-    <value>Upload finished: {0} uploaded, {1} failed.</value>
+    <value>Upload finished. Uploaded: {0}. Failed: {1}.</value>
   </data>
   <data name="Settings_ScannerTitle.Text" xml:space="preserve">
     <value>Folder scanner</value>
@@ -663,11 +654,8 @@
   <data name="Settings_AddressLabel.Text" xml:space="preserve">
     <value>Address</value>
   </data>
-  <data name="Settings_AddressBox.PlaceholderText" xml:space="preserve">
-    <value>http://localhost:5000</value>
-  </data>
   <data name="Settings_AddressHint.Text" xml:space="preserve">
-    <value>Where Tools reaches the scanner on this computer. Leave it as it is unless support asks you to change it.</value>
+    <value>Change it only if support asks you to.</value>
   </data>
   <data name="Settings_Test.Text" xml:space="preserve">
     <value>Test connection</value>
@@ -951,15 +939,6 @@
   <data name="Watch_Stop.Text" xml:space="preserve">
     <value>Stop watching</value>
   </data>
-  <data name="Watch_DelayValue" xml:space="preserve">
-    <value>{0} seconds</value>
-  </data>
-  <data name="Watch_RowVideos" xml:space="preserve">
-    <value>{0} videos arrived</value>
-  </data>
-  <data name="Watch_RowWaiting" xml:space="preserve">
-    <value>{0} waiting for approval</value>
-  </data>
   <data name="Watch_FileRow" xml:space="preserve">
     <value>Row {0}</value>
   </data>
@@ -1002,9 +981,6 @@
   <data name="Watch_ApprovalChanged" xml:space="preserve">
     <value>An approval changed</value>
   </data>
-  <data name="Watch_DecisionDone" xml:space="preserve">
-    <value>{0} videos decided.</value>
-  </data>
   <data name="Watch_Creating" xml:space="preserve">
     <value>Starting to watch…</value>
   </data>
@@ -1030,16 +1006,13 @@
     <value>Refreshing…</value>
   </data>
   <data name="Watch_Loaded" xml:space="preserve">
-    <value>{0} folders watched.</value>
+    <value>Folder list is up to date.</value>
   </data>
   <data name="Watch_RefreshFailed" xml:space="preserve">
     <value>Couldn't refresh watched folders</value>
   </data>
   <data name="Watch_Viewing" xml:space="preserve">
     <value>Showing</value>
-  </data>
-  <data name="Watch_PreviewReady" xml:space="preserve">
-    <value>{0} folders ready to watch.</value>
   </data>
   <data name="Watch_PreviewFailed" xml:space="preserve">
     <value>Couldn't work out the folders</value>
@@ -1051,13 +1024,10 @@
     <value>Starting {0} of {1}…</value>
   </data>
   <data name="Watch_ManyDone" xml:space="preserve">
-    <value>{0} folders watched, {1} failed.</value>
+    <value>Now watched: {0}. Couldn't start: {1}.</value>
   </data>
   <data name="Watch_ManyDoneTitle" xml:space="preserve">
     <value>Folders watched</value>
-  </data>
-  <data name="Watch_ManyCreated" xml:space="preserve">
-    <value>{0} folders are now watched.</value>
   </data>
   <data name="Watch_ManyAllFailed" xml:space="preserve">
     <value>None of them could be watched. Check the folders exist and Tools can open them.</value>
@@ -1072,16 +1042,13 @@
     <value>Use a CSV or JSON file.</value>
   </data>
   <data name="Watch_FileChecked" xml:space="preserve">
-    <value>{0} rows are valid, {1} have problems.</value>
+    <value>Valid rows: {0}. Rows with problems: {1}.</value>
   </data>
   <data name="Watch_FileFailed" xml:space="preserve">
     <value>Couldn't read the file</value>
   </data>
   <data name="Watch_FileNoneValid" xml:space="preserve">
     <value>No row in the file is valid.</value>
-  </data>
-  <data name="Watch_TemplatesLoaded" xml:space="preserve">
-    <value>{0} templates available.</value>
   </data>
   <data name="Watch_TemplatesFailed" xml:space="preserve">
     <value>Couldn't load templates</value>
@@ -1341,9 +1308,6 @@
   <data name="Approve_Loading" xml:space="preserve">
     <value>Loading approvals…</value>
   </data>
-  <data name="Approve_Loaded" xml:space="preserve">
-    <value>{0} videos waiting.</value>
-  </data>
   <data name="Approve_LoadFailed" xml:space="preserve">
     <value>Couldn't load approvals</value>
   </data>
@@ -1353,23 +1317,11 @@
   <data name="Approve_Rejecting" xml:space="preserve">
     <value>Rejecting…</value>
   </data>
-  <data name="Approve_ApprovingMany" xml:space="preserve">
-    <value>Approving {0} videos…</value>
-  </data>
-  <data name="Approve_RejectingMany" xml:space="preserve">
-    <value>Rejecting {0} videos…</value>
-  </data>
   <data name="Approve_ApprovedOne" xml:space="preserve">
     <value>Approved</value>
   </data>
   <data name="Approve_RejectedOne" xml:space="preserve">
     <value>Rejected</value>
-  </data>
-  <data name="Approve_ApprovedMany" xml:space="preserve">
-    <value>{0} videos approved.</value>
-  </data>
-  <data name="Approve_RejectedMany" xml:space="preserve">
-    <value>{0} videos rejected.</value>
   </data>
   <data name="Approve_ApproveFailed" xml:space="preserve">
     <value>Couldn't approve</value>
@@ -1377,17 +1329,8 @@
   <data name="Approve_RejectFailed" xml:space="preserve">
     <value>Couldn't reject</value>
   </data>
-  <data name="Approve_ApproveManyFailed" xml:space="preserve">
-    <value>Couldn't approve {0} videos.</value>
-  </data>
-  <data name="Approve_RejectManyFailed" xml:space="preserve">
-    <value>Couldn't reject {0} videos.</value>
-  </data>
   <data name="Approve_Previewing" xml:space="preserve">
     <value>Previewing</value>
-  </data>
-  <data name="Approve_SelectedAll" xml:space="preserve">
-    <value>{0} videos selected.</value>
   </data>
   <data name="Approve_SelectionCleared" xml:space="preserve">
     <value>Selection cleared.</value>
@@ -1518,14 +1461,8 @@
   <data name="Stats_TrendDown" xml:space="preserve">
     <value>{0} fewer arrived than the period before</value>
   </data>
-  <data name="Stats_ChannelSummary" xml:space="preserve">
-    <value>{0} videos, {1}</value>
-  </data>
   <data name="Stats_Priority" xml:space="preserve">
     <value>Priority {0}</value>
-  </data>
-  <data name="Stats_PriorityCount" xml:space="preserve">
-    <value>{0} videos, {1}</value>
   </data>
   <data name="Stats_StatusApproved" xml:space="preserve">
     <value>Approved</value>
@@ -1566,9 +1503,6 @@
   <data name="When_Date" xml:space="preserve">
     <value>{0}, {1}</value>
   </data>
-  <data name="Watch_Stopped.Text" xml:space="preserve">
-    <value>Not being watched</value>
-  </data>
   <data name="SignIn_WaitingBody.Text" xml:space="preserve">
     <value>A sign-in page opened in your browser. Tools carries on by itself once you've signed in there.</value>
   </data>
@@ -1584,12 +1518,6 @@
   <data name="Notify_RejectedOne" xml:space="preserve">
     <value>Video rejected</value>
   </data>
-  <data name="Notify_ApprovedMany" xml:space="preserve">
-    <value>{0} videos approved</value>
-  </data>
-  <data name="Notify_RejectedMany" xml:space="preserve">
-    <value>{0} videos rejected</value>
-  </data>
   <data name="Notify_Ok" xml:space="preserve">
     <value>OK</value>
   </data>
@@ -1601,5 +1529,197 @@
   </data>
   <data name="Stats_ChannelNoneDecided" xml:space="preserve">
     <value>None decided yet</value>
+  </data>
+  <data name="Operation_FilesFound_One" xml:space="preserve">
+    <value>1 video found</value>
+  </data>
+  <data name="Operation_FilesFound_Other" xml:space="preserve">
+    <value>{0} videos found</value>
+  </data>
+  <data name="Operation_FilesFound_Zero" xml:space="preserve">
+    <value>No videos found</value>
+  </data>
+  <data name="Import_Found_One" xml:space="preserve">
+    <value>Found 1 video in {1}.</value>
+  </data>
+  <data name="Import_Found_Other" xml:space="preserve">
+    <value>Found {0} videos in {1}.</value>
+  </data>
+  <data name="Import_Found_Zero" xml:space="preserve">
+    <value>No videos found.</value>
+  </data>
+  <data name="Count_Channels_One" xml:space="preserve">
+    <value>1 channel</value>
+  </data>
+  <data name="Count_Channels_Other" xml:space="preserve">
+    <value>{0} channels</value>
+  </data>
+  <data name="Import_Processed_One" xml:space="preserve">
+    <value>1 video sent for upload.</value>
+  </data>
+  <data name="Import_Processed_Other" xml:space="preserve">
+    <value>{0} videos sent for upload.</value>
+  </data>
+  <data name="Watch_DelayValue_One" xml:space="preserve">
+    <value>1 second</value>
+  </data>
+  <data name="Watch_DelayValue_Other" xml:space="preserve">
+    <value>{0} seconds</value>
+  </data>
+  <data name="Watch_RowVideos_One" xml:space="preserve">
+    <value>1 video arrived</value>
+  </data>
+  <data name="Watch_RowVideos_Other" xml:space="preserve">
+    <value>{0} videos arrived</value>
+  </data>
+  <data name="Watch_RowVideos_Zero" xml:space="preserve">
+    <value>No videos yet</value>
+  </data>
+  <data name="Watch_RowWaiting_One" xml:space="preserve">
+    <value>1 waiting for approval</value>
+  </data>
+  <data name="Watch_RowWaiting_Other" xml:space="preserve">
+    <value>{0} waiting for approval</value>
+  </data>
+  <data name="Watch_RowWaiting_Zero" xml:space="preserve">
+    <value>Nothing waiting for approval</value>
+  </data>
+  <data name="Watch_DecisionDone_One" xml:space="preserve">
+    <value>Decided on 1 video.</value>
+  </data>
+  <data name="Watch_DecisionDone_Other" xml:space="preserve">
+    <value>Decided on {0} videos.</value>
+  </data>
+  <data name="Watch_PreviewReady_One" xml:space="preserve">
+    <value>1 folder ready to watch.</value>
+  </data>
+  <data name="Watch_PreviewReady_Other" xml:space="preserve">
+    <value>{0} folders ready to watch.</value>
+  </data>
+  <data name="Watch_PreviewReady_Zero" xml:space="preserve">
+    <value>No folders ready to watch.</value>
+  </data>
+  <data name="Watch_ManyCreated_One" xml:space="preserve">
+    <value>1 folder is now watched.</value>
+  </data>
+  <data name="Watch_ManyCreated_Other" xml:space="preserve">
+    <value>{0} folders are now watched.</value>
+  </data>
+  <data name="Watch_ManyCreated_Zero" xml:space="preserve">
+    <value>No folders were started.</value>
+  </data>
+  <data name="Watch_TemplatesLoaded_One" xml:space="preserve">
+    <value>1 template available.</value>
+  </data>
+  <data name="Watch_TemplatesLoaded_Other" xml:space="preserve">
+    <value>{0} templates available.</value>
+  </data>
+  <data name="Watch_TemplatesLoaded_Zero" xml:space="preserve">
+    <value>No templates available.</value>
+  </data>
+  <data name="Approve_Loaded_One" xml:space="preserve">
+    <value>1 video waiting.</value>
+  </data>
+  <data name="Approve_Loaded_Other" xml:space="preserve">
+    <value>{0} videos waiting.</value>
+  </data>
+  <data name="Approve_Loaded_Zero" xml:space="preserve">
+    <value>Nothing is waiting.</value>
+  </data>
+  <data name="Approve_ApprovingMany_One" xml:space="preserve">
+    <value>Approving 1 video…</value>
+  </data>
+  <data name="Approve_ApprovingMany_Other" xml:space="preserve">
+    <value>Approving {0} videos…</value>
+  </data>
+  <data name="Approve_RejectingMany_One" xml:space="preserve">
+    <value>Rejecting 1 video…</value>
+  </data>
+  <data name="Approve_RejectingMany_Other" xml:space="preserve">
+    <value>Rejecting {0} videos…</value>
+  </data>
+  <data name="Approve_ApprovedMany_One" xml:space="preserve">
+    <value>1 video approved.</value>
+  </data>
+  <data name="Approve_ApprovedMany_Other" xml:space="preserve">
+    <value>{0} videos approved.</value>
+  </data>
+  <data name="Approve_RejectedMany_One" xml:space="preserve">
+    <value>1 video rejected.</value>
+  </data>
+  <data name="Approve_RejectedMany_Other" xml:space="preserve">
+    <value>{0} videos rejected.</value>
+  </data>
+  <data name="Approve_ApproveManyFailed_One" xml:space="preserve">
+    <value>Couldn't approve 1 video.</value>
+  </data>
+  <data name="Approve_ApproveManyFailed_Other" xml:space="preserve">
+    <value>Couldn't approve {0} videos.</value>
+  </data>
+  <data name="Approve_RejectManyFailed_One" xml:space="preserve">
+    <value>Couldn't reject 1 video.</value>
+  </data>
+  <data name="Approve_RejectManyFailed_Other" xml:space="preserve">
+    <value>Couldn't reject {0} videos.</value>
+  </data>
+  <data name="Approve_SelectedAll_One" xml:space="preserve">
+    <value>1 video selected.</value>
+  </data>
+  <data name="Approve_SelectedAll_Other" xml:space="preserve">
+    <value>{0} videos selected.</value>
+  </data>
+  <data name="Notify_ApprovedMany_One" xml:space="preserve">
+    <value>1 video approved</value>
+  </data>
+  <data name="Notify_ApprovedMany_Other" xml:space="preserve">
+    <value>{0} videos approved</value>
+  </data>
+  <data name="Notify_RejectedMany_One" xml:space="preserve">
+    <value>1 video rejected</value>
+  </data>
+  <data name="Notify_RejectedMany_Other" xml:space="preserve">
+    <value>{0} videos rejected</value>
+  </data>
+  <data name="Stats_ChannelSummary_One" xml:space="preserve">
+    <value>1 video, {1}</value>
+  </data>
+  <data name="Stats_ChannelSummary_Other" xml:space="preserve">
+    <value>{0} videos, {1}</value>
+  </data>
+  <data name="Stats_PriorityCount_One" xml:space="preserve">
+    <value>1 video, {1}</value>
+  </data>
+  <data name="Stats_PriorityCount_Other" xml:space="preserve">
+    <value>{0} videos, {1}</value>
+  </data>
+  <data name="Watch_StoppedRow.Text" xml:space="preserve">
+    <value>Not being watched</value>
+  </data>
+  <data name="Watch_Resume.Text" xml:space="preserve">
+    <value>Watch again</value>
+  </data>
+  <data name="Watch_Resuming" xml:space="preserve">
+    <value>Starting to watch again…</value>
+  </data>
+  <data name="Watch_Resumed" xml:space="preserve">
+    <value>Watching again</value>
+  </data>
+  <data name="Watch_ResumeFailed" xml:space="preserve">
+    <value>Couldn't watch this folder again. Another watch may already cover it.</value>
+  </data>
+  <data name="Settings_LocationLabel.Text" xml:space="preserve">
+    <value>Runs on</value>
+  </data>
+  <data name="Settings_LocationHere" xml:space="preserve">
+    <value>This computer</value>
+  </data>
+  <data name="Settings_LocationOther" xml:space="preserve">
+    <value>Another computer, set under Advanced</value>
+  </data>
+  <data name="Settings_LocationHint.Text" xml:space="preserve">
+    <value>Tools finds and talks to the scanner by itself.</value>
+  </data>
+  <data name="Settings_Advanced.Text" xml:space="preserve">
+    <value>Advanced</value>
   </data>
 </root>

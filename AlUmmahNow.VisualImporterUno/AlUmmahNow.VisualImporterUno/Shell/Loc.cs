@@ -27,9 +27,13 @@ public static class Loc
         }
     }
 
-    /// <summary>A resource string with placeholders; whole-number arguments are written as exact numbers.</summary>
+    /// <summary>
+    /// A resource string with placeholders; whole-number arguments are written as exact numbers. When the first argument is a
+    /// whole number and the key has plural forms (Key_One, Key_Other, …), the form for that number is used.
+    /// </summary>
     public static string Format(string key, params object?[] args)
     {
+        key = PluralKey(key, args);
         var shown = args.Select(a => a switch
         {
             int i => Number(i),
@@ -38,6 +42,38 @@ public static class Loc
             _ => a,
         }).ToArray();
         return string.Format(CultureInfo.CurrentUICulture, Get(key), shown);
+    }
+
+    /// <summary>A count phrase such as "3 channels" / «٣ قنوات», for use inside another string.</summary>
+    public static string Plural(string key, long count) => Format(key, count);
+
+    /// <summary>
+    /// The plural category of a whole number. Arabic follows CLDR: 0 zero, 1 one, 2 two, 3–10 few and 11–99 many (by the last
+    /// two digits), the rest other («١٠٠ مرئي»). English has one and other. Either language may add a Zero form.
+    /// </summary>
+    public static string PluralCategory(long n, bool arabic)
+    {
+        if (!arabic) return n == 1 ? "One" : "Other";
+        var lastTwo = Math.Abs(n) % 100;
+        return n switch
+        {
+            0 => "Zero",
+            1 => "One",
+            2 => "Two",
+            _ when lastTwo is >= 3 and <= 10 => "Few",
+            _ when lastTwo is >= 11 and <= 99 => "Many",
+            _ => "Other",
+        };
+    }
+
+    private static string PluralKey(string key, object?[] args)
+    {
+        if (args.Length == 0 || args[0] is not (int or long)) return key;
+        var n = System.Convert.ToInt64(args[0]);
+        string[] tries = n == 0 ? [key + "_Zero", key + "_" + PluralCategory(n, IsArabic), key + "_Other"] : [key + "_" + PluralCategory(n, IsArabic), key + "_Other"];
+        foreach (var candidate in tries)
+            if (Get(candidate) != candidate) return candidate;
+        return key;
     }
 
     /// <summary>

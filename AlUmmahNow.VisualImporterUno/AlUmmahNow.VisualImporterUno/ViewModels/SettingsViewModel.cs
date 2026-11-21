@@ -44,6 +44,12 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
             DetectServicePaths();
         }
 
+        /// <summary>Where the scanner runs, in words: this computer unless the address points somewhere else.</summary>
+        public string ScannerLocationText =>
+            Uri.TryCreate(FileScanServiceUrl, UriKind.Absolute, out var uri) && !uri.IsLoopback
+                ? Loc.Get("Settings_LocationOther")
+                : Loc.Get("Settings_LocationHere");
+
         public string FileScanServiceUrl
         {
             get => _fileScanServiceUrl;
@@ -52,6 +58,7 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
                 if (SetProperty(ref _fileScanServiceUrl, value))
                 {
                     TestResults = ""; // Clear previous test results when URL changes
+                    OnPropertyChanged(nameof(ScannerLocationText));
                 }
             }
         }

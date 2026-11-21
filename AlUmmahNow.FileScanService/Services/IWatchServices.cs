@@ -16,6 +16,12 @@ public interface IFileWatchService
     /// Stop watching a channel directory
     /// </summary>
     Task<bool> StopWatchAsync(Guid watchId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Start watching a stopped watch's folder again, keeping its history. False when it doesn't exist or another active
+    /// watch already monitors that folder.
+    /// </summary>
+    Task<bool> ResumeWatchAsync(Guid watchId, CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Get all active watches

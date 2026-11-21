@@ -337,6 +337,30 @@ namespace AlUmmahNow.FileScanService.Hubs
         }
 
         /// <summary>
+        /// Start watching a stopped watch's folder again
+        /// </summary>
+        /// <param name="watchId">Watch ID to resume</param>
+        /// <returns>Success status</returns>
+        public async Task<bool> ResumeWatch(Guid watchId)
+        {
+            try
+            {
+                _logger.LogInformation("Resuming watch {WatchId} from {ConnectionId}", watchId, Context.ConnectionId);
+                var success = await _fileWatchService.ResumeWatchAsync(watchId);
+                if (success)
+                {
+                    await Clients.Group($"watch-{watchId}").SendAsync("WatchResumed", watchId);
+                }
+                return success;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error resuming watch {WatchId}", watchId);
+                throw new HubException($"Failed to resume watch: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// Get all active watches
         /// </summary>
         /// <returns>List of active watches</returns>
