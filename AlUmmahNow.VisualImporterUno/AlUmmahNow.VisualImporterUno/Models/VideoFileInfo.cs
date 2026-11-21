@@ -189,18 +189,7 @@ namespace AlUmmahNow.VisualImporterUno.Models
             return true;
         }
 
-        private static string FormatFileSize(long bytes)
-        {
-            string[] suffixes = { "B", "KB", "MB", "GB", "TB" };
-            int counter = 0;
-            decimal number = bytes;
-            while (Math.Round(number / 1024) >= 1)
-            {
-                number /= 1024;
-                counter++;
-            }
-            return $"{number:n1} {suffixes[counter]}";
-        }
+        private static string FormatFileSize(long bytes) => AlUmmahNow.VisualImporterUno.Shell.Loc.Bytes(bytes);
     }
 
     /// <summary>
@@ -254,18 +243,7 @@ namespace AlUmmahNow.VisualImporterUno.Models
         /// </summary>
         public string DuplicateSizeFormatted => FormatFileSize(DuplicateSize);
 
-        private static string FormatFileSize(long bytes)
-        {
-            string[] suffixes = { "B", "KB", "MB", "GB", "TB" };
-            int counter = 0;
-            decimal number = bytes;
-            while (Math.Round(number / 1024) >= 1)
-            {
-                number /= 1024;
-                counter++;
-            }
-            return $"{number:n1} {suffixes[counter]}";
-        }
+        private static string FormatFileSize(long bytes) => AlUmmahNow.VisualImporterUno.Shell.Loc.Bytes(bytes);
     }
 
     /// <summary>

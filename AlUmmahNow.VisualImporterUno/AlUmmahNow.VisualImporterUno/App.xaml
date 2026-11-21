@@ -10,6 +10,8 @@
         <!-- Fawanees, the default site theme (vendored, see Themes/Fawanees/SOURCE.md) -->
         <ResourceDictionary Source="ms-appx:///Themes/Fawanees/Fanous.Colors.xaml" />
         <ResourceDictionary Source="ms-appx:///Themes/Fawanees/Fanous.Tokens.xaml" />
+        <ResourceDictionary Source="ms-appx:///Themes/Tools.WinUI.xaml" />
+        <ResourceDictionary Source="ms-appx:///Themes/Tools.Styles.xaml" />
       </ResourceDictionary.MergedDictionaries>
 
       <!-- WinUI accent follows the Fawanees accent (gold in dark, deep amber in light), not the OS accent -->

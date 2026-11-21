@@ -5,1011 +5,572 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
 using AlUmmahNow.VisualImporterUno.Services;
+using AlUmmahNow.VisualImporterUno.Shell;
 using AlUmmahNow.Data.Models.FileScanning;
 using Microsoft.UI.Dispatching;
 
 namespace AlUmmahNow.VisualImporterUno.ViewModels;
 
+/// <summary>What the folder scanner (the local FileScan service) is doing, in the words staff see.</summary>
+public enum ScannerState
+{
+    Checking,
+    Off,
+    Starting,
+    On,
+    Stopping,
+    Missing,
+    Failed,
+}
+
 /// <summary>
-/// ViewModel for monitoring FileScan service status and managing service lifecycle
+/// The local folder scanner: its state, the scans it is running, its activity and its problems. One instance serves the
+/// dashboard, the Service status page and the workspace, so every view shows the same numbers. Every change to a bound
+/// property or collection happens on the UI thread.
 /// </summary>
 public partial class ServiceStatusViewModel : ObservableObject, IDisposable
 {
+    /// <summary>Start the scanner when the app opens. Screenshot runs turn it off so they never launch processes.</summary>
+    public static bool AutoStart { get; set; } = true;
+
+    private const int ActivityLimit = 200;
+
     private readonly FileScanSignalRClient _signalRClient;
     private readonly FileScanServiceManager _serviceManager;
     private readonly DispatcherQueue? _dispatcherQueue;
     private readonly System.Threading.Timer _metricsTimer;
-    private System.Diagnostics.Process? _serviceProcess;
-    private bool _disposed = false;
+    private bool _disposed;
 
-    [ObservableProperty]
-    private ServiceStatus _serviceStatus = ServiceStatus.NotAvailable;
+    [ObservableProperty] private ServiceStatus _serviceStatus = ServiceStatus.NotAvailable;
+    [ObservableProperty] private ServiceHealthStatus _serviceHealthStatus = ServiceHealthStatus.Unknown;
+    [ObservableProperty] private bool _isServiceManaged;
 
-    [ObservableProperty]
-    private string _serviceStatusMessage = "Not connected";
+    [ObservableProperty] private ScannerState _scannerState = ScannerState.Checking;
+    [ObservableProperty] private string _scannerTitle = Loc.Get("Scanner_CheckingTitle");
+    [ObservableProperty] private string _scannerDetail = Loc.Get("Scanner_CheckingDetail");
+    [ObservableProperty] private string _scannerActionText = Loc.Get("Scanner_ActionTurnOn");
+    [ObservableProperty] private bool _canRunScannerAction;
+    [ObservableProperty] private bool _isScannerBusy = true;
+    [ObservableProperty] private string _scannerStatusColor = "#FF8BA3AE";
 
-    [ObservableProperty]
-    private string _serviceStatusColor = "#FF6B6B"; // Red
+    [ObservableProperty] private bool _canStartService;
+    [ObservableProperty] private bool _canStopService;
+    [ObservableProperty] private bool _isConnecting;
+    [ObservableProperty] private bool _isStartingService;
+    [ObservableProperty] private bool _isStoppingService;
 
-    [ObservableProperty]
-    private double _cpuUsage = 0;
+    [ObservableProperty] private string _connectionText = Loc.Get("Scanner_ConnectionNone");
+    [ObservableProperty] private string _processText = "–";
+    [ObservableProperty] private string _uptimeText = "–";
+    [ObservableProperty] private string _memoryText = "–";
+    [ObservableProperty] private string _threadsText = "–";
+    [ObservableProperty] private string _cpuText = "–";
 
-    [ObservableProperty]
-    private long _memoryUsageMB = 0;
+    [ObservableProperty] private int _filesScanned;
+    [ObservableProperty] private string _filesScannedText = Loc.Number(0);
+    [ObservableProperty] private bool _hasActiveOperation;
+    [ObservableProperty] private string _activeOperationsText = Loc.Number(0);
+    [ObservableProperty] private int _problemCount;
+    [ObservableProperty] private string _problemCountText = Loc.Number(0);
+    [ObservableProperty] private bool _hasProblems;
+    [ObservableProperty] private bool _hasActivity;
 
-    [ObservableProperty]
-    private string _currentState = "Idle";
+    /// <summary>Everything the scanner reported, newest first.</summary>
+    public ObservableCollection<ActivityEntry> Activity { get; } = new();
 
-    [ObservableProperty]
-    private int _processId = 0;
+    /// <summary>The problems among <see cref="Activity"/>, newest first.</summary>
+    public ObservableCollection<ActivityEntry> Problems { get; } = new();
 
-    [ObservableProperty]
-    private string _uptime = "N/A";
-
-    [ObservableProperty]
-    private int _threadCount = 0;
-
-    [ObservableProperty]
-    private long _workingSetMB = 0;
-
-    [ObservableProperty]
-    private ServiceHealthStatus _serviceHealthStatus = ServiceHealthStatus.Unknown;
-
-    [ObservableProperty]
-    private string _serviceHealthMessage = "Unknown";
-
-    [ObservableProperty]
-    private bool _isServiceManaged = false;
-
-    [ObservableProperty]
-    private bool _canStartService = true;
-
-    [ObservableProperty]
-    private bool _canStopService = false;
-
-    [ObservableProperty]
-    private string _currentOperation = "No operations";
-
-    [ObservableProperty]
-    private double _progressPercentage = 0;
-
-    [ObservableProperty]
-    private int _filesScanned = 0;
-
-    [ObservableProperty]
-    private string _currentFile = string.Empty;
-
-    [ObservableProperty]
-    private bool _hasActiveOperation = false;
-
-    [ObservableProperty]
-    private bool _isConnecting = false;
-
-    [ObservableProperty]
-    private bool _isStartingService = false;
-
-    [ObservableProperty]
-    private bool _isStoppingService = false;
-
-    public ObservableCollection<ErrorMessage> Errors { get; } = new();
+    /// <summary>The scans running now.</summary>
     public ObservableCollection<OperationInfo> OngoingOperations { get; } = new();
 
     public ServiceStatusViewModel(FileScanSignalRClient signalRClient, FileScanServiceManager serviceManager)
     {
         _signalRClient = signalRClient ?? throw new ArgumentNullException(nameof(signalRClient));
         _serviceManager = serviceManager ?? throw new ArgumentNullException(nameof(serviceManager));
-        
-        // Get dispatcher queue for UI updates with enhanced safety
+
         try
         {
-            _dispatcherQueue = App.Current?.MainWindow?.DispatcherQueue
-                ?? DispatcherQueue.GetForCurrentThread();
+            _dispatcherQueue = App.Current?.MainWindow?.DispatcherQueue ?? DispatcherQueue.GetForCurrentThread();
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"Failed to get dispatcher queue: {ex.Message}");
-            _dispatcherQueue = null;
+            System.Diagnostics.Debug.WriteLine($"No dispatcher for the scanner view model: {ex.Message}");
         }
 
-        // Initialize metrics timer (update every 2 seconds)
-        _metricsTimer = new System.Threading.Timer(
-            async _ => await UpdateSystemMetricsAsync(),
-            null,
-            TimeSpan.FromSeconds(2),
-            TimeSpan.FromSeconds(2)
-        );
-
-        // Subscribe to events with safe initialization
-        try
-        {
-            SubscribeToEvents();
-            
-            // Initialize connection in background to avoid blocking constructor
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    await Task.Delay(1000); // Give UI time to initialize
-                    await InitializeServiceAsync();
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Background initialization failed: {ex.Message}");
-                    DispatcherExecute(() => AddServiceLog($"?? Initialization failed: {ex.Message}", MessageType.Error));
-                }
-            });
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"ServiceStatusViewModel initialization failed: {ex.Message}");
-            // Don't throw - let the view model exist in a degraded state
-            ServiceStatusMessage = $"Initialization failed: {ex.Message}";
-            ServiceStatus = ServiceStatus.NotAvailable;
-        }
+        _metricsTimer = new System.Threading.Timer(async _ => await UpdateMetricsAsync(), null, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(2));
+        SubscribeToEvents();
+        _ = Task.Run(InitializeAsync);
     }
 
-    private async Task InitializeServiceAsync()
+    private async Task InitializeAsync()
     {
         try
         {
-            AddServiceLog("?? Initializing FileScan service management...", MessageType.Information);
-            
-            // First update service manager status
-            await UpdateServiceManagerStatusAsync();
-
-            DispatcherExecute(() =>
-            {
-                IsConnecting = true;
-                ServiceStatusMessage = "Checking service availability...";
-            });
-
-            // Check if service is already running
+            await Task.Delay(500);
+            await RefreshHealthAsync();
             if (await _serviceManager.IsServiceRunningAsync())
             {
-                AddServiceLog("? FileScan service is already running", MessageType.Success);
-                
-                // Try to connect to existing service
-                var connected = await _signalRClient.ConnectAsync();
-                
-                DispatcherExecute(() =>
-                {
-                    if (connected)
-                    {
-                        ServiceStatusMessage = "Connected to existing FileScan service";
-                        ServiceStatus = ServiceStatus.Connected;
-                        AddServiceLog("?? Connected to existing FileScan service", MessageType.Success);
-                    }
-                    else
-                    {
-                        ServiceStatusMessage = "Service running but connection failed";
-                        ServiceStatus = ServiceStatus.NotAvailable;
-                        AddServiceLog("?? Service is running but SignalR connection failed", MessageType.Warning);
-                    }
-                    IsConnecting = false;
-                });
+                Log(ActivityKind.Success, "Activity_ScannerFound");
+                await ConnectAsync();
+            }
+            else if (AutoStart)
+            {
+                await StartAsync();
             }
             else
             {
-                AddServiceLog("?? No running FileScan service detected", MessageType.Information);
-                
-                DispatcherExecute(() =>
-                {
-                    ServiceStatusMessage = "FileScan service not running";
-                    ServiceStatus = ServiceStatus.NotAvailable;
-                    IsConnecting = false;
-                });
-                
-                // Optionally start the service automatically
-                AddServiceLog("?? Auto-starting FileScan service...", MessageType.Information);
-                await StartServiceAsync();
+                OnUi(() => SetHealth(ServiceHealthStatus.Stopped));
             }
         }
         catch (Exception ex)
         {
-            DispatcherExecute(() =>
-            {
-                ServiceStatusMessage = $"Initialization failed: {ex.Message}";
-                ServiceStatus = ServiceStatus.NotAvailable;
-                IsConnecting = false;
-                AddServiceLog($"?? Service initialization error: {ex.Message}", MessageType.Error);
-            });
+            Problem("Problem_ScannerCheck", ex.Message);
+            OnUi(() => SetHealth(ServiceHealthStatus.Error));
         }
-    }
-
-    private async Task UpdateServiceManagerStatusAsync()
-    {
-        try
-        {
-            var serviceInfo = await _serviceManager.GetServiceInfoAsync();
-            
-            DispatcherExecute(() =>
-            {
-                ServiceHealthStatus = serviceInfo.Status;
-                IsServiceManaged = serviceInfo.IsManaged;
-                
-                ServiceHealthMessage = ServiceHealthStatus switch
-                {
-                    ServiceHealthStatus.Running => GetRunningStatusMessage(serviceInfo),
-                    ServiceHealthStatus.Starting => "Service starting...",
-                    ServiceHealthStatus.Stopping => "Service stopping...",
-                    ServiceHealthStatus.Stopped => "Service stopped",
-                    ServiceHealthStatus.Error => "Service error",
-                    ServiceHealthStatus.NotFound => "Service executable not found",
-                    _ => "Unknown"
-                };
-                
-                CanStartService = ServiceHealthStatus != ServiceHealthStatus.Running && 
-                                 ServiceHealthStatus != ServiceHealthStatus.Starting &&
-                                 ServiceHealthStatus != ServiceHealthStatus.NotFound;
-                                 
-                CanStopService = IsServiceManaged && 
-                               (ServiceHealthStatus == ServiceHealthStatus.Running || 
-                                ServiceHealthStatus == ServiceHealthStatus.Starting);
-            });
-        }
-        catch (Exception ex)
-        {
-            DispatcherExecute(() =>
-            {
-                AddError($"Failed to get service status: {ex.Message}");
-            });
-        }
-    }
-
-    private string GetRunningStatusMessage(ServiceInfo serviceInfo)
-    {
-        var baseMessage = $"Service running{(IsServiceManaged ? " (managed)" : " (external)")}";
-        
-        if (serviceInfo.SingletonInfo != null)
-        {
-            var singletonInfo = serviceInfo.SingletonInfo;
-            if (singletonInfo.IsLockHeld)
-            {
-                baseMessage += $" - PID: {singletonInfo.CurrentProcessId}";
-                if (singletonInfo.LockHolderStartTime.HasValue)
-                {
-                    var uptime = DateTime.Now - singletonInfo.LockHolderStartTime.Value;
-                    if (uptime.TotalHours >= 1)
-                        baseMessage += $", up {uptime.Hours}h {uptime.Minutes}m";
-                    else if (uptime.TotalMinutes >= 1)
-                        baseMessage += $", up {uptime.Minutes}m";
-                    else
-                        baseMessage += $", up {uptime.Seconds}s";
-                }
-            }
-        }
-        
-        return baseMessage;
     }
 
     private void SubscribeToEvents()
     {
-        // SignalR client events
-        _signalRClient.ServiceStatusChanged += OnServiceStatusChanged;
-        _signalRClient.ScanProgressReceived += OnScanProgressReceived;
+        _signalRClient.ServiceStatusChanged += OnConnectionChanged;
+        _signalRClient.ScanProgressReceived += OnScanProgress;
         _signalRClient.ScanStarted += OnScanStarted;
         _signalRClient.ScanCompleted += OnScanCompleted;
         _signalRClient.ScanFailed += OnScanFailed;
         _signalRClient.ScanCancelled += OnScanCancelled;
-        _signalRClient.ErrorOccurred += OnErrorOccurred;
-
-        // Service manager events
-        _serviceManager.ServiceStatusChanged += OnServiceManagerStatusChanged;
+        _signalRClient.ErrorOccurred += OnConnectionError;
+        _serviceManager.ServiceStatusChanged += OnHealthChanged;
     }
 
-    private void OnScanProgressReceived(object? sender, FileScanProgressEventArgs e)
+    /// <summary>The scanner card's one button: turn on, turn off, or try again after a problem.</summary>
+    [RelayCommand]
+    private async Task ScannerActionAsync()
     {
-        DispatcherExecute(() =>
-        {
-            try
-            {
-                ProgressPercentage = e.ProgressPercentage;
-                FilesScanned = e.FilesScanned;
-                CurrentFile = e.CurrentFile;
-                CurrentOperation = e.CurrentOperation;
-
-                // Update the operation info for this session
-                var operation = OngoingOperations.FirstOrDefault(o => o.SessionId == e.SessionId);
-                if (operation != null)
-                {
-                    operation.Progress = e.ProgressPercentage;
-                    operation.CurrentOperation = e.CurrentOperation;
-                    operation.ItemsProcessed = e.FilesScanned;
-                }
-
-                AddServiceLog($"?? Scan progress: {e.ProgressPercentage:F1}% ({e.FilesScanned} files scanned)", MessageType.Information);
-            }
-            catch (Exception ex)
-            {
-                AddServiceLog($"?? Error processing scan progress: {ex.Message}", MessageType.Error);
-            }
-        });
+        if (ScannerState == ScannerState.On) await StopAsync();
+        else await StartAsync();
     }
 
     [RelayCommand]
-    private async Task StartServiceAsync()
-    {
-        try
-        {
-            IsStartingService = true;
-            CanStartService = false;
-            AddServiceLog("?? Starting FileScan service...", MessageType.Information);
-            
-            var started = await _serviceManager.EnsureServiceRunningAsync();
-            
-            if (started)
-            {
-                AddServiceLog("? FileScan service started successfully", MessageType.Success);
-                
-                // Try to connect after service starts
-                await Task.Delay(2000); // Give service time to fully initialize
-                AddServiceLog("?? Attempting to connect to started service...", MessageType.Information);
-                await ConnectToServiceAsync();
-            }
-            else
-            {
-                AddServiceLog("? Failed to start FileScan service", MessageType.Error);
-            }
-        }
-        catch (Exception ex)
-        {
-            AddServiceLog($"?? Error starting service: {ex.Message}", MessageType.Error);
-        }
-        finally
-        {
-            IsStartingService = false;
-            await UpdateServiceManagerStatusAsync();
-        }
-    }
+    private Task StartServiceAsync() => StartAsync();
 
     [RelayCommand]
-    private async Task StopServiceAsync()
-    {
-        try
-        {
-            IsStoppingService = true;
-            CanStopService = false;
-            AddServiceLog("?? Stopping FileScan service...", MessageType.Information);
-            
-            // Disconnect first
-            AddServiceLog("?? Disconnecting from service...", MessageType.Information);
-            await _signalRClient.DisconnectAsync();
-            
-            // Then stop the service
-            var stopped = await _serviceManager.StopServiceAsync();
-            
-            if (stopped)
-            {
-                AddServiceLog("? FileScan service stopped successfully", MessageType.Success);
-            }
-            else
-            {
-                AddServiceLog("?? Failed to stop FileScan service gracefully", MessageType.Warning);
-            }
-        }
-        catch (Exception ex)
-        {
-            AddServiceLog($"?? Error stopping service: {ex.Message}", MessageType.Error);
-        }
-        finally
-        {
-            IsStoppingService = false;
-            await UpdateServiceManagerStatusAsync();
-        }
-    }
+    private Task StopServiceAsync() => StopAsync();
 
     [RelayCommand]
-    private async Task ConnectToServiceAsync()
-    {
-        try
-        {
-            IsConnecting = true;
-            ServiceStatusMessage = "Connecting to FileScan service...";
-            AddServiceLog("?? Connecting to FileScan service...", MessageType.Information);
-            
-            var connected = await _signalRClient.ConnectAsync();
-            
-            if (!connected)
-            {
-                AddServiceLog("? Failed to connect to FileScan service. Make sure the service is running.", MessageType.Error);
-            }
-            else
-            {
-                AddServiceLog("? Successfully connected to FileScan service", MessageType.Success);
-            }
-        }
-        catch (Exception ex)
-        {
-            AddServiceLog($"?? Connection error: {ex.Message}", MessageType.Error);
-        }
-        finally
-        {
-            IsConnecting = false;
-        }
-    }
+    private Task ConnectToServiceAsync() => ConnectAsync();
 
     [RelayCommand]
     private async Task DisconnectFromServiceAsync()
     {
         try
         {
-            AddServiceLog("?? Disconnecting from FileScan service...", MessageType.Information);
             await _signalRClient.DisconnectAsync();
-            ServiceStatus = ServiceStatus.Disconnected;
-            ServiceStatusMessage = "Disconnected from service";
-            UpdateStatusColor();
-            AddServiceLog("? Disconnected from FileScan service", MessageType.Success);
+            Log(ActivityKind.Info, "Activity_Disconnected");
         }
         catch (Exception ex)
         {
-            AddServiceLog($"?? Disconnect error: {ex.Message}", MessageType.Error);
+            Problem("Problem_Disconnect", ex.Message);
         }
     }
 
+    /// <summary>Checks the scanner again, reconnects when it is on, and reloads the running scans.</summary>
     [RelayCommand]
     private async Task RefreshStatusAsync()
     {
         try
         {
-            AddServiceLog("?? Refreshing service status...", MessageType.Information);
-            
-            // Update service manager status
-            await UpdateServiceManagerStatusAsync();
-            
-            if (_signalRClient.IsConnected)
+            await RefreshHealthAsync();
+            if (ServiceHealthStatus == ServiceHealthStatus.Running && !_signalRClient.IsConnected) await ConnectAsync();
+            if (!_signalRClient.IsConnected) return;
+
+            var sessions = await _signalRClient.GetAllSessionsAsync();
+            OnUi(() =>
             {
-                // Refresh ongoing operations by querying the service
-                var sessions = await _signalRClient.GetAllSessionsAsync();
-                
-                DispatcherExecute(() =>
+                OngoingOperations.Clear();
+                foreach (var scan in sessions.Where(s => s.Status == "InProgress"))
                 {
-                    // Update ongoing operations
-                    OngoingOperations.Clear();
-                    
-                    var activeScans = sessions.Where(s => s.Status == "InProgress").ToList();
-                    
-                    foreach (var scan in activeScans)
-                    {
-                        OngoingOperations.Add(new OperationInfo
-                        {
-                            SessionId = scan.Id,
-                            Type = "Scan",
-                            Progress = 0, // Progress percentage not available in session DTO
-                            CurrentOperation = scan.Status,
-                            ItemsProcessed = scan.FilesScanned,
-                            StartTime = scan.CreatedAt
-                        });
-                    }
-                    
-                    HasActiveOperation = OngoingOperations.Count > 0;
-                    
-                    if (!HasActiveOperation)
-                    {
-                        CurrentOperation = "No operations";
-                        ProgressPercentage = 0;
-                    }
-                });
-                
-                AddServiceLog($"? Status refreshed: {sessions.Count} total sessions, {sessions.Count(s => s.Status == "InProgress")} active", MessageType.Success);
+                    OngoingOperations.Add(new OperationInfo { SessionId = scan.Id, ItemsProcessed = scan.FilesScanned, StartTime = scan.CreatedAt });
+                }
+                UpdateOperationCounts();
+            });
+        }
+        catch (Exception ex)
+        {
+            Problem("Problem_Refresh", ex.Message);
+        }
+    }
+
+    [RelayCommand]
+    private void ClearActivity() => OnUi(() =>
+    {
+        Activity.Clear();
+        Problems.Clear();
+        UpdateProblemCounts();
+    });
+
+    private async Task StartAsync()
+    {
+        OnUi(() =>
+        {
+            IsStartingService = true;
+            SetHealth(ServiceHealthStatus.Starting);
+        });
+        try
+        {
+            if (await _serviceManager.EnsureServiceRunningAsync())
+            {
+                Log(ActivityKind.Success, "Activity_ScannerStarted");
+                await Task.Delay(1500);
+                await ConnectAsync();
             }
             else
             {
-                AddServiceLog("?? Not connected to service - cannot refresh operations", MessageType.Warning);
+                await RefreshHealthAsync();
+                if (ServiceHealthStatus != ServiceHealthStatus.NotFound) Problem("Problem_ScannerStart", null);
             }
         }
         catch (Exception ex)
         {
-            AddServiceLog($"?? Refresh failed: {ex.Message}", MessageType.Error);
+            Problem("Problem_ScannerStart", ex.Message);
+        }
+        finally
+        {
+            OnUi(() => IsStartingService = false);
+            await RefreshHealthAsync();
         }
     }
 
-    private void OnServiceManagerStatusChanged(object? sender, ServiceStatusChangedEventArgs e)
+    private async Task StopAsync()
     {
-        DispatcherExecute(async () =>
+        OnUi(() =>
         {
-            ServiceHealthStatus = e.CurrentStatus;
-            
-            ServiceHealthMessage = ServiceHealthStatus switch
-            {
-                ServiceHealthStatus.Running => $"Service running{(IsServiceManaged ? " (managed)" : " (external)")}",
-                ServiceHealthStatus.Starting => "Service starting...",
-                ServiceHealthStatus.Stopping => "Service stopping...",
-                ServiceHealthStatus.Stopped => "Service stopped",
-                ServiceHealthStatus.Error => "Service error",
-                ServiceHealthStatus.NotFound => "Service executable not found",
-                _ => "Unknown"
-            };
-            
-            // Log service status changes
-            var statusMessage = ServiceHealthStatus switch
-            {
-                ServiceHealthStatus.Running => $"?? Service is now running {(IsServiceManaged ? "(managed by this app)" : "(external process)")}",
-                ServiceHealthStatus.Starting => "?? Service is starting up...",
-                ServiceHealthStatus.Stopping => "?? Service is shutting down...",
-                ServiceHealthStatus.Stopped => "?? Service has stopped",
-                ServiceHealthStatus.Error => "?? Service encountered an error",
-                ServiceHealthStatus.NotFound => "? Service executable not found",
-                _ => $"? Service status unknown: {ServiceHealthStatus}"
-            };
-            
-            var messageType = ServiceHealthStatus switch
-            {
-                ServiceHealthStatus.Running => MessageType.Success,
-                ServiceHealthStatus.Starting or ServiceHealthStatus.Stopping => MessageType.Information,
-                ServiceHealthStatus.Stopped => MessageType.Warning,
-                ServiceHealthStatus.Error or ServiceHealthStatus.NotFound => MessageType.Error,
-                _ => MessageType.Information
-            };
-            
-            AddServiceLog(statusMessage, messageType);
-            
-            CanStartService = ServiceHealthStatus != ServiceHealthStatus.Running && 
-                             ServiceHealthStatus != ServiceHealthStatus.Starting &&
-                             ServiceHealthStatus != ServiceHealthStatus.NotFound;
-                             
-            CanStopService = IsServiceManaged && 
-                           (ServiceHealthStatus == ServiceHealthStatus.Running || 
-                            ServiceHealthStatus == ServiceHealthStatus.Starting);
+            IsStoppingService = true;
+            SetHealth(ServiceHealthStatus.Stopping);
+        });
+        try
+        {
+            await _signalRClient.DisconnectAsync();
+            if (await _serviceManager.StopServiceAsync()) Log(ActivityKind.Info, "Activity_ScannerStopped");
+            else Problem("Problem_ScannerStop", null);
+        }
+        catch (Exception ex)
+        {
+            Problem("Problem_ScannerStop", ex.Message);
+        }
+        finally
+        {
+            OnUi(() => IsStoppingService = false);
+            await RefreshHealthAsync();
+        }
+    }
 
-            // Try to connect when service becomes available
-            if (ServiceHealthStatus == ServiceHealthStatus.Running && 
-                ServiceStatus != ServiceStatus.Connected && 
-                !IsConnecting)
+    private async Task ConnectAsync()
+    {
+        OnUi(() => IsConnecting = true);
+        try
+        {
+            if (await _signalRClient.ConnectAsync()) Log(ActivityKind.Success, "Activity_Connected");
+            else Problem("Problem_Connect", null);
+        }
+        catch (Exception ex)
+        {
+            Problem("Problem_Connect", ex.Message);
+        }
+        finally
+        {
+            OnUi(() => IsConnecting = false);
+        }
+    }
+
+    private async Task RefreshHealthAsync()
+    {
+        try
+        {
+            var info = await _serviceManager.GetServiceInfoAsync();
+            OnUi(() =>
             {
-                AddServiceLog("?? Service is running, attempting automatic connection...", MessageType.Information);
-                await Task.Delay(1000); // Give service time to fully start
-                await ConnectToServiceAsync();
+                IsServiceManaged = info.IsManaged;
+                SetHealth(info.Status);
+            });
+        }
+        catch (Exception ex)
+        {
+            Problem("Problem_ScannerCheck", ex.Message);
+        }
+    }
+
+    private void OnHealthChanged(object? sender, ServiceStatusChangedEventArgs e)
+    {
+        OnUi(() =>
+        {
+            SetHealth(e.CurrentStatus);
+            if (e.CurrentStatus == ServiceHealthStatus.Error) Problem("Problem_ScannerStopped", null);
+        });
+        if (e.CurrentStatus == ServiceHealthStatus.Running && ServiceStatus != ServiceStatus.Connected && !IsConnecting)
+        {
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(1000);
+                await ConnectAsync();
+            });
+        }
+    }
+
+    private void OnConnectionChanged(object? sender, ServiceStatusEventArgs e)
+    {
+        OnUi(() =>
+        {
+            ServiceStatus = e.Status;
+            ConnectionText = Loc.Get(e.Status switch
+            {
+                ServiceStatus.Connected => "Scanner_ConnectionConnected",
+                ServiceStatus.Reconnecting => "Scanner_ConnectionReconnecting",
+                _ => "Scanner_ConnectionNone",
+            });
+            if (e.Status is ServiceStatus.Disconnected or ServiceStatus.NotAvailable)
+            {
+                OngoingOperations.Clear();
+                UpdateOperationCounts();
             }
+            UpdateScanner();
         });
     }
 
-    private void OnServiceStatusChanged(object? sender, ServiceStatusEventArgs e)
+    private void OnConnectionError(object? sender, string error) => Problem("Problem_Connection", error);
+
+    private void OnScanProgress(object? sender, FileScanProgressEventArgs e)
     {
-        DispatcherExecute(() =>
+        OnUi(() =>
         {
-            ServiceStatus = e.Status;
-            ServiceStatusMessage = e.Message;
-            UpdateStatusColor();
-            
-            // Log SignalR connection status changes
-            var connectionMessage = ServiceStatus switch
-            {
-                ServiceStatus.Connected => "?? SignalR connection established",
-                ServiceStatus.Reconnecting => "?? SignalR connection lost, reconnecting...",
-                ServiceStatus.Disconnected => "?? SignalR disconnected",
-                ServiceStatus.NotAvailable => "? SignalR service not available",
-                ServiceStatus.Stopped => "?? SignalR service stopped",
-                _ => $"? SignalR status: {ServiceStatus}"
-            };
-            
-            var messageType = ServiceStatus switch
-            {
-                ServiceStatus.Connected => MessageType.Success,
-                ServiceStatus.Reconnecting => MessageType.Information,
-                ServiceStatus.Disconnected or ServiceStatus.Stopped => MessageType.Warning,
-                ServiceStatus.NotAvailable => MessageType.Error,
-                _ => MessageType.Information
-            };
-            
-            AddServiceLog(connectionMessage, messageType);
-            
-            // Clear ongoing operations if disconnected
-            if (e.Status == ServiceStatus.Disconnected || e.Status == ServiceStatus.NotAvailable)
-            {
-                OngoingOperations.Clear();
-                HasActiveOperation = false;
-                CurrentOperation = "No operations";
-                ProgressPercentage = 0;
-            }
+            FilesScanned = e.FilesScanned;
+            FilesScannedText = Loc.Number(e.FilesScanned);
+            var operation = OngoingOperations.FirstOrDefault(o => o.SessionId == e.SessionId);
+            if (operation == null) return;
+            operation.Progress = e.ProgressPercentage;
+            operation.ItemsProcessed = e.FilesScanned;
         });
     }
 
     private void OnScanStarted(object? sender, Guid sessionId)
     {
-        DispatcherExecute(() =>
+        OnUi(() =>
         {
-            var operation = new OperationInfo
-            {
-                SessionId = sessionId,
-                Type = "Scan",
-                Progress = 0,
-                CurrentOperation = "Starting scan...",
-                ItemsProcessed = 0,
-                StartTime = DateTime.Now
-            };
-            
-            OngoingOperations.Add(operation);
-            HasActiveOperation = true;
-            CurrentOperation = "Scan started";
-            
-            AddServiceLog($"?? Scan operation started (Session: {sessionId:N})", MessageType.Success);
+            OngoingOperations.Add(new OperationInfo { SessionId = sessionId, StartTime = DateTime.Now });
+            UpdateOperationCounts();
         });
+        Log(ActivityKind.Info, "Activity_ScanStarted");
     }
 
     private void OnScanCompleted(object? sender, Guid sessionId)
     {
-        DispatcherExecute(() =>
+        OnUi(() =>
         {
             var operation = OngoingOperations.FirstOrDefault(o => o.SessionId == sessionId);
-            if (operation != null)
-            {
-                operation.Progress = 100;
-                operation.CurrentOperation = "Completed";
-                operation.EndTime = DateTime.Now;
-                
-                AddServiceLog($"? Scan operation completed (Session: {sessionId:N})", MessageType.Success);
-                
-                // Remove after a delay
-                Task.Delay(3000).ContinueWith(_ =>
-                {
-                    DispatcherExecute(() =>
-                    {
-                        OngoingOperations.Remove(operation);
-                        HasActiveOperation = OngoingOperations.Count > 0;
-                        
-                        if (!HasActiveOperation)
-                        {
-                            CurrentOperation = "No operations";
-                            ProgressPercentage = 0;
-                        }
-                    });
-                });
-            }
+            if (operation != null) OngoingOperations.Remove(operation);
+            UpdateOperationCounts();
         });
+        Log(ActivityKind.Success, "Activity_ScanCompleted");
     }
 
     private void OnScanFailed(object? sender, (Guid sessionId, string error) args)
     {
-        DispatcherExecute(() =>
+        OnUi(() =>
         {
             var operation = OngoingOperations.FirstOrDefault(o => o.SessionId == args.sessionId);
-            if (operation != null)
-            {
-                operation.CurrentOperation = "Failed";
-                operation.EndTime = DateTime.Now;
-                OngoingOperations.Remove(operation);
-            }
-            
-            AddServiceLog($"? Scan operation failed (Session: {args.sessionId:N}): {args.error}", MessageType.Error);
-            HasActiveOperation = OngoingOperations.Count > 0;
+            if (operation != null) OngoingOperations.Remove(operation);
+            UpdateOperationCounts();
         });
+        Problem("Problem_ScanFailed", args.error);
     }
 
     private void OnScanCancelled(object? sender, Guid sessionId)
     {
-        DispatcherExecute(() =>
+        OnUi(() =>
         {
             var operation = OngoingOperations.FirstOrDefault(o => o.SessionId == sessionId);
-            if (operation != null)
+            if (operation != null) OngoingOperations.Remove(operation);
+            UpdateOperationCounts();
+        });
+        Log(ActivityKind.Info, "Activity_ScanCancelled");
+    }
+
+    private void SetHealth(ServiceHealthStatus status)
+    {
+        ServiceHealthStatus = status;
+        CanStartService = status is not (ServiceHealthStatus.Running or ServiceHealthStatus.Starting or ServiceHealthStatus.Stopping);
+        CanStopService = IsServiceManaged && status is ServiceHealthStatus.Running or ServiceHealthStatus.Starting;
+        UpdateScanner();
+    }
+
+    private void UpdateScanner()
+    {
+        var state = ServiceHealthStatus switch
+        {
+            ServiceHealthStatus.Running => ScannerState.On,
+            ServiceHealthStatus.Starting => ScannerState.Starting,
+            ServiceHealthStatus.Stopping => ScannerState.Stopping,
+            ServiceHealthStatus.Stopped => ScannerState.Off,
+            ServiceHealthStatus.NotFound => ScannerState.Missing,
+            ServiceHealthStatus.Error => ScannerState.Failed,
+            _ => ScannerState.Checking,
+        };
+        ScannerState = state;
+        (ScannerTitle, ScannerDetail, ScannerActionText) = state switch
+        {
+            ScannerState.On => (Loc.Get("Scanner_OnTitle"), Loc.Get(IsServiceManaged ? "Scanner_OnDetail" : "Scanner_OnExternalDetail"), Loc.Get("Scanner_ActionTurnOff")),
+            ScannerState.Off => (Loc.Get("Scanner_OffTitle"), Loc.Get("Scanner_OffDetail"), Loc.Get("Scanner_ActionTurnOn")),
+            ScannerState.Starting => (Loc.Get("Scanner_StartingTitle"), Loc.Get("Scanner_StartingDetail"), Loc.Get("Scanner_ActionTurnOn")),
+            ScannerState.Stopping => (Loc.Get("Scanner_StoppingTitle"), Loc.Get("Scanner_StoppingDetail"), Loc.Get("Scanner_ActionTurnOff")),
+            ScannerState.Missing => (Loc.Get("Scanner_MissingTitle"), Loc.Get("Scanner_MissingDetail"), Loc.Get("Scanner_ActionTryAgain")),
+            ScannerState.Failed => (Loc.Get("Scanner_FailedTitle"), Loc.Get("Scanner_FailedDetail"), Loc.Get("Scanner_ActionTryAgain")),
+            _ => (Loc.Get("Scanner_CheckingTitle"), Loc.Get("Scanner_CheckingDetail"), Loc.Get("Scanner_ActionTurnOn")),
+        };
+        IsScannerBusy = state is ScannerState.Checking or ScannerState.Starting or ScannerState.Stopping;
+        CanRunScannerAction = !IsScannerBusy && (state != ScannerState.On || IsServiceManaged);
+        ScannerStatusColor = state switch
+        {
+            ScannerState.On => "#FF2FA866",
+            ScannerState.Failed or ScannerState.Missing => "#FFE0605A",
+            ScannerState.Off => "#FF7F97A3",
+            _ => "#FFE0962A",
+        };
+    }
+
+    private void UpdateOperationCounts()
+    {
+        HasActiveOperation = OngoingOperations.Count > 0;
+        ActiveOperationsText = Loc.Number(OngoingOperations.Count);
+    }
+
+    private void UpdateProblemCounts()
+    {
+        ProblemCount = Problems.Count;
+        ProblemCountText = Loc.Number(Problems.Count);
+        HasProblems = Problems.Count > 0;
+        HasActivity = Activity.Count > 0;
+    }
+
+    private void Log(ActivityKind kind, string titleKey, string? detail = null)
+    {
+        var entry = new ActivityEntry(kind, Loc.Get(titleKey), detail, DateTime.Now);
+        OnUi(() =>
+        {
+            Activity.Insert(0, entry);
+            while (Activity.Count > ActivityLimit) Activity.RemoveAt(Activity.Count - 1);
+            if (kind == ActivityKind.Problem)
             {
-                operation.CurrentOperation = "Cancelled";
-                operation.EndTime = DateTime.Now;
-                OngoingOperations.Remove(operation);
+                Problems.Insert(0, entry);
+                while (Problems.Count > ActivityLimit) Problems.RemoveAt(Problems.Count - 1);
             }
-            
-            AddServiceLog($"?? Scan operation cancelled (Session: {sessionId:N})", MessageType.Warning);
-            HasActiveOperation = OngoingOperations.Count > 0;
-            
-            if (!HasActiveOperation)
-            {
-                CurrentOperation = "No operations";
-                ProgressPercentage = 0;
-            }
+            UpdateProblemCounts();
         });
     }
 
-    private void OnErrorOccurred(object? sender, string error)
-    {
-        DispatcherExecute(() => AddServiceLog($"?? SignalR error: {error}", MessageType.Error));
-    }
+    /// <summary>A problem staff can act on: a plain title, with the technical detail kept for the details line.</summary>
+    private void Problem(string titleKey, string? detail) => Log(ActivityKind.Problem, titleKey, detail);
 
-    private void AddError(string message)
-    {
-        var error = new ErrorMessage
-        {
-            Message = message,
-            Timestamp = DateTime.Now,
-            Type = GetMessageType(message)
-        };
-        
-        Errors.Insert(0, error); // Add to beginning
-        
-        // Keep only last 100 messages
-        while (Errors.Count > 100)
-        {
-            Errors.RemoveAt(Errors.Count - 1);
-        }
-    }
-
-    private MessageType GetMessageType(string message)
-    {
-        var lowerMessage = message.ToLowerInvariant();
-        
-        if (lowerMessage.Contains("error") || lowerMessage.Contains("failed") || lowerMessage.Contains("exception"))
-            return MessageType.Error;
-        
-        if (lowerMessage.Contains("warning") || lowerMessage.Contains("timeout") || lowerMessage.Contains("retry"))
-            return MessageType.Warning;
-        
-        if (lowerMessage.Contains("connected") || lowerMessage.Contains("started") || lowerMessage.Contains("completed") || lowerMessage.Contains("successful"))
-            return MessageType.Success;
-        
-        return MessageType.Information;
-    }
-
-    private void AddServiceLog(string message, MessageType type = MessageType.Information)
-    {
-        var error = new ErrorMessage
-        {
-            Message = message,
-            Timestamp = DateTime.Now,
-            Type = type
-        };
-        
-        Errors.Insert(0, error);
-        
-        // Keep only last 100 messages
-        while (Errors.Count > 100)
-        {
-            Errors.RemoveAt(Errors.Count - 1);
-        }
-    }
-
-    [RelayCommand]
-    private void ClearErrors()
-    {
-        Errors.Clear();
-    }
-
-    private void UpdateStatusColor()
-    {
-        ServiceStatusColor = ServiceStatus switch
-        {
-            ServiceStatus.Connected => "#51CF66", // Green
-            ServiceStatus.Reconnecting => "#FFD43B", // Yellow
-            ServiceStatus.Disconnected => "#FF8787", // Light red
-            ServiceStatus.NotAvailable => "#FF6B6B", // Red
-            ServiceStatus.Stopped => "#868E96", // Gray
-            _ => "#FF6B6B"
-        };
-    }
-
-    private void DispatcherExecute(Action action)
-    {
-        if (_dispatcherQueue?.HasThreadAccess == true)
-        {
-            action();
-        }
-        else if (_dispatcherQueue != null)
-        {
-            _dispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Normal, () => action());
-        }
-        else
-        {
-            // Fallback: execute directly
-            action();
-        }
-    }
-
-    /// <summary>
-    /// Updates system metrics (CPU, Memory, etc.) for the service process
-    /// </summary>
-    private async Task UpdateSystemMetricsAsync()
+    private async Task UpdateMetricsAsync()
     {
         if (_disposed) return;
-
         try
         {
-            // Get service info to get process ID
-            var serviceInfo = await _serviceManager.GetServiceInfoAsync();
-
-            if (serviceInfo.ProcessId.HasValue && serviceInfo.IsRunning)
+            var info = await _serviceManager.GetServiceInfoAsync();
+            System.Diagnostics.Process? process = null;
+            if (info.IsRunning && info.ProcessId is int pid)
             {
-                // Try to get the process
-                System.Diagnostics.Process? process = null;
-
                 try
                 {
-                    process = System.Diagnostics.Process.GetProcessById(serviceInfo.ProcessId.Value);
-                    _serviceProcess = process;
+                    process = System.Diagnostics.Process.GetProcessById(pid);
                 }
-                catch
+                catch (Exception)
                 {
-                    // Process not found or access denied
-                    _serviceProcess = null;
-                }
-
-                if (process != null && !process.HasExited)
-                {
-                    try
-                    {
-                        // Update process metrics
-                        DispatcherExecute(() =>
-                        {
-                            ProcessId = process.Id;
-                            ThreadCount = process.Threads.Count;
-                            WorkingSetMB = process.WorkingSet64 / (1024 * 1024);
-                            MemoryUsageMB = process.PrivateMemorySize64 / (1024 * 1024);
-
-                            // Calculate uptime
-                            var uptime = DateTime.Now - process.StartTime;
-                            if (uptime.TotalHours >= 1)
-                                Uptime = $"{uptime.Hours}h {uptime.Minutes}m";
-                            else if (uptime.TotalMinutes >= 1)
-                                Uptime = $"{uptime.Minutes}m {uptime.Seconds}s";
-                            else
-                                Uptime = $"{uptime.Seconds}s";
-
-                            // Calculate CPU usage (requires two samples)
-                            try
-                            {
-                                var cpuCounter = new System.Diagnostics.PerformanceCounter(
-                                    "Process",
-                                    "% Processor Time",
-                                    process.ProcessName,
-                                    true
-                                );
-                                cpuCounter.NextValue(); // First call always returns 0
-                                System.Threading.Thread.Sleep(100); // Small delay
-                                var cpuUsage = cpuCounter.NextValue() / Environment.ProcessorCount;
-                                CpuUsage = Math.Round(cpuUsage, 1);
-                            }
-                            catch
-                            {
-                                // CPU counter might not be available on all platforms
-                                CpuUsage = 0;
-                            }
-
-                            // Update current state based on operations
-                            if (HasActiveOperation)
-                            {
-                                var operationTypes = OngoingOperations.Select(o => o.Type).Distinct().ToList();
-                                CurrentState = operationTypes.Count > 1
-                                    ? $"Multiple operations ({string.Join(", ", operationTypes)})"
-                                    : operationTypes.First();
-                            }
-                            else
-                            {
-                                CurrentState = ServiceStatus == ServiceStatus.Connected ? "Idle" : "Disconnected";
-                            }
-                        });
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"Error updating metrics: {ex.Message}");
-                    }
-                }
-                else
-                {
-                    // Process not accessible, reset metrics
-                    DispatcherExecute(() =>
-                    {
-                        ProcessId = 0;
-                        CpuUsage = 0;
-                        MemoryUsageMB = 0;
-                        ThreadCount = 0;
-                        WorkingSetMB = 0;
-                        Uptime = "N/A";
-                        CurrentState = "No service process";
-                    });
+                    process = null;
                 }
             }
-            else
+
+            if (process == null || process.HasExited)
             {
-                // Service not running, reset metrics
-                DispatcherExecute(() =>
-                {
-                    ProcessId = 0;
-                    CpuUsage = 0;
-                    MemoryUsageMB = 0;
-                    ThreadCount = 0;
-                    WorkingSetMB = 0;
-                    Uptime = "N/A";
-                    CurrentState = "Service not running";
-                });
+                OnUi(() => ProcessText = UptimeText = MemoryText = ThreadsText = CpuText = "–");
+                return;
             }
+
+            var uptime = DateTime.Now - process.StartTime;
+            var memory = process.WorkingSet64;
+            var threads = process.Threads.Count;
+            var id = process.Id;
+            OnUi(() =>
+            {
+                ProcessText = Loc.IsArabic ? Loc.ToArabicDigits(id.ToString(System.Globalization.CultureInfo.InvariantCulture)) : id.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                UptimeText = Loc.Duration(uptime);
+                MemoryText = Loc.Bytes(memory);
+                ThreadsText = Loc.Number(threads);
+                CpuText = "–";
+            });
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"Error in UpdateSystemMetricsAsync: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"Scanner metrics: {ex.Message}");
         }
+    }
+
+    private void OnUi(Action action)
+    {
+        if (_dispatcherQueue == null || _dispatcherQueue.HasThreadAccess) action();
+        else _dispatcherQueue.TryEnqueue(() => action());
     }
 
     public void Dispose()
     {
-        if (!_disposed)
-        {
-            _disposed = true;
-
-            // Dispose metrics timer
-            _metricsTimer?.Dispose();
-
-            // Dispose service process reference
-            _serviceProcess = null;
-
-            // Unsubscribe from SignalR events
-            _signalRClient.ServiceStatusChanged -= OnServiceStatusChanged;
-            _signalRClient.ScanProgressReceived -= OnScanProgressReceived;
-            _signalRClient.ScanStarted -= OnScanStarted;
-            _signalRClient.ScanCompleted -= OnScanCompleted;
-            _signalRClient.ScanFailed -= OnScanFailed;
-            _signalRClient.ScanCancelled -= OnScanCancelled;
-            _signalRClient.ErrorOccurred -= OnErrorOccurred;
-
-            // Unsubscribe from service manager events
-            _serviceManager.ServiceStatusChanged -= OnServiceManagerStatusChanged;
-        }
+        if (_disposed) return;
+        _disposed = true;
+        _metricsTimer.Dispose();
+        _signalRClient.ServiceStatusChanged -= OnConnectionChanged;
+        _signalRClient.ScanProgressReceived -= OnScanProgress;
+        _signalRClient.ScanStarted -= OnScanStarted;
+        _signalRClient.ScanCompleted -= OnScanCompleted;
+        _signalRClient.ScanFailed -= OnScanFailed;
+        _signalRClient.ScanCancelled -= OnScanCancelled;
+        _signalRClient.ErrorOccurred -= OnConnectionError;
+        _serviceManager.ServiceStatusChanged -= OnHealthChanged;
     }
 }
 
-/// <summary>
-/// Information about an ongoing operation
-/// </summary>
+/// <summary>A scan the scanner is running.</summary>
 public partial class OperationInfo : ObservableObject
 {
-    [ObservableProperty]
-    private Guid _sessionId;
+    [ObservableProperty] private Guid _sessionId;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(ProgressText))] private double _progress;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(ItemsText))] private int _itemsProcessed;
+    [ObservableProperty] private DateTime _startTime;
 
-    [ObservableProperty]
-    private string _type = string.Empty;
-
-    [ObservableProperty]
-    private double _progress;
-
-    [ObservableProperty]
-    private string _currentOperation = string.Empty;
-
-    [ObservableProperty]
-    private int _itemsProcessed;
-
-    [ObservableProperty]
-    private DateTime _startTime;
-
-    [ObservableProperty]
-    private DateTime? _endTime;
-
-    public string DisplayText => $"{Type}: {CurrentOperation} ({Progress:F1}%)";
-    
-    public string Duration
-    {
-        get
-        {
-            var end = EndTime ?? DateTime.Now;
-            var duration = end - StartTime;
-            return duration.TotalSeconds < 60 
-                ? $"{duration.TotalSeconds:F0}s" 
-                : $"{duration.TotalMinutes:F1}m";
-        }
-    }
+    public string Title => Loc.Get("Operation_Scan");
+    public string ProgressText => Loc.Percent(Progress);
+    public string ItemsText => Loc.Format("Operation_FilesFound", ItemsProcessed);
+    public string StartedText => Loc.Format("Operation_Started", Loc.Time(StartTime));
 }
 
-/// <summary>
-/// Error message information
-/// </summary>
-public class ErrorMessage
+public enum ActivityKind
 {
-    public string Message { get; set; } = string.Empty;
-    public DateTime Timestamp { get; set; }
-    public MessageType Type { get; set; } = MessageType.Information;
-    
-    public string DisplayText => $"[{Timestamp:HH:mm:ss}] {Message}";
-    public string TypeIcon => Type switch
-    {
-        MessageType.Error => "?",
-        MessageType.Warning => "??",
-        MessageType.Success => "?",
-        MessageType.Information => "??",
-        _ => "�"
-    };
-}
-
-/// <summary>
-/// Message type enumeration
-/// </summary>
-public enum MessageType
-{
-    Information,
+    Info,
     Success,
-    Warning,
-    Error
+    Problem,
+}
+
+/// <summary>One line of scanner activity: a plain title, an optional technical detail, and when it happened.</summary>
+public sealed record ActivityEntry(ActivityKind Kind, string Title, string? Detail, DateTime Time)
+{
+    public string TimeText => Loc.Time(Time);
+    public bool HasDetail => !string.IsNullOrWhiteSpace(Detail);
+    public string Glyph => Kind switch
+    {
+        ActivityKind.Problem => "",
+        ActivityKind.Success => "",
+        _ => "",
+    };
+    public string GlyphColor => Kind switch
+    {
+        ActivityKind.Problem => "#FFE0605A",
+        ActivityKind.Success => "#FF2FA866",
+        _ => "#FF7F97A3",
+    };
 }

@@ -1,3 +1,4 @@
+using AlUmmahNow.VisualImporterUno.Shell;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using System;
@@ -26,7 +27,7 @@ public partial class WatchViewModel : ObservableObject, IDisposable
     private bool _isLoading = false;
 
     [ObservableProperty]
-    private string _statusMessage = "Ready to manage watches";
+    private string _statusMessage = Loc.Get("Watch_Ready");
 
     [ObservableProperty]
     private WatchStatusDto? _selectedWatch;
@@ -36,15 +37,19 @@ public partial class WatchViewModel : ObservableObject, IDisposable
 
     // Observable Properties - Statistics
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(TotalWatchesText))]
     private int _totalWatches = 0;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ActiveWatchesText))]
     private int _activeWatchesCount = 0;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(FilesDetectedText))]
     private int _totalFilesDetected = 0;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PendingApprovalsText))]
     private int _pendingApprovalsCount = 0;
 
     [ObservableProperty]
@@ -160,6 +165,38 @@ public partial class WatchViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private WatchBatchImport? _importResult;
 
+    public string TotalWatchesText => Loc.Number(TotalWatches);
+    public string ActiveWatchesText => Loc.Number(ActiveWatchesCount);
+    public string FilesDetectedText => Loc.Count(TotalFilesDetected);
+    public string PendingApprovalsText => Loc.Number(PendingApprovalsCount);
+    public bool HasWatches => ActiveWatches.Count > 0;
+    public bool HasPendingApprovals => PendingApprovalsCount > 0;
+    public bool IsTemplateTab => BatchDialogTab == 0;
+    public bool IsFileTab => BatchDialogTab == 1;
+
+    /// <summary>Problems found in an imported file, one row per entry, each with its row number.</summary>
+    public string ImportProblemsText => ImportResult == null ? string.Empty : string.Join("\n\n",
+        ImportResult.ValidationErrors.OrderBy(e => e.Key).Select(e => Loc.WithDetail(Loc.Format("Watch_FileRow", e.Key + 1), string.Join("\n", e.Value))));
+
+    public bool HasImportProblems => ImportResult?.ValidationErrors.Count > 0;
+
+    [RelayCommand]
+    private void ShowBatchTab(string tab) => BatchDialogTab = tab == "file" ? 1 : 0;
+
+    partial void OnBatchDialogTabChanged(int value)
+    {
+        OnPropertyChanged(nameof(IsTemplateTab));
+        OnPropertyChanged(nameof(IsFileTab));
+    }
+
+    partial void OnImportResultChanged(WatchBatchImport? value)
+    {
+        OnPropertyChanged(nameof(ImportProblemsText));
+        OnPropertyChanged(nameof(HasImportProblems));
+    }
+
+    partial void OnPendingApprovalsCountChanged(int value) => OnPropertyChanged(nameof(HasPendingApprovals));
+
     // Collections
     public ObservableCollection<WatchStatusDto> ActiveWatches { get; } = new();
     public ObservableCollection<PendingApprovalDto> PendingApprovals { get; } = new();
@@ -178,6 +215,7 @@ public partial class WatchViewModel : ObservableObject, IDisposable
     {
         _signalRClient = signalRClient ?? throw new ArgumentNullException(nameof(signalRClient));
         _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
+        ActiveWatches.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasWatches));
 
         // Get dispatcher queue for UI updates with enhanced safety
         try
@@ -212,7 +250,7 @@ public partial class WatchViewModel : ObservableObject, IDisposable
                     System.Diagnostics.Debug.WriteLine($"Background initialization failed: {ex.Message}");
                     DispatcherExecute(() =>
                     {
-                        StatusMessage = $"Initialization failed: {ex.Message}";
+                        StatusMessage = Loc.GetWithDetail("Watch_StartFailed", ex.Message);
                     });
                 }
             });
@@ -220,7 +258,7 @@ public partial class WatchViewModel : ObservableObject, IDisposable
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"WatchViewModel initialization failed: {ex.Message}");
-            StatusMessage = $"Initialization failed: {ex.Message}";
+            StatusMessage = Loc.GetWithDetail("Watch_StartFailed", ex.Message);
         }
     }
 
@@ -247,7 +285,7 @@ public partial class WatchViewModel : ObservableObject, IDisposable
             {
                 DispatcherExecute(() =>
                 {
-                    StatusMessage = "SignalR not connected. Please connect to the service first.";
+                    StatusMessage = Loc.Get("Watch_NotConnected");
                 });
                 return;
             }
@@ -258,7 +296,7 @@ public partial class WatchViewModel : ObservableObject, IDisposable
         {
             DispatcherExecute(() =>
             {
-                StatusMessage = $"Failed to initialize: {ex.Message}";
+                StatusMessage = Loc.GetWithDetail("Watch_StartFailed", ex.Message);
             });
         }
     }
@@ -289,12 +327,12 @@ public partial class WatchViewModel : ObservableObject, IDisposable
         {
             if (e.Status == ServiceStatus.Connected)
             {
-                StatusMessage = "Connected to FileScan service";
+                StatusMessage = Loc.Get("Watch_Connected");
                 _ = Task.Run(async () => await RefreshWatchesAsync());
             }
             else if (e.Status == ServiceStatus.Disconnected || e.Status == ServiceStatus.NotAvailable)
             {
-                StatusMessage = "Disconnected from FileScan service";
+                StatusMessage = Loc.Get("Watch_Disconnected");
                 ActiveWatches.Clear();
                 PendingApprovals.Clear();
                 FilteredPendingApprovals.Clear();
@@ -306,7 +344,7 @@ public partial class WatchViewModel : ObservableObject, IDisposable
     {
         DispatcherExecute(() =>
         {
-            StatusMessage = $"Error: {error}";
+            StatusMessage = Loc.GetWithDetail("Watch_ScannerProblem", error);
         });
     }
 
@@ -314,7 +352,7 @@ public partial class WatchViewModel : ObservableObject, IDisposable
     {
         DispatcherExecute(() =>
         {
-            StatusMessage = $"File detected: {e.FileName} in {e.ChannelName}";
+            StatusMessage = Loc.GetWithDetail("Watch_FileDetected", e.FileName);
 
             // Update the watch's file count if it exists in our list
             var watch = ActiveWatches.FirstOrDefault(w => w.WatchId == e.WatchId);
@@ -356,7 +394,7 @@ public partial class WatchViewModel : ObservableObject, IDisposable
                 UpdateStatistics();
             }
 
-            StatusMessage = $"Watch status changed: {e.ChannelName} - {e.StatusMessage}";
+            StatusMessage = Loc.GetWithDetail("Watch_StatusChanged", e.ChannelName);
         });
     }
 
@@ -369,7 +407,7 @@ public partial class WatchViewModel : ObservableObject, IDisposable
             {
                 watch.IsActive = false;
                 UpdateStatistics();
-                StatusMessage = $"Watch stopped: {watch.ChannelName}";
+                StatusMessage = Loc.GetWithDetail("Watch_Stopped", watch.ChannelName);
             }
         });
     }
@@ -378,7 +416,7 @@ public partial class WatchViewModel : ObservableObject, IDisposable
     {
         DispatcherExecute(() =>
         {
-            StatusMessage = "Watch updated";
+            StatusMessage = Loc.Get("Watch_Updated");
             // Refresh the specific watch or all watches
             _ = Task.Run(async () => await RefreshWatchesAsync());
         });
@@ -394,7 +432,7 @@ public partial class WatchViewModel : ObservableObject, IDisposable
                 ActiveWatches.Remove(watch);
                 UpdateStatistics();
                 UpdateAvailableChannels();
-                StatusMessage = $"Watch deleted: {watch.ChannelName}";
+                StatusMessage = Loc.GetWithDetail("Watch_Deleted", watch.ChannelName);
 
                 if (SelectedWatch?.WatchId == watchId)
                 {
@@ -408,7 +446,7 @@ public partial class WatchViewModel : ObservableObject, IDisposable
     {
         DispatcherExecute(() =>
         {
-            StatusMessage = $"New file for approval: {e.FileName} in {e.ChannelName}";
+            StatusMessage = Loc.GetWithDetail("Watch_NewForApproval", e.FileName);
 
             // Refresh pending approvals
             _ = Task.Run(async () => await RefreshPendingApprovalsAsync());
@@ -427,7 +465,7 @@ public partial class WatchViewModel : ObservableObject, IDisposable
                 UpdateStatistics();
             }
 
-            StatusMessage = $"Approval status changed: {e.FileName} - {e.NewStatus}";
+            StatusMessage = Loc.GetWithDetail("Watch_ApprovalChanged", e.FileName);
         });
     }
 
@@ -435,7 +473,7 @@ public partial class WatchViewModel : ObservableObject, IDisposable
     {
         DispatcherExecute(() =>
         {
-            StatusMessage = $"Approval decision processed: {request.ApprovalIds.Count} files";
+            StatusMessage = Loc.Format("Watch_DecisionDone", request.ApprovalIds.Count);
 
             // Refresh approvals to reflect changes
             _ = Task.Run(async () => await RefreshPendingApprovalsAsync());
@@ -446,7 +484,7 @@ public partial class WatchViewModel : ObservableObject, IDisposable
     {
         DispatcherExecute(() =>
         {
-            StatusMessage = $"Bulk approval processed: {e.ProcessedCount} files";
+            StatusMessage = Loc.Format("Watch_DecisionDone", e.ProcessedCount);
 
             // Refresh approvals to reflect changes
             _ = Task.Run(async () => await RefreshPendingApprovalsAsync());
@@ -476,11 +514,11 @@ public partial class WatchViewModel : ObservableObject, IDisposable
         {
             IsCreatingWatch = true;
             CreateWatchError = string.Empty;
-            StatusMessage = "Creating watch...";
+            StatusMessage = Loc.Get("Watch_Creating");
 
             if (!_signalRClient.IsConnected)
             {
-                CreateWatchError = "Not connected to FileScan service";
+                CreateWatchError = Loc.Get("Watch_NotConnected");
                 return;
             }
 
@@ -502,7 +540,7 @@ public partial class WatchViewModel : ObservableObject, IDisposable
             };
 
             var watchId = await _signalRClient.StartWatchAsync(request);
-            StatusMessage = $"Watch created for channel '{request.ChannelName}' (ID: {watchId})";
+            StatusMessage = Loc.GetWithDetail("Watch_Created", request.ChannelName);
 
             // Close dialog and refresh watches
             IsCreateDialogOpen = false;
@@ -510,8 +548,8 @@ public partial class WatchViewModel : ObservableObject, IDisposable
         }
         catch (Exception ex)
         {
-            CreateWatchError = $"Failed to create watch: {ex.Message}";
-            StatusMessage = $"Failed to create watch: {ex.Message}";
+            CreateWatchError = Loc.GetWithDetail("Watch_CreateFailed", ex.Message);
+            StatusMessage = Loc.GetWithDetail("Watch_CreateFailed", ex.Message);
         }
         finally
         {
@@ -532,23 +570,23 @@ public partial class WatchViewModel : ObservableObject, IDisposable
         try
         {
             IsLoading = true;
-            StatusMessage = $"Stopping watch for '{SelectedWatch.ChannelName}'...";
+            StatusMessage = Loc.GetWithDetail("Watch_Stopping", SelectedWatch.ChannelName);
 
             var result = await _signalRClient.StopWatchAsync(SelectedWatch.WatchId);
 
             if (result)
             {
-                StatusMessage = $"Watch stopped for '{SelectedWatch.ChannelName}'";
+                StatusMessage = Loc.GetWithDetail("Watch_Stopped", SelectedWatch.ChannelName);
                 await RefreshWatchesAsync();
             }
             else
             {
-                StatusMessage = $"Failed to stop watch for '{SelectedWatch.ChannelName}'";
+                StatusMessage = Loc.GetWithDetail("Watch_StopFailed", SelectedWatch.ChannelName);
             }
         }
         catch (Exception ex)
         {
-            StatusMessage = $"Failed to stop watch: {ex.Message}";
+            StatusMessage = Loc.GetWithDetail("Watch_StopFailed", ex.Message);
         }
         finally
         {
@@ -564,24 +602,24 @@ public partial class WatchViewModel : ObservableObject, IDisposable
         try
         {
             IsLoading = true;
-            StatusMessage = $"Deleting watch for '{SelectedWatch.ChannelName}'...";
+            StatusMessage = Loc.GetWithDetail("Watch_Deleting", SelectedWatch.ChannelName);
 
             var result = await _signalRClient.DeleteWatchAsync(SelectedWatch.WatchId);
 
             if (result)
             {
-                StatusMessage = $"Watch deleted for '{SelectedWatch.ChannelName}'";
+                StatusMessage = Loc.GetWithDetail("Watch_Deleted", SelectedWatch.ChannelName);
                 SelectedWatch = null;
                 await RefreshWatchesAsync();
             }
             else
             {
-                StatusMessage = $"Failed to delete watch for '{SelectedWatch.ChannelName}'";
+                StatusMessage = Loc.GetWithDetail("Watch_DeleteFailed", SelectedWatch.ChannelName);
             }
         }
         catch (Exception ex)
         {
-            StatusMessage = $"Failed to delete watch: {ex.Message}";
+            StatusMessage = Loc.GetWithDetail("Watch_DeleteFailed", ex.Message);
         }
         finally
         {
@@ -595,11 +633,11 @@ public partial class WatchViewModel : ObservableObject, IDisposable
         try
         {
             IsLoading = true;
-            StatusMessage = "Refreshing watches...";
+            StatusMessage = Loc.Get("Watch_Refreshing");
 
             if (!_signalRClient.IsConnected)
             {
-                StatusMessage = "Not connected to FileScan service";
+                StatusMessage = Loc.Get("Watch_NotConnected");
                 return;
             }
 
@@ -617,11 +655,11 @@ public partial class WatchViewModel : ObservableObject, IDisposable
                 UpdateAvailableChannels();
             });
 
-            StatusMessage = $"Loaded {watches.Count} active watches";
+            StatusMessage = Loc.Format("Watch_Loaded", watches.Count);
         }
         catch (Exception ex)
         {
-            StatusMessage = $"Failed to refresh watches: {ex.Message}";
+            StatusMessage = Loc.GetWithDetail("Watch_RefreshFailed", ex.Message);
         }
         finally
         {
@@ -634,7 +672,7 @@ public partial class WatchViewModel : ObservableObject, IDisposable
     {
         if (SelectedWatch == null) return;
 
-        StatusMessage = $"Viewing details for '{SelectedWatch.ChannelName}'";
+        StatusMessage = Loc.GetWithDetail("Watch_Viewing", SelectedWatch.ChannelName);
 
         // Filter pending approvals by selected watch
         ChannelFilter = SelectedWatch.ChannelName;
@@ -649,11 +687,11 @@ public partial class WatchViewModel : ObservableObject, IDisposable
         try
         {
             IsLoading = true;
-            StatusMessage = "Refreshing pending approvals...";
+            StatusMessage = Loc.Get("Approve_Loading");
 
             if (!_signalRClient.IsConnected)
             {
-                StatusMessage = "Not connected to FileScan service";
+                StatusMessage = Loc.Get("Watch_NotConnected");
                 return;
             }
 
@@ -671,11 +709,11 @@ public partial class WatchViewModel : ObservableObject, IDisposable
                 UpdateStatistics();
             });
 
-            StatusMessage = $"Loaded {approvals.Count} pending approvals";
+            StatusMessage = Loc.Format("Approve_Loaded", approvals.Count);
         }
         catch (Exception ex)
         {
-            StatusMessage = $"Failed to refresh approvals: {ex.Message}";
+            StatusMessage = Loc.GetWithDetail("Approve_LoadFailed", ex.Message);
         }
         finally
         {
@@ -691,7 +729,7 @@ public partial class WatchViewModel : ObservableObject, IDisposable
         try
         {
             IsLoading = true;
-            StatusMessage = "Approving file...";
+            StatusMessage = Loc.Get("Approve_Approving");
 
             var fileName = SelectedApproval.FileName;
             var request = new ApprovalDecisionRequest
@@ -705,7 +743,7 @@ public partial class WatchViewModel : ObservableObject, IDisposable
 
             if (result)
             {
-                StatusMessage = $"File approved: {fileName}";
+                StatusMessage = Loc.GetWithDetail("Approve_ApprovedOne", fileName);
 
                 // Show notification if enabled
                 if (EnableNotifications)
@@ -717,19 +755,19 @@ public partial class WatchViewModel : ObservableObject, IDisposable
             }
             else
             {
-                StatusMessage = $"Failed to approve file: {fileName}";
+                StatusMessage = Loc.GetWithDetail("Approve_ApproveFailed", fileName);
                 if (EnableNotifications)
                 {
-                    await _notificationService.ShowErrorAsync("Approval Failed", $"Failed to approve {fileName}");
+                    await _notificationService.ShowErrorAsync(Loc.Get("Approve_ApproveFailed"), fileName);
                 }
             }
         }
         catch (Exception ex)
         {
-            StatusMessage = $"Failed to approve file: {ex.Message}";
+            StatusMessage = Loc.GetWithDetail("Approve_ApproveFailed", ex.Message);
             if (EnableNotifications)
             {
-                await _notificationService.ShowErrorAsync("Approval Error", ex.Message);
+                await _notificationService.ShowErrorAsync(Loc.Get("Approve_ApproveFailed"), ex.Message);
             }
         }
         finally
@@ -746,7 +784,7 @@ public partial class WatchViewModel : ObservableObject, IDisposable
         try
         {
             IsLoading = true;
-            StatusMessage = "Rejecting file...";
+            StatusMessage = Loc.Get("Approve_Rejecting");
 
             var fileName = SelectedApproval.FileName;
             var request = new ApprovalDecisionRequest
@@ -760,7 +798,7 @@ public partial class WatchViewModel : ObservableObject, IDisposable
 
             if (result)
             {
-                StatusMessage = $"File rejected: {fileName}";
+                StatusMessage = Loc.GetWithDetail("Approve_RejectedOne", fileName);
 
                 // Show notification if enabled
                 if (EnableNotifications)
@@ -772,19 +810,19 @@ public partial class WatchViewModel : ObservableObject, IDisposable
             }
             else
             {
-                StatusMessage = $"Failed to reject file: {fileName}";
+                StatusMessage = Loc.GetWithDetail("Approve_RejectFailed", fileName);
                 if (EnableNotifications)
                 {
-                    await _notificationService.ShowErrorAsync("Rejection Failed", $"Failed to reject {fileName}");
+                    await _notificationService.ShowErrorAsync(Loc.Get("Approve_RejectFailed"), fileName);
                 }
             }
         }
         catch (Exception ex)
         {
-            StatusMessage = $"Failed to reject file: {ex.Message}";
+            StatusMessage = Loc.GetWithDetail("Approve_RejectFailed", ex.Message);
             if (EnableNotifications)
             {
-                await _notificationService.ShowErrorAsync("Rejection Error", ex.Message);
+                await _notificationService.ShowErrorAsync(Loc.Get("Approve_RejectFailed"), ex.Message);
             }
         }
         finally
@@ -800,7 +838,7 @@ public partial class WatchViewModel : ObservableObject, IDisposable
         {
             IsLoading = true;
             var count = _selectedApprovalIds.Count;
-            StatusMessage = $"Approving {count} files...";
+            StatusMessage = Loc.Format("Approve_ApprovingMany", count);
 
             var request = new ApprovalDecisionRequest
             {
@@ -813,7 +851,7 @@ public partial class WatchViewModel : ObservableObject, IDisposable
 
             if (result)
             {
-                StatusMessage = $"Approved {count} files";
+                StatusMessage = Loc.Format("Approve_ApprovedMany", count);
 
                 // Show notification if enabled
                 if (EnableNotifications)
@@ -826,19 +864,19 @@ public partial class WatchViewModel : ObservableObject, IDisposable
             }
             else
             {
-                StatusMessage = $"Failed to approve {count} files";
+                StatusMessage = Loc.Format("Approve_ApproveManyFailed", count);
                 if (EnableNotifications)
                 {
-                    await _notificationService.ShowErrorAsync("Bulk Approval Failed", $"Failed to approve {count} files");
+                    await _notificationService.ShowErrorAsync(Loc.Get("Approve_ApproveFailed"), Loc.Format("Approve_ApproveManyFailed", count));
                 }
             }
         }
         catch (Exception ex)
         {
-            StatusMessage = $"Failed to approve files: {ex.Message}";
+            StatusMessage = Loc.GetWithDetail("Approve_ApproveFailed", ex.Message);
             if (EnableNotifications)
             {
-                await _notificationService.ShowErrorAsync("Bulk Approval Error", ex.Message);
+                await _notificationService.ShowErrorAsync(Loc.Get("Approve_ApproveFailed"), ex.Message);
             }
         }
         finally
@@ -854,7 +892,7 @@ public partial class WatchViewModel : ObservableObject, IDisposable
         {
             IsLoading = true;
             var count = _selectedApprovalIds.Count;
-            StatusMessage = $"Rejecting {count} files...";
+            StatusMessage = Loc.Format("Approve_RejectingMany", count);
 
             var request = new ApprovalDecisionRequest
             {
@@ -867,7 +905,7 @@ public partial class WatchViewModel : ObservableObject, IDisposable
 
             if (result)
             {
-                StatusMessage = $"Rejected {count} files";
+                StatusMessage = Loc.Format("Approve_RejectedMany", count);
 
                 // Show notification if enabled
                 if (EnableNotifications)
@@ -880,19 +918,19 @@ public partial class WatchViewModel : ObservableObject, IDisposable
             }
             else
             {
-                StatusMessage = $"Failed to reject {count} files";
+                StatusMessage = Loc.Format("Approve_RejectManyFailed", count);
                 if (EnableNotifications)
                 {
-                    await _notificationService.ShowErrorAsync("Bulk Rejection Failed", $"Failed to reject {count} files");
+                    await _notificationService.ShowErrorAsync(Loc.Get("Approve_RejectFailed"), Loc.Format("Approve_RejectManyFailed", count));
                 }
             }
         }
         catch (Exception ex)
         {
-            StatusMessage = $"Failed to reject files: {ex.Message}";
+            StatusMessage = Loc.GetWithDetail("Approve_RejectFailed", ex.Message);
             if (EnableNotifications)
             {
-                await _notificationService.ShowErrorAsync("Bulk Rejection Error", ex.Message);
+                await _notificationService.ShowErrorAsync(Loc.Get("Approve_RejectFailed"), ex.Message);
             }
         }
         finally
@@ -1002,12 +1040,12 @@ public partial class WatchViewModel : ObservableObject, IDisposable
                 }
             });
 
-            StatusMessage = $"Generated preview for {preview.Count} watches";
+            StatusMessage = Loc.Format("Watch_PreviewReady", preview.Count);
         }
         catch (Exception ex)
         {
-            BatchCreateError = $"Failed to generate preview: {ex.Message}";
-            StatusMessage = $"Failed to generate preview: {ex.Message}";
+            BatchCreateError = Loc.GetWithDetail("Watch_PreviewFailed", ex.Message);
+            StatusMessage = Loc.GetWithDetail("Watch_PreviewFailed", ex.Message);
         }
         finally
         {
@@ -1020,7 +1058,7 @@ public partial class WatchViewModel : ObservableObject, IDisposable
     {
         if (PreviewWatches.Count == 0)
         {
-            BatchCreateError = "No watches to create. Generate preview first.";
+            BatchCreateError = Loc.Get("Watch_PreviewFirst");
             return;
         }
 
@@ -1033,7 +1071,7 @@ public partial class WatchViewModel : ObservableObject, IDisposable
 
             if (!_signalRClient.IsConnected)
             {
-                BatchCreateError = "Not connected to FileScan service";
+                BatchCreateError = Loc.Get("Watch_NotConnected");
                 return;
             }
 
@@ -1054,10 +1092,10 @@ public partial class WatchViewModel : ObservableObject, IDisposable
                 }
 
                 BatchCreateProgress++;
-                StatusMessage = $"Creating watches: {BatchCreateProgress}/{BatchCreateTotal}";
+                StatusMessage = Loc.Format("Watch_CreatingMany", BatchCreateProgress, BatchCreateTotal);
             }
 
-            StatusMessage = $"Batch creation complete: {successCount} successful, {failureCount} failed";
+            StatusMessage = Loc.Format("Watch_ManyDone", successCount, failureCount);
 
             if (successCount > 0)
             {
@@ -1066,19 +1104,19 @@ public partial class WatchViewModel : ObservableObject, IDisposable
 
                 if (EnableNotifications)
                 {
-                    await _notificationService.ShowSuccessAsync("Batch Creation Complete",
-                        $"Created {successCount} watch(es)");
+                    await _notificationService.ShowSuccessAsync(Loc.Get("Watch_ManyDoneTitle"),
+                        Loc.Format("Watch_ManyCreated", successCount));
                 }
             }
             else
             {
-                BatchCreateError = "All watch creations failed. Check paths and permissions.";
+                BatchCreateError = Loc.Get("Watch_ManyAllFailed");
             }
         }
         catch (Exception ex)
         {
-            BatchCreateError = $"Failed to create watches: {ex.Message}";
-            StatusMessage = $"Batch creation failed: {ex.Message}";
+            BatchCreateError = Loc.GetWithDetail("Watch_CreateFailed", ex.Message);
+            StatusMessage = Loc.GetWithDetail("Watch_CreateFailed", ex.Message);
         }
         finally
         {
@@ -1095,13 +1133,13 @@ public partial class WatchViewModel : ObservableObject, IDisposable
         {
             if (string.IsNullOrWhiteSpace(ImportFilePath))
             {
-                ImportError = "Please select a file to import";
+                ImportError = Loc.Get("Watch_FileNeeded");
                 return;
             }
 
             if (!System.IO.File.Exists(ImportFilePath))
             {
-                ImportError = "File does not exist";
+                ImportError = Loc.Get("Watch_FileMissing");
                 return;
             }
 
@@ -1125,7 +1163,7 @@ public partial class WatchViewModel : ObservableObject, IDisposable
             }
             else
             {
-                ImportError = "Unsupported file format. Use CSV or JSON.";
+                ImportError = Loc.Get("Watch_FileFormat");
                 return;
             }
 
@@ -1142,18 +1180,18 @@ public partial class WatchViewModel : ObservableObject, IDisposable
                     }
                 });
 
-                StatusMessage = $"Import successful: {result.Summary}";
+                StatusMessage = Loc.Format("Watch_FileChecked", result.ValidCount, result.InvalidCount);
             }
             else
             {
-                ImportError = $"Import validation failed: {result.Summary}";
-                StatusMessage = $"Import has errors: {result.Summary}";
+                ImportError = Loc.Format("Watch_FileChecked", result.ValidCount, result.InvalidCount);
+                StatusMessage = Loc.Format("Watch_FileChecked", result.ValidCount, result.InvalidCount);
             }
         }
         catch (Exception ex)
         {
-            ImportError = $"Failed to import: {ex.Message}";
-            StatusMessage = $"Import failed: {ex.Message}";
+            ImportError = Loc.GetWithDetail("Watch_FileFailed", ex.Message);
+            StatusMessage = Loc.GetWithDetail("Watch_FileFailed", ex.Message);
         }
         finally
         {
@@ -1166,7 +1204,7 @@ public partial class WatchViewModel : ObservableObject, IDisposable
     {
         if (ImportResult == null || !ImportResult.IsValid)
         {
-            ImportError = "No valid watches to import";
+            ImportError = Loc.Get("Watch_FileNoneValid");
             return;
         }
 
@@ -1179,7 +1217,7 @@ public partial class WatchViewModel : ObservableObject, IDisposable
 
             if (!_signalRClient.IsConnected)
             {
-                ImportError = "Not connected to FileScan service";
+                ImportError = Loc.Get("Watch_NotConnected");
                 return;
             }
 
@@ -1200,10 +1238,10 @@ public partial class WatchViewModel : ObservableObject, IDisposable
                 }
 
                 BatchCreateProgress++;
-                StatusMessage = $"Creating watches: {BatchCreateProgress}/{BatchCreateTotal}";
+                StatusMessage = Loc.Format("Watch_CreatingMany", BatchCreateProgress, BatchCreateTotal);
             }
 
-            StatusMessage = $"Import complete: {successCount} successful, {failureCount} failed";
+            StatusMessage = Loc.Format("Watch_ManyDone", successCount, failureCount);
 
             if (successCount > 0)
             {
@@ -1212,46 +1250,25 @@ public partial class WatchViewModel : ObservableObject, IDisposable
 
                 if (EnableNotifications)
                 {
-                    await _notificationService.ShowSuccessAsync("Import Complete",
-                        $"Imported {successCount} watch(es)");
+                    await _notificationService.ShowSuccessAsync(Loc.Get("Watch_ManyDoneTitle"),
+                        Loc.Format("Watch_ManyCreated", successCount));
                 }
             }
             else
             {
-                ImportError = "All watch imports failed. Check paths and permissions.";
+                ImportError = Loc.Get("Watch_ManyAllFailed");
             }
         }
         catch (Exception ex)
         {
-            ImportError = $"Failed to import watches: {ex.Message}";
-            StatusMessage = $"Import failed: {ex.Message}";
+            ImportError = Loc.GetWithDetail("Watch_FileFailed", ex.Message);
+            StatusMessage = Loc.GetWithDetail("Watch_FileFailed", ex.Message);
         }
         finally
         {
             IsCreatingBatch = false;
             BatchCreateProgress = 0;
             BatchCreateTotal = 0;
-        }
-    }
-
-    [RelayCommand]
-    private async Task SaveAsTemplateAsync()
-    {
-        if (PreviewWatches.Count == 0)
-        {
-            StatusMessage = "No watches to save as template";
-            return;
-        }
-
-        try
-        {
-            // This would open a dialog to name the template
-            // For now, just show a message
-            StatusMessage = "Save as template functionality - coming soon";
-        }
-        catch (Exception ex)
-        {
-            StatusMessage = $"Failed to save template: {ex.Message}";
         }
     }
 
@@ -1275,11 +1292,11 @@ public partial class WatchViewModel : ObservableObject, IDisposable
                 }
             });
 
-            StatusMessage = $"Loaded {templates.Count} template(s)";
+            StatusMessage = Loc.Format("Watch_TemplatesLoaded", templates.Count);
         }
         catch (Exception ex)
         {
-            StatusMessage = $"Failed to load templates: {ex.Message}";
+            StatusMessage = Loc.GetWithDetail("Watch_TemplatesFailed", ex.Message);
         }
     }
 
@@ -1302,22 +1319,22 @@ public partial class WatchViewModel : ObservableObject, IDisposable
         if (string.IsNullOrWhiteSpace(channelName))
         {
             IsChannelNameValid = false;
-            ChannelNameValidationMessage = "Channel name is required";
+            ChannelNameValidationMessage = Loc.Get("Watch_NameRequired");
         }
         else if (channelName.Length < 2)
         {
             IsChannelNameValid = false;
-            ChannelNameValidationMessage = "Channel name must be at least 2 characters";
+            ChannelNameValidationMessage = Loc.Get("Watch_NameShort");
         }
         else if (channelName.Length > 100)
         {
             IsChannelNameValid = false;
-            ChannelNameValidationMessage = "Channel name must not exceed 100 characters";
+            ChannelNameValidationMessage = Loc.Get("Watch_NameLong");
         }
         else if (ActiveWatches.Any(w => w.ChannelName.Equals(channelName.Trim(), StringComparison.OrdinalIgnoreCase)))
         {
             IsChannelNameValid = false;
-            ChannelNameValidationMessage = "A watch for this channel already exists";
+            ChannelNameValidationMessage = Loc.Get("Watch_NameTaken");
         }
         else
         {
@@ -1331,17 +1348,17 @@ public partial class WatchViewModel : ObservableObject, IDisposable
         if (string.IsNullOrWhiteSpace(watchPath))
         {
             IsWatchPathValid = false;
-            WatchPathValidationMessage = "Watch path is required";
+            WatchPathValidationMessage = Loc.Get("Watch_PathRequired");
         }
         else if (!System.IO.Directory.Exists(watchPath))
         {
             IsWatchPathValid = false;
-            WatchPathValidationMessage = "Directory does not exist";
+            WatchPathValidationMessage = Loc.Get("Watch_PathMissing");
         }
         else if (ActiveWatches.Any(w => w.WatchPath.Equals(watchPath.Trim(), StringComparison.OrdinalIgnoreCase)))
         {
             IsWatchPathValid = false;
-            WatchPathValidationMessage = "This path is already being watched";
+            WatchPathValidationMessage = Loc.Get("Watch_PathTaken");
         }
         else
         {
@@ -1357,19 +1374,19 @@ public partial class WatchViewModel : ObservableObject, IDisposable
 
         if (!IsChannelNameValid || !IsWatchPathValid)
         {
-            CreateWatchError = "Please fix validation errors";
+            CreateWatchError = Loc.Get("Watch_FixFields");
             return false;
         }
 
         if (ProcessingDelaySeconds < 1 || ProcessingDelaySeconds > 300)
         {
-            CreateWatchError = "Processing delay must be between 1 and 300 seconds";
+            CreateWatchError = Loc.Get("Watch_DelayRange");
             return false;
         }
 
         if (string.IsNullOrWhiteSpace(SelectedExtensions))
         {
-            CreateWatchError = "At least one file extension must be selected";
+            CreateWatchError = Loc.Get("Watch_ExtensionsNeeded");
             return false;
         }
 
@@ -1427,8 +1444,8 @@ public partial class WatchViewModel : ObservableObject, IDisposable
             filtered = filtered.Where(a => a.Status == ApprovalStatus.Pending);
         }
 
-        // Filter by channel ("All Channels" is the list's own entry for no filter)
-        if (!string.IsNullOrWhiteSpace(ChannelFilter) && ChannelFilter != "All Channels")
+        // Filter by channel (MainViewModel.AllChannels is the list's own entry for no filter)
+        if (!string.IsNullOrWhiteSpace(ChannelFilter) && ChannelFilter != MainViewModel.AllChannels)
         {
             filtered = filtered.Where(a => a.ChannelName.Equals(ChannelFilter, StringComparison.OrdinalIgnoreCase));
         }
@@ -1448,7 +1465,8 @@ public partial class WatchViewModel : ObservableObject, IDisposable
         TotalWatches = ActiveWatches.Count;
         ActiveWatchesCount = ActiveWatches.Count(w => w.IsActive);
         TotalFilesDetected = ActiveWatches.Sum(w => w.TotalFilesDetected);
-        PendingApprovalsCount = PendingApprovals.Count(a => a.Status == ApprovalStatus.Pending);
+        // Each watch reports its own waiting count, so this is right before the approvals list has loaded
+        PendingApprovalsCount = ActiveWatches.Sum(w => w.PendingApprovals);
         ApprovedCount = PendingApprovals.Count(a => a.Status == ApprovalStatus.Approved || a.Status == ApprovalStatus.AutoApproved);
         RejectedCount = PendingApprovals.Count(a => a.Status == ApprovalStatus.Rejected);
     }
@@ -1462,7 +1480,7 @@ public partial class WatchViewModel : ObservableObject, IDisposable
             .ToList();
 
         AvailableChannels.Clear();
-        AvailableChannels.Add("All Channels");
+        AvailableChannels.Add(MainViewModel.AllChannels);
         KnownChannelNames.Clear();
         foreach (var channel in channels)
         {

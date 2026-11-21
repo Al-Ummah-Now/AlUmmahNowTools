@@ -1,291 +1,121 @@
+using AlUmmahNow.Data.Models.FileScanning;
+using AlUmmahNow.VisualImporterUno.Shell;
 using AlUmmahNow.VisualImporterUno.ViewModels;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Data;
+using Microsoft.UI.Xaml.Media.Imaging;
 using System;
-using System.Globalization;
+using System.Linq;
 
 namespace AlUmmahNow.VisualImporterUno.Views;
 
-/// <summary>
-/// Approval Workflow page for managing file approvals with real-time updates
-/// </summary>
+/// <summary>Videos that arrived in watched folders, waiting for a yes or a no before they upload.</summary>
 public sealed partial class ApprovalWorkflowPage : Page
 {
     public ApprovalViewModel ViewModel { get; }
 
     public ApprovalWorkflowPage()
     {
-        this.InitializeComponent();
-
-        // Get ViewModel from DI container (registered as singleton)
         ViewModel = App.GetService<ApprovalViewModel>();
-
-        // Set DataContext for binding
-        this.DataContext = ViewModel;
+        InitializeComponent();
+        DataContext = ViewModel;
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(RefreshButton, Loc.Get("Watch_Refresh"));
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(SortBox, Loc.Get("Approve_SortLabel"));
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(SortDirection, Loc.Get("Approve_SortReverse"));
     }
 
-    protected override void OnNavigatedTo(Microsoft.UI.Xaml.Navigation.NavigationEventArgs e)
+    private void OfflineCard_Connected(object? sender, EventArgs e)
     {
-        base.OnNavigatedTo(e);
-        // Additional initialization can be done here if needed
+        ViewModel.RefreshApprovalsCommand.NotifyCanExecuteChanged();
+        if (ViewModel.RefreshApprovalsCommand.CanExecute(null)) _ = ViewModel.RefreshApprovalsCommand.ExecuteAsync(null);
     }
 
-    protected override void OnNavigatedFrom(Microsoft.UI.Xaml.Navigation.NavigationEventArgs e)
-    {
-        base.OnNavigatedFrom(e);
-        // Cleanup if needed
-    }
+    private void ApprovalsList_SelectionChanged(object sender, SelectionChangedEventArgs e) =>
+        ViewModel.SetSelection(ApprovalsList.SelectedItems.OfType<PendingApprovalDto>().ToList());
+
+    private void SelectAll_Click(object sender, RoutedEventArgs e) => ApprovalsList.SelectAll();
+
+    private void SelectNone_Click(object sender, RoutedEventArgs e) => ApprovalsList.SelectedItems.Clear();
+
+    private static PendingApprovalDto? ItemOf(object sender) => (sender as FrameworkElement)?.Tag as PendingApprovalDto;
+
+    private void Preview_Click(object sender, RoutedEventArgs e) => ViewModel.PreviewFileCommand.Execute(ItemOf(sender));
+
+    private async void ApproveOne_Click(object sender, RoutedEventArgs e) => await ViewModel.ApproveOneCommand.ExecuteAsync(ItemOf(sender));
+
+    private async void RejectOne_Click(object sender, RoutedEventArgs e) => await ViewModel.RejectOneCommand.ExecuteAsync(ItemOf(sender));
 
     private async void OnSavePresetClick(object sender, RoutedEventArgs e)
     {
-        var dialog = new ContentDialog
-        {
-            Title = "Save Filter Preset",
-            PrimaryButtonText = "Save",
-            CloseButtonText = "Cancel",
-            DefaultButton = ContentDialogButton.Primary,
-            XamlRoot = (sender as FrameworkElement)?.XamlRoot ?? this.XamlRoot
-        };
-
-        var stackPanel = new StackPanel { Spacing = 12 };
-
-        var nameBox = new TextBox
-        {
-            Header = "Preset Name",
-            PlaceholderText = "Enter preset name...",
-            Text = ViewModel.NewPresetName
-        };
-
+        var nameBox = new TextBox { Header = Loc.Get("Approve_PresetName"), Text = ViewModel.NewPresetName };
         var descriptionBox = new TextBox
         {
-            Header = "Description (Optional)",
-            PlaceholderText = "Enter description...",
+            Header = Loc.Get("Approve_PresetDescription"),
             Text = ViewModel.NewPresetDescription,
             AcceptsReturn = true,
             TextWrapping = TextWrapping.Wrap,
-            Height = 80
+            Height = 80,
         };
+        var defaultBox = new CheckBox { Content = Loc.Get("Approve_PresetAsDefault"), IsChecked = ViewModel.SetAsDefault };
+        var panel = new StackPanel { Spacing = 12 };
+        panel.Children.Add(nameBox);
+        panel.Children.Add(descriptionBox);
+        panel.Children.Add(defaultBox);
 
-        var defaultCheckBox = new CheckBox
+        var dialog = new ContentDialog
         {
-            Content = "Set as default preset",
-            IsChecked = ViewModel.SetAsDefault
+            Title = Loc.Get("Approve_PresetDialogTitle"),
+            PrimaryButtonText = Loc.Get("Approve_PresetSaveButton"),
+            CloseButtonText = Loc.Get("Approve_PresetCancel"),
+            DefaultButton = ContentDialogButton.Primary,
+            Content = panel,
+            FlowDirection = FlowDirection,
+            XamlRoot = XamlRoot,
         };
-
-        stackPanel.Children.Add(nameBox);
-        stackPanel.Children.Add(descriptionBox);
-        stackPanel.Children.Add(defaultCheckBox);
-
-        dialog.Content = stackPanel;
-
-        var result = await dialog.ShowAsync();
-
-        if (result == ContentDialogResult.Primary)
-        {
-            ViewModel.NewPresetName = nameBox.Text;
-            ViewModel.NewPresetDescription = descriptionBox.Text;
-            ViewModel.SetAsDefault = defaultCheckBox.IsChecked ?? false;
-
-            await ViewModel.SavePresetCommand.ExecuteAsync(nameBox.Text);
-        }
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        ViewModel.NewPresetName = nameBox.Text;
+        ViewModel.NewPresetDescription = descriptionBox.Text;
+        ViewModel.SetAsDefault = defaultBox.IsChecked ?? false;
+        await ViewModel.SavePresetCommand.ExecuteAsync(nameBox.Text);
     }
 }
 
-#region Value Converters
-
-/// <summary>
-/// Converts DateTime to relative time string (e.g., "2 hours ago")
-/// </summary>
-public class RelativeDateConverter : IValueConverter
-{
-    public object Convert(object value, Type targetType, object parameter, string language)
-    {
-        if (value is DateTime dateTime)
-        {
-            var timeSpan = DateTime.Now - dateTime;
-
-            if (timeSpan.TotalMinutes < 1)
-                return "Just now";
-            if (timeSpan.TotalMinutes < 60)
-                return $"{(int)timeSpan.TotalMinutes} min ago";
-            if (timeSpan.TotalHours < 24)
-                return $"{(int)timeSpan.TotalHours} hr ago";
-            if (timeSpan.TotalDays < 7)
-                return $"{(int)timeSpan.TotalDays} days ago";
-            if (timeSpan.TotalDays < 30)
-                return $"{(int)(timeSpan.TotalDays / 7)} weeks ago";
-
-            return dateTime.ToString("MMM dd, yyyy");
-        }
-
-        return string.Empty;
-    }
-
-    public object ConvertBack(object value, Type targetType, object parameter, string language)
-    {
-        throw new NotImplementedException();
-    }
-}
-
-/// <summary>
-/// Converts priority level to background color
-/// </summary>
-public class PriorityColorConverter : IValueConverter
-{
-    public object Convert(object value, Type targetType, object parameter, string language)
-    {
-        if (value is int priority)
-        {
-            return priority switch
-            {
-                1 => "#DC2626", // High priority - Red
-                2 => "#F59E0B", // Medium-high - Orange
-                3 => "#3B82F6", // Medium - Blue
-                4 => "#10B981", // Medium-low - Green
-                5 => "#6B7280", // Low - Gray
-                _ => "#6B7280"
-            };
-        }
-
-        return "#6B7280";
-    }
-
-    public object ConvertBack(object value, Type targetType, object parameter, string language)
-    {
-        throw new NotImplementedException();
-    }
-}
-
-/// <summary>
-/// Converts null to Visibility (Visible if not null)
-/// </summary>
+/// <summary>Visible when the value is set; ConverterParameter "Inverse" flips it.</summary>
 public class NullToVisibilityConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, string language)
     {
-        return value != null ? Visibility.Visible : Visibility.Collapsed;
+        var present = value is string text ? !string.IsNullOrEmpty(text) : value != null;
+        if (parameter as string == "Inverse") present = !present;
+        return present ? Visibility.Visible : Visibility.Collapsed;
     }
 
-    public object ConvertBack(object value, Type targetType, object parameter, string language)
-    {
-        throw new NotImplementedException();
-    }
+    public object ConvertBack(object value, Type targetType, object parameter, string language) => throw new NotSupportedException();
 }
 
-/// <summary>
-/// Converts string to long for file size input
-/// </summary>
+/// <summary>A size filter typed as text.</summary>
 public class StringToLongConverter : IValueConverter
 {
-    public object Convert(object value, Type targetType, object parameter, string language)
-    {
-        if (value is long longValue)
-        {
-            return longValue.ToString();
-        }
+    public object Convert(object value, Type targetType, object parameter, string language) => value is long number ? number.ToString() : string.Empty;
 
-        return string.Empty;
-    }
-
-    public object ConvertBack(object value, Type targetType, object parameter, string language)
-    {
-        if (value is string str && long.TryParse(str, out long result))
-        {
-            return result;
-        }
-
-        return null;
-    }
+    public object? ConvertBack(object value, Type targetType, object parameter, string language) =>
+        value is string text && long.TryParse(text, out var number) ? number : null;
 }
 
-/// <summary>
-/// Converts DateTime to DateTimeOffset for DatePicker
-/// </summary>
+/// <summary>A date filter for the calendar picker.</summary>
 public class DateTimeToDateConverter : IValueConverter
 {
-    public object Convert(object value, Type targetType, object parameter, string language)
-    {
-        if (value is DateTime dateTime)
-        {
-            return new DateTimeOffset(dateTime);
-        }
+    public object? Convert(object value, Type targetType, object parameter, string language) => value is DateTime date ? new DateTimeOffset(date) : null;
 
-        return null;
-    }
-
-    public object ConvertBack(object value, Type targetType, object parameter, string language)
-    {
-        if (value is DateTimeOffset dateTimeOffset)
-        {
-            return dateTimeOffset.DateTime;
-        }
-
-        return null;
-    }
+    public object? ConvertBack(object value, Type targetType, object parameter, string language) => value is DateTimeOffset offset ? offset.DateTime : null;
 }
 
-/// <summary>
-/// Converts selected count to approve button text
-/// </summary>
-public class ApproveButtonTextConverter : IValueConverter
+/// <summary>A thumbnail file on disk as an image.</summary>
+public class PathToUriConverter : IValueConverter
 {
-    public object Convert(object value, Type targetType, object parameter, string language)
-    {
-        if (value is int count)
-        {
-            return count > 0 ? $"Approve ({count})" : "Approve";
-        }
+    public object? Convert(object value, Type targetType, object parameter, string language) =>
+        value is string path && !string.IsNullOrEmpty(path) ? new BitmapImage(new Uri(path)) : null;
 
-        return "Approve";
-    }
-
-    public object ConvertBack(object value, Type targetType, object parameter, string language)
-    {
-        throw new NotImplementedException();
-    }
+    public object ConvertBack(object value, Type targetType, object parameter, string language) => throw new NotSupportedException();
 }
-
-/// <summary>
-/// Converts selected count to reject button text
-/// </summary>
-public class RejectButtonTextConverter : IValueConverter
-{
-    public object Convert(object value, Type targetType, object parameter, string language)
-    {
-        if (value is int count)
-        {
-            return count > 0 ? $"Reject ({count})" : "Reject";
-        }
-
-        return "Reject";
-    }
-
-    public object ConvertBack(object value, Type targetType, object parameter, string language)
-    {
-        throw new NotImplementedException();
-    }
-}
-
-/// <summary>
-/// Converts selected count to status text
-/// </summary>
-public class SelectedCountTextConverter : IValueConverter
-{
-    public object Convert(object value, Type targetType, object parameter, string language)
-    {
-        if (value is int count)
-        {
-            return count > 0 ? $"{count} items selected" : "No items selected";
-        }
-
-        return "No items selected";
-    }
-
-    public object ConvertBack(object value, Type targetType, object parameter, string language)
-    {
-        throw new NotImplementedException();
-    }
-}
-
-#endregion

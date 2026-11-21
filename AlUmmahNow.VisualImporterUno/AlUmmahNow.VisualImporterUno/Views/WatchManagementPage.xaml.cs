@@ -1,105 +1,78 @@
+using AlUmmahNow.Data.Models.FileScanning;
+using AlUmmahNow.VisualImporterUno.ViewModels;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Data;
 using Microsoft.UI.Xaml.Navigation;
 using System;
-using AlUmmahNow.VisualImporterUno.ViewModels;
-using AlUmmahNow.Data.Models.FileScanning;
 using Windows.Storage.Pickers;
 using WinRT.Interop;
 
 namespace AlUmmahNow.VisualImporterUno.Views;
 
-/// <summary>
-/// Watch Management page for managing file system watches and approvals
-/// </summary>
+/// <summary>Folders the scanner watches for new videos, and adding one or several of them.</summary>
 public sealed partial class WatchManagementPage : Page
 {
-    /// <summary>
-    /// Gets the ViewModel for this page
-    /// </summary>
-    public WatchViewModel ViewModel { get; private set; }
+    public WatchViewModel ViewModel { get; }
 
     public WatchManagementPage()
     {
-        this.InitializeComponent();
-
-        // Get ViewModel from DI container (registered as singleton)
         ViewModel = App.GetService<WatchViewModel>();
-
-        // Set DataContext for binding
-        this.DataContext = ViewModel;
+        InitializeComponent();
+        DataContext = ViewModel;
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(RefreshButton, Shell.Loc.Get("Watch_Refresh"));
     }
 
     protected override void OnNavigatedTo(NavigationEventArgs e)
     {
         base.OnNavigatedTo(e);
-
-        // ViewModel is already initialized from DI
-        // Additional initialization can be done here if needed
-
-        // Update bindings
         Bindings.Update();
     }
 
-    protected override void OnNavigatedFrom(NavigationEventArgs e)
+    private void OfflineCard_Connected(object? sender, EventArgs e)
     {
-        base.OnNavigatedFrom(e);
-
-        // Cleanup if necessary
-        // Note: Don't dispose ViewModel here as it might be reused
+        ViewModel.RefreshWatchesCommand.NotifyCanExecuteChanged();
+        if (ViewModel.RefreshWatchesCommand.CanExecute(null)) _ = ViewModel.RefreshWatchesCommand.ExecuteAsync(null);
     }
 
-    /// <summary>
-    /// Opens a folder picker dialog for selecting watch directory
-    /// </summary>
     private async void BrowseFolder_Click(object sender, RoutedEventArgs e)
     {
         try
         {
-            var folderPicker = new FolderPicker
-            {
-                SuggestedStartLocation = PickerLocationId.ComputerFolder,
-                ViewMode = PickerViewMode.List
-            };
-
-            folderPicker.FileTypeFilter.Add("*");
-
-            // Initialize the folder picker with the window handle
-            var window = App.Current.MainWindow;
-            var hwnd = WindowNative.GetWindowHandle(window);
-            InitializeWithWindow.Initialize(folderPicker, hwnd);
-
-            var folder = await folderPicker.PickSingleFolderAsync();
-            if (folder != null)
-            {
-                ViewModel.NewWatchPath = folder.Path;
-            }
+            var picker = new FolderPicker { SuggestedStartLocation = PickerLocationId.ComputerFolder, ViewMode = PickerViewMode.List };
+            picker.FileTypeFilter.Add("*");
+            InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(App.Current.MainWindow));
+            var folder = await picker.PickSingleFolderAsync();
+            if (folder != null) ViewModel.NewWatchPath = folder.Path;
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"Error picking folder: {ex.Message}");
+            ViewModel.CreateWatchError = Shell.Loc.GetWithDetail("Import_FolderFailed", ex.Message);
         }
     }
-}
 
-/// <summary>
-/// Converter for status color based on IsActive property
-/// </summary>
-public class StatusColorConverter : IValueConverter
-{
-    public object Convert(object value, Type targetType, object parameter, string language)
+    private async void BrowseImportFile_Click(object sender, RoutedEventArgs e)
     {
-        if (value is bool isActive)
+        try
         {
-            return isActive ? Windows.UI.Color.FromArgb(255, 22, 163, 74) : // Green #16A34A
-                             Windows.UI.Color.FromArgb(255, 156, 163, 175);  // Gray #9CA3AF
+            var picker = new FileOpenPicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary, ViewMode = PickerViewMode.List };
+            picker.FileTypeFilter.Add(".csv");
+            picker.FileTypeFilter.Add(".json");
+            InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(App.Current.MainWindow));
+            var file = await picker.PickSingleFileAsync();
+            if (file != null) ViewModel.ImportFilePath = file.Path;
         }
-        return Windows.UI.Color.FromArgb(255, 156, 163, 175);
+        catch (Exception ex)
+        {
+            ViewModel.ImportError = Shell.Loc.GetWithDetail("Settings_BrowseFailed", ex.Message);
+        }
     }
 
-    public object ConvertBack(object value, Type targetType, object parameter, string language)
+    private void StopWatch_Click(object sender, RoutedEventArgs e)
     {
-        throw new NotImplementedException();
+        if ((sender as FrameworkElement)?.Tag is not WatchStatusDto watch) return;
+        ViewModel.SelectedWatch = watch;
+        if (ViewModel.StopWatchCommand.CanExecute(null)) ViewModel.StopWatchCommand.Execute(null);
     }
+
+    private void Approvals_Click(object sender, RoutedEventArgs e) => (App.Current.MainWindow as MainWindow)?.NavigateToApprovalWorkflowView();
 }

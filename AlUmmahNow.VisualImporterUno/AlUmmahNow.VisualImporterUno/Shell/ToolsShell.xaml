@@ -86,7 +86,8 @@
             <Setter Property="CornerRadius" Value="20" />
             <Setter Property="Padding" Value="36,32" />
             <Setter Property="MaxWidth" Value="460" />
-            <Setter Property="HorizontalAlignment" Value="Center" />
+            <!-- Stretch up to the max width: every card is the same width, whatever its text -->
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
             <Setter Property="VerticalAlignment" Value="Center" />
             <Setter Property="Margin" Value="16" />
         </Style>
@@ -99,12 +100,9 @@
         </Grid.RowDefinitions>
 
         <!-- Header: logo lockup, language, light/dark, account, environment (the shared order) -->
-        <Grid Grid.Row="0" Background="{StaticResource ShellHeaderBrush}" Padding="16,10" ColumnSpacing="8">
+        <Grid Grid.Row="0" Background="{StaticResource ShellHeaderBrush}" Padding="16,0" Height="60" ColumnSpacing="8">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
@@ -120,15 +118,17 @@
                 </StackPanel>
             </StackPanel>
 
-            <Button x:Name="LanguageButton" Grid.Column="1" Style="{StaticResource HeaderButton}" Click="OnLanguageClick">
+            <!-- A panel, not grid columns: hidden controls leave no gap at the edge -->
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+            <Button x:Name="LanguageButton" Style="{StaticResource HeaderButton}" Click="OnLanguageClick">
                 <TextBlock x:Uid="Shell_LanguageButtonLabel" Text="العربية" />
             </Button>
 
-            <Button x:Name="ThemeButton" Grid.Column="2" Style="{StaticResource HeaderButton}" Padding="0" Width="36" Click="OnThemeClick">
+            <Button x:Name="ThemeButton" Style="{StaticResource HeaderButton}" Padding="0" Width="36" Click="OnThemeClick">
                 <FontIcon x:Name="ThemeIcon" Glyph="&#xE706;" FontSize="16" />
             </Button>
 
-            <Button x:Name="AccountButton" Grid.Column="3" Style="{StaticResource HeaderButton}" Padding="4,0,10,0" Visibility="Collapsed">
+            <Button x:Name="AccountButton" Style="{StaticResource HeaderButton}" Padding="4,0,10,0" Visibility="Collapsed">
                 <StackPanel Orientation="Horizontal" Spacing="8">
                     <Border Width="28" Height="28" CornerRadius="14" Background="{ThemeResource FanousPrimaryBrush}">
                         <TextBlock x:Name="AccountInitials" Text="A" Foreground="#FF09151E" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
@@ -155,11 +155,13 @@
                 </Button.Flyout>
             </Button>
 
-            <Border x:Name="EnvironmentBadge" Grid.Column="4" CornerRadius="13" Padding="10,4" VerticalAlignment="Center" Visibility="Collapsed" BorderThickness="1">
+            <Border x:Name="EnvironmentBadge" CornerRadius="13" Padding="10,4" VerticalAlignment="Center" Visibility="Collapsed" BorderThickness="1">
                 <TextBlock x:Name="EnvironmentBadgeText" Text="QA" FontSize="12" FontWeight="Bold" CharacterSpacing="40" />
             </Border>
 
-            <Rectangle Grid.ColumnSpan="5" Height="1" VerticalAlignment="Bottom" Margin="-16,0,-16,-10" Fill="{StaticResource ShellHeaderRuleBrush}" />
+            </StackPanel>
+
+            <Rectangle Grid.ColumnSpan="2" Height="1" VerticalAlignment="Bottom" Margin="-16,0,-16,0" Fill="{StaticResource ShellHeaderRuleBrush}" />
         </Grid>
 
         <!-- Content -->
@@ -190,7 +192,7 @@
                         <StackPanel Spacing="8">
                             <TextBlock x:Uid="SignIn_EnvironmentLabel" Text="Environment" FontSize="13" FontWeight="SemiBold" Foreground="{ThemeResource FanousTextMutedBrush}" />
                             <Border Background="{ThemeResource FanousBackgroundBrush}" CornerRadius="10" Padding="3" BorderBrush="{ThemeResource FanousOutlineBrush}" BorderThickness="1">
-                                <Grid ColumnSpacing="3">
+                                <Grid x:Name="EnvironmentSegments" ColumnSpacing="3">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="*" />
@@ -211,18 +213,29 @@
                         </Button>
 
                         <StackPanel x:Name="WaitingPanel" Spacing="12" Visibility="Collapsed">
-                            <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center">
-                                <ProgressRing IsActive="True" Width="20" Height="20" Foreground="{ThemeResource FanousPrimaryBrush}" />
-                                <TextBlock x:Uid="SignIn_Waiting" Text="Finish signing in in your browser…" VerticalAlignment="Center" Foreground="{ThemeResource FanousTextPrimaryBrush}" TextWrapping="Wrap" />
-                            </StackPanel>
+                            <Border CornerRadius="10" Padding="14,12" Background="{ThemeResource FanousSurfaceRaisedBrush}" BorderBrush="{ThemeResource FanousOutlineBrush}" BorderThickness="1">
+                                <Grid ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                    <ProgressRing IsActive="True" Width="20" Height="20" VerticalAlignment="Top" Margin="0,2,0,0" Foreground="{ThemeResource FanousPrimaryBrush}" />
+                                    <StackPanel Grid.Column="1" Spacing="4">
+                                        <TextBlock x:Uid="SignIn_Waiting" Text="Continue in your browser" FontWeight="SemiBold" Foreground="{ThemeResource FanousTextPrimaryBrush}" TextWrapping="Wrap" />
+                                        <TextBlock x:Uid="SignIn_WaitingBody" Text="A sign-in page opened in your browser. Tools carries on by itself once you've signed in there." FontSize="13" Foreground="{ThemeResource FanousTextSecondaryBrush}" TextWrapping="Wrap" />
+                                        <HyperlinkButton Padding="0" Margin="0,4,0,0" Foreground="{ThemeResource FanousLinkBrush}" FontWeight="SemiBold" FontSize="13" Click="OnReopenBrowserClick">
+                                            <TextBlock x:Uid="SignIn_Reopen" Text="Open the sign-in page again" />
+                                        </HyperlinkButton>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
                             <Button x:Uid="SignIn_Cancel" Content="Cancel" Style="{StaticResource SecondaryAction}" Click="OnCancelSignInClick" />
                         </StackPanel>
 
-                        <Border x:Name="FailureBox" Visibility="Collapsed" CornerRadius="10" Padding="14,10" BorderThickness="1" BorderBrush="{ThemeResource FanousErrorTextBrush}">
-                            <Border.Background>
-                                <SolidColorBrush Color="{ThemeResource FanousErrorTextColor}" Opacity="0.08" />
-                            </Border.Background>
-                            <TextBlock x:Name="FailureText" Text="" Foreground="{ThemeResource FanousErrorTextBrush}" TextWrapping="Wrap" />
+                        <!-- A cancelled sign-in is just a note; the others are problems -->
+                        <Border x:Name="FailureBox" Visibility="Collapsed" CornerRadius="10" Padding="14,10" BorderThickness="1">
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                <FontIcon x:Name="FailureIcon" Glyph="&#xE946;" FontSize="16" VerticalAlignment="Top" Margin="0,2,0,0" />
+                                <TextBlock x:Name="FailureText" Grid.Column="1" Text="" TextWrapping="Wrap" />
+                            </Grid>
                         </Border>
 
                         <Rectangle Height="1" Fill="{ThemeResource FanousDividerBrush}" />
@@ -250,7 +263,7 @@
                         </Border>
                         <TextBlock x:Name="GateTitle" Text="" HorizontalAlignment="Center" TextAlignment="Center" FontSize="22" FontWeight="Bold" Foreground="{ThemeResource FanousTextPrimaryBrush}" TextWrapping="Wrap" />
                         <TextBlock x:Name="GateBody" Text="" HorizontalAlignment="Center" TextAlignment="Center" FontSize="15" Foreground="{ThemeResource FanousTextSecondaryBrush}" TextWrapping="Wrap" />
-                        <Border x:Name="GateAccountChip" HorizontalAlignment="Center" CornerRadius="16" Padding="12,6" Background="{ThemeResource FanousSurfaceRaisedBrush}" Visibility="Collapsed">
+                        <Border x:Name="GateAccountChip" HorizontalAlignment="Center" CornerRadius="16" Padding="12,6" Background="{ThemeResource FanousSurfaceRaisedBrush}" BorderBrush="{ThemeResource FanousOutlineBrush}" BorderThickness="1" Visibility="Collapsed">
                             <TextBlock x:Name="GateAccountText" Text="" FontSize="13" Foreground="{ThemeResource FanousTextPrimaryBrush}" />
                         </Border>
                         <StackPanel x:Name="GateActions" Spacing="10">

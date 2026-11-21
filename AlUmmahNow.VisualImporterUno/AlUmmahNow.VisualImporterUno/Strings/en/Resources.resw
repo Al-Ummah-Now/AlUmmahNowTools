@@ -190,7 +190,7 @@
     <value>Sign in with your browser</value>
   </data>
   <data name="SignIn_Waiting.Text" xml:space="preserve">
-    <value>Finish signing in in your browser…</value>
+    <value>Continue in your browser</value>
   </data>
   <data name="SignIn_Cancel.Content" xml:space="preserve">
     <value>Cancel</value>
@@ -199,7 +199,7 @@
     <value>Sign-in opens in your browser. Your password never enters this app.</value>
   </data>
   <data name="SignIn_FailureCancelled" xml:space="preserve">
-    <value>Sign-in was cancelled. Sign in again when you're ready.</value>
+    <value>Sign-in was cancelled. Sign in again whenever you're ready.</value>
   </data>
   <data name="SignIn_FailureTimedOut" xml:space="preserve">
     <value>Sign-in took too long. Try again, and finish it in the browser window that opens.</value>
@@ -253,18 +253,1344 @@
     <value>Analytics</value>
   </data>
   <data name="Nav_ServiceStatus.Content" xml:space="preserve">
-    <value>Service status</value>
+    <value>Folder scanner</value>
   </data>
   <data name="Nav_Settings.Content" xml:space="preserve">
     <value>Settings</value>
   </data>
   <data name="Nav_FFmpegSettings.Content" xml:space="preserve">
-    <value>FFmpeg</value>
+    <value>Video tools</value>
   </data>
   <data name="Status_Ready.Text" xml:space="preserve">
     <value>Ready</value>
   </data>
   <data name="Shell_Selected" xml:space="preserve">
     <value>Selected</value>
+  </data>
+  <data name="Page_Dashboard_Title" xml:space="preserve">
+    <value>Dashboard</value>
+  </data>
+  <data name="Page_Dashboard_Subtitle" xml:space="preserve">
+    <value>The folder scanner, bulk imports and anything that needs you.</value>
+  </data>
+  <data name="Page_Import_Title" xml:space="preserve">
+    <value>Import</value>
+  </data>
+  <data name="Page_Import_Subtitle" xml:space="preserve">
+    <value>Upload a folder of videos to a channel, with their captions, chapters and thumbnails.</value>
+  </data>
+  <data name="Page_WatchManagement_Title" xml:space="preserve">
+    <value>Watched folders</value>
+  </data>
+  <data name="Page_WatchManagement_Subtitle" xml:space="preserve">
+    <value>Folders Tools keeps an eye on and imports from as new videos arrive.</value>
+  </data>
+  <data name="Page_ApprovalWorkflow_Title" xml:space="preserve">
+    <value>Approvals</value>
+  </data>
+  <data name="Page_ApprovalWorkflow_Subtitle" xml:space="preserve">
+    <value>Videos found in watched folders, waiting for a yes before they upload.</value>
+  </data>
+  <data name="Page_Analytics_Title" xml:space="preserve">
+    <value>Analytics</value>
+  </data>
+  <data name="Page_Analytics_Subtitle" xml:space="preserve">
+    <value>How imports and approvals have gone over time.</value>
+  </data>
+  <data name="Page_ServiceStatus_Title" xml:space="preserve">
+    <value>Folder scanner</value>
+  </data>
+  <data name="Page_ServiceStatus_Subtitle" xml:space="preserve">
+    <value>The helper that searches folders for videos in the background.</value>
+  </data>
+  <data name="Page_Settings_Title" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <data name="Page_Settings_Subtitle" xml:space="preserve">
+    <value>How Tools imports, names and checks your videos.</value>
+  </data>
+  <data name="Page_FFmpegSettings_Title" xml:space="preserve">
+    <value>Video tools</value>
+  </data>
+  <data name="Page_FFmpegSettings_Subtitle" xml:space="preserve">
+    <value>The video programs Tools uses to read and prepare files.</value>
+  </data>
+  <data name="Dashboard_FilesLabel.Text" xml:space="preserve">
+    <value>Videos found</value>
+  </data>
+  <data name="Dashboard_FilesHint.Text" xml:space="preserve">
+    <value>By the folder scanner since Tools opened</value>
+  </data>
+  <data name="Dashboard_ScansLabel.Text" xml:space="preserve">
+    <value>Scans running</value>
+  </data>
+  <data name="Dashboard_ScansHint.Text" xml:space="preserve">
+    <value>Folders being searched for videos now</value>
+  </data>
+  <data name="Dashboard_ProblemsLabel.Text" xml:space="preserve">
+    <value>Problems</value>
+  </data>
+  <data name="Dashboard_ProblemsHint.Text" xml:space="preserve">
+    <value>Each one can be tried again below</value>
+  </data>
+  <data name="Dashboard_ScannerHeading.Text" xml:space="preserve">
+    <value>Folder scanner</value>
+  </data>
+  <data name="Dashboard_ScannerDetails.Content" xml:space="preserve">
+    <value>Scanner details</value>
+  </data>
+  <data name="Dashboard_ImportHeading.Text" xml:space="preserve">
+    <value>Bulk import</value>
+  </data>
+  <data name="Dashboard_ImportTitle.Text" xml:space="preserve">
+    <value>Bring a folder of videos to a channel</value>
+  </data>
+  <data name="Dashboard_ImportBody.Text" xml:space="preserve">
+    <value>Pick a folder. Tools finds the videos and their caption, chapter and thumbnail files, then uploads them to the channel you choose, with no upload limits.</value>
+  </data>
+  <data name="Dashboard_StartImport.Text" xml:space="preserve">
+    <value>Start new import</value>
+  </data>
+  <data name="Dashboard_WatchedFolders.Content" xml:space="preserve">
+    <value>Watched folders</value>
+  </data>
+  <data name="Dashboard_RunningTitle.Text" xml:space="preserve">
+    <value>Scans running</value>
+  </data>
+  <data name="Dashboard_ProblemsTitle.Text" xml:space="preserve">
+    <value>Problems</value>
+  </data>
+  <data name="Dashboard_TryAgain.Text" xml:space="preserve">
+    <value>Try again</value>
+  </data>
+  <data name="Dashboard_SeeAll.Content" xml:space="preserve">
+    <value>See all</value>
+  </data>
+  <data name="Dashboard_NoProblems.Text" xml:space="preserve">
+    <value>No problems. If a scan or an import goes wrong, it shows here with a way to try again.</value>
+  </data>
+  <data name="Scanner_CheckAgain.Text" xml:space="preserve">
+    <value>Check again</value>
+  </data>
+  <data name="Scanner_ConnectionLabel.Text" xml:space="preserve">
+    <value>Connection</value>
+  </data>
+  <data name="Scanner_UptimeLabel.Text" xml:space="preserve">
+    <value>Running for</value>
+  </data>
+  <data name="Scanner_MemoryLabel.Text" xml:space="preserve">
+    <value>Memory</value>
+  </data>
+  <data name="Scanner_ThreadsLabel.Text" xml:space="preserve">
+    <value>Threads</value>
+  </data>
+  <data name="Scanner_ProcessLabel.Text" xml:space="preserve">
+    <value>Process number</value>
+  </data>
+  <data name="Scanner_RunningTitle.Text" xml:space="preserve">
+    <value>Scans running</value>
+  </data>
+  <data name="Scanner_NoScans.Text" xml:space="preserve">
+    <value>No scans are running. Start an import or add a watched folder to scan.</value>
+  </data>
+  <data name="Scanner_ActivityTitle.Text" xml:space="preserve">
+    <value>Activity</value>
+  </data>
+  <data name="Scanner_ClearActivity.Text" xml:space="preserve">
+    <value>Clear</value>
+  </data>
+  <data name="Scanner_NoActivity.Text" xml:space="preserve">
+    <value>Nothing yet. Turning the scanner on, scans and problems are listed here.</value>
+  </data>
+  <data name="Scanner_CheckingTitle" xml:space="preserve">
+    <value>Checking the scanner</value>
+  </data>
+  <data name="Scanner_CheckingDetail" xml:space="preserve">
+    <value>Looking for the folder scanner on this computer.</value>
+  </data>
+  <data name="Scanner_OnTitle" xml:space="preserve">
+    <value>Scanner is on</value>
+  </data>
+  <data name="Scanner_OnDetail" xml:space="preserve">
+    <value>Watched folders are searched for new videos as they arrive.</value>
+  </data>
+  <data name="Scanner_OnExternalDetail" xml:space="preserve">
+    <value>It was already running when Tools opened, so Tools uses it as is.</value>
+  </data>
+  <data name="Scanner_OffTitle" xml:space="preserve">
+    <value>Scanner is off</value>
+  </data>
+  <data name="Scanner_OffDetail" xml:space="preserve">
+    <value>Turn it on to search watched folders for new videos. Imports you start yourself still work.</value>
+  </data>
+  <data name="Scanner_StartingTitle" xml:space="preserve">
+    <value>Turning the scanner on</value>
+  </data>
+  <data name="Scanner_StartingDetail" xml:space="preserve">
+    <value>This takes a few seconds.</value>
+  </data>
+  <data name="Scanner_StoppingTitle" xml:space="preserve">
+    <value>Turning the scanner off</value>
+  </data>
+  <data name="Scanner_StoppingDetail" xml:space="preserve">
+    <value>Scans that are running finish first.</value>
+  </data>
+  <data name="Scanner_MissingTitle" xml:space="preserve">
+    <value>Scanner isn't installed</value>
+  </data>
+  <data name="Scanner_MissingDetail" xml:space="preserve">
+    <value>Tools couldn't find the folder scanner next to the app. Reinstalling Tools puts it back.</value>
+  </data>
+  <data name="Scanner_FailedTitle" xml:space="preserve">
+    <value>Scanner stopped unexpectedly</value>
+  </data>
+  <data name="Scanner_FailedDetail" xml:space="preserve">
+    <value>Try again. If it keeps stopping, the activity below says why.</value>
+  </data>
+  <data name="Scanner_ActionTurnOn" xml:space="preserve">
+    <value>Turn on</value>
+  </data>
+  <data name="Scanner_ActionTurnOff" xml:space="preserve">
+    <value>Turn off</value>
+  </data>
+  <data name="Scanner_ActionTryAgain" xml:space="preserve">
+    <value>Try again</value>
+  </data>
+  <data name="Scanner_ConnectionNone" xml:space="preserve">
+    <value>Not connected</value>
+  </data>
+  <data name="Scanner_ConnectionConnected" xml:space="preserve">
+    <value>Connected</value>
+  </data>
+  <data name="Scanner_ConnectionReconnecting" xml:space="preserve">
+    <value>Reconnecting</value>
+  </data>
+  <data name="Activity_ScannerFound" xml:space="preserve">
+    <value>Found the scanner already running</value>
+  </data>
+  <data name="Activity_ScannerStarted" xml:space="preserve">
+    <value>Scanner turned on</value>
+  </data>
+  <data name="Activity_ScannerStopped" xml:space="preserve">
+    <value>Scanner turned off</value>
+  </data>
+  <data name="Activity_Connected" xml:space="preserve">
+    <value>Connected to the scanner</value>
+  </data>
+  <data name="Activity_Disconnected" xml:space="preserve">
+    <value>Disconnected from the scanner</value>
+  </data>
+  <data name="Activity_ScanStarted" xml:space="preserve">
+    <value>Scan started</value>
+  </data>
+  <data name="Activity_ScanCompleted" xml:space="preserve">
+    <value>Scan finished</value>
+  </data>
+  <data name="Activity_ScanCancelled" xml:space="preserve">
+    <value>Scan cancelled</value>
+  </data>
+  <data name="Problem_ScannerCheck" xml:space="preserve">
+    <value>Couldn't check the scanner</value>
+  </data>
+  <data name="Problem_ScannerStart" xml:space="preserve">
+    <value>Couldn't turn the scanner on</value>
+  </data>
+  <data name="Problem_ScannerStop" xml:space="preserve">
+    <value>Couldn't turn the scanner off</value>
+  </data>
+  <data name="Problem_ScannerStopped" xml:space="preserve">
+    <value>The scanner stopped unexpectedly</value>
+  </data>
+  <data name="Problem_Connect" xml:space="preserve">
+    <value>Couldn't connect to the scanner</value>
+  </data>
+  <data name="Problem_Connection" xml:space="preserve">
+    <value>The connection to the scanner dropped</value>
+  </data>
+  <data name="Problem_Disconnect" xml:space="preserve">
+    <value>Couldn't disconnect from the scanner</value>
+  </data>
+  <data name="Problem_Refresh" xml:space="preserve">
+    <value>Couldn't refresh the scanner's state</value>
+  </data>
+  <data name="Problem_ScanFailed" xml:space="preserve">
+    <value>A scan failed</value>
+  </data>
+  <data name="Operation_Scan" xml:space="preserve">
+    <value>Folder scan</value>
+  </data>
+  <data name="Operation_FilesFound" xml:space="preserve">
+    <value>{0} videos found</value>
+  </data>
+  <data name="Operation_Started" xml:space="preserve">
+    <value>Started {0}</value>
+  </data>
+  <data name="Progress_Scanning" xml:space="preserve">
+    <value>Scanning: {0} of {1} files checked, {2} videos found</value>
+  </data>
+  <data name="Progress_Importing" xml:space="preserve">
+    <value>Importing {0} of {1}</value>
+  </data>
+  <data name="Progress_ImportingItem" xml:space="preserve">
+    <value>Importing {0} of {1}: {2}</value>
+  </data>
+  <data name="Duration_HoursMinutes" xml:space="preserve">
+    <value>{0} h {1} min</value>
+  </data>
+  <data name="Duration_MinutesSeconds" xml:space="preserve">
+    <value>{0} min {1} s</value>
+  </data>
+  <data name="Duration_Seconds" xml:space="preserve">
+    <value>{0} s</value>
+  </data>
+  <data name="Import_FolderTitle.Text" xml:space="preserve">
+    <value>Folder</value>
+  </data>
+  <data name="Import_FolderBody.Text" xml:space="preserve">
+    <value>Each folder inside it becomes a channel. Tools finds the videos and the caption, chapter and thumbnail files next to them.</value>
+  </data>
+  <data name="Import_FolderBox.PlaceholderText" xml:space="preserve">
+    <value>No folder chosen yet</value>
+  </data>
+  <data name="Import_Browse.Text" xml:space="preserve">
+    <value>Choose folder</value>
+  </data>
+  <data name="Import_Scan.Text" xml:space="preserve">
+    <value>Find videos</value>
+  </data>
+  <data name="Import_EmptyTitle.Text" xml:space="preserve">
+    <value>Videos show here</value>
+  </data>
+  <data name="Import_EmptyBody.Text" xml:space="preserve">
+    <value>Choose a folder and find its videos. You then pick which ones to upload; nothing uploads until you say so.</value>
+  </data>
+  <data name="Import_FoundTitle.Text" xml:space="preserve">
+    <value>Videos found</value>
+  </data>
+  <data name="Import_SelectedLabel.Text" xml:space="preserve">
+    <value>selected</value>
+  </data>
+  <data name="Import_SelectAll.Text" xml:space="preserve">
+    <value>Select all</value>
+  </data>
+  <data name="Import_SelectNone.Text" xml:space="preserve">
+    <value>Select none</value>
+  </data>
+  <data name="Import_OnlySelected.Content" xml:space="preserve">
+    <value>Show only selected</value>
+  </data>
+  <data name="Import_Upload.Text" xml:space="preserve">
+    <value>Upload selected</value>
+  </data>
+  <data name="Import_AllChannels" xml:space="preserve">
+    <value>All channels</value>
+  </data>
+  <data name="Import_Ready" xml:space="preserve">
+    <value>Choose a folder to find its videos.</value>
+  </data>
+  <data name="Import_SafeMode" xml:space="preserve">
+    <value>Tools started in safe mode, so some features are unavailable. Restart Tools to try again.</value>
+  </data>
+  <data name="Import_FolderChosen" xml:space="preserve">
+    <value>Folder chosen. Find its videos next.</value>
+  </data>
+  <data name="Import_FolderFailed" xml:space="preserve">
+    <value>Couldn't open the folder</value>
+  </data>
+  <data name="Import_Scanning" xml:space="preserve">
+    <value>Looking for videos…</value>
+  </data>
+  <data name="Import_Found" xml:space="preserve">
+    <value>Found {0} videos in {1} channels.</value>
+  </data>
+  <data name="Import_ScanCancelled" xml:space="preserve">
+    <value>The search was cancelled.</value>
+  </data>
+  <data name="Import_ScanFailed" xml:space="preserve">
+    <value>Couldn't search the folder</value>
+  </data>
+  <data name="Import_Starting" xml:space="preserve">
+    <value>Starting the upload…</value>
+  </data>
+  <data name="Import_NoneSelected" xml:space="preserve">
+    <value>Select at least one video to upload.</value>
+  </data>
+  <data name="Import_Processed" xml:space="preserve">
+    <value>{0} videos sent for upload.</value>
+  </data>
+  <data name="Import_Failed" xml:space="preserve">
+    <value>The upload failed</value>
+  </data>
+  <data name="Import_Started" xml:space="preserve">
+    <value>Upload started.</value>
+  </data>
+  <data name="Import_StartFailed" xml:space="preserve">
+    <value>Couldn't start the upload</value>
+  </data>
+  <data name="Import_SessionLoading" xml:space="preserve">
+    <value>Loading the import…</value>
+  </data>
+  <data name="Import_SessionLoaded" xml:space="preserve">
+    <value>Import loaded.</value>
+  </data>
+  <data name="Import_SessionFailed" xml:space="preserve">
+    <value>Couldn't load the import</value>
+  </data>
+  <data name="Import_Resuming" xml:space="preserve">
+    <value>Resuming the upload…</value>
+  </data>
+  <data name="Import_Resumed" xml:space="preserve">
+    <value>Upload resumed.</value>
+  </data>
+  <data name="Import_ResumeFailed" xml:space="preserve">
+    <value>Couldn't resume the upload</value>
+  </data>
+  <data name="Import_Cancelled" xml:space="preserve">
+    <value>Upload cancelled.</value>
+  </data>
+  <data name="Import_CancelFailed" xml:space="preserve">
+    <value>Couldn't cancel the upload</value>
+  </data>
+  <data name="Import_SessionsFailed" xml:space="preserve">
+    <value>Couldn't load past imports</value>
+  </data>
+  <data name="Import_Completed" xml:space="preserve">
+    <value>Upload finished: {0} uploaded, {1} failed.</value>
+  </data>
+  <data name="Settings_ScannerTitle.Text" xml:space="preserve">
+    <value>Folder scanner</value>
+  </data>
+  <data name="Settings_AddressLabel.Text" xml:space="preserve">
+    <value>Address</value>
+  </data>
+  <data name="Settings_AddressBox.PlaceholderText" xml:space="preserve">
+    <value>http://localhost:5000</value>
+  </data>
+  <data name="Settings_AddressHint.Text" xml:space="preserve">
+    <value>Where Tools reaches the scanner on this computer. Leave it as it is unless support asks you to change it.</value>
+  </data>
+  <data name="Settings_Test.Text" xml:space="preserve">
+    <value>Test connection</value>
+  </data>
+  <data name="Settings_ProgramTitle.Text" xml:space="preserve">
+    <value>Scanner program</value>
+  </data>
+  <data name="Settings_AutoStart.Text" xml:space="preserve">
+    <value>Turn the scanner on when Tools opens</value>
+  </data>
+  <data name="Settings_AutoStartHint.Text" xml:space="preserve">
+    <value>Watched folders are only checked while the scanner is on.</value>
+  </data>
+  <data name="Settings_PathLabel.Text" xml:space="preserve">
+    <value>Program location</value>
+  </data>
+  <data name="Settings_PathBox.PlaceholderText" xml:space="preserve">
+    <value>Found automatically</value>
+  </data>
+  <data name="Settings_PathHint.Text" xml:space="preserve">
+    <value>Tools looks beside itself first. Choose a file only if the scanner was installed somewhere else.</value>
+  </data>
+  <data name="Settings_Browse.Text" xml:space="preserve">
+    <value>Choose file</value>
+  </data>
+  <data name="Settings_NotificationsTitle.Text" xml:space="preserve">
+    <value>Notifications</value>
+  </data>
+  <data name="Settings_Notify.Text" xml:space="preserve">
+    <value>Tell me when videos arrive</value>
+  </data>
+  <data name="Settings_NotifyHint.Text" xml:space="preserve">
+    <value>A desktop notification when a watched folder gets a new video or an approval is made.</value>
+  </data>
+  <data name="Settings_Sound.Text" xml:space="preserve">
+    <value>Play a sound</value>
+  </data>
+  <data name="Settings_SoundHint.Text" xml:space="preserve">
+    <value>With each notification.</value>
+  </data>
+  <data name="Settings_Save.Text" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="Settings_Reset.Text" xml:space="preserve">
+    <value>Restore defaults</value>
+  </data>
+  <data name="Settings_Saved" xml:space="preserve">
+    <value>Saved. Tools uses these settings from now on.</value>
+  </data>
+  <data name="Settings_SaveFailed" xml:space="preserve">
+    <value>Couldn't save the settings</value>
+  </data>
+  <data name="Settings_ResetDone" xml:space="preserve">
+    <value>Defaults restored. Save to keep them.</value>
+  </data>
+  <data name="Settings_BrowseFailed" xml:space="preserve">
+    <value>Couldn't open the file picker</value>
+  </data>
+  <data name="Settings_Testing" xml:space="preserve">
+    <value>Testing…</value>
+  </data>
+  <data name="Settings_TestOk" xml:space="preserve">
+    <value>Connected. The scanner answered.</value>
+  </data>
+  <data name="Settings_TestRefused" xml:space="preserve">
+    <value>The scanner answered with an error</value>
+  </data>
+  <data name="Settings_TestBadAddress" xml:space="preserve">
+    <value>That address isn't valid. It should look like http://localhost:5000.</value>
+  </data>
+  <data name="Settings_TestFailed" xml:space="preserve">
+    <value>Couldn't reach the scanner</value>
+  </data>
+  <data name="Settings_TestTimeout" xml:space="preserve">
+    <value>The scanner didn't answer within 10 seconds. Check it's on.</value>
+  </data>
+  <data name="Video_Detect.Text" xml:space="preserve">
+    <value>Find automatically</value>
+  </data>
+  <data name="Video_Verify.Text" xml:space="preserve">
+    <value>Check again</value>
+  </data>
+  <data name="Video_UseThumbsTitle.Text" xml:space="preserve">
+    <value>Thumbnails</value>
+  </data>
+  <data name="Video_UseThumbsBody.Text" xml:space="preserve">
+    <value>A thumbnail from the video when the folder has none.</value>
+  </data>
+  <data name="Video_UseDetailsTitle.Text" xml:space="preserve">
+    <value>Video details</value>
+  </data>
+  <data name="Video_UseDetailsBody.Text" xml:space="preserve">
+    <value>Length, picture size and format, read before upload.</value>
+  </data>
+  <data name="Video_UseChecksTitle.Text" xml:space="preserve">
+    <value>File checks</value>
+  </data>
+  <data name="Video_UseChecksBody.Text" xml:space="preserve">
+    <value>Broken or unplayable files are caught before they upload.</value>
+  </data>
+  <data name="Video_LocationsTitle.Text" xml:space="preserve">
+    <value>Program locations</value>
+  </data>
+  <data name="Video_LocationsBody.Text" xml:space="preserve">
+    <value>Found automatically in most cases. Set them yourself only if the programs are somewhere unusual.</value>
+  </data>
+  <data name="Video_ConverterLabel.Text" xml:space="preserve">
+    <value>Video converter (ffmpeg)</value>
+  </data>
+  <data name="Video_ReaderLabel.Text" xml:space="preserve">
+    <value>Video reader (ffprobe)</value>
+  </data>
+  <data name="Video_Browse.Text" xml:space="preserve">
+    <value>Choose</value>
+  </data>
+  <data name="Video_Browse2.Text" xml:space="preserve">
+    <value>Choose</value>
+  </data>
+  <data name="Video_Save.Text" xml:space="preserve">
+    <value>Save locations</value>
+  </data>
+  <data name="Video_InstallTitle.Text" xml:space="preserve">
+    <value>Installing them</value>
+  </data>
+  <data name="Video_InstallBody.Text" xml:space="preserve">
+    <value>Both programs come in one free package. Run this in a terminal, then choose Find automatically.</value>
+  </data>
+  <data name="Video_Website.Text" xml:space="preserve">
+    <value>Other ways to install</value>
+  </data>
+  <data name="Video_Checking" xml:space="preserve">
+    <value>Checking the video programs…</value>
+  </data>
+  <data name="Video_Detecting" xml:space="preserve">
+    <value>Looking for the video programs…</value>
+  </data>
+  <data name="Video_ReadyTitle" xml:space="preserve">
+    <value>Video programs are ready</value>
+  </data>
+  <data name="Video_ReadyBody" xml:space="preserve">
+    <value>Thumbnails, video details and file checks all work.</value>
+  </data>
+  <data name="Video_MissingTitle" xml:space="preserve">
+    <value>Video programs aren't set up</value>
+  </data>
+  <data name="Video_ConverterMissing" xml:space="preserve">
+    <value>The video converter wasn't found.</value>
+  </data>
+  <data name="Video_ConverterBroken" xml:space="preserve">
+    <value>The video converter was found but doesn't run.</value>
+  </data>
+  <data name="Video_ReaderMissing" xml:space="preserve">
+    <value>The video reader wasn't found.</value>
+  </data>
+  <data name="Video_ReaderBroken" xml:space="preserve">
+    <value>The video reader was found but doesn't run.</value>
+  </data>
+  <data name="Video_NotDetected" xml:space="preserve">
+    <value>They aren't installed on this computer. Install them below, then try again.</value>
+  </data>
+  <data name="Video_CheckFailed" xml:space="preserve">
+    <value>Couldn't check the video programs</value>
+  </data>
+  <data name="Video_NeedBoth" xml:space="preserve">
+    <value>Choose both programs before saving.</value>
+  </data>
+  <data name="Video_PathsInvalid" xml:space="preserve">
+    <value>Those files don't run as the video programs. Check the locations.</value>
+  </data>
+  <data name="Video_SaveFailed" xml:space="preserve">
+    <value>Couldn't save the locations</value>
+  </data>
+  <data name="Video_Saved" xml:space="preserve">
+    <value>Saved. Both programs work.</value>
+  </data>
+  <data name="Watch_Add.Text" xml:space="preserve">
+    <value>Watch a folder</value>
+  </data>
+  <data name="Watch_AddMany.Text" xml:space="preserve">
+    <value>Watch several</value>
+  </data>
+  <data name="Watch_StatFolders.Text" xml:space="preserve">
+    <value>Watched folders</value>
+  </data>
+  <data name="Watch_StatActive.Text" xml:space="preserve">
+    <value>Being watched now</value>
+  </data>
+  <data name="Watch_StatFiles.Text" xml:space="preserve">
+    <value>Videos arrived</value>
+  </data>
+  <data name="Watch_StatPending.Text" xml:space="preserve">
+    <value>Waiting for approval</value>
+  </data>
+  <data name="Watch_Review.Text" xml:space="preserve">
+    <value>Review them</value>
+  </data>
+  <data name="Watch_AddTitle.Text" xml:space="preserve">
+    <value>Watch a folder</value>
+  </data>
+  <data name="Watch_AddBody.Text" xml:space="preserve">
+    <value>New videos that land in the folder wait for your approval, then upload to the channel.</value>
+  </data>
+  <data name="Watch_ChannelLabel.Text" xml:space="preserve">
+    <value>Channel</value>
+  </data>
+  <data name="Watch_ChannelBox.PlaceholderText" xml:space="preserve">
+    <value>Type a channel name</value>
+  </data>
+  <data name="Watch_FolderLabel.Text" xml:space="preserve">
+    <value>Folder</value>
+  </data>
+  <data name="Watch_Choose.Text" xml:space="preserve">
+    <value>Choose</value>
+  </data>
+  <data name="Watch_Subfolders.Content" xml:space="preserve">
+    <value>Include folders inside it</value>
+  </data>
+  <data name="Watch_DelayLabel.Text" xml:space="preserve">
+    <value>Wait before picking up a new video</value>
+  </data>
+  <data name="Watch_ExtensionsLabel.Text" xml:space="preserve">
+    <value>Video file types</value>
+  </data>
+  <data name="Watch_Start.Text" xml:space="preserve">
+    <value>Start watching</value>
+  </data>
+  <data name="Watch_Cancel.Text" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="Watch_ManyTitle.Text" xml:space="preserve">
+    <value>Watch several folders</value>
+  </data>
+  <data name="Watch_TabTemplate.Content" xml:space="preserve">
+    <value>From a template</value>
+  </data>
+  <data name="Watch_TabFile.Content" xml:space="preserve">
+    <value>From a file</value>
+  </data>
+  <data name="Watch_TemplateLabel.Text" xml:space="preserve">
+    <value>Template</value>
+  </data>
+  <data name="Watch_CountLabel.Text" xml:space="preserve">
+    <value>How many folders</value>
+  </data>
+  <data name="Watch_FirstLabel.Text" xml:space="preserve">
+    <value>First number</value>
+  </data>
+  <data name="Watch_BaseLabel.Text" xml:space="preserve">
+    <value>Parent folder</value>
+  </data>
+  <data name="Watch_Preview.Text" xml:space="preserve">
+    <value>Show the folders</value>
+  </data>
+  <data name="Watch_StartAll.Text" xml:space="preserve">
+    <value>Start watching all</value>
+  </data>
+  <data name="Watch_FileBody.Text" xml:space="preserve">
+    <value>A CSV or JSON file with one row per folder: the channel name and the folder.</value>
+  </data>
+  <data name="Watch_ChooseFile.Text" xml:space="preserve">
+    <value>Choose file</value>
+  </data>
+  <data name="Watch_CheckFile.Text" xml:space="preserve">
+    <value>Check the file</value>
+  </data>
+  <data name="Watch_StartValid.Text" xml:space="preserve">
+    <value>Start watching the valid rows</value>
+  </data>
+  <data name="Watch_Close.Text" xml:space="preserve">
+    <value>Close</value>
+  </data>
+  <data name="Watch_ListTitle.Text" xml:space="preserve">
+    <value>Folders</value>
+  </data>
+  <data name="Watch_EmptyTitle.Text" xml:space="preserve">
+    <value>No folders are watched yet</value>
+  </data>
+  <data name="Watch_EmptyBody.Text" xml:space="preserve">
+    <value>Watch a folder and every new video in it is offered for upload to its channel. The folder scanner has to be on.</value>
+  </data>
+  <data name="Watch_Stop.Text" xml:space="preserve">
+    <value>Stop watching</value>
+  </data>
+  <data name="Watch_DelayValue" xml:space="preserve">
+    <value>{0} seconds</value>
+  </data>
+  <data name="Watch_RowVideos" xml:space="preserve">
+    <value>{0} videos arrived</value>
+  </data>
+  <data name="Watch_RowWaiting" xml:space="preserve">
+    <value>{0} waiting for approval</value>
+  </data>
+  <data name="Watch_FileRow" xml:space="preserve">
+    <value>Row {0}</value>
+  </data>
+  <data name="Watch_Ready" xml:space="preserve">
+    <value>Folders are checked while the folder scanner is on.</value>
+  </data>
+  <data name="Watch_StartFailed" xml:space="preserve">
+    <value>Couldn't load watched folders</value>
+  </data>
+  <data name="Watch_NotConnected" xml:space="preserve">
+    <value>The folder scanner is off. Turn it on from the Folder scanner page.</value>
+  </data>
+  <data name="Watch_Connected" xml:space="preserve">
+    <value>Connected to the folder scanner.</value>
+  </data>
+  <data name="Watch_Disconnected" xml:space="preserve">
+    <value>Disconnected from the folder scanner.</value>
+  </data>
+  <data name="Watch_ScannerProblem" xml:space="preserve">
+    <value>The folder scanner reported a problem</value>
+  </data>
+  <data name="Watch_FileDetected" xml:space="preserve">
+    <value>A new video arrived</value>
+  </data>
+  <data name="Watch_StatusChanged" xml:space="preserve">
+    <value>A watched folder changed</value>
+  </data>
+  <data name="Watch_Stopped" xml:space="preserve">
+    <value>Stopped watching</value>
+  </data>
+  <data name="Watch_Updated" xml:space="preserve">
+    <value>Watched folder updated.</value>
+  </data>
+  <data name="Watch_Deleted" xml:space="preserve">
+    <value>Watched folder removed</value>
+  </data>
+  <data name="Watch_NewForApproval" xml:space="preserve">
+    <value>A new video is waiting for approval</value>
+  </data>
+  <data name="Watch_ApprovalChanged" xml:space="preserve">
+    <value>An approval changed</value>
+  </data>
+  <data name="Watch_DecisionDone" xml:space="preserve">
+    <value>{0} videos decided.</value>
+  </data>
+  <data name="Watch_Creating" xml:space="preserve">
+    <value>Starting to watch…</value>
+  </data>
+  <data name="Watch_Created" xml:space="preserve">
+    <value>Now watching</value>
+  </data>
+  <data name="Watch_CreateFailed" xml:space="preserve">
+    <value>Couldn't start watching</value>
+  </data>
+  <data name="Watch_Stopping" xml:space="preserve">
+    <value>Stopping…</value>
+  </data>
+  <data name="Watch_StopFailed" xml:space="preserve">
+    <value>Couldn't stop watching</value>
+  </data>
+  <data name="Watch_Deleting" xml:space="preserve">
+    <value>Removing…</value>
+  </data>
+  <data name="Watch_DeleteFailed" xml:space="preserve">
+    <value>Couldn't remove the watched folder</value>
+  </data>
+  <data name="Watch_Refreshing" xml:space="preserve">
+    <value>Refreshing…</value>
+  </data>
+  <data name="Watch_Loaded" xml:space="preserve">
+    <value>{0} folders watched.</value>
+  </data>
+  <data name="Watch_RefreshFailed" xml:space="preserve">
+    <value>Couldn't refresh watched folders</value>
+  </data>
+  <data name="Watch_Viewing" xml:space="preserve">
+    <value>Showing</value>
+  </data>
+  <data name="Watch_PreviewReady" xml:space="preserve">
+    <value>{0} folders ready to watch.</value>
+  </data>
+  <data name="Watch_PreviewFailed" xml:space="preserve">
+    <value>Couldn't work out the folders</value>
+  </data>
+  <data name="Watch_PreviewFirst" xml:space="preserve">
+    <value>Show the folders first, then start watching them.</value>
+  </data>
+  <data name="Watch_CreatingMany" xml:space="preserve">
+    <value>Starting {0} of {1}…</value>
+  </data>
+  <data name="Watch_ManyDone" xml:space="preserve">
+    <value>{0} folders watched, {1} failed.</value>
+  </data>
+  <data name="Watch_ManyDoneTitle" xml:space="preserve">
+    <value>Folders watched</value>
+  </data>
+  <data name="Watch_ManyCreated" xml:space="preserve">
+    <value>{0} folders are now watched.</value>
+  </data>
+  <data name="Watch_ManyAllFailed" xml:space="preserve">
+    <value>None of them could be watched. Check the folders exist and Tools can open them.</value>
+  </data>
+  <data name="Watch_FileNeeded" xml:space="preserve">
+    <value>Choose a file first.</value>
+  </data>
+  <data name="Watch_FileMissing" xml:space="preserve">
+    <value>That file doesn't exist.</value>
+  </data>
+  <data name="Watch_FileFormat" xml:space="preserve">
+    <value>Use a CSV or JSON file.</value>
+  </data>
+  <data name="Watch_FileChecked" xml:space="preserve">
+    <value>{0} rows are valid, {1} have problems.</value>
+  </data>
+  <data name="Watch_FileFailed" xml:space="preserve">
+    <value>Couldn't read the file</value>
+  </data>
+  <data name="Watch_FileNoneValid" xml:space="preserve">
+    <value>No row in the file is valid.</value>
+  </data>
+  <data name="Watch_TemplatesLoaded" xml:space="preserve">
+    <value>{0} templates available.</value>
+  </data>
+  <data name="Watch_TemplatesFailed" xml:space="preserve">
+    <value>Couldn't load templates</value>
+  </data>
+  <data name="Watch_NameRequired" xml:space="preserve">
+    <value>Type a channel name.</value>
+  </data>
+  <data name="Watch_NameShort" xml:space="preserve">
+    <value>Use at least 2 characters.</value>
+  </data>
+  <data name="Watch_NameLong" xml:space="preserve">
+    <value>Use 100 characters or fewer.</value>
+  </data>
+  <data name="Watch_NameTaken" xml:space="preserve">
+    <value>A folder is already watched for this channel.</value>
+  </data>
+  <data name="Watch_PathRequired" xml:space="preserve">
+    <value>Choose a folder.</value>
+  </data>
+  <data name="Watch_PathMissing" xml:space="preserve">
+    <value>That folder doesn't exist.</value>
+  </data>
+  <data name="Watch_PathTaken" xml:space="preserve">
+    <value>This folder is already watched.</value>
+  </data>
+  <data name="Watch_FixFields" xml:space="preserve">
+    <value>Fix the fields marked above.</value>
+  </data>
+  <data name="Watch_DelayRange" xml:space="preserve">
+    <value>The wait has to be between 1 and 300 seconds.</value>
+  </data>
+  <data name="Watch_ExtensionsNeeded" xml:space="preserve">
+    <value>Add at least one video file type.</value>
+  </data>
+  <data name="Watch_Refresh" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+  <data name="Approve_StatPending.Text" xml:space="preserve">
+    <value>Waiting</value>
+  </data>
+  <data name="Approve_StatApproved.Text" xml:space="preserve">
+    <value>Approved</value>
+  </data>
+  <data name="Approve_StatRejected.Text" xml:space="preserve">
+    <value>Rejected</value>
+  </data>
+  <data name="Approve_StatSize.Text" xml:space="preserve">
+    <value>Size waiting</value>
+  </data>
+  <data name="Approve_FiltersTitle.Text" xml:space="preserve">
+    <value>Filters and presets</value>
+  </data>
+  <data name="Approve_ChannelLabel.Text" xml:space="preserve">
+    <value>Channel</value>
+  </data>
+  <data name="Approve_ChannelBox.PlaceholderText" xml:space="preserve">
+    <value>All channels</value>
+  </data>
+  <data name="Approve_PriorityLabel.Text" xml:space="preserve">
+    <value>Priority</value>
+  </data>
+  <data name="Approve_PriorityBox.PlaceholderText" xml:space="preserve">
+    <value>Any priority</value>
+  </data>
+  <data name="Approve_TypeLabel.Text" xml:space="preserve">
+    <value>File types</value>
+  </data>
+  <data name="Approve_TypeBox.PlaceholderText" xml:space="preserve">
+    <value>mp4, mkv</value>
+  </data>
+  <data name="Approve_SizeLabel.Text" xml:space="preserve">
+    <value>Size in bytes</value>
+  </data>
+  <data name="Approve_MinBox.PlaceholderText" xml:space="preserve">
+    <value>From</value>
+  </data>
+  <data name="Approve_MaxBox.PlaceholderText" xml:space="preserve">
+    <value>To</value>
+  </data>
+  <data name="Approve_FromLabel.Text" xml:space="preserve">
+    <value>Arrived from</value>
+  </data>
+  <data name="Approve_ToLabel.Text" xml:space="preserve">
+    <value>Arrived until</value>
+  </data>
+  <data name="Approve_ClearFilters.Text" xml:space="preserve">
+    <value>Clear filters</value>
+  </data>
+  <data name="Approve_PresetsTitle.Text" xml:space="preserve">
+    <value>Presets</value>
+  </data>
+  <data name="Approve_PresetBox.PlaceholderText" xml:space="preserve">
+    <value>Choose a preset</value>
+  </data>
+  <data name="Approve_PresetUse.Text" xml:space="preserve">
+    <value>Use</value>
+  </data>
+  <data name="Approve_PresetSave.Text" xml:space="preserve">
+    <value>Save these filters</value>
+  </data>
+  <data name="Approve_PresetMakeDefault.Text" xml:space="preserve">
+    <value>Make default</value>
+  </data>
+  <data name="Approve_PresetDelete.Text" xml:space="preserve">
+    <value>Delete</value>
+  </data>
+  <data name="Approve_AllTitle.Text" xml:space="preserve">
+    <value>Everything that matches the filters</value>
+  </data>
+  <data name="Approve_AllApprove.Text" xml:space="preserve">
+    <value>Approve all</value>
+  </data>
+  <data name="Approve_AllReject.Text" xml:space="preserve">
+    <value>Reject all</value>
+  </data>
+  <data name="Approve_SortDate.Content" xml:space="preserve">
+    <value>Newest first</value>
+  </data>
+  <data name="Approve_SortName.Content" xml:space="preserve">
+    <value>By file name</value>
+  </data>
+  <data name="Approve_SortSize.Content" xml:space="preserve">
+    <value>By size</value>
+  </data>
+  <data name="Approve_SortPriority.Content" xml:space="preserve">
+    <value>By priority</value>
+  </data>
+  <data name="Approve_SortChannel.Content" xml:space="preserve">
+    <value>By channel</value>
+  </data>
+  <data name="Approve_SelectAll.Text" xml:space="preserve">
+    <value>Select all</value>
+  </data>
+  <data name="Approve_SelectNone.Text" xml:space="preserve">
+    <value>Select none</value>
+  </data>
+  <data name="Approve_EmptyTitle.Text" xml:space="preserve">
+    <value>Nothing is waiting</value>
+  </data>
+  <data name="Approve_EmptyBody.Text" xml:space="preserve">
+    <value>Videos that arrive in watched folders wait here for a yes or a no. Clear the filters if you expected some.</value>
+  </data>
+  <data name="Approve_RowPreview.Text" xml:space="preserve">
+    <value>Preview</value>
+  </data>
+  <data name="Approve_RowApprove.Text" xml:space="preserve">
+    <value>Approve</value>
+  </data>
+  <data name="Approve_RowReject.Text" xml:space="preserve">
+    <value>Reject</value>
+  </data>
+  <data name="Approve_PreviewTitle.Text" xml:space="preserve">
+    <value>Preview</value>
+  </data>
+  <data name="Approve_PreviewEmpty.Text" xml:space="preserve">
+    <value>Choose Preview on a video to see its picture and details here.</value>
+  </data>
+  <data name="Approve_ThumbAgain.Text" xml:space="preserve">
+    <value>Make the picture again</value>
+  </data>
+  <data name="Approve_DChannel.Text" xml:space="preserve">
+    <value>Channel</value>
+  </data>
+  <data name="Approve_DSize.Text" xml:space="preserve">
+    <value>Size</value>
+  </data>
+  <data name="Approve_DArrived.Text" xml:space="preserve">
+    <value>Arrived</value>
+  </data>
+  <data name="Approve_DLength.Text" xml:space="preserve">
+    <value>Length</value>
+  </data>
+  <data name="Approve_DPicture.Text" xml:space="preserve">
+    <value>Picture size</value>
+  </data>
+  <data name="Approve_DFrames.Text" xml:space="preserve">
+    <value>Frame rate</value>
+  </data>
+  <data name="Approve_DBitrate.Text" xml:space="preserve">
+    <value>Bit rate</value>
+  </data>
+  <data name="Approve_PApprove.Text" xml:space="preserve">
+    <value>Approve</value>
+  </data>
+  <data name="Approve_PReject.Text" xml:space="preserve">
+    <value>Reject</value>
+  </data>
+  <data name="Approve_ActivityTitle.Text" xml:space="preserve">
+    <value>Activity</value>
+  </data>
+  <data name="Approve_ActivityClear.Text" xml:space="preserve">
+    <value>Clear</value>
+  </data>
+  <data name="Approve_SortLabel" xml:space="preserve">
+    <value>Sort order</value>
+  </data>
+  <data name="Approve_SortReverse" xml:space="preserve">
+    <value>Reverse the order</value>
+  </data>
+  <data name="Approve_PresetName" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="Approve_PresetDescription" xml:space="preserve">
+    <value>Description (optional)</value>
+  </data>
+  <data name="Approve_PresetAsDefault" xml:space="preserve">
+    <value>Use these filters whenever the page opens</value>
+  </data>
+  <data name="Approve_PresetDialogTitle" xml:space="preserve">
+    <value>Save these filters</value>
+  </data>
+  <data name="Approve_PresetSaveButton" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="Approve_PresetCancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="Approve_ListTitle" xml:space="preserve">
+    <value>Waiting: {0}</value>
+  </data>
+  <data name="Approve_Approve" xml:space="preserve">
+    <value>Approve</value>
+  </data>
+  <data name="Approve_Reject" xml:space="preserve">
+    <value>Reject</value>
+  </data>
+  <data name="Approve_ApproveN" xml:space="preserve">
+    <value>Approve {0}</value>
+  </data>
+  <data name="Approve_RejectN" xml:space="preserve">
+    <value>Reject {0}</value>
+  </data>
+  <data name="Approve_Fps" xml:space="preserve">
+    <value>{0} frames a second</value>
+  </data>
+  <data name="Approve_Kbps" xml:space="preserve">
+    <value>{0} kilobits a second</value>
+  </data>
+  <data name="Approve_Ready" xml:space="preserve">
+    <value>Choose videos, then approve or reject them.</value>
+  </data>
+  <data name="Approve_StartFailed" xml:space="preserve">
+    <value>Couldn't load approvals</value>
+  </data>
+  <data name="Approve_Connecting" xml:space="preserve">
+    <value>Connecting to the folder scanner…</value>
+  </data>
+  <data name="Approve_Started" xml:space="preserve">
+    <value>Approvals are up to date.</value>
+  </data>
+  <data name="Approve_NewFile" xml:space="preserve">
+    <value>A new video arrived.</value>
+  </data>
+  <data name="Approve_Changed" xml:space="preserve">
+    <value>An approval changed.</value>
+  </data>
+  <data name="Approve_Loading" xml:space="preserve">
+    <value>Loading approvals…</value>
+  </data>
+  <data name="Approve_Loaded" xml:space="preserve">
+    <value>{0} videos waiting.</value>
+  </data>
+  <data name="Approve_LoadFailed" xml:space="preserve">
+    <value>Couldn't load approvals</value>
+  </data>
+  <data name="Approve_Approving" xml:space="preserve">
+    <value>Approving…</value>
+  </data>
+  <data name="Approve_Rejecting" xml:space="preserve">
+    <value>Rejecting…</value>
+  </data>
+  <data name="Approve_ApprovingMany" xml:space="preserve">
+    <value>Approving {0} videos…</value>
+  </data>
+  <data name="Approve_RejectingMany" xml:space="preserve">
+    <value>Rejecting {0} videos…</value>
+  </data>
+  <data name="Approve_ApprovedOne" xml:space="preserve">
+    <value>Approved</value>
+  </data>
+  <data name="Approve_RejectedOne" xml:space="preserve">
+    <value>Rejected</value>
+  </data>
+  <data name="Approve_ApprovedMany" xml:space="preserve">
+    <value>{0} videos approved.</value>
+  </data>
+  <data name="Approve_RejectedMany" xml:space="preserve">
+    <value>{0} videos rejected.</value>
+  </data>
+  <data name="Approve_ApproveFailed" xml:space="preserve">
+    <value>Couldn't approve</value>
+  </data>
+  <data name="Approve_RejectFailed" xml:space="preserve">
+    <value>Couldn't reject</value>
+  </data>
+  <data name="Approve_ApproveManyFailed" xml:space="preserve">
+    <value>Couldn't approve {0} videos.</value>
+  </data>
+  <data name="Approve_RejectManyFailed" xml:space="preserve">
+    <value>Couldn't reject {0} videos.</value>
+  </data>
+  <data name="Approve_Previewing" xml:space="preserve">
+    <value>Previewing</value>
+  </data>
+  <data name="Approve_SelectedAll" xml:space="preserve">
+    <value>{0} videos selected.</value>
+  </data>
+  <data name="Approve_SelectionCleared" xml:space="preserve">
+    <value>Selection cleared.</value>
+  </data>
+  <data name="Approve_FiltersCleared" xml:space="preserve">
+    <value>Filters cleared.</value>
+  </data>
+  <data name="Approve_PresetsFailed" xml:space="preserve">
+    <value>Couldn't load presets</value>
+  </data>
+  <data name="Approve_PresetApplied" xml:space="preserve">
+    <value>Preset in use</value>
+  </data>
+  <data name="Approve_PresetNameNeeded" xml:space="preserve">
+    <value>Give the preset a name.</value>
+  </data>
+  <data name="Approve_PresetSaved" xml:space="preserve">
+    <value>Preset saved</value>
+  </data>
+  <data name="Approve_PresetSaveFailed" xml:space="preserve">
+    <value>Couldn't change the preset</value>
+  </data>
+  <data name="Approve_PresetDeleted" xml:space="preserve">
+    <value>Preset deleted</value>
+  </data>
+  <data name="Approve_PresetDefault" xml:space="preserve">
+    <value>Default preset</value>
+  </data>
+  <data name="Approve_PresetDefaultCleared" xml:space="preserve">
+    <value>No default preset now.</value>
+  </data>
+  <data name="Approve_FilterFailed" xml:space="preserve">
+    <value>Couldn't apply the filters</value>
+  </data>
+  <data name="Approve_VideoMissing" xml:space="preserve">
+    <value>The video file isn't there any more</value>
+  </data>
+  <data name="Approve_ThumbMade" xml:space="preserve">
+    <value>Picture made.</value>
+  </data>
+  <data name="Approve_ThumbFailed" xml:space="preserve">
+    <value>Couldn't make the picture</value>
+  </data>
+  <data name="Approve_ThumbMaking" xml:space="preserve">
+    <value>Making the picture…</value>
+  </data>
+  <data name="Approve_Showing" xml:space="preserve">
+    <value>Showing {0} of {1}.</value>
+  </data>
+  <data name="Stats_Today.Content" xml:space="preserve">
+    <value>Today</value>
+  </data>
+  <data name="Stats_Week.Content" xml:space="preserve">
+    <value>This week</value>
+  </data>
+  <data name="Stats_Month.Content" xml:space="preserve">
+    <value>This month</value>
+  </data>
+  <data name="Stats_All.Content" xml:space="preserve">
+    <value>All time</value>
+  </data>
+  <data name="Stats_Export.Text" xml:space="preserve">
+    <value>Save as CSV</value>
+  </data>
+  <data name="Stats_Approved.Text" xml:space="preserve">
+    <value>Approved in this period</value>
+  </data>
+  <data name="Stats_Rate.Text" xml:space="preserve">
+    <value>Approved of those decided</value>
+  </data>
+  <data name="Stats_Waiting.Text" xml:space="preserve">
+    <value>Waiting now</value>
+  </data>
+  <data name="Stats_Oldest.Text" xml:space="preserve">
+    <value>Oldest waiting for</value>
+  </data>
+  <data name="Stats_Size.Text" xml:space="preserve">
+    <value>Size approved in this period</value>
+  </data>
+  <data name="Stats_Busiest.Text" xml:space="preserve">
+    <value>Busiest channel in this period</value>
+  </data>
+  <data name="Stats_DailyTitle.Text" xml:space="preserve">
+    <value>Videos that arrived, by day</value>
+  </data>
+  <data name="Stats_LegendApproved.Text" xml:space="preserve">
+    <value>Approved</value>
+  </data>
+  <data name="Stats_LegendRejected.Text" xml:space="preserve">
+    <value>Rejected</value>
+  </data>
+  <data name="Stats_TopTitle.Text" xml:space="preserve">
+    <value>Top channels</value>
+  </data>
+  <data name="Stats_PriorityTitle.Text" xml:space="preserve">
+    <value>By priority</value>
+  </data>
+  <data name="Stats_HoursTitle.Text" xml:space="preserve">
+    <value>When videos arrive, by hour</value>
+  </data>
+  <data name="Stats_RecentTitle.Text" xml:space="preserve">
+    <value>Latest videos</value>
+  </data>
+  <data name="Stats_RecentEmpty.Text" xml:space="preserve">
+    <value>Nothing has arrived yet in this period.</value>
+  </data>
+  <data name="Stats_Loading" xml:space="preserve">
+    <value>Loading…</value>
+  </data>
+  <data name="Stats_LoadFailed" xml:space="preserve">
+    <value>Couldn't load analytics</value>
+  </data>
+  <data name="Stats_UpdatedAt" xml:space="preserve">
+    <value>Updated {0}</value>
+  </data>
+  <data name="Stats_Exporting" xml:space="preserve">
+    <value>Saving…</value>
+  </data>
+  <data name="Stats_Exported" xml:space="preserve">
+    <value>Saved to</value>
+  </data>
+  <data name="Stats_ExportFailed" xml:space="preserve">
+    <value>Couldn't save the file</value>
+  </data>
+  <data name="Stats_TrendUp" xml:space="preserve">
+    <value>{0} more arrived than the period before</value>
+  </data>
+  <data name="Stats_TrendDown" xml:space="preserve">
+    <value>{0} fewer arrived than the period before</value>
+  </data>
+  <data name="Stats_ChannelSummary" xml:space="preserve">
+    <value>{0} videos, {1}</value>
+  </data>
+  <data name="Stats_Priority" xml:space="preserve">
+    <value>Priority {0}</value>
+  </data>
+  <data name="Stats_PriorityCount" xml:space="preserve">
+    <value>{0} videos, {1}</value>
+  </data>
+  <data name="Stats_StatusApproved" xml:space="preserve">
+    <value>Approved</value>
+  </data>
+  <data name="Stats_StatusRejected" xml:space="preserve">
+    <value>Rejected</value>
+  </data>
+  <data name="Stats_StatusPending" xml:space="preserve">
+    <value>Waiting</value>
+  </data>
+  <data name="Stats_StatusOther" xml:space="preserve">
+    <value>Done</value>
+  </data>
+  <data name="Offline_Title.Text" xml:space="preserve">
+    <value>The folder scanner is off</value>
+  </data>
+  <data name="Offline_Open.Text" xml:space="preserve">
+    <value>Open Folder scanner</value>
+  </data>
+  <data name="Offline_Retry.Text" xml:space="preserve">
+    <value>Check again</value>
+  </data>
+  <data name="Offline_Detail" xml:space="preserve">
+    <value>This page needs it running. Turn it on from the Folder scanner page, and this page fills in by itself.</value>
+  </data>
+  <data name="Approve_NotAccepted" xml:space="preserve">
+    <value>The scanner didn't accept the decision. Try again.</value>
+  </data>
+  <data name="Stats_LegendWaiting.Text" xml:space="preserve">
+    <value>Waiting</value>
+  </data>
+  <data name="When_Today" xml:space="preserve">
+    <value>Today, {0}</value>
+  </data>
+  <data name="When_Yesterday" xml:space="preserve">
+    <value>Yesterday, {0}</value>
+  </data>
+  <data name="When_Date" xml:space="preserve">
+    <value>{0}, {1}</value>
+  </data>
+  <data name="Watch_Stopped.Text" xml:space="preserve">
+    <value>Not being watched</value>
+  </data>
+  <data name="SignIn_WaitingBody.Text" xml:space="preserve">
+    <value>A sign-in page opened in your browser. Tools carries on by itself once you've signed in there.</value>
+  </data>
+  <data name="SignIn_Reopen.Text" xml:space="preserve">
+    <value>Open the sign-in page again</value>
+  </data>
+  <data name="Notify_FileDetected" xml:space="preserve">
+    <value>New video in a watched folder</value>
+  </data>
+  <data name="Notify_ApprovedOne" xml:space="preserve">
+    <value>Video approved</value>
+  </data>
+  <data name="Notify_RejectedOne" xml:space="preserve">
+    <value>Video rejected</value>
+  </data>
+  <data name="Notify_ApprovedMany" xml:space="preserve">
+    <value>{0} videos approved</value>
+  </data>
+  <data name="Notify_RejectedMany" xml:space="preserve">
+    <value>{0} videos rejected</value>
+  </data>
+  <data name="Notify_Ok" xml:space="preserve">
+    <value>OK</value>
   </data>
 </root>

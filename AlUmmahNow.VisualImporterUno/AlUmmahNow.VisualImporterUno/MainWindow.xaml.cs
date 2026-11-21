@@ -32,7 +32,7 @@ namespace AlUmmahNow.VisualImporterUno
         private void BuildShell()
         {
             (_shell?.Workspace as IDisposable)?.Dispose();
-            _shell = new ToolsShell(_state, () => new WorkspaceView());
+            _shell = new ToolsShell(_state, () => new WorkspaceView(Environment.GetEnvironmentVariable("TOOLS_DEMO_PAGE")));
             Host.Children.Clear();
             Host.Children.Add(_shell);
         }
@@ -54,6 +54,7 @@ namespace AlUmmahNow.VisualImporterUno
         public void NavigateToWatchManagementView() => Workspace?.NavigateToWatchManagementView();
         public void NavigateToApprovalWorkflowView() => Workspace?.NavigateToApprovalWorkflowView();
         public void NavigateToAnalyticsView() => Workspace?.NavigateToAnalyticsView();
+        public void NavigateToServiceStatusView() => Workspace?.NavigateToServiceStatusView();
 
         public void UpdateScanProgress(double progressPercentage, string currentOperation, int processedFiles, int totalFiles, int filesFound) =>
             Workspace?.UpdateScanProgress(progressPercentage, currentOperation, processedFiles, totalFiles, filesFound);

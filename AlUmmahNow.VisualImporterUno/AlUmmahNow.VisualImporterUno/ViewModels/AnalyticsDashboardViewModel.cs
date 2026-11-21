@@ -1,3 +1,4 @@
+using AlUmmahNow.VisualImporterUno.Shell;
 using AlUmmahNow.Data.Models.FileScanning;
 using AlUmmahNow.VisualImporterUno.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -27,7 +28,7 @@ public partial class AnalyticsDashboardViewModel : ObservableObject, IDisposable
     private bool _isLoading = false;
 
     [ObservableProperty]
-    private string _statusMessage = "Ready";
+    private string _statusMessage = string.Empty;
 
     [ObservableProperty]
     private TimePeriod _selectedPeriod = TimePeriod.ThisWeek;
@@ -55,7 +56,7 @@ public partial class AnalyticsDashboardViewModel : ObservableObject, IDisposable
     private long _totalSizeApproved = 0;
 
     [ObservableProperty]
-    private string _mostActiveChannel = "N/A";
+    private string _mostActiveChannel = "–";
 
     [ObservableProperty]
     private double _avgApprovalTimeHours = 0.0;
@@ -67,6 +68,34 @@ public partial class AnalyticsDashboardViewModel : ObservableObject, IDisposable
     private double _rejectionTrend = 0.0;
 
     // Collections for charts and lists
+    public string TotalApprovalsText => Loc.Count(TotalApprovals);
+    public string ApprovalRateText => Loc.Percent(ApprovalRate);
+    /// <summary>How long the oldest video has waited (AvgApprovalTimeHours holds it; the name predates the change).</summary>
+    public string AvgApprovalTimeText => AvgApprovalTimeHours <= 0 ? "–" : Loc.Duration(TimeSpan.FromHours(AvgApprovalTimeHours));
+    public string FilesPendingText => Loc.Number(FilesPending);
+    public string TotalSizeApprovedText => Loc.Bytes(TotalSizeApproved);
+    public string ApprovalTrendText => ApprovalTrend == 0 ? string.Empty
+        : Loc.Format(ApprovalTrend > 0 ? "Stats_TrendUp" : "Stats_TrendDown", Loc.Percent(Math.Abs(ApprovalTrend)));
+    public bool IsToday => SelectedPeriod == TimePeriod.Today;
+    public bool IsThisWeek => SelectedPeriod == TimePeriod.ThisWeek;
+    public bool IsThisMonth => SelectedPeriod == TimePeriod.ThisMonth;
+    public bool IsAllTime => SelectedPeriod == TimePeriod.AllTime;
+    public bool HasRecentActivity => RecentActivities.Count > 0;
+
+    partial void OnTotalApprovalsChanged(int value) => OnPropertyChanged(nameof(TotalApprovalsText));
+    partial void OnApprovalRateChanged(double value) => OnPropertyChanged(nameof(ApprovalRateText));
+    partial void OnAvgApprovalTimeHoursChanged(double value) => OnPropertyChanged(nameof(AvgApprovalTimeText));
+    partial void OnFilesPendingChanged(int value) => OnPropertyChanged(nameof(FilesPendingText));
+    partial void OnTotalSizeApprovedChanged(long value) => OnPropertyChanged(nameof(TotalSizeApprovedText));
+    partial void OnApprovalTrendChanged(double value) => OnPropertyChanged(nameof(ApprovalTrendText));
+    partial void OnSelectedPeriodChanged(TimePeriod value)
+    {
+        OnPropertyChanged(nameof(IsToday));
+        OnPropertyChanged(nameof(IsThisWeek));
+        OnPropertyChanged(nameof(IsThisMonth));
+        OnPropertyChanged(nameof(IsAllTime));
+    }
+
     public ObservableCollection<DailyTrendData> ApprovalTrends { get; } = new();
     public ObservableCollection<ChannelStatistic> TopChannels { get; } = new();
     public ObservableCollection<HourlyActivity> PeakHours { get; } = new();
@@ -78,6 +107,7 @@ public partial class AnalyticsDashboardViewModel : ObservableObject, IDisposable
     public AnalyticsDashboardViewModel(FileScanSignalRClient signalRClient)
     {
         _signalRClient = signalRClient ?? throw new ArgumentNullException(nameof(signalRClient));
+        RecentActivities.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasRecentActivity));
 
         // Get dispatcher queue for thread-safe UI updates
         try
@@ -94,69 +124,7 @@ public partial class AnalyticsDashboardViewModel : ObservableObject, IDisposable
         // Set initial period
         UpdatePeriodDates();
 
-        // Initialize with background data load
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                await Task.Delay(500); // Give UI time to initialize
-                await InitializeAsync();
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Background initialization failed: {ex.Message}");
-                DispatcherExecute(() =>
-                {
-                    StatusMessage = $"Initialization failed: {ex.Message}";
-                });
-            }
-        });
     }
-
-    #region Initialization
-
-    private async Task InitializeAsync()
-    {
-        try
-        {
-            DispatcherExecute(() =>
-            {
-                IsLoading = true;
-                StatusMessage = "Connecting to analytics service...";
-            });
-
-            // Ensure SignalR connection
-            if (!_signalRClient.IsConnected)
-            {
-                var connected = await _signalRClient.ConnectAsync();
-                if (!connected)
-                {
-                    throw new InvalidOperationException("Failed to connect to FileScan service");
-                }
-            }
-
-            // Load analytics data
-            await RefreshAnalyticsAsync();
-
-            DispatcherExecute(() =>
-            {
-                StatusMessage = "Analytics dashboard loaded successfully";
-            });
-        }
-        catch (Exception ex)
-        {
-            DispatcherExecute(() =>
-            {
-                StatusMessage = $"Initialization error: {ex.Message}";
-            });
-        }
-        finally
-        {
-            DispatcherExecute(() => IsLoading = false);
-        }
-    }
-
-    #endregion
 
     #region Commands
 
@@ -166,11 +134,13 @@ public partial class AnalyticsDashboardViewModel : ObservableObject, IDisposable
         try
         {
             IsLoading = true;
-            StatusMessage = "Loading analytics data...";
+            StatusMessage = Loc.Get("Stats_Loading");
 
             if (!_signalRClient.IsConnected)
             {
-                throw new InvalidOperationException("Not connected to FileScan service");
+                // The page shows the scanner-off card instead
+                StatusMessage = string.Empty;
+                return;
             }
 
             // Load statistics from service
@@ -182,14 +152,14 @@ public partial class AnalyticsDashboardViewModel : ObservableObject, IDisposable
 
             DispatcherExecute(() =>
             {
-                StatusMessage = $"Analytics updated for {SelectedPeriod}";
+                StatusMessage = Loc.Format("Stats_UpdatedAt", Loc.Time(DateTime.Now));
             });
         }
         catch (Exception ex)
         {
             DispatcherExecute(() =>
             {
-                StatusMessage = $"Error loading analytics: {ex.Message}";
+                StatusMessage = Loc.GetWithDetail("Stats_LoadFailed", ex.Message);
             });
         }
         finally
@@ -213,7 +183,7 @@ public partial class AnalyticsDashboardViewModel : ObservableObject, IDisposable
     {
         try
         {
-            StatusMessage = "Exporting report...";
+            StatusMessage = Loc.Get("Stats_Exporting");
 
             // Generate CSV report
             var csv = GenerateCsvReport();
@@ -225,11 +195,11 @@ public partial class AnalyticsDashboardViewModel : ObservableObject, IDisposable
 
             await File.WriteAllTextAsync(filePath, csv);
 
-            StatusMessage = $"Report exported to: {filePath}";
+            StatusMessage = Loc.GetWithDetail("Stats_Exported", filePath);
         }
         catch (Exception ex)
         {
-            StatusMessage = $"Export failed: {ex.Message}";
+            StatusMessage = Loc.GetWithDetail("Stats_ExportFailed", ex.Message);
         }
     }
 
@@ -241,91 +211,82 @@ public partial class AnalyticsDashboardViewModel : ObservableObject, IDisposable
     {
         await Task.Run(() =>
         {
-            // Calculate overview statistics
-            CalculateOverviewStatistics(stats);
+            // Everything but the trend and what's waiting right now covers only the chosen period
+            var inPeriod = SelectedPeriod == TimePeriod.AllTime
+                ? allApprovals
+                : allApprovals.Where(a => Local(a) >= PeriodStartDate && Local(a) <= PeriodEndDate).ToList();
 
-            // Calculate trends
-            CalculateTrends(stats);
-
-            // Calculate top channels
-            CalculateTopChannels(allApprovals);
-
-            // Calculate peak hours
-            CalculatePeakHours(allApprovals);
-
-            // Calculate priority distribution
-            CalculatePriorityDistribution(allApprovals);
-
-            // Get recent activities
-            GetRecentActivities(allApprovals);
+            CalculateOverviewStatistics(stats, inPeriod);
+            CalculateTrends(allApprovals);
+            CalculateTopChannels(inPeriod);
+            CalculatePeakHours(inPeriod);
+            CalculatePriorityDistribution(inPeriod);
+            GetRecentActivities(inPeriod);
         });
     }
 
-    private void CalculateOverviewStatistics(ApprovalStatistics stats)
+    private static DateTime Local(PendingApprovalDto approval) => approval.DetectedAt.ToLocalTime();
+
+    private void CalculateOverviewStatistics(ApprovalStatistics stats, List<PendingApprovalDto> inPeriod)
     {
+        var approved = inPeriod.Where(a => a.Status == ApprovalStatus.Approved).ToList();
+        var rejected = inPeriod.Count(a => a.Status == ApprovalStatus.Rejected);
+        var decided = approved.Count + rejected;
         DispatcherExecute(() =>
         {
-            TotalApprovals = stats.TotalApproved;
+            TotalApprovals = approved.Count;
+            TotalSizeApproved = approved.Sum(a => a.FileSize);
+            // Out of the videos decided in the period
+            ApprovalRate = decided == 0 ? 0.0 : approved.Count * 100.0 / decided;
+            RejectionRate = decided == 0 ? 0.0 : rejected * 100.0 / decided;
+            // Waiting is about right now, whatever the period
             FilesPending = stats.TotalPending;
-            TotalSizeApproved = stats.TotalSizeApproved;
 
-            // Calculate rates
-            var total = stats.TotalApproved + stats.TotalRejected + stats.TotalPending;
-            if (total > 0)
-            {
-                ApprovalRate = (double)stats.TotalApproved / total * 100.0;
-                RejectionRate = (double)stats.TotalRejected / total * 100.0;
-            }
-            else
-            {
-                ApprovalRate = 0.0;
-                RejectionRate = 0.0;
-            }
-
-            // Calculate average approval time (mock data for now)
-            if (stats.OldestPending.HasValue && stats.NewestPending.HasValue)
-            {
-                var timeSpan = stats.NewestPending.Value - stats.OldestPending.Value;
-                AvgApprovalTimeHours = timeSpan.TotalHours / Math.Max(1, stats.TotalPending);
-            }
-            else
-            {
-                AvgApprovalTimeHours = 0.0;
-            }
+            // How long the oldest video has been waiting for a decision
+            AvgApprovalTimeHours = stats.OldestPending.HasValue
+                ? Math.Max(0, (DateTime.UtcNow - stats.OldestPending.Value.ToUniversalTime()).TotalHours)
+                : 0.0;
         });
     }
 
-    private void CalculateTrends(ApprovalStatistics stats)
+    /// <summary>
+    /// Videos that arrived each day of the period by what happened to them, and how arrivals compare with the period of
+    /// the same length before it. All Time has nothing before it, so it has no trend.
+    /// </summary>
+    private void CalculateTrends(List<PendingApprovalDto> allApprovals)
     {
-        // Mock trend calculation (would need historical data)
-        // Positive trend = improvement
-        DispatcherExecute(() =>
-        {
-            ApprovalTrend = 12.5; // +12.5% compared to previous period
-            RejectionTrend = -3.2; // -3.2% compared to previous period
-        });
+        var days = GetDaysInPeriod();
+        // All Time charts its last 30 days
+        var start = SelectedPeriod == TimePeriod.AllTime ? DateTime.Today.AddDays(1 - days) : PeriodStartDate.Date;
+        var arrivals = allApprovals.Select(a => (Day: a.DetectedAt.ToLocalTime().Date, a.Status)).ToList();
 
-        // Calculate daily trends for chart
+        var current = arrivals.Count(a => a.Day >= start && a.Day < start.AddDays(days));
+        var previous = SelectedPeriod == TimePeriod.AllTime ? 0 : arrivals.Count(a => a.Day >= start.AddDays(-days) && a.Day < start);
+        var trend = previous == 0 ? 0.0 : (current - previous) * 100.0 / previous;
+
+        var daily = Enumerable.Range(0, days).Select(i =>
+        {
+            var date = start.AddDays(i);
+            var approved = arrivals.Count(a => a.Day == date && a.Status == ApprovalStatus.Approved);
+            var rejected = arrivals.Count(a => a.Day == date && a.Status == ApprovalStatus.Rejected);
+            var pending = arrivals.Count(a => a.Day == date && a.Status == ApprovalStatus.Pending);
+            var total = arrivals.Count(a => a.Day == date);
+            return new DailyTrendData { Date = date, Approved = approved, Rejected = rejected, Pending = pending, Total = total };
+        }).ToList();
+        var busiest = Math.Max(1, daily.Max(d => Math.Max(d.Approved, Math.Max(d.Rejected, d.Pending))));
+        foreach (var day in daily)
+        {
+            day.ApprovedHeight = 140.0 * day.Approved / busiest;
+            day.RejectedHeight = 140.0 * day.Rejected / busiest;
+            day.PendingHeight = 140.0 * day.Pending / busiest;
+        }
+
         DispatcherExecute(() =>
         {
+            ApprovalTrend = trend;
+            RejectionTrend = 0;
             ApprovalTrends.Clear();
-
-            var daysInPeriod = GetDaysInPeriod();
-            for (int i = 0; i < daysInPeriod; i++)
-            {
-                var date = PeriodStartDate.AddDays(i);
-                // Mock data - in real implementation, would query actual data
-                var approvals = new Random((int)date.Ticks).Next(10, 50);
-                var rejections = new Random((int)date.Ticks + 1).Next(2, 15);
-
-                ApprovalTrends.Add(new DailyTrendData
-                {
-                    Date = date,
-                    Approved = approvals,
-                    Rejected = rejections,
-                    Total = approvals + rejections
-                });
-            }
+            foreach (var day in daily) ApprovalTrends.Add(day);
         });
     }
 
@@ -354,14 +315,14 @@ public partial class AnalyticsDashboardViewModel : ObservableObject, IDisposable
                 TopChannels.Add(channel);
             }
 
-            MostActiveChannel = TopChannels.FirstOrDefault()?.ChannelName ?? "N/A";
+            MostActiveChannel = TopChannels.FirstOrDefault()?.ChannelName ?? "–";
         });
     }
 
     private void CalculatePeakHours(List<PendingApprovalDto> allApprovals)
     {
         var hourlyGroups = allApprovals
-            .GroupBy(a => a.DetectedAt.Hour)
+            .GroupBy(a => Local(a).Hour)
             .Select(g => new HourlyActivity
             {
                 Hour = g.Key,
@@ -426,7 +387,6 @@ public partial class AnalyticsDashboardViewModel : ObservableObject, IDisposable
     private void GetRecentActivities(List<PendingApprovalDto> allApprovals)
     {
         var recent = allApprovals
-            .Where(a => a.Status != ApprovalStatus.Pending)
             .OrderByDescending(a => a.DetectedAt)
             .Take(10)
             .Select(a => new RecentActivityItem
@@ -484,7 +444,7 @@ public partial class AnalyticsDashboardViewModel : ObservableObject, IDisposable
             TimePeriod.Today => 1,
             TimePeriod.ThisWeek => 7,
             TimePeriod.ThisMonth => DateTime.DaysInMonth(DateTime.Now.Year, DateTime.Now.Month),
-            TimePeriod.AllTime => 30, // Show last 30 days for all time
+            TimePeriod.AllTime => 30, // charted as the last 30 days
             _ => 7
         };
     }
@@ -611,15 +571,25 @@ public class DailyTrendData
     public DateTime Date { get; set; }
     public int Approved { get; set; }
     public int Rejected { get; set; }
+    public int Pending { get; set; }
     public int Total { get; set; }
-    public string DateLabel => Date.ToString("MMM dd");
+    public string DateLabel
+    {
+        get
+        {
+            var text = Date.ToString("d MMM", System.Globalization.CultureInfo.CurrentUICulture);
+            return Loc.IsArabic ? Loc.ToArabicDigits(text) : text;
+        }
+    }
     public double ApprovedPercentage => Total > 0 ? (double)Approved / Total * 100 : 0;
     public double RejectedPercentage => Total > 0 ? (double)Rejected / Total * 100 : 0;
+    /// <summary>Bar heights in pixels for a 140px chart.</summary>
+    public double ApprovedHeight { get; set; }
+    public double RejectedHeight { get; set; }
+    public double PendingHeight { get; set; }
+    public string TotalText => Loc.Number(Total);
 }
 
-/// <summary>
-/// Channel statistics for top channels analysis
-/// </summary>
 public class ChannelStatistic
 {
     public string ChannelName { get; set; } = string.Empty;
@@ -629,76 +599,33 @@ public class ChannelStatistic
     public int PendingFiles { get; set; }
     public long TotalSize { get; set; }
     public double ApprovalRate => TotalFiles > 0 ? (double)ApprovedFiles / TotalFiles * 100 : 0;
-    public string TotalSizeFormatted => FormatFileSize(TotalSize);
-
-    private static string FormatFileSize(long bytes)
-    {
-        string[] suffixes = { "B", "KB", "MB", "GB", "TB" };
-        int counter = 0;
-        decimal number = bytes;
-        while (Math.Round(number / 1024) >= 1)
-        {
-            number /= 1024;
-            counter++;
-        }
-        return $"{number:n1} {suffixes[counter]}";
-    }
+    public string TotalSizeFormatted => Loc.Bytes(TotalSize);
+    public string SummaryText => Loc.Format("Stats_ChannelSummary", TotalFiles, Loc.Bytes(TotalSize));
+    public string ApprovalRateText => Loc.Percent(ApprovalRate);
 }
 
-/// <summary>
-/// Hourly activity data for peak hours visualization
-/// </summary>
 public class HourlyActivity
 {
     public int Hour { get; set; }
     public int FileCount { get; set; }
     public int MaxCount { get; set; }
-    public string HourLabel => $"{Hour:D2}:00";
+    public string HourLabel => Loc.IsArabic ? Loc.ToArabicDigits(Hour.ToString("D2")) : Hour.ToString("D2");
+    public string FileCountText => Loc.Count(FileCount);
     public double BarHeight => MaxCount > 0 ? (double)FileCount / MaxCount * 100 : 0;
-    public string IntensityColor => GetIntensityColor();
-
-    private string GetIntensityColor()
-    {
-        var percentage = MaxCount > 0 ? (double)FileCount / MaxCount * 100 : 0;
-        return percentage switch
-        {
-            >= 75 => "#DC2626", // High - Red
-            >= 50 => "#F59E0B", // Medium-High - Orange
-            >= 25 => "#FCD34D", // Medium - Yellow
-            > 0 => "#86EFAC",   // Low - Light Green
-            _ => "#F3F4F6"      // None - Gray
-        };
-    }
+    /// <summary>The cell's gold, stronger the busier the hour.</summary>
+    // Capped so the hour and count stay readable on the busiest hour
+    public double Intensity => MaxCount > 0 ? 0.1 + 0.5 * FileCount / MaxCount : 0.06;
 }
 
-/// <summary>
-/// Priority distribution statistics
-/// </summary>
 public class PriorityDistribution
 {
     public int Priority { get; set; }
     public int Count { get; set; }
     public double Percentage { get; set; }
-    public string PriorityLabel => $"Priority {Priority}";
-    public string Color => GetPriorityColor();
-
-    private string GetPriorityColor()
-    {
-        return Priority switch
-        {
-            1 => "#DC2626", // Critical - Red
-            2 => "#F59E0B", // High - Orange
-            3 => "#3B82F6", // Medium - Blue
-            4 => "#10B981", // Low - Green
-            5 => "#6B7280", // Very Low - Gray
-            _ => "#9CA3AF"
-        };
-    }
+    public string PriorityLabel => Loc.Format("Stats_Priority", Priority);
+    public string CountText => Loc.Format("Stats_PriorityCount", Count, Loc.Percent(Percentage));
 }
 
-/// <summary>
-/// Recent activity item
-/// </summary>
 public class RecentActivityItem
 {
     public string FileName { get; set; } = string.Empty;
@@ -706,25 +633,21 @@ public class RecentActivityItem
     public ApprovalStatus Status { get; set; }
     public DateTime Timestamp { get; set; }
     public long FileSize { get; set; }
-
-    public string StatusText => Status.ToString();
+    public string StatusText => Loc.Get(Status switch
+    {
+        ApprovalStatus.Approved => "Stats_StatusApproved",
+        ApprovalStatus.Rejected => "Stats_StatusRejected",
+        ApprovalStatus.Pending => "Stats_StatusPending",
+        _ => "Stats_StatusOther",
+    });
     public string StatusColor => Status switch
     {
-        ApprovalStatus.Approved => "#16A34A",
-        ApprovalStatus.Rejected => "#DC2626",
-        ApprovalStatus.Pending => "#F59E0B",
-        _ => "#6B7280"
+        ApprovalStatus.Approved => "#FF2FA866",
+        ApprovalStatus.Rejected => "#FFE0605A",
+        ApprovalStatus.Pending => "#FFE0962A",
+        _ => "#FF7F97A3",
     };
-    public string TimeAgo => GetTimeAgo();
-
-    private string GetTimeAgo()
-    {
-        var span = DateTime.Now - Timestamp;
-        return span.TotalMinutes < 1 ? "Just now" :
-               span.TotalMinutes < 60 ? $"{(int)span.TotalMinutes} min ago" :
-               span.TotalHours < 24 ? $"{(int)span.TotalHours} hours ago" :
-               $"{(int)span.TotalDays} days ago";
-    }
+    public string TimeText => Loc.When(Timestamp.Kind == DateTimeKind.Utc ? Timestamp.ToLocalTime() : Timestamp);
 }
 
 #endregion

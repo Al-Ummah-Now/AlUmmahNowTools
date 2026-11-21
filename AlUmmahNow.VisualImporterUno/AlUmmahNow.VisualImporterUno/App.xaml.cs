@@ -310,6 +310,8 @@ public partial class App : Application
                         {
                             try
                             {
+                                if (AlUmmahNow.VisualImporterUno.Shell.DemoScannerClient.Requested)
+                                    return new AlUmmahNow.VisualImporterUno.Shell.DemoScannerClient(fileScanServiceUrl);
                                 return new FileScanSignalRClient(fileScanServiceUrl);
                             }
                             catch (Exception ex)
@@ -342,9 +344,8 @@ public partial class App : Application
 
                         // Register view models with safe initialization
                         services.AddTransient<MainViewModel>();
-                        services.AddTransient<ServiceStatusViewModel>();
+                        services.AddSingleton<ServiceStatusViewModel>();
                         services.AddTransient<SettingsViewModel>();
-                        services.AddTransient<DatabaseMainViewModel>();
 
                         // Register Watch Management and Approval Workflow ViewModels as singletons
                         // (they manage SignalR connection and need to maintain state)

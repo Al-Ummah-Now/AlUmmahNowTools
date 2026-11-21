@@ -1,3 +1,4 @@
+using AlUmmahNow.VisualImporterUno.Shell;
 using AlUmmahNow.Data.Models.FileScanning;
 using AlUmmahNow.Data.Models;
 using AlUmmahNow.Data.Services;
@@ -34,7 +35,7 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
     private bool _isLoading = false;
 
     [ObservableProperty]
-    private string _statusMessage = "Ready";
+    private string _statusMessage = Loc.Get("Approve_Ready");
 
     [ObservableProperty]
     private PendingApprovalDto? _currentApproval;
@@ -130,6 +131,85 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
     /// </summary>
     public ObservableCollection<PendingApprovalDto> SelectedApprovals { get; } = new();
 
+    // Text for the page, in the chosen language's digits
+    public string PendingText => Loc.Number(Statistics.TotalPending);
+    public string ApprovedText => Loc.Number(Statistics.TotalApproved);
+    public string RejectedText => Loc.Number(Statistics.TotalRejected);
+    public string PendingSizeText => Loc.Bytes(PendingApprovals.Sum(a => a.FileSize));
+    public bool HasApprovals => FilteredApprovals.Count > 0;
+    public string ListTitleText => Loc.Format("Approve_ListTitle", FilteredApprovals.Count);
+    public string ApproveSelectedText => SelectedCount > 0 ? Loc.Format("Approve_ApproveN", SelectedCount) : Loc.Get("Approve_Approve");
+    public string RejectSelectedText => SelectedCount > 0 ? Loc.Format("Approve_RejectN", SelectedCount) : Loc.Get("Approve_Reject");
+
+    public string CurrentSizeText => CurrentApproval == null ? string.Empty : Loc.Bytes(CurrentApproval.FileSize);
+    public string CurrentDetectedText => CurrentApproval == null ? string.Empty : Loc.When(CurrentApproval.DetectedAt.ToLocalTime());
+    public string DurationText => CurrentVideoMetadata == null ? string.Empty : Loc.Duration(CurrentVideoMetadata.Duration);
+    public string ResolutionText => CurrentVideoMetadata == null ? string.Empty : Loc.Number(CurrentVideoMetadata.Width) + " × " + Loc.Number(CurrentVideoMetadata.Height);
+    public string FrameRateText => CurrentVideoMetadata == null ? string.Empty : Loc.Format("Approve_Fps", CurrentVideoMetadata.FrameRate);
+    public string BitRateText => CurrentVideoMetadata == null ? string.Empty : Loc.Format("Approve_Kbps", CurrentVideoMetadata.BitRate / 1000);
+
+    private static readonly string[] SortKeys = { "DetectedAt", "FileName", "FileSize", "Priority", "ChannelName" };
+
+    /// <summary>The sort order as a position in the page's list of orders.</summary>
+    public int SortIndex
+    {
+        get => Math.Max(0, Array.IndexOf(SortKeys, SortBy));
+        set { if (value >= 0 && value < SortKeys.Length) SortBy = SortKeys[value]; }
+    }
+
+    partial void OnStatisticsChanged(ApprovalStatistics value)
+    {
+        OnPropertyChanged(nameof(PendingText));
+        OnPropertyChanged(nameof(ApprovedText));
+        OnPropertyChanged(nameof(RejectedText));
+    }
+
+    partial void OnSelectedCountChanged(int value)
+    {
+        OnPropertyChanged(nameof(ApproveSelectedText));
+        OnPropertyChanged(nameof(RejectSelectedText));
+    }
+
+    partial void OnCurrentApprovalChanged(PendingApprovalDto? value)
+    {
+        OnPropertyChanged(nameof(CurrentSizeText));
+        OnPropertyChanged(nameof(CurrentDetectedText));
+    }
+
+    partial void OnCurrentVideoMetadataChanged(VideoMetadata? value)
+    {
+        OnPropertyChanged(nameof(DurationText));
+        OnPropertyChanged(nameof(ResolutionText));
+        OnPropertyChanged(nameof(FrameRateText));
+        OnPropertyChanged(nameof(BitRateText));
+    }
+
+    partial void OnSortByChanged(string value) => OnPropertyChanged(nameof(SortIndex));
+
+    /// <summary>Makes the page's selection the one approve and reject act on.</summary>
+    public void SetSelection(IEnumerable<PendingApprovalDto> items)
+    {
+        SelectedApprovals.Clear();
+        foreach (var item in items) SelectedApprovals.Add(item);
+        UpdateSelectionStatus();
+    }
+
+    [RelayCommand]
+    private async Task ApproveOneAsync(PendingApprovalDto? approval)
+    {
+        if (approval == null) return;
+        SetSelection(new[] { approval });
+        if (ApproveSelectedCommand.CanExecute(null)) await ApproveSelectedAsync();
+    }
+
+    [RelayCommand]
+    private async Task RejectOneAsync(PendingApprovalDto? approval)
+    {
+        if (approval == null) return;
+        SetSelection(new[] { approval });
+        if (RejectSelectedCommand.CanExecute(null)) await RejectSelectedAsync();
+    }
+
     /// <summary>
     /// Available channels for filtering
     /// </summary>
@@ -153,6 +233,12 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
         _filterPresetService = filterPresetService ?? throw new ArgumentNullException(nameof(filterPresetService));
         _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
         _videoThumbnailService = videoThumbnailService ?? throw new ArgumentNullException(nameof(videoThumbnailService));
+        PendingApprovals.CollectionChanged += (_, _) => OnPropertyChanged(nameof(PendingSizeText));
+        FilteredApprovals.CollectionChanged += (_, _) =>
+        {
+            OnPropertyChanged(nameof(HasApprovals));
+            OnPropertyChanged(nameof(ListTitleText));
+        };
 
         // Get dispatcher queue for thread-safe UI updates
         try
@@ -182,8 +268,8 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
                 System.Diagnostics.Debug.WriteLine($"Background initialization failed: {ex.Message}");
                 DispatcherExecute(() =>
                 {
-                    StatusMessage = $"Initialization failed: {ex.Message}";
-                    AddLog($"Failed to initialize: {ex.Message}", LogType.Error);
+                    StatusMessage = Loc.GetWithDetail("Approve_StartFailed", ex.Message);
+                    AddLog(Loc.GetWithDetail("Approve_StartFailed", ex.Message), LogType.Error);
                 });
             }
         });
@@ -201,7 +287,7 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
             DispatcherExecute(() =>
             {
                 IsLoading = true;
-                StatusMessage = "Connecting to approval service...";
+                StatusMessage = Loc.Get("Approve_Connecting");
             });
 
             // Ensure SignalR connection
@@ -210,7 +296,7 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
                 var connected = await _signalRClient.ConnectAsync();
                 if (!connected)
                 {
-                    throw new InvalidOperationException("Failed to connect to FileScan service");
+                    throw new InvalidOperationException(Loc.Get("Watch_NotConnected"));
                 }
             }
 
@@ -228,16 +314,16 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
 
             DispatcherExecute(() =>
             {
-                StatusMessage = "Ready";
-                AddLog("Approval workflow initialized successfully", LogType.Success);
+                StatusMessage = Loc.Get("Approve_Ready");
+                AddLog(Loc.Get("Approve_Started"), LogType.Success);
             });
         }
         catch (Exception ex)
         {
             DispatcherExecute(() =>
             {
-                StatusMessage = $"Initialization error: {ex.Message}";
-                AddLog($"Initialization error: {ex.Message}", LogType.Error);
+                StatusMessage = Loc.GetWithDetail("Approve_StartFailed", ex.Message);
+                AddLog(Loc.GetWithDetail("Approve_StartFailed", ex.Message), LogType.Error);
             });
         }
         finally
@@ -281,12 +367,12 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
         {
             try
             {
-                AddLog("New file detected - refreshing approvals", LogType.Information);
+                AddLog(Loc.Get("Approve_NewFile"), LogType.Information);
                 await RefreshApprovalsAsync();
             }
             catch (Exception ex)
             {
-                AddLog($"Failed to refresh after new file: {ex.Message}", LogType.Error);
+                AddLog(Loc.GetWithDetail("Approve_LoadFailed", ex.Message), LogType.Error);
             }
         });
     }
@@ -297,12 +383,12 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
         {
             try
             {
-                AddLog("Approval status changed - refreshing", LogType.Information);
+                AddLog(Loc.Get("Approve_Changed"), LogType.Information);
                 await RefreshApprovalsAsync();
             }
             catch (Exception ex)
             {
-                AddLog($"Failed to refresh after status change: {ex.Message}", LogType.Error);
+                AddLog(Loc.GetWithDetail("Approve_LoadFailed", ex.Message), LogType.Error);
             }
         });
     }
@@ -317,11 +403,11 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
         try
         {
             IsLoading = true;
-            StatusMessage = "Loading pending approvals...";
+            StatusMessage = Loc.Get("Approve_Loading");
 
             if (!_signalRClient.IsConnected)
             {
-                throw new InvalidOperationException("Not connected to FileScan service");
+                throw new InvalidOperationException(Loc.Get("Watch_NotConnected"));
             }
 
             // Load pending approvals from service
@@ -348,16 +434,16 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
                 // Apply filters
                 ApplyFiltersAndSorting();
 
-                StatusMessage = $"Loaded {approvals.Count} pending approvals";
-                AddLog($"Loaded {approvals.Count} pending approvals", LogType.Success);
+                StatusMessage = Loc.Format("Approve_Loaded", approvals.Count(a => a.Status == ApprovalStatus.Pending));
+                AddLog(Loc.Format("Approve_Loaded", approvals.Count(a => a.Status == ApprovalStatus.Pending)), LogType.Success);
             });
         }
         catch (Exception ex)
         {
             DispatcherExecute(() =>
             {
-                StatusMessage = $"Error loading approvals: {ex.Message}";
-                AddLog($"Error loading approvals: {ex.Message}", LogType.Error);
+                StatusMessage = Loc.GetWithDetail("Approve_LoadFailed", ex.Message);
+                AddLog(Loc.GetWithDetail("Approve_LoadFailed", ex.Message), LogType.Error);
             });
         }
         finally
@@ -375,7 +461,7 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
         {
             IsProcessingApproval = true;
             var selectedIds = SelectedApprovals.Select(a => a.Id).ToList();
-            StatusMessage = $"Approving {selectedIds.Count} files...";
+            StatusMessage = Loc.Format("Approve_ApprovingMany", selectedIds.Count);
 
             var request = new ApprovalDecisionRequest
             {
@@ -394,8 +480,8 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
 
                 DispatcherExecute(() =>
                 {
-                    StatusMessage = $"Successfully approved {count} files";
-                    AddLog($"Approved {count} files", LogType.Success);
+                    StatusMessage = Loc.Format("Approve_ApprovedMany", count);
+                    AddLog(Loc.Format("Approve_ApprovedMany", count), LogType.Success);
                 });
 
                 // Show notification if enabled
@@ -408,20 +494,20 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
             }
             else
             {
-                throw new InvalidOperationException("Approval operation failed");
+                throw new InvalidOperationException(Loc.Get("Approve_NotAccepted"));
             }
         }
         catch (Exception ex)
         {
             DispatcherExecute(() =>
             {
-                StatusMessage = $"Error approving files: {ex.Message}";
-                AddLog($"Error approving files: {ex.Message}", LogType.Error);
+                StatusMessage = Loc.GetWithDetail("Approve_ApproveFailed", ex.Message);
+                AddLog(Loc.GetWithDetail("Approve_ApproveFailed", ex.Message), LogType.Error);
             });
 
             if (EnableNotifications)
             {
-                await _notificationService.ShowErrorAsync("Approval Error", ex.Message);
+                await _notificationService.ShowErrorAsync(Loc.Get("Approve_ApproveFailed"), ex.Message);
             }
         }
         finally
@@ -439,7 +525,7 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
         {
             IsProcessingApproval = true;
             var selectedIds = SelectedApprovals.Select(a => a.Id).ToList();
-            StatusMessage = $"Rejecting {selectedIds.Count} files...";
+            StatusMessage = Loc.Format("Approve_RejectingMany", selectedIds.Count);
 
             var request = new ApprovalDecisionRequest
             {
@@ -458,8 +544,8 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
 
                 DispatcherExecute(() =>
                 {
-                    StatusMessage = $"Successfully rejected {count} files";
-                    AddLog($"Rejected {count} files", LogType.Warning);
+                    StatusMessage = Loc.Format("Approve_RejectedMany", count);
+                    AddLog(Loc.Format("Approve_RejectedMany", count), LogType.Warning);
                 });
 
                 // Show notification if enabled
@@ -472,20 +558,20 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
             }
             else
             {
-                throw new InvalidOperationException("Rejection operation failed");
+                throw new InvalidOperationException(Loc.Get("Approve_NotAccepted"));
             }
         }
         catch (Exception ex)
         {
             DispatcherExecute(() =>
             {
-                StatusMessage = $"Error rejecting files: {ex.Message}";
-                AddLog($"Error rejecting files: {ex.Message}", LogType.Error);
+                StatusMessage = Loc.GetWithDetail("Approve_RejectFailed", ex.Message);
+                AddLog(Loc.GetWithDetail("Approve_RejectFailed", ex.Message), LogType.Error);
             });
 
             if (EnableNotifications)
             {
-                await _notificationService.ShowErrorAsync("Rejection Error", ex.Message);
+                await _notificationService.ShowErrorAsync(Loc.Get("Approve_RejectFailed"), ex.Message);
             }
         }
         finally
@@ -502,7 +588,7 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
         try
         {
             IsProcessingBulkApproval = true;
-            StatusMessage = "Processing bulk approval...";
+            StatusMessage = Loc.Get("Approve_Approving");
 
             var request = BuildBulkApprovalRequest(ApprovalStatus.Approved);
 
@@ -510,8 +596,8 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
 
             DispatcherExecute(() =>
             {
-                StatusMessage = $"Bulk approved {processedCount} files";
-                AddLog($"Bulk approved {processedCount} files matching filters", LogType.Success);
+                StatusMessage = Loc.Format("Approve_ApprovedMany", processedCount);
+                AddLog(Loc.Format("Approve_ApprovedMany", processedCount), LogType.Success);
             });
 
             // Show notification if enabled
@@ -526,13 +612,13 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
         {
             DispatcherExecute(() =>
             {
-                StatusMessage = $"Error in bulk approval: {ex.Message}";
-                AddLog($"Error in bulk approval: {ex.Message}", LogType.Error);
+                StatusMessage = Loc.GetWithDetail("Approve_ApproveFailed", ex.Message);
+                AddLog(Loc.GetWithDetail("Approve_ApproveFailed", ex.Message), LogType.Error);
             });
 
             if (EnableNotifications)
             {
-                await _notificationService.ShowErrorAsync("Bulk Approval Error", ex.Message);
+                await _notificationService.ShowErrorAsync(Loc.Get("Approve_ApproveFailed"), ex.Message);
             }
         }
         finally
@@ -547,7 +633,7 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
         try
         {
             IsProcessingBulkApproval = true;
-            StatusMessage = "Processing bulk rejection...";
+            StatusMessage = Loc.Get("Approve_Rejecting");
 
             var request = BuildBulkApprovalRequest(ApprovalStatus.Rejected);
 
@@ -555,8 +641,8 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
 
             DispatcherExecute(() =>
             {
-                StatusMessage = $"Bulk rejected {processedCount} files";
-                AddLog($"Bulk rejected {processedCount} files matching filters", LogType.Warning);
+                StatusMessage = Loc.Format("Approve_RejectedMany", processedCount);
+                AddLog(Loc.Format("Approve_RejectedMany", processedCount), LogType.Warning);
             });
 
             // Show notification if enabled
@@ -571,13 +657,13 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
         {
             DispatcherExecute(() =>
             {
-                StatusMessage = $"Error in bulk rejection: {ex.Message}";
-                AddLog($"Error in bulk rejection: {ex.Message}", LogType.Error);
+                StatusMessage = Loc.GetWithDetail("Approve_RejectFailed", ex.Message);
+                AddLog(Loc.GetWithDetail("Approve_RejectFailed", ex.Message), LogType.Error);
             });
 
             if (EnableNotifications)
             {
-                await _notificationService.ShowErrorAsync("Bulk Rejection Error", ex.Message);
+                await _notificationService.ShowErrorAsync(Loc.Get("Approve_RejectFailed"), ex.Message);
             }
         }
         finally
@@ -596,7 +682,7 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
         DispatcherExecute(() =>
         {
             CurrentApproval = approval;
-            AddLog($"Previewing: {approval.FileName}", LogType.Information);
+            AddLog(Loc.GetWithDetail("Approve_Previewing", approval.FileName), LogType.Information);
         });
     }
 
@@ -611,7 +697,7 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
                 SelectedApprovals.Add(approval);
             }
             UpdateSelectionStatus();
-            AddLog($"Selected all {FilteredApprovals.Count} visible approvals", LogType.Information);
+            AddLog(Loc.Format("Approve_SelectedAll", FilteredApprovals.Count), LogType.Information);
         });
     }
 
@@ -622,7 +708,7 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
         {
             SelectedApprovals.Clear();
             UpdateSelectionStatus();
-            AddLog("Cleared selection", LogType.Information);
+            AddLog(Loc.Get("Approve_SelectionCleared"), LogType.Information);
         });
     }
 
@@ -659,7 +745,7 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
             ExtensionFilter = null;
 
             ApplyFiltersAndSorting();
-            AddLog("Filters cleared", LogType.Information);
+            AddLog(Loc.Get("Approve_FiltersCleared"), LogType.Information);
         });
     }
 
@@ -677,7 +763,7 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
         try
         {
             IsLoading = true;
-            StatusMessage = $"Loading approvals for channel: {channelName}";
+            StatusMessage = Loc.GetWithDetail("Approve_Loading", channelName);
 
             var approvals = await _signalRClient.GetPendingApprovalsByChannelAsync(channelName);
 
@@ -690,16 +776,16 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
                 }
 
                 ApplyFiltersAndSorting();
-                StatusMessage = $"Loaded {approvals.Count} approvals for {channelName}";
-                AddLog($"Loaded {approvals.Count} approvals for channel: {channelName}", LogType.Success);
+                StatusMessage = Loc.Format("Approve_Loaded", approvals.Count(a => a.Status == ApprovalStatus.Pending));
+                AddLog(Loc.Format("Approve_Loaded", approvals.Count(a => a.Status == ApprovalStatus.Pending)), LogType.Success);
             });
         }
         catch (Exception ex)
         {
             DispatcherExecute(() =>
             {
-                StatusMessage = $"Error loading channel approvals: {ex.Message}";
-                AddLog($"Error loading channel approvals: {ex.Message}", LogType.Error);
+                StatusMessage = Loc.GetWithDetail("Approve_LoadFailed", ex.Message);
+                AddLog(Loc.GetWithDetail("Approve_LoadFailed", ex.Message), LogType.Error);
             });
         }
         finally
@@ -733,7 +819,7 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
         {
             DispatcherExecute(() =>
             {
-                AddLog($"Error loading presets: {ex.Message}", LogType.Error);
+                AddLog(Loc.GetWithDetail("Approve_PresetsFailed", ex.Message), LogType.Error);
             });
         }
         finally
@@ -762,7 +848,7 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
 
                 SelectedPreset = preset;
 
-                AddLog($"Applied preset: {preset.Name}", LogType.Success);
+                AddLog(Loc.GetWithDetail("Approve_PresetApplied", preset.Name), LogType.Success);
             });
 
             await Task.CompletedTask;
@@ -771,7 +857,7 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
         {
             DispatcherExecute(() =>
             {
-                AddLog($"Error loading preset: {ex.Message}", LogType.Error);
+                AddLog(Loc.GetWithDetail("Approve_PresetsFailed", ex.Message), LogType.Error);
             });
         }
     }
@@ -791,7 +877,7 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
     {
         if (string.IsNullOrWhiteSpace(presetName))
         {
-            DispatcherExecute(() => AddLog("Preset name is required", LogType.Warning));
+            DispatcherExecute(() => AddLog(Loc.Get("Approve_PresetNameNeeded"), LogType.Warning));
             return;
         }
 
@@ -817,7 +903,7 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
 
             DispatcherExecute(() =>
             {
-                AddLog($"Saved preset: {presetName}", LogType.Success);
+                AddLog(Loc.GetWithDetail("Approve_PresetSaved", presetName), LogType.Success);
                 NewPresetName = string.Empty;
                 NewPresetDescription = string.Empty;
                 SetAsDefault = false;
@@ -827,7 +913,7 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
         {
             DispatcherExecute(() =>
             {
-                AddLog($"Error saving preset: {ex.Message}", LogType.Error);
+                AddLog(Loc.GetWithDetail("Approve_PresetSaveFailed", ex.Message), LogType.Error);
             });
         }
     }
@@ -848,14 +934,14 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
                 {
                     SelectedPreset = null;
                 }
-                AddLog($"Deleted preset: {preset.Name}", LogType.Success);
+                AddLog(Loc.GetWithDetail("Approve_PresetDeleted", preset.Name), LogType.Success);
             });
         }
         catch (Exception ex)
         {
             DispatcherExecute(() =>
             {
-                AddLog($"Error deleting preset: {ex.Message}", LogType.Error);
+                AddLog(Loc.GetWithDetail("Approve_PresetSaveFailed", ex.Message), LogType.Error);
             });
         }
     }
@@ -875,14 +961,14 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
 
             DispatcherExecute(() =>
             {
-                AddLog($"Set default preset: {preset.Name}", LogType.Success);
+                AddLog(Loc.GetWithDetail("Approve_PresetDefault", preset.Name), LogType.Success);
             });
         }
         catch (Exception ex)
         {
             DispatcherExecute(() =>
             {
-                AddLog($"Error setting default preset: {ex.Message}", LogType.Error);
+                AddLog(Loc.GetWithDetail("Approve_PresetSaveFailed", ex.Message), LogType.Error);
             });
         }
     }
@@ -899,14 +985,14 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
 
             DispatcherExecute(() =>
             {
-                AddLog("Cleared default preset", LogType.Success);
+                AddLog(Loc.Get("Approve_PresetDefaultCleared"), LogType.Success);
             });
         }
         catch (Exception ex)
         {
             DispatcherExecute(() =>
             {
-                AddLog($"Error clearing default preset: {ex.Message}", LogType.Error);
+                AddLog(Loc.GetWithDetail("Approve_PresetSaveFailed", ex.Message), LogType.Error);
             });
         }
     }
@@ -925,7 +1011,7 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
         {
             DispatcherExecute(() =>
             {
-                AddLog($"Error applying default preset: {ex.Message}", LogType.Error);
+                AddLog(Loc.GetWithDetail("Approve_PresetsFailed", ex.Message), LogType.Error);
             });
         }
     }
@@ -947,7 +1033,7 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
             }
 
             // Apply channel filter
-            if (!string.IsNullOrWhiteSpace(ChannelFilter) && ChannelFilter != "All Channels")
+            if (!string.IsNullOrWhiteSpace(ChannelFilter) && ChannelFilter != MainViewModel.AllChannels)
             {
                 filtered = filtered.Where(a => a.ChannelName.Equals(ChannelFilter, StringComparison.OrdinalIgnoreCase));
             }
@@ -1013,12 +1099,12 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
                 FilteredApprovals.Add(approval);
             }
 
-            StatusMessage = $"Showing {FilteredApprovals.Count} of {PendingApprovals.Count} approvals";
+            StatusMessage = Loc.Format("Approve_Showing", FilteredApprovals.Count, PendingApprovals.Count);
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"Error applying filters: {ex.Message}");
-            AddLog($"Error applying filters: {ex.Message}", LogType.Error);
+            System.Diagnostics.Debug.WriteLine(Loc.GetWithDetail("Approve_FilterFailed", ex.Message));
+            AddLog(Loc.GetWithDetail("Approve_FilterFailed", ex.Message), LogType.Error);
         }
     }
 
@@ -1083,7 +1169,7 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
             {
                 DispatcherExecute(() =>
                 {
-                    AddLog($"Video file not found: {filePath}", LogType.Warning);
+                    AddLog(Loc.GetWithDetail("Approve_VideoMissing", filePath), LogType.Warning);
                     CurrentThumbnailPath = null;
                     CurrentVideoMetadata = null;
                 });
@@ -1106,11 +1192,11 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
 
                 if (thumbnailPath != null)
                 {
-                    AddLog($"Generated thumbnail for {CurrentApproval.FileName}", LogType.Success);
+                    AddLog(Loc.Get("Approve_ThumbMade"), LogType.Success);
                 }
                 else
                 {
-                    AddLog($"Failed to generate thumbnail for {CurrentApproval.FileName}", LogType.Warning);
+                    AddLog(Loc.Get("Approve_ThumbFailed"), LogType.Warning);
                 }
             });
         }
@@ -1118,7 +1204,7 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
         {
             DispatcherExecute(() =>
             {
-                AddLog($"Error generating thumbnail: {ex.Message}", LogType.Error);
+                AddLog(Loc.GetWithDetail("Approve_ThumbFailed", ex.Message), LogType.Error);
                 CurrentThumbnailPath = null;
                 CurrentVideoMetadata = null;
             });
@@ -1141,7 +1227,7 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
         {
             DispatcherExecute(() =>
             {
-                AddLog("Refreshing thumbnail...", LogType.Information);
+                AddLog(Loc.Get("Approve_ThumbMaking"), LogType.Information);
             });
 
             await GenerateThumbnailForCurrentApprovalAsync();
@@ -1150,7 +1236,7 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
         {
             DispatcherExecute(() =>
             {
-                AddLog($"Error refreshing thumbnail: {ex.Message}", LogType.Error);
+                AddLog(Loc.GetWithDetail("Approve_ThumbFailed", ex.Message), LogType.Error);
             });
         }
     }
@@ -1171,7 +1257,7 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
         };
 
         // Apply current filters to bulk request
-        if (!string.IsNullOrWhiteSpace(ChannelFilter) && ChannelFilter != "All Channels")
+        if (!string.IsNullOrWhiteSpace(ChannelFilter) && ChannelFilter != MainViewModel.AllChannels)
         {
             request.ChannelName = ChannelFilter;
         }
@@ -1215,7 +1301,7 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
             .ToList();
 
         AvailableChannels.Clear();
-        AvailableChannels.Add("All Channels");
+        AvailableChannels.Add(MainViewModel.AllChannels);
         foreach (var channel in channels)
         {
             AvailableChannels.Add(channel);
@@ -1319,15 +1405,22 @@ public class ApprovalLogMessage
     public DateTime Timestamp { get; set; }
     public LogType Type { get; set; }
 
-    public string DisplayText => $"[{Timestamp:HH:mm:ss}] {Message}";
+    public string TimeText => Loc.Time(Timestamp);
 
-    public string TypeIcon => Type switch
+    public string Glyph => Type switch
     {
-        LogType.Success => "✓",
-        LogType.Warning => "⚠",
-        LogType.Error => "✗",
-        LogType.Information => "ℹ",
-        _ => "·"
+        LogType.Success => "\uE73E",
+        LogType.Warning => "\uE7BA",
+        LogType.Error => "\uE783",
+        _ => "\uE946",
+    };
+
+    public string GlyphColor => Type switch
+    {
+        LogType.Success => "#FF2FA866",
+        LogType.Warning => "#FFE0962A",
+        LogType.Error => "#FFE0605A",
+        _ => "#FF7F97A3",
     };
 }
 

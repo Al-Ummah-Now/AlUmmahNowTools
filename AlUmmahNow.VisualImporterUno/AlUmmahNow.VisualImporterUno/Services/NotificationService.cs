@@ -1,3 +1,4 @@
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using System;
 using System.Collections.Concurrent;
@@ -241,11 +242,11 @@ public class NotificationService : INotificationService, IDisposable
 
     public async Task ShowFileDetectedAsync(string fileName, string channelName, long fileSize)
     {
-        var sizeText = FormatFileSize(fileSize);
         await EnqueueNotificationAsync(new NotificationItem
         {
-            Title = "New Video Detected",
-            Message = $"{fileName} in {channelName} ({sizeText})",
+            Title = Shell.Loc.Get("Notify_FileDetected"),
+            // Names on lines of their own: Arabic and Latin on one line come out in the wrong order on Uno
+            Message = fileName + "\n" + channelName + "\n" + Shell.Loc.Bytes(fileSize),
             Type = NotificationType.Info,
             Scenario = "fileDetected",
             GroupKey = $"file_{channelName}"
@@ -254,9 +255,10 @@ public class NotificationService : INotificationService, IDisposable
 
     public async Task ShowApprovalProcessedAsync(string fileName, bool approved, int count = 1)
     {
-        var action = approved ? "Approved" : "Rejected";
-        var title = count > 1 ? $"{action} {count} Files" : $"{action} File";
-        var message = count > 1 ? $"{count} files have been {action.ToLower()}" : $"{fileName} has been {action.ToLower()}";
+        var title = count > 1
+            ? Shell.Loc.Format(approved ? "Notify_ApprovedMany" : "Notify_RejectedMany", count)
+            : Shell.Loc.Get(approved ? "Notify_ApprovedOne" : "Notify_RejectedOne");
+        var message = count > 1 ? string.Empty : fileName;
 
         await EnqueueNotificationAsync(new NotificationItem
         {
@@ -429,7 +431,8 @@ public class NotificationService : INotificationService, IDisposable
                     {
                         Title = GetIconForNotificationType(notification.Type) + " " + notification.Title,
                         Content = notification.Message,
-                        CloseButtonText = "OK",
+                        CloseButtonText = Shell.Loc.Get("Notify_Ok"),
+                        FlowDirection = Shell.Loc.IsArabic ? FlowDirection.RightToLeft : FlowDirection.LeftToRight,
                         XamlRoot = App.Current.MainWindow?.Content?.XamlRoot
                     };
 

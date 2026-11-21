@@ -40,6 +40,10 @@ public class FileScanSignalRClient : IAsyncDisposable
     // General Error Event
     public event EventHandler<string>? ErrorOccurred;
 
+    /// <summary>Lets a stand-in client report its connection like the real one</summary>
+    protected void RaiseServiceStatus(ServiceStatus status) =>
+        ServiceStatusChanged?.Invoke(this, new ServiceStatusEventArgs { Status = status, Message = status.ToString() });
+
     public FileScanSignalRClient(string serviceUrl)
     {
         _hubUrl = $"{serviceUrl.TrimEnd('/')}/scanHub";
@@ -271,7 +275,7 @@ public class FileScanSignalRClient : IAsyncDisposable
     /// <summary>
     /// Connect to the SignalR hub
     /// </summary>
-    public async Task<bool> ConnectAsync()
+    public virtual async Task<bool> ConnectAsync()
     {
         try
         {
@@ -310,7 +314,7 @@ public class FileScanSignalRClient : IAsyncDisposable
     /// <summary>
     /// Check if connected to the service
     /// </summary>
-    public bool IsConnected => _isConnected && _connection.State == HubConnectionState.Connected;
+    public virtual bool IsConnected => _isConnected && _connection.State == HubConnectionState.Connected;
 
     /// <summary>
     /// Get current service status
@@ -469,7 +473,7 @@ public class FileScanSignalRClient : IAsyncDisposable
     /// <summary>
     /// Get all active watches
     /// </summary>
-    public async Task<List<WatchStatusDto>> GetActiveWatchesAsync()
+    public virtual async Task<List<WatchStatusDto>> GetActiveWatchesAsync()
     {
         try
         {
@@ -605,7 +609,7 @@ public class FileScanSignalRClient : IAsyncDisposable
     /// <summary>
     /// Get all pending approvals
     /// </summary>
-    public async Task<List<PendingApprovalDto>> GetPendingApprovalsAsync()
+    public virtual async Task<List<PendingApprovalDto>> GetPendingApprovalsAsync()
     {
         try
         {
@@ -647,7 +651,7 @@ public class FileScanSignalRClient : IAsyncDisposable
     /// <summary>
     /// Process an approval decision (approve/reject files)
     /// </summary>
-    public async Task<bool> ProcessApprovalDecisionAsync(ApprovalDecisionRequest request)
+    public virtual async Task<bool> ProcessApprovalDecisionAsync(ApprovalDecisionRequest request)
     {
         try
         {
@@ -670,7 +674,7 @@ public class FileScanSignalRClient : IAsyncDisposable
     /// <summary>
     /// Process bulk approvals based on criteria
     /// </summary>
-    public async Task<int> ProcessBulkApprovalAsync(BulkApprovalRequest request)
+    public virtual async Task<int> ProcessBulkApprovalAsync(BulkApprovalRequest request)
     {
         try
         {
@@ -693,7 +697,7 @@ public class FileScanSignalRClient : IAsyncDisposable
     /// <summary>
     /// Get approval statistics
     /// </summary>
-    public async Task<ApprovalStatistics> GetApprovalStatisticsAsync(Guid? channelWatchId = null)
+    public virtual async Task<ApprovalStatistics> GetApprovalStatisticsAsync(Guid? channelWatchId = null)
     {
         try
         {
