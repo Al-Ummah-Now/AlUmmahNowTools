@@ -1,131 +1,65 @@
-using Microsoft.UI.Xaml.Controls;
+using AlUmmahNow.VisualImporterUno.Shell;
 using AlUmmahNow.VisualImporterUno.ViewModels;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+using System;
+using System.Threading.Tasks;
 using Windows.Storage.Pickers;
 using WinRT.Interop;
-using System;
 
 namespace AlUmmahNow.VisualImporterUno.Views
 {
+    /// <summary>The video programs Tools uses (ffmpeg and ffprobe): whether they work, where they are, how to install them.</summary>
     public sealed partial class FFmpegSettingsPage : Page
     {
         public FFmpegSettingsViewModel ViewModel { get; }
 
         public FFmpegSettingsPage()
         {
-            this.InitializeComponent();
             ViewModel = App.GetService<FFmpegSettingsViewModel>();
+            InitializeComponent();
         }
 
-        private async void AutoDetectButton_Click(object sender, RoutedEventArgs e)
-        {
-            await ViewModel.AutoDetectAsync();
-        }
+        private async void AutoDetectButton_Click(object sender, RoutedEventArgs e) => await ViewModel.AutoDetectAsync();
 
-        private async void VerifyButton_Click(object sender, RoutedEventArgs e)
-        {
-            await ViewModel.VerifyInstallationAsync();
-        }
+        private async void VerifyButton_Click(object sender, RoutedEventArgs e) => await ViewModel.VerifyInstallationAsync();
 
-        private async void SavePathsButton_Click(object sender, RoutedEventArgs e)
-        {
-            var success = await ViewModel.SavePathsAsync();
-            if (success)
-            {
-                ShowInfoMessage("Success", "FFmpeg paths saved successfully and verified to be working.");
-            }
-            else
-            {
-                ShowErrorMessage("Save Failed", "Failed to save FFmpeg paths. Please ensure the paths are correct and the executables are working.");
-            }
-        }
+        private async void SavePathsButton_Click(object sender, RoutedEventArgs e) =>
+            ShowStatus(await ViewModel.SavePathsAsync() ? Loc.Get("Video_Saved") : ViewModel.StatusMessage);
 
         private async void BrowseFFmpegButton_Click(object sender, RoutedEventArgs e)
         {
-            try
-            {
-                var openPicker = new FileOpenPicker();
-                openPicker.ViewMode = PickerViewMode.List;
-                openPicker.SuggestedStartLocation = PickerLocationId.ComputerFolder;
-                openPicker.FileTypeFilter.Add(".exe");
-
-                // Get the current window handle for the picker
-                var window = App.Current.MainWindow;
-                if (window == null)
-                {
-                    return;
-                }
-
-                var hWnd = WindowNative.GetWindowHandle(window);
-                InitializeWithWindow.Initialize(openPicker, hWnd);
-
-                var file = await openPicker.PickSingleFileAsync();
-                if (file != null)
-                {
-                    ViewModel.FFmpegPath = file.Path;
-                }
-            }
-            catch (Exception ex)
-            {
-                ShowErrorMessage("Error", $"Failed to browse for FFmpeg executable: {ex.Message}");
-            }
+            var path = await PickProgramAsync();
+            if (path != null) ViewModel.FFmpegPath = path;
         }
 
         private async void BrowseFFprobeButton_Click(object sender, RoutedEventArgs e)
         {
+            var path = await PickProgramAsync();
+            if (path != null) ViewModel.FFprobePath = path;
+        }
+
+        private async Task<string?> PickProgramAsync()
+        {
             try
             {
-                var openPicker = new FileOpenPicker();
-                openPicker.ViewMode = PickerViewMode.List;
-                openPicker.SuggestedStartLocation = PickerLocationId.ComputerFolder;
-                openPicker.FileTypeFilter.Add(".exe");
-
-                // Get the current window handle for the picker
-                var window = App.Current.MainWindow;
-                if (window == null)
-                {
-                    return;
-                }
-
-                var hWnd = WindowNative.GetWindowHandle(window);
-                InitializeWithWindow.Initialize(openPicker, hWnd);
-
-                var file = await openPicker.PickSingleFileAsync();
-                if (file != null)
-                {
-                    ViewModel.FFprobePath = file.Path;
-                }
+                var picker = new FileOpenPicker { ViewMode = PickerViewMode.List, SuggestedStartLocation = PickerLocationId.ComputerFolder };
+                picker.FileTypeFilter.Add(OperatingSystem.IsWindows() ? ".exe" : "*");
+                if (App.Current.MainWindow is not { } window) return null;
+                InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(window));
+                return (await picker.PickSingleFileAsync())?.Path;
             }
             catch (Exception ex)
             {
-                ShowErrorMessage("Error", $"Failed to browse for FFprobe executable: {ex.Message}");
+                ShowStatus(Loc.GetWithDetail("Settings_BrowseFailed", ex.Message));
+                return null;
             }
         }
 
-        private async void ShowInfoMessage(string title, string message)
+        private void ShowStatus(string text)
         {
-            var dialog = new ContentDialog()
-            {
-                Title = title,
-                Content = message,
-                CloseButtonText = "OK",
-                XamlRoot = this.XamlRoot
-            };
-
-            await dialog.ShowAsync();
-        }
-
-        private async void ShowErrorMessage(string title, string message)
-        {
-            var dialog = new ContentDialog()
-            {
-                Title = title,
-                Content = message,
-                CloseButtonText = "OK",
-                XamlRoot = this.XamlRoot
-            };
-
-            await dialog.ShowAsync();
+            SaveStatus.Text = text;
+            SaveStatus.Visibility = string.IsNullOrEmpty(text) ? Visibility.Collapsed : Visibility.Visible;
         }
     }
 }

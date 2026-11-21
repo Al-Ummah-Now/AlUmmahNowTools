@@ -1,0 +1,111 @@
+<!-- Shared Tools page styles on the Fawanees palette: cards, titles, buttons and status pills. -->
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- A gold hairline along the card's top that fades into its outline -->
+    <LinearGradientBrush x:Key="ToolsCardEdgeBrush" StartPoint="0.5,0" EndPoint="0.5,1">
+        <GradientStop Color="#99F4AE3A" Offset="0" />
+        <GradientStop Color="#33F5CF92" Offset="0.25" />
+        <GradientStop Color="#268BA3AE" Offset="1" />
+    </LinearGradientBrush>
+
+    <Style x:Key="ToolsCard" TargetType="Border">
+        <Setter Property="Background" Value="{ThemeResource FanousSurfaceBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource ToolsCardEdgeBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="14" />
+        <Setter Property="Padding" Value="20" />
+    </Style>
+
+    <Style x:Key="ToolsInsetCard" TargetType="Border">
+        <Setter Property="Background" Value="{ThemeResource FanousBackgroundBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="Padding" Value="14,12" />
+    </Style>
+
+    <Style x:Key="ToolsPageTitle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="26" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Foreground" Value="{ThemeResource FanousTextPrimaryBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <Style x:Key="ToolsPageSubtitle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="Foreground" Value="{ThemeResource FanousTextSecondaryBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <Style x:Key="ToolsCardTitle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="16" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{ThemeResource FanousTextPrimaryBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <Style x:Key="ToolsBody" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="Foreground" Value="{ThemeResource FanousTextSecondaryBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <Style x:Key="ToolsMuted" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Foreground" Value="{ThemeResource FanousTextMutedBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <Style x:Key="ToolsLabel" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{ThemeResource FanousTextSecondaryBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <Style x:Key="ToolsStatValue" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="30" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Foreground" Value="{ThemeResource FanousTextPrimaryBrush}" />
+    </Style>
+
+    <Style x:Key="ToolsPrimaryButton" TargetType="Button">
+        <Setter Property="Background" Value="{ThemeResource FanousPrimaryBrush}" />
+        <Setter Property="Foreground" Value="{ThemeResource FanousOnPrimaryBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource FanousPrimaryEdgeBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="MinHeight" Value="40" />
+        <Setter Property="Padding" Value="18,0" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
+    <Style x:Key="ToolsSecondaryButton" TargetType="Button">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{ThemeResource FanousTextPrimaryBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource FanousOutlineBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="MinHeight" Value="40" />
+        <Setter Property="Padding" Value="16,0" />
+        <Setter Property="FontSize" Value="14" />
+    </Style>
+
+    <Style x:Key="ToolsLinkButton" TargetType="HyperlinkButton">
+        <Setter Property="Foreground" Value="{ThemeResource FanousLinkBrush}" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
+    <Style x:Key="ToolsPill" TargetType="Border">
+        <Setter Property="CornerRadius" Value="13" />
+        <Setter Property="Padding" Value="10,4" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="HorizontalAlignment" Value="Left" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+</ResourceDictionary>

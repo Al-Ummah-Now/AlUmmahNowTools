@@ -1,3 +1,4 @@
+using AlUmmahNow.VisualImporterUno.Shell;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System;
@@ -134,7 +135,7 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
             if (IsTesting) return;
 
             IsTesting = true;
-            TestResults = "Testing connection...";
+            TestResults = Loc.Get("Settings_Testing");
 
             try
             {
@@ -148,28 +149,28 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
                 
                 if (response.IsSuccessStatusCode)
                 {
-                    TestResults = "? Service connection successful";
+                    TestResults = Loc.Get("Settings_TestOk");
                 }
                 else
                 {
-                    TestResults = $"? Service responded with {response.StatusCode}";
+                    TestResults = Loc.GetWithDetail("Settings_TestRefused", $"HTTP {(int)response.StatusCode}");
                 }
             }
             catch (UriFormatException)
             {
-                TestResults = "? Invalid URL format";
+                TestResults = Loc.Get("Settings_TestBadAddress");
             }
             catch (System.Net.Http.HttpRequestException ex)
             {
-                TestResults = $"? Connection failed: {ex.Message}";
+                TestResults = Loc.GetWithDetail("Settings_TestFailed", ex.Message);
             }
             catch (TaskCanceledException)
             {
-                TestResults = "? Connection timeout";
+                TestResults = Loc.Get("Settings_TestTimeout");
             }
             catch (Exception ex)
             {
-                TestResults = $"? Unexpected error: {ex.Message}";
+                TestResults = Loc.GetWithDetail("Settings_TestFailed", ex.Message);
                 _logger.LogError(ex, "Error testing service connection");
             }
             finally
@@ -375,21 +376,11 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
             {
                 DetectedServicePaths.Clear();
 
-                // Check in current application directory
-                var appDir = AppContext.BaseDirectory;
-                var possiblePaths = new[]
+                foreach (var path in FileScanServiceManager.ScannerCandidates(null))
                 {
-                    Path.Combine(appDir, "AlUmmahNow.FileScanService.exe"),
-                    Path.Combine(Path.GetDirectoryName(appDir) ?? "", "AlUmmahNow.FileScanService", "AlUmmahNow.FileScanService.exe"),
-                    Path.Combine(Path.GetDirectoryName(Path.GetDirectoryName(appDir) ?? "") ?? "", "AlUmmahNow.FileScanService", "bin", "Debug", "net8.0", "AlUmmahNow.FileScanService.exe"),
-                    Path.Combine(Path.GetDirectoryName(Path.GetDirectoryName(appDir) ?? "") ?? "", "AlUmmahNow.FileScanService", "bin", "Release", "net8.0", "AlUmmahNow.FileScanService.exe")
-                };
-
-                foreach (var path in possiblePaths)
-                {
-                    if (File.Exists(path))
+                    if (File.Exists(path) && !DetectedServicePaths.Contains(Path.GetFullPath(path)))
                     {
-                        DetectedServicePaths.Add(path);
+                        DetectedServicePaths.Add(Path.GetFullPath(path));
                     }
                 }
 
@@ -402,7 +393,7 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
                     {
                         try
                         {
-                            var servicePath = Path.Combine(dir, "AlUmmahNow.FileScanService.exe");
+                            var servicePath = Path.Combine(dir, OperatingSystem.IsWindows() ? "AlUmmahNow.FileScanService.exe" : "AlUmmahNow.FileScanService");
                             if (File.Exists(servicePath) && !DetectedServicePaths.Contains(servicePath))
                             {
                                 DetectedServicePaths.Add(servicePath);

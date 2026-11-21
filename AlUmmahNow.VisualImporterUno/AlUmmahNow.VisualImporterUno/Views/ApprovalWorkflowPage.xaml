@@ -4,868 +4,341 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:helpers="using:AlUmmahNow.VisualImporterUno.Helpers"
-    xmlns:local="using:AlUmmahNow.VisualImporterUno.Views"
     xmlns:vm="using:AlUmmahNow.VisualImporterUno.ViewModels"
     xmlns:models="using:AlUmmahNow.Data.Models.FileScanning"
     xmlns:dataModels="using:AlUmmahNow.Data.Models"
-    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    mc:Ignorable="d"
-    Background="#F8F9FA">
+    xmlns:shell="using:AlUmmahNow.VisualImporterUno.Shell"
+    xmlns:local="using:AlUmmahNow.VisualImporterUno.Views"
+    xmlns:converters="using:AlUmmahNow.VisualImporterUno.Converters"
+    Background="Transparent">
 
     <Page.Resources>
-        <!-- Card Styles -->
-        <Style x:Key="StatCardStyle" TargetType="Border">
-            <Setter Property="Background" Value="White"/>
-            <Setter Property="CornerRadius" Value="8"/>
-            <Setter Property="Padding" Value="24"/>
-            <Setter Property="Shadow">
-                <Setter.Value>
-                    <ThemeShadow/>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="FilterCardStyle" TargetType="Border">
-            <Setter Property="Background" Value="White"/>
-            <Setter Property="CornerRadius" Value="8"/>
-            <Setter Property="Padding" Value="20"/>
-            <Setter Property="Margin" Value="0,0,0,16"/>
-            <Setter Property="Shadow">
-                <Setter.Value>
-                    <ThemeShadow/>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- Text Styles -->
-        <Style x:Key="PageTitleStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="32"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Foreground" Value="#111827"/>
-        </Style>
-
-        <Style x:Key="CardTitleStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="Foreground" Value="#6B7280"/>
-            <Setter Property="Margin" Value="0,0,0,8"/>
-        </Style>
-
-        <Style x:Key="StatNumberStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="36"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Foreground" Value="#111827"/>
-        </Style>
-
-        <Style x:Key="SectionTitleStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="18"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Foreground" Value="#111827"/>
-            <Setter Property="Margin" Value="0,0,0,16"/>
-        </Style>
-
-        <!-- Button Styles -->
-        <Style x:Key="PrimaryButtonStyle" TargetType="Button">
-            <Setter Property="Background" Value="#16A34A"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Height" Value="44"/>
-            <Setter Property="CornerRadius" Value="8"/>
-            <Setter Property="FontSize" Value="15"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Padding" Value="20,0"/>
-            <Setter Property="Shadow">
-                <Setter.Value>
-                    <ThemeShadow/>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="DangerButtonStyle" TargetType="Button">
-            <Setter Property="Background" Value="#DC2626"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Height" Value="44"/>
-            <Setter Property="CornerRadius" Value="8"/>
-            <Setter Property="FontSize" Value="15"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Padding" Value="20,0"/>
-            <Setter Property="Shadow">
-                <Setter.Value>
-                    <ThemeShadow/>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="SecondaryButtonStyle" TargetType="Button">
-            <Setter Property="Background" Value="White"/>
-            <Setter Property="Foreground" Value="#374151"/>
-            <Setter Property="Height" Value="44"/>
-            <Setter Property="CornerRadius" Value="8"/>
-            <Setter Property="FontSize" Value="15"/>
-            <Setter Property="BorderBrush" Value="#E5E7EB"/>
-            <Setter Property="BorderThickness" Value="2"/>
-            <Setter Property="Padding" Value="20,0"/>
-        </Style>
-
-        <!-- Input Styles -->
-        <Style x:Key="FilterInputStyle" TargetType="TextBox">
-            <Setter Property="Height" Value="40"/>
-            <Setter Property="CornerRadius" Value="6"/>
-            <Setter Property="BorderBrush" Value="#E5E7EB"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="12,8"/>
-            <Setter Property="FontSize" Value="14"/>
-        </Style>
-
-        <Style x:Key="FilterComboStyle" TargetType="ComboBox">
-            <Setter Property="Height" Value="40"/>
-            <Setter Property="CornerRadius" Value="6"/>
-            <Setter Property="BorderBrush" Value="#E5E7EB"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="12,8"/>
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="HorizontalAlignment" Value="Stretch"/>
-        </Style>
-
-        <!-- Data Template for Approval List Items -->
-        <DataTemplate x:Key="ApprovalItemTemplate" x:DataType="models:PendingApprovalDto">
-            <Border Background="White" Padding="16" Margin="0,0,0,8" CornerRadius="8" BorderBrush="#E5E7EB" BorderThickness="1">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-
-                    <!-- Selection Checkbox -->
-                    <CheckBox Grid.Column="0" Margin="0,0,16,0" VerticalAlignment="Center"/>
-
-                    <!-- File Information -->
-                    <Grid Grid.Column="1">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
-
-                        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="12">
-                            <TextBlock Text="{x:Bind FileName}" FontSize="15" FontWeight="SemiBold" Foreground="#111827"/>
-                            <Border Background="#DBEAFE" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
-                                <TextBlock Text="{x:Bind Extension}" FontSize="11" Foreground="#3B82F6" FontWeight="SemiBold"/>
-                            </Border>
-                            <Border Background="{x:Bind Priority, Converter={StaticResource PriorityColorConverter}}"
-                                    CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
-                                <TextBlock Text="{x:Bind Priority}" FontSize="11" Foreground="White" FontWeight="SemiBold"/>
-                            </Border>
-                        </StackPanel>
-
-                        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="16" Margin="0,8,0,0">
-                            <TextBlock FontSize="13" Foreground="#6B7280">
-                                <Run Text="Channel:"/>
-                                <Run Text="{x:Bind ChannelName}" FontWeight="SemiBold"/>
-                            </TextBlock>
-                            <TextBlock FontSize="13" Foreground="#6B7280">
-                                <Run Text="Size:"/>
-                                <Run Text="{x:Bind FileSize, Converter={StaticResource FileSizeConverter}}" FontWeight="SemiBold"/>
-                            </TextBlock>
-                            <TextBlock FontSize="13" Foreground="#6B7280">
-                                <Run Text="Detected:"/>
-                                <Run Text="{x:Bind DetectedAt, Converter={StaticResource RelativeDateConverter}}" FontWeight="SemiBold"/>
-                            </TextBlock>
-                        </StackPanel>
-                    </Grid>
-
-                    <!-- Actions -->
-                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                        <Button Content="Preview" Background="#F3F4F6" Foreground="#374151"
-                                CornerRadius="6" Height="36" Padding="16,0" FontSize="13"
-                                Command="{Binding DataContext.PreviewFileCommand, ElementName=PageRoot}"
-                                CommandParameter="{x:Bind}"/>
-                        <Button Content="Approve" Background="#DCFCE7" Foreground="#16A34A"
-                                CornerRadius="6" Height="36" Padding="16,0" FontSize="13" FontWeight="SemiBold"/>
-                        <Button Content="Reject" Background="#FEE2E2" Foreground="#DC2626"
-                                CornerRadius="6" Height="36" Padding="16,0" FontSize="13" FontWeight="SemiBold"/>
-                    </StackPanel>
-                </Grid>
-            </Border>
-        </DataTemplate>
-
-        <!-- Activity Log Template -->
-        <DataTemplate x:Key="ActivityLogTemplate" x:DataType="vm:ApprovalLogMessage">
-            <Border Padding="12,8" Margin="0,0,0,4" Background="#F9FAFB" CornerRadius="4">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-
-                    <TextBlock Grid.Column="0" Text="{x:Bind TypeIcon}" FontSize="14" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                    <TextBlock Grid.Column="1" Text="{x:Bind DisplayText}" FontSize="13" Foreground="#6B7280" TextWrapping="Wrap"/>
-                </Grid>
-            </Border>
-        </DataTemplate>
+        <converters:LocFormatConverter x:Key="LocFormat"/>
+        <converters:ColorConverter x:Key="ColorConverter"/>
+        <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibility"/>
+        <local:NullToVisibilityConverter x:Key="NullToVisibility"/>
+        <local:StringToLongConverter x:Key="StringToLong"/>
+        <local:DateTimeToDateConverter x:Key="DateTimeToDate"/>
+        <local:PathToUriConverter x:Key="PathToUri"/>
     </Page.Resources>
 
-    <Grid x:Name="PageRoot">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
+    <ScrollViewer HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Spacing="16" Padding="24,8,24,24" MaxWidth="1200">
+            <shell:ScannerOfflineCard x:Name="OfflineCard" Connected="OfflineCard_Connected" />
 
-        <!-- Header Section -->
-        <Border Grid.Row="0" Background="White" Padding="40,32">
-            <Border.Shadow>
-                <ThemeShadow/>
-            </Border.Shadow>
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
+            <StackPanel Spacing="16" Visibility="{x:Bind OfflineCard.IsConnected, Mode=OneWay}">
 
-                <!-- Title and Bulk Actions -->
-                <Grid Grid.Row="0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-
-                    <StackPanel Grid.Column="0">
-                        <TextBlock Text="Approval Workflow" Style="{StaticResource PageTitleStyle}"/>
-                        <TextBlock Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
-                                   FontSize="16" Foreground="#6B7280" Margin="0,8,0,0"/>
+            <!-- Numbers -->
+            <shell:TileGrid MinItemWidth="200" MaxColumns="4" Spacing="16">
+                <Border Style="{StaticResource ToolsCard}">
+                    <StackPanel Spacing="4">
+                        <TextBlock x:Uid="Approve_StatPending" Text="Waiting" Style="{StaticResource ToolsLabel}" />
+                        <TextBlock Text="{x:Bind ViewModel.PendingText, Mode=OneWay}" Style="{StaticResource ToolsStatValue}" />
                     </StackPanel>
-
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-                        <Button Style="{StaticResource SecondaryButtonStyle}"
-                                Command="{x:Bind ViewModel.RefreshApprovalsCommand}">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <SymbolIcon Symbol="Refresh" Foreground="#374151"/>
-                                <TextBlock Text="Refresh" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Button>
-
-                        <Button Content="Select All"
-                                Style="{StaticResource SecondaryButtonStyle}"
-                                Command="{x:Bind ViewModel.SelectAllCommand}"/>
-
-                        <Button Content="Clear Selection"
-                                Style="{StaticResource SecondaryButtonStyle}"
-                                Command="{x:Bind ViewModel.DeselectAllCommand}"
-                                IsEnabled="{x:Bind ViewModel.HasSelection, Mode=OneWay}"/>
-
-                        <Button Style="{StaticResource PrimaryButtonStyle}"
-                                Command="{x:Bind ViewModel.ApproveSelectedCommand}"
-                                IsEnabled="{x:Bind ViewModel.HasSelection, Mode=OneWay}">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <SymbolIcon Symbol="Accept" Foreground="White"/>
-                                <TextBlock Text="{x:Bind ViewModel.SelectedCount, Mode=OneWay, Converter={StaticResource ApproveButtonTextConverter}}"
-                                           VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Button>
-
-                        <Button Style="{StaticResource DangerButtonStyle}"
-                                Command="{x:Bind ViewModel.RejectSelectedCommand}"
-                                IsEnabled="{x:Bind ViewModel.HasSelection, Mode=OneWay}">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <SymbolIcon Symbol="Cancel" Foreground="White"/>
-                                <TextBlock Text="{x:Bind ViewModel.SelectedCount, Mode=OneWay, Converter={StaticResource RejectButtonTextConverter}}"
-                                           VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Button>
+                </Border>
+                <Border Style="{StaticResource ToolsCard}">
+                    <StackPanel Spacing="4">
+                        <TextBlock x:Uid="Approve_StatApproved" Text="Approved" Style="{StaticResource ToolsLabel}" />
+                        <TextBlock Text="{x:Bind ViewModel.ApprovedText, Mode=OneWay}" Style="{StaticResource ToolsStatValue}" />
                     </StackPanel>
-                </Grid>
+                </Border>
+                <Border Style="{StaticResource ToolsCard}">
+                    <StackPanel Spacing="4">
+                        <TextBlock x:Uid="Approve_StatRejected" Text="Rejected" Style="{StaticResource ToolsLabel}" />
+                        <TextBlock Text="{x:Bind ViewModel.RejectedText, Mode=OneWay}" Style="{StaticResource ToolsStatValue}" />
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource ToolsCard}">
+                    <StackPanel Spacing="4">
+                        <TextBlock x:Uid="Approve_StatSize" Text="Size waiting" Style="{StaticResource ToolsLabel}" />
+                        <TextBlock Text="{x:Bind ViewModel.PendingSizeText, Mode=OneWay}" Style="{StaticResource ToolsStatValue}" />
+                    </StackPanel>
+                </Border>
+            </shell:TileGrid>
 
-                <!-- Statistics Dashboard -->
-                <Grid Grid.Row="1" Margin="0,24,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-
-                    <!-- Pending Card -->
-                    <Border Grid.Column="0" Background="#FEF3C7" CornerRadius="8" Padding="20" Margin="0,0,12,0">
-                        <StackPanel>
-                            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
-                                <Ellipse Width="12" Height="12" Fill="#F59E0B"/>
-                                <TextBlock Text="Pending" FontSize="13" Foreground="#92400E" FontWeight="SemiBold"/>
+            <!-- Filters, folded away until wanted -->
+            <Border Style="{StaticResource ToolsCard}" Padding="0">
+                <Expander HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Background="Transparent" BorderThickness="0">
+                    <Expander.Header>
+                        <TextBlock x:Uid="Approve_FiltersTitle" Text="Filters and presets" Style="{StaticResource ToolsCardTitle}" />
+                    </Expander.Header>
+                    <StackPanel Spacing="16">
+                        <shell:TileGrid MinItemWidth="220" MaxColumns="3" Spacing="16">
+                            <StackPanel Spacing="6">
+                                <TextBlock x:Name="ChannelFilterLabel" x:Uid="Approve_ChannelLabel" Text="Channel" Style="{StaticResource ToolsLabel}" />
+                                <AutoSuggestBox x:Uid="Approve_ChannelBox" PlaceholderText="All channels" QueryIcon="Find"
+                                                helpers:AutoSuggest.Candidates="{x:Bind ViewModel.AvailableChannels, Mode=OneWay}"
+                                                helpers:AutoSuggest.Value="{x:Bind ViewModel.ChannelFilter, Mode=TwoWay}"
+                                                AutomationProperties.LabeledBy="{Binding ElementName=ChannelFilterLabel}" />
                             </StackPanel>
-                            <TextBlock Text="{x:Bind ViewModel.Statistics.TotalPending, Mode=OneWay}"
-                                       FontSize="32" FontWeight="Bold" Foreground="#92400E"/>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- Approved Card -->
-                    <Border Grid.Column="1" Background="#DCFCE7" CornerRadius="8" Padding="20" Margin="6,0">
-                        <StackPanel>
-                            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
-                                <Ellipse Width="12" Height="12" Fill="#16A34A"/>
-                                <TextBlock Text="Approved" FontSize="13" Foreground="#14532D" FontWeight="SemiBold"/>
+                            <StackPanel Spacing="6">
+                                <TextBlock x:Uid="Approve_PriorityLabel" Text="Priority" Style="{StaticResource ToolsLabel}" />
+                                <ComboBox x:Uid="Approve_PriorityBox" PlaceholderText="Any priority" SelectedItem="{x:Bind ViewModel.PriorityFilter, Mode=TwoWay}" HorizontalAlignment="Stretch">
+                                    <x:Int32>1</x:Int32>
+                                    <x:Int32>2</x:Int32>
+                                    <x:Int32>3</x:Int32>
+                                    <x:Int32>4</x:Int32>
+                                    <x:Int32>5</x:Int32>
+                                </ComboBox>
                             </StackPanel>
-                            <TextBlock Text="{x:Bind ViewModel.Statistics.TotalApproved, Mode=OneWay}"
-                                       FontSize="32" FontWeight="Bold" Foreground="#14532D"/>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- Rejected Card -->
-                    <Border Grid.Column="2" Background="#FEE2E2" CornerRadius="8" Padding="20" Margin="6,0">
-                        <StackPanel>
-                            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
-                                <Ellipse Width="12" Height="12" Fill="#DC2626"/>
-                                <TextBlock Text="Rejected" FontSize="13" Foreground="#7F1D1D" FontWeight="SemiBold"/>
+                            <StackPanel Spacing="6">
+                                <TextBlock x:Uid="Approve_TypeLabel" Text="File types" Style="{StaticResource ToolsLabel}" />
+                                <TextBox x:Uid="Approve_TypeBox" PlaceholderText="mp4, mkv" FlowDirection="LeftToRight" Text="{x:Bind ViewModel.ExtensionFilter, Mode=TwoWay}" />
                             </StackPanel>
-                            <TextBlock Text="{x:Bind ViewModel.Statistics.TotalRejected, Mode=OneWay}"
-                                       FontSize="32" FontWeight="Bold" Foreground="#7F1D1D"/>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- Total Size Card -->
-                    <Border Grid.Column="3" Background="#DBEAFE" CornerRadius="8" Padding="20" Margin="12,0,0,0">
-                        <StackPanel>
-                            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
-                                <Ellipse Width="12" Height="12" Fill="#3B82F6"/>
-                                <TextBlock Text="Total Size" FontSize="13" Foreground="#1E3A8A" FontWeight="SemiBold"/>
+                            <StackPanel Spacing="6">
+                                <TextBlock x:Uid="Approve_SizeLabel" Text="Size in bytes" Style="{StaticResource ToolsLabel}" />
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Uid="Approve_MinBox" PlaceholderText="From" Text="{x:Bind ViewModel.MinSizeFilter, Mode=TwoWay, Converter={StaticResource StringToLong}}" />
+                                    <TextBox Grid.Column="1" x:Uid="Approve_MaxBox" PlaceholderText="To" Text="{x:Bind ViewModel.MaxSizeFilter, Mode=TwoWay, Converter={StaticResource StringToLong}}" />
+                                </Grid>
                             </StackPanel>
-                            <TextBlock Text="{x:Bind ViewModel.Statistics.TotalSizePending, Mode=OneWay, Converter={StaticResource FileSizeConverter}}"
-                                       FontSize="32" FontWeight="Bold" Foreground="#1E3A8A"/>
-                        </StackPanel>
-                    </Border>
-                </Grid>
-            </Grid>
-        </Border>
-
-        <!-- Main Content -->
-        <ScrollViewer Grid.Row="1">
-            <Grid Padding="40,24,40,40">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="300"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="320"/>
-                </Grid.ColumnDefinitions>
-
-                <!-- Left Panel - Filters -->
-                <StackPanel Grid.Column="0" Margin="0,0,16,0">
-                    <!-- Filters Header -->
-                    <Border Style="{StaticResource FilterCardStyle}">
-                        <Grid>
-                            <TextBlock Text="Filters" Style="{StaticResource SectionTitleStyle}" Margin="0"/>
-                            <Button Content="Clear"
-                                    Background="Transparent"
-                                    Foreground="#EF4444"
-                                    BorderThickness="0"
-                                    FontSize="13"
-                                    FontWeight="SemiBold"
-                                    HorizontalAlignment="Right"
-                                    Command="{x:Bind ViewModel.ClearFiltersCommand}"/>
-                        </Grid>
-                    </Border>
-
-                    <!-- Filter Presets Section -->
-                    <Border Style="{StaticResource FilterCardStyle}">
-                        <StackPanel Spacing="12">
-                            <TextBlock Text="Filter Presets" FontSize="13" FontWeight="SemiBold" Foreground="#374151"/>
-
-                            <!-- Preset Selector -->
-                            <ComboBox ItemsSource="{x:Bind ViewModel.SavedPresets, Mode=OneWay}"
-                                     SelectedItem="{x:Bind ViewModel.SelectedPreset, Mode=TwoWay}"
-                                     Style="{StaticResource FilterComboStyle}"
-                                     PlaceholderText="Select a preset...">
-                                <ComboBox.ItemTemplate>
-                                    <DataTemplate x:DataType="dataModels:FilterPreset">
-                                        <StackPanel Orientation="Horizontal" Spacing="8">
-                                            <FontIcon Glyph="&#xE735;" FontSize="12"
-                                                     Visibility="{x:Bind IsDefault, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"
-                                                     Foreground="#F59E0B"/>
-                                            <TextBlock Text="{x:Bind Name}" FontWeight="SemiBold"/>
-                                            <Border Background="#E5E7EB" CornerRadius="3" Padding="4,2"
-                                                   Visibility="{x:Bind IsBuiltIn, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
-                                                <TextBlock Text="Built-in" FontSize="10" Foreground="#6B7280"/>
-                                            </Border>
-                                        </StackPanel>
-                                    </DataTemplate>
-                                </ComboBox.ItemTemplate>
-                            </ComboBox>
-
-                            <!-- Preset Actions -->
-                            <Grid ColumnSpacing="8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-
-                                <Button Grid.Column="0"
-                                       Content="Load"
-                                       Background="#3B82F6"
-                                       Foreground="White"
-                                       HorizontalAlignment="Stretch"
-                                       CornerRadius="6"
-                                       Height="36"
-                                       FontSize="13"
-                                       Command="{x:Bind ViewModel.LoadPresetCommand}"
-                                       CommandParameter="{x:Bind ViewModel.SelectedPreset, Mode=OneWay}"/>
-
-                                <Button Grid.Column="1"
-                                       Content="Save Current"
-                                       Background="White"
-                                       Foreground="#374151"
-                                       BorderBrush="#E5E7EB"
-                                       BorderThickness="1"
-                                       HorizontalAlignment="Stretch"
-                                       CornerRadius="6"
-                                       Height="36"
-                                       FontSize="13"
-                                       Click="OnSavePresetClick"/>
-                            </Grid>
-
-                            <!-- Preset Management -->
-                            <StackPanel Spacing="6"
-                                       Visibility="{x:Bind ViewModel.SelectedPreset, Mode=OneWay, Converter={StaticResource NullToVisibilityConverter}}">
-                                <TextBlock Text="Selected Preset Actions" FontSize="11" Foreground="#6B7280" Margin="0,4,0,0"/>
-
-                                <Button Background="Transparent"
-                                       Foreground="#F59E0B"
-                                       BorderBrush="#F59E0B"
-                                       BorderThickness="1"
-                                       HorizontalAlignment="Stretch"
-                                       CornerRadius="6"
-                                       Height="32"
-                                       FontSize="12"
-                                       Command="{x:Bind ViewModel.SetDefaultPresetCommand}"
-                                       CommandParameter="{x:Bind ViewModel.SelectedPreset, Mode=OneWay}">
-                                    <StackPanel Orientation="Horizontal" Spacing="6">
-                                        <FontIcon Glyph="&#xE735;" FontSize="12"/>
-                                        <TextBlock Text="Set as Default" VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                </Button>
-
-                                <Button Background="Transparent"
-                                       Foreground="#EF4444"
-                                       BorderBrush="#EF4444"
-                                       BorderThickness="1"
-                                       HorizontalAlignment="Stretch"
-                                       CornerRadius="6"
-                                       Height="32"
-                                       FontSize="12"
-                                       Command="{x:Bind ViewModel.DeletePresetCommand}"
-                                       CommandParameter="{x:Bind ViewModel.SelectedPreset, Mode=OneWay}">
-                                    <StackPanel Orientation="Horizontal" Spacing="6">
-                                        <FontIcon Glyph="&#xE74D;" FontSize="12"/>
-                                        <TextBlock Text="Delete" VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                </Button>
+                            <StackPanel Spacing="6">
+                                <TextBlock x:Uid="Approve_FromLabel" Text="Arrived from" Style="{StaticResource ToolsLabel}" />
+                                <CalendarDatePicker Date="{x:Bind ViewModel.DateFromFilter, Mode=TwoWay, Converter={StaticResource DateTimeToDate}}" HorizontalAlignment="Stretch" />
                             </StackPanel>
+                            <StackPanel Spacing="6">
+                                <TextBlock x:Uid="Approve_ToLabel" Text="Arrived until" Style="{StaticResource ToolsLabel}" />
+                                <CalendarDatePicker Date="{x:Bind ViewModel.DateToFilter, Mode=TwoWay, Converter={StaticResource DateTimeToDate}}" HorizontalAlignment="Stretch" />
+                            </StackPanel>
+                        </shell:TileGrid>
 
-                            <!-- Preset Description -->
-                            <TextBlock Text="{x:Bind ViewModel.SelectedPreset.Description, Mode=OneWay}"
-                                      FontSize="11"
-                                      Foreground="#6B7280"
-                                      TextWrapping="Wrap"
-                                      Visibility="{x:Bind ViewModel.SelectedPreset, Mode=OneWay, Converter={StaticResource NullToVisibilityConverter}}"/>
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <Button Style="{StaticResource ToolsSecondaryButton}" Command="{x:Bind ViewModel.ClearFiltersCommand}">
+                                <TextBlock x:Uid="Approve_ClearFilters" Text="Clear filters" />
+                            </Button>
                         </StackPanel>
-                    </Border>
 
-                    <!-- Channel Filter -->
-                    <Border Style="{StaticResource FilterCardStyle}">
-                        <StackPanel Spacing="8">
-                            <TextBlock x:Name="ChannelFilterLabel" Text="Channel" FontSize="13" FontWeight="SemiBold" Foreground="#374151"/>
-                            <!-- Type to find a channel: suggestions as you type, Enter or a click applies it -->
-                            <AutoSuggestBox helpers:AutoSuggest.Candidates="{x:Bind ViewModel.AvailableChannels, Mode=OneWay}"
-                                            helpers:AutoSuggest.Value="{x:Bind ViewModel.ChannelFilter, Mode=TwoWay}"
-                                            AutomationProperties.LabeledBy="{Binding ElementName=ChannelFilterLabel}"
-                                            PlaceholderText="All Channels"
-                                            QueryIcon="Find"
-                                            MinHeight="40"/>
+                        <Border Height="1" Background="{ThemeResource FanousDividerBrush}" />
+
+                        <TextBlock x:Uid="Approve_PresetsTitle" Text="Presets" Style="{StaticResource ToolsLabel}" />
+                        <ComboBox x:Uid="Approve_PresetBox" PlaceholderText="Choose a preset" ItemsSource="{x:Bind ViewModel.SavedPresets, Mode=OneWay}"
+                                  SelectedItem="{x:Bind ViewModel.SelectedPreset, Mode=TwoWay}" DisplayMemberPath="Name" HorizontalAlignment="Stretch" MaxWidth="460" />
+                        <TextBlock Text="{x:Bind ViewModel.SelectedPreset.Description, Mode=OneWay}" Style="{StaticResource ToolsMuted}"
+                                   Visibility="{x:Bind ViewModel.SelectedPreset, Mode=OneWay, Converter={StaticResource NullToVisibility}}" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button Style="{StaticResource ToolsSecondaryButton}" Command="{x:Bind ViewModel.LoadPresetCommand}" CommandParameter="{x:Bind ViewModel.SelectedPreset, Mode=OneWay}">
+                                <TextBlock x:Uid="Approve_PresetUse" Text="Use" />
+                            </Button>
+                            <Button Style="{StaticResource ToolsSecondaryButton}" Click="OnSavePresetClick">
+                                <TextBlock x:Uid="Approve_PresetSave" Text="Save these filters" />
+                            </Button>
+                            <Button Style="{StaticResource ToolsSecondaryButton}" Command="{x:Bind ViewModel.SetDefaultPresetCommand}" CommandParameter="{x:Bind ViewModel.SelectedPreset, Mode=OneWay}"
+                                    Visibility="{x:Bind ViewModel.SelectedPreset, Mode=OneWay, Converter={StaticResource NullToVisibility}}">
+                                <TextBlock x:Uid="Approve_PresetMakeDefault" Text="Make default" />
+                            </Button>
+                            <Button Style="{StaticResource ToolsSecondaryButton}" Command="{x:Bind ViewModel.DeletePresetCommand}" CommandParameter="{x:Bind ViewModel.SelectedPreset, Mode=OneWay}"
+                                    Visibility="{x:Bind ViewModel.SelectedPreset, Mode=OneWay, Converter={StaticResource NullToVisibility}}">
+                                <TextBlock x:Uid="Approve_PresetDelete" Text="Delete" />
+                            </Button>
                         </StackPanel>
-                    </Border>
 
-                    <!-- Priority Filter -->
-                    <Border Style="{StaticResource FilterCardStyle}">
-                        <StackPanel Spacing="8">
-                            <TextBlock Text="Priority" FontSize="13" FontWeight="SemiBold" Foreground="#374151"/>
-                            <ComboBox SelectedItem="{x:Bind ViewModel.PriorityFilter, Mode=TwoWay}"
-                                     Style="{StaticResource FilterComboStyle}"
-                                     PlaceholderText="All Priorities">
-                                <x:Int32>1</x:Int32>
-                                <x:Int32>2</x:Int32>
-                                <x:Int32>3</x:Int32>
-                                <x:Int32>4</x:Int32>
-                                <x:Int32>5</x:Int32>
-                            </ComboBox>
+                        <Border Height="1" Background="{ThemeResource FanousDividerBrush}" />
+
+                        <TextBlock x:Uid="Approve_AllTitle" Text="Everything that matches the filters" Style="{StaticResource ToolsLabel}" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button Style="{StaticResource ToolsSecondaryButton}" Command="{x:Bind ViewModel.BulkApproveCommand}">
+                                <TextBlock x:Uid="Approve_AllApprove" Text="Approve all" />
+                            </Button>
+                            <Button Style="{StaticResource ToolsSecondaryButton}" Command="{x:Bind ViewModel.BulkRejectCommand}">
+                                <TextBlock x:Uid="Approve_AllReject" Text="Reject all" />
+                            </Button>
                         </StackPanel>
-                    </Border>
+                    </StackPanel>
+                </Expander>
+            </Border>
 
-                    <!-- File Size Filter -->
-                    <Border Style="{StaticResource FilterCardStyle}">
-                        <StackPanel Spacing="8">
-                            <TextBlock Text="File Size" FontSize="13" FontWeight="SemiBold" Foreground="#374151"/>
-                            <TextBox Text="{x:Bind ViewModel.MinSizeFilter, Mode=TwoWay, Converter={StaticResource StringToLongConverter}}"
-                                    Style="{StaticResource FilterInputStyle}"
-                                    PlaceholderText="Min size (bytes)"/>
-                            <TextBox Text="{x:Bind ViewModel.MaxSizeFilter, Mode=TwoWay, Converter={StaticResource StringToLongConverter}}"
-                                    Style="{StaticResource FilterInputStyle}"
-                                    PlaceholderText="Max size (bytes)"/>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- Date Range Filter -->
-                    <Border Style="{StaticResource FilterCardStyle}">
-                        <StackPanel Spacing="8">
-                            <TextBlock Text="Date Range" FontSize="13" FontWeight="SemiBold" Foreground="#374151"/>
-                            <DatePicker Date="{x:Bind ViewModel.DateFromFilter, Mode=TwoWay, Converter={StaticResource DateTimeToDateConverter}}"
-                                       Header="From"
-                                       HorizontalAlignment="Stretch"/>
-                            <DatePicker Date="{x:Bind ViewModel.DateToFilter, Mode=TwoWay, Converter={StaticResource DateTimeToDateConverter}}"
-                                       Header="To"
-                                       HorizontalAlignment="Stretch"/>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- Extension Filter -->
-                    <Border Style="{StaticResource FilterCardStyle}">
-                        <StackPanel Spacing="8">
-                            <TextBlock Text="File Extension" FontSize="13" FontWeight="SemiBold" Foreground="#374151"/>
-                            <TextBox Text="{x:Bind ViewModel.ExtensionFilter, Mode=TwoWay}"
-                                    Style="{StaticResource FilterInputStyle}"
-                                    PlaceholderText="e.g., mp4, mkv"/>
-                            <TextBlock Text="Comma-separated list" FontSize="11" Foreground="#9CA3AF"/>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- Bulk Actions -->
-                    <Border Style="{StaticResource FilterCardStyle}">
-                        <StackPanel Spacing="12">
-                            <TextBlock Text="Bulk Actions" Style="{StaticResource SectionTitleStyle}" Margin="0"/>
-                            <TextBlock Text="Apply actions to all files matching current filters"
-                                      FontSize="12" Foreground="#6B7280" TextWrapping="Wrap" Margin="0,0,0,8"/>
-
-                            <Button Content="Bulk Approve All"
-                                    Background="#16A34A"
-                                    Foreground="White"
-                                    HorizontalAlignment="Stretch"
-                                    CornerRadius="6"
-                                    Height="40"
-                                    Command="{x:Bind ViewModel.BulkApproveCommand}"/>
-
-                            <Button Content="Bulk Reject All"
-                                    Background="#DC2626"
-                                    Foreground="White"
-                                    HorizontalAlignment="Stretch"
-                                    CornerRadius="6"
-                                    Height="40"
-                                    Command="{x:Bind ViewModel.BulkRejectCommand}"/>
-                        </StackPanel>
-                    </Border>
-                </StackPanel>
-
-                <!-- Center Panel - Approvals List -->
-                <StackPanel Grid.Column="1" Margin="8,0">
-                    <!-- List Header -->
-                    <Border Style="{StaticResource FilterCardStyle}">
-                        <Grid>
+            <!-- The list and the video it is showing -->
+            <shell:TileGrid MinItemWidth="420" MaxColumns="2" Spacing="16">
+                <Border Style="{StaticResource ToolsCard}">
+                    <StackPanel Spacing="12">
+                        <Grid ColumnSpacing="12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-
-                            <StackPanel Grid.Column="0">
-                                <TextBlock Style="{StaticResource SectionTitleStyle}" Margin="0,0,0,4">
-                                    <Run Text="Pending Approvals"/>
-                                    <Run Text="(" Foreground="#6B7280"/>
-                                    <Run Text="{x:Bind ViewModel.FilteredApprovals.Count, Mode=OneWay}" Foreground="#6B7280"/>
-                                    <Run Text=")" Foreground="#6B7280"/>
-                                </TextBlock>
-                                <TextBlock Text="{x:Bind ViewModel.SelectedCount, Mode=OneWay, Converter={StaticResource SelectedCountTextConverter}}"
-                                          FontSize="13" Foreground="#6B7280"/>
-                            </StackPanel>
-
-                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                                <ComboBox SelectedItem="{x:Bind ViewModel.SortBy, Mode=TwoWay}"
-                                         Width="150"
-                                         Height="36">
-                                    <ComboBoxItem Content="Date Detected"/>
-                                    <ComboBoxItem Content="File Name" Tag="FileName"/>
-                                    <ComboBoxItem Content="File Size" Tag="FileSize"/>
-                                    <ComboBoxItem Content="Priority" Tag="Priority"/>
-                                    <ComboBoxItem Content="Channel" Tag="ChannelName"/>
-                                </ComboBox>
-
-                                <ToggleButton IsChecked="{x:Bind ViewModel.SortDescending, Mode=TwoWay}"
-                                             Width="36" Height="36"
-                                             Background="White"
-                                             BorderBrush="#E5E7EB"
-                                             BorderThickness="1"
-                                             CornerRadius="6">
-                                    <SymbolIcon Symbol="Sort"/>
-                                </ToggleButton>
-                            </StackPanel>
+                            <TextBlock Text="{x:Bind ViewModel.ListTitleText, Mode=OneWay}" Style="{StaticResource ToolsCardTitle}" VerticalAlignment="Center" />
+                            <Button Grid.Column="1" x:Name="RefreshButton" Style="{StaticResource ToolsSecondaryButton}" Command="{x:Bind ViewModel.RefreshApprovalsCommand}">
+                                <FontIcon Glyph="&#xE72C;" FontSize="14" />
+                            </Button>
                         </Grid>
-                    </Border>
+                        <TextBlock Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" Style="{StaticResource ToolsMuted}" />
 
-                    <!-- Loading Indicator -->
-                    <ProgressBar IsIndeterminate="True"
-                                Visibility="{x:Bind ViewModel.IsLoading, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"
-                                Margin="0,0,0,16"/>
+                        <Grid ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <ComboBox x:Name="SortBox" HorizontalAlignment="Stretch" SelectedIndex="{x:Bind ViewModel.SortIndex, Mode=TwoWay}">
+                                <ComboBoxItem x:Uid="Approve_SortDate" Content="Newest first" />
+                                <ComboBoxItem x:Uid="Approve_SortName" Content="By file name" />
+                                <ComboBoxItem x:Uid="Approve_SortSize" Content="By size" />
+                                <ComboBoxItem x:Uid="Approve_SortPriority" Content="By priority" />
+                                <ComboBoxItem x:Uid="Approve_SortChannel" Content="By channel" />
+                            </ComboBox>
+                            <ToggleButton Grid.Column="1" x:Name="SortDirection" IsChecked="{x:Bind ViewModel.SortDescending, Mode=TwoWay}">
+                                <FontIcon Glyph="&#xE8CB;" FontSize="14" />
+                            </ToggleButton>
+                        </Grid>
 
-                    <!-- Approvals List -->
-                    <ListView ItemsSource="{x:Bind ViewModel.FilteredApprovals, Mode=OneWay}"
-                             ItemTemplate="{StaticResource ApprovalItemTemplate}"
-                             SelectionMode="None"
-                             IsItemClickEnabled="False">
-                        <ListView.ItemContainerStyle>
-                            <Style TargetType="ListViewItem">
-                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                                <Setter Property="Padding" Value="0"/>
-                                <Setter Property="Margin" Value="0"/>
-                            </Style>
-                        </ListView.ItemContainerStyle>
-                    </ListView>
-
-                    <!-- Empty State -->
-                    <Border Visibility="{x:Bind ViewModel.FilteredApprovals.Count, Mode=OneWay, Converter={StaticResource ZeroToVisibilityConverter}}"
-                            Background="White"
-                            Padding="40"
-                            CornerRadius="8"
-                            BorderBrush="#E5E7EB"
-                            BorderThickness="1">
-                        <StackPanel HorizontalAlignment="Center" Spacing="12">
-                            <Ellipse Width="80" Height="80" Fill="#F3F4F6"/>
-                            <TextBlock Text="No approvals found"
-                                      FontSize="18"
-                                      FontWeight="SemiBold"
-                                      Foreground="#111827"
-                                      HorizontalAlignment="Center"/>
-                            <TextBlock Text="Try adjusting your filters or check back later"
-                                      FontSize="14"
-                                      Foreground="#6B7280"
-                                      HorizontalAlignment="Center"/>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button Style="{StaticResource ToolsSecondaryButton}" Click="SelectAll_Click">
+                                <TextBlock x:Uid="Approve_SelectAll" Text="Select all" />
+                            </Button>
+                            <Button Style="{StaticResource ToolsSecondaryButton}" Click="SelectNone_Click">
+                                <TextBlock x:Uid="Approve_SelectNone" Text="Select none" />
+                            </Button>
                         </StackPanel>
-                    </Border>
-                </StackPanel>
 
-                <!-- Right Panel - Preview and Activity -->
-                <StackPanel Grid.Column="2" Margin="16,0,0,0">
-                    <!-- File Preview -->
-                    <Border Style="{StaticResource FilterCardStyle}"
-                            Visibility="{x:Bind ViewModel.CurrentApproval, Mode=OneWay, Converter={StaticResource NullToVisibilityConverter}}">
-                        <StackPanel Spacing="16">
-                            <TextBlock Text="File Preview" Style="{StaticResource SectionTitleStyle}" Margin="0"/>
+                        <ProgressBar IsIndeterminate="True" Visibility="{x:Bind ViewModel.IsLoading, Mode=OneWay}" />
 
-                            <!-- Video Thumbnail -->
-                            <Grid>
-                                <Border Background="#F3F4F6"
-                                       Height="180"
-                                       CornerRadius="6"
-                                       HorizontalAlignment="Stretch"
-                                       Visibility="{x:Bind ViewModel.CurrentThumbnailPath, Mode=OneWay, Converter={StaticResource NullToVisibilityConverter}, ConverterParameter=Inverse}">
-                                    <Grid>
-                                        <SymbolIcon Symbol="Video"
-                                                   Foreground="#9CA3AF"
-                                                   Visibility="{x:Bind ViewModel.IsGeneratingThumbnail, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Inverse}"
-                                                   RenderTransformOrigin="0.5,0.5">
-                                            <SymbolIcon.RenderTransform>
-                                                <ScaleTransform ScaleX="3" ScaleY="3"/>
-                                            </SymbolIcon.RenderTransform>
-                                        </SymbolIcon>
-                                        <ProgressRing IsActive="{x:Bind ViewModel.IsGeneratingThumbnail, Mode=OneWay}"
-                                                     Width="40"
-                                                     Height="40"
-                                                     Foreground="#3B82F6"/>
-                                    </Grid>
-                                </Border>
+                        <StackPanel Spacing="6" Visibility="{x:Bind ViewModel.HasApprovals, Mode=OneWay, Converter={StaticResource InverseBoolToVisibility}}">
+                            <TextBlock x:Uid="Approve_EmptyTitle" Text="Nothing is waiting" Style="{StaticResource ToolsBody}" Foreground="{ThemeResource FanousTextPrimaryBrush}" />
+                            <TextBlock x:Uid="Approve_EmptyBody" Text="Videos that arrive in watched folders wait here for a yes or a no. Clear the filters if you expected some." Style="{StaticResource ToolsMuted}" />
+                        </StackPanel>
 
-                                <Border Height="180"
-                                       CornerRadius="6"
-                                       HorizontalAlignment="Stretch"
-                                       Visibility="{x:Bind ViewModel.CurrentThumbnailPath, Mode=OneWay, Converter={StaticResource NullToVisibilityConverter}}">
-                                    <Grid>
-                                        <Image Stretch="UniformToFill">
-                                            <Image.Source>
-                                                <BitmapImage UriSource="{x:Bind ViewModel.CurrentThumbnailPath, Mode=OneWay, Converter={StaticResource PathToUriConverter}}"/>
-                                            </Image.Source>
-                                        </Image>
-                                        <Border Background="#000000" Opacity="0.5" VerticalAlignment="Bottom">
-                                            <StackPanel Orientation="Horizontal" Spacing="8" Padding="8,6" HorizontalAlignment="Right">
-                                                <SymbolIcon Symbol="Refresh" Foreground="White" RenderTransformOrigin="0.5,0.5">
-                                                    <SymbolIcon.RenderTransform>
-                                                        <ScaleTransform ScaleX="0.8" ScaleY="0.8"/>
-                                                    </SymbolIcon.RenderTransform>
-                                                </SymbolIcon>
-                                                <Button Content="Refresh"
-                                                       Background="Transparent"
-                                                       Foreground="White"
-                                                       BorderThickness="0"
-                                                       Padding="0"
-                                                       FontSize="11"
-                                                       Command="{x:Bind ViewModel.RefreshThumbnailCommand}"/>
+                        <ListView x:Name="ApprovalsList" SelectionMode="Multiple" ItemsSource="{x:Bind ViewModel.FilteredApprovals, Mode=OneWay}"
+                                  SelectionChanged="ApprovalsList_SelectionChanged" MaxHeight="640" Padding="0">
+                            <ListView.ItemTemplate>
+                                <DataTemplate x:DataType="models:PendingApprovalDto">
+                                    <Grid ColumnSpacing="12" Padding="0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Spacing="2" VerticalAlignment="Center">
+                                            <TextBlock Text="{x:Bind FileName}" Style="{StaticResource ToolsBody}" Foreground="{ThemeResource FanousTextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <TextBlock Text="{x:Bind ChannelName}" Style="{StaticResource ToolsMuted}" TextTrimming="CharacterEllipsis" MaxWidth="220" />
+                                                <TextBlock Text="·" Style="{StaticResource ToolsMuted}" />
+                                                <TextBlock Text="{x:Bind FileSize, Converter={StaticResource LocFormat}, ConverterParameter=Bytes}" Style="{StaticResource ToolsMuted}" />
                                             </StackPanel>
-                                        </Border>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="0" VerticalAlignment="Center">
+                                            <HyperlinkButton Style="{StaticResource ToolsLinkButton}" Padding="8,4" Tag="{x:Bind}" Click="Preview_Click">
+                                                <TextBlock x:Uid="Approve_RowPreview" Text="Preview" />
+                                            </HyperlinkButton>
+                                            <HyperlinkButton Style="{StaticResource ToolsLinkButton}" Padding="8,4" Tag="{x:Bind}" Click="ApproveOne_Click">
+                                                <TextBlock x:Uid="Approve_RowApprove" Text="Approve" />
+                                            </HyperlinkButton>
+                                            <HyperlinkButton Style="{StaticResource ToolsLinkButton}" Padding="8,4" Tag="{x:Bind}" Click="RejectOne_Click">
+                                                <TextBlock x:Uid="Approve_RowReject" Text="Reject" />
+                                            </HyperlinkButton>
+                                        </StackPanel>
                                     </Grid>
-                                </Border>
-                            </Grid>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
 
-                            <!-- Video Metadata -->
-                            <Border Background="#F9FAFB"
-                                   CornerRadius="6"
-                                   Padding="12"
-                                   Visibility="{x:Bind ViewModel.CurrentVideoMetadata, Mode=OneWay, Converter={StaticResource NullToVisibilityConverter}}">
-                                <StackPanel Spacing="8">
-                                    <TextBlock Text="Video Information" FontSize="12" FontWeight="SemiBold" Foreground="#374151" Margin="0,0,0,4"/>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button Style="{StaticResource ToolsPrimaryButton}" Command="{x:Bind ViewModel.ApproveSelectedCommand}">
+                                <TextBlock Text="{x:Bind ViewModel.ApproveSelectedText, Mode=OneWay}" />
+                            </Button>
+                            <Button Style="{StaticResource ToolsSecondaryButton}" Command="{x:Bind ViewModel.RejectSelectedCommand}">
+                                <TextBlock Text="{x:Bind ViewModel.RejectSelectedText, Mode=OneWay}" />
+                            </Button>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
 
-                                    <Grid>
-                                        <TextBlock Text="Duration" FontSize="11" Foreground="#6B7280"/>
-                                        <TextBlock Text="{x:Bind ViewModel.CurrentVideoMetadata.DurationFormatted, Mode=OneWay}"
-                                                  FontSize="11"
-                                                  Foreground="#111827"
-                                                  FontWeight="SemiBold"
-                                                  HorizontalAlignment="Right"/>
-                                    </Grid>
-
-                                    <Grid>
-                                        <TextBlock Text="Resolution" FontSize="11" Foreground="#6B7280"/>
-                                        <TextBlock Text="{x:Bind ViewModel.CurrentVideoMetadata.Resolution, Mode=OneWay}"
-                                                  FontSize="11"
-                                                  Foreground="#111827"
-                                                  FontWeight="SemiBold"
-                                                  HorizontalAlignment="Right"/>
-                                    </Grid>
-
-                                    <Grid>
-                                        <TextBlock Text="Codec" FontSize="11" Foreground="#6B7280"/>
-                                        <TextBlock Text="{x:Bind ViewModel.CurrentVideoMetadata.Codec, Mode=OneWay}"
-                                                  FontSize="11"
-                                                  Foreground="#111827"
-                                                  FontWeight="SemiBold"
-                                                  HorizontalAlignment="Right"/>
-                                    </Grid>
-
-                                    <Grid>
-                                        <TextBlock Text="Frame Rate" FontSize="11" Foreground="#6B7280"/>
-                                        <TextBlock Text="{x:Bind ViewModel.CurrentVideoMetadata.FrameRateFormatted, Mode=OneWay}"
-                                                  FontSize="11"
-                                                  Foreground="#111827"
-                                                  FontWeight="SemiBold"
-                                                  HorizontalAlignment="Right"/>
-                                    </Grid>
-
-                                    <Grid>
-                                        <TextBlock Text="Bit Rate" FontSize="11" Foreground="#6B7280"/>
-                                        <TextBlock Text="{x:Bind ViewModel.CurrentVideoMetadata.BitRateFormatted, Mode=OneWay}"
-                                                  FontSize="11"
-                                                  Foreground="#111827"
-                                                  FontWeight="SemiBold"
-                                                  HorizontalAlignment="Right"/>
-                                    </Grid>
-                                </StackPanel>
+                <!-- Preview -->
+                <Border Style="{StaticResource ToolsCard}">
+                    <StackPanel Spacing="12">
+                        <TextBlock x:Uid="Approve_PreviewTitle" Text="Preview" Style="{StaticResource ToolsCardTitle}" />
+                        <TextBlock x:Uid="Approve_PreviewEmpty" Text="Choose Preview on a video to see its picture and details here." Style="{StaticResource ToolsMuted}"
+                                   Visibility="{x:Bind ViewModel.CurrentApproval, Mode=OneWay, Converter={StaticResource NullToVisibility}, ConverterParameter=Inverse}" />
+                        <StackPanel Spacing="12" Visibility="{x:Bind ViewModel.CurrentApproval, Mode=OneWay, Converter={StaticResource NullToVisibility}}">
+                            <Border Style="{StaticResource ToolsInsetCard}" Padding="0" Height="200">
+                                <Grid>
+                                    <ProgressRing IsActive="{x:Bind ViewModel.IsGeneratingThumbnail, Mode=OneWay}" Width="32" Height="32" />
+                                    <Image Source="{x:Bind ViewModel.CurrentThumbnailPath, Mode=OneWay, Converter={StaticResource PathToUri}}" Stretch="Uniform" />
+                                </Grid>
                             </Border>
-
-                            <!-- File Details -->
-                            <StackPanel Spacing="12">
-                                <TextBlock Text="{x:Bind ViewModel.CurrentApproval.FileName, Mode=OneWay}"
-                                          FontSize="15"
-                                          FontWeight="SemiBold"
-                                          Foreground="#111827"
-                                          TextWrapping="Wrap"/>
-
-                                <StackPanel Spacing="8">
-                                    <Grid>
-                                        <TextBlock Text="Channel" FontSize="12" Foreground="#6B7280"/>
-                                        <TextBlock Text="{x:Bind ViewModel.CurrentApproval.ChannelName, Mode=OneWay}"
-                                                  FontSize="12"
-                                                  Foreground="#111827"
-                                                  FontWeight="SemiBold"
-                                                  HorizontalAlignment="Right"/>
-                                    </Grid>
-
-                                    <Grid>
-                                        <TextBlock Text="Size" FontSize="12" Foreground="#6B7280"/>
-                                        <TextBlock Text="{x:Bind ViewModel.CurrentApproval.FileSize, Mode=OneWay, Converter={StaticResource FileSizeConverter}}"
-                                                  FontSize="12"
-                                                  Foreground="#111827"
-                                                  FontWeight="SemiBold"
-                                                  HorizontalAlignment="Right"/>
-                                    </Grid>
-
-                                    <Grid>
-                                        <TextBlock Text="Extension" FontSize="12" Foreground="#6B7280"/>
-                                        <TextBlock Text="{x:Bind ViewModel.CurrentApproval.Extension, Mode=OneWay}"
-                                                  FontSize="12"
-                                                  Foreground="#111827"
-                                                  FontWeight="SemiBold"
-                                                  HorizontalAlignment="Right"/>
-                                    </Grid>
-
-                                    <Grid>
-                                        <TextBlock Text="Priority" FontSize="12" Foreground="#6B7280"/>
-                                        <TextBlock Text="{x:Bind ViewModel.CurrentApproval.Priority, Mode=OneWay}"
-                                                  FontSize="12"
-                                                  Foreground="#111827"
-                                                  FontWeight="SemiBold"
-                                                  HorizontalAlignment="Right"/>
-                                    </Grid>
-
-                                    <Grid>
-                                        <TextBlock Text="Detected" FontSize="12" Foreground="#6B7280"/>
-                                        <TextBlock Text="{x:Bind ViewModel.CurrentApproval.DetectedAt, Mode=OneWay, Converter={StaticResource DateTimeConverter}}"
-                                                  FontSize="12"
-                                                  Foreground="#111827"
-                                                  FontWeight="SemiBold"
-                                                  HorizontalAlignment="Right"/>
-                                    </Grid>
-                                </StackPanel>
-
-                                <StackPanel Spacing="8" Margin="0,8,0,0">
-                                    <Button Content="Approve"
-                                            Background="#16A34A"
-                                            Foreground="White"
-                                            HorizontalAlignment="Stretch"
-                                            CornerRadius="6"
-                                            Height="40"/>
-
-                                    <Button Content="Reject"
-                                            Background="#DC2626"
-                                            Foreground="White"
-                                            HorizontalAlignment="Stretch"
-                                            CornerRadius="6"
-                                            Height="40"/>
-                                </StackPanel>
+                            <Button Style="{StaticResource ToolsSecondaryButton}" Command="{x:Bind ViewModel.RefreshThumbnailCommand}">
+                                <TextBlock x:Uid="Approve_ThumbAgain" Text="Make the picture again" />
+                            </Button>
+                            <TextBlock Text="{x:Bind ViewModel.CurrentApproval.FileName, Mode=OneWay}" Style="{StaticResource ToolsCardTitle}" FontSize="15" TextWrapping="Wrap" />
+                            <Grid ColumnSpacing="12" RowSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <TextBlock x:Uid="Approve_DChannel" Text="Channel" Style="{StaticResource ToolsMuted}" />
+                                <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.CurrentApproval.ChannelName, Mode=OneWay}" Style="{StaticResource ToolsBody}" />
+                                <TextBlock Grid.Row="1" x:Uid="Approve_DSize" Text="Size" Style="{StaticResource ToolsMuted}" />
+                                <TextBlock Grid.Row="1" Grid.Column="1" Text="{x:Bind ViewModel.CurrentSizeText, Mode=OneWay}" Style="{StaticResource ToolsBody}" />
+                                <TextBlock Grid.Row="2" x:Uid="Approve_DArrived" Text="Arrived" Style="{StaticResource ToolsMuted}" />
+                                <TextBlock Grid.Row="2" Grid.Column="1" Text="{x:Bind ViewModel.CurrentDetectedText, Mode=OneWay}" Style="{StaticResource ToolsBody}" />
+                                <TextBlock Grid.Row="3" x:Uid="Approve_DLength" Text="Length" Style="{StaticResource ToolsMuted}" />
+                                <TextBlock Grid.Row="3" Grid.Column="1" Text="{x:Bind ViewModel.DurationText, Mode=OneWay}" Style="{StaticResource ToolsBody}" />
+                                <TextBlock Grid.Row="4" x:Uid="Approve_DPicture" Text="Picture size" Style="{StaticResource ToolsMuted}" />
+                                <TextBlock Grid.Row="4" Grid.Column="1" Text="{x:Bind ViewModel.ResolutionText, Mode=OneWay}" Style="{StaticResource ToolsBody}" />
+                                <TextBlock Grid.Row="5" x:Uid="Approve_DFrames" Text="Frame rate" Style="{StaticResource ToolsMuted}" />
+                                <TextBlock Grid.Row="5" Grid.Column="1" Text="{x:Bind ViewModel.FrameRateText, Mode=OneWay}" Style="{StaticResource ToolsBody}" />
+                                <TextBlock Grid.Row="6" x:Uid="Approve_DBitrate" Text="Bit rate" Style="{StaticResource ToolsMuted}" />
+                                <TextBlock Grid.Row="6" Grid.Column="1" Text="{x:Bind ViewModel.BitRateText, Mode=OneWay}" Style="{StaticResource ToolsBody}" />
+                            </Grid>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button Style="{StaticResource ToolsPrimaryButton}" Command="{x:Bind ViewModel.ApproveOneCommand}" CommandParameter="{x:Bind ViewModel.CurrentApproval, Mode=OneWay}">
+                                    <TextBlock x:Uid="Approve_PApprove" Text="Approve" />
+                                </Button>
+                                <Button Style="{StaticResource ToolsSecondaryButton}" Command="{x:Bind ViewModel.RejectOneCommand}" CommandParameter="{x:Bind ViewModel.CurrentApproval, Mode=OneWay}">
+                                    <TextBlock x:Uid="Approve_PReject" Text="Reject" />
+                                </Button>
                             </StackPanel>
                         </StackPanel>
-                    </Border>
+                    </StackPanel>
+                </Border>
+            </shell:TileGrid>
 
-                    <!-- Activity Log -->
-                    <Border Style="{StaticResource FilterCardStyle}">
-                        <StackPanel Spacing="12">
-                            <Grid>
-                                <TextBlock Text="Activity Log" Style="{StaticResource SectionTitleStyle}" Margin="0"/>
-                                <Button Content="Clear"
-                                       Background="Transparent"
-                                       Foreground="#EF4444"
-                                       BorderThickness="0"
-                                       FontSize="13"
-                                       FontWeight="SemiBold"
-                                       HorizontalAlignment="Right"
-                                       Command="{x:Bind ViewModel.ClearActivityLogCommand}"/>
-                            </Grid>
-
-                            <ScrollViewer MaxHeight="400" VerticalScrollBarVisibility="Auto">
-                                <ItemsControl ItemsSource="{x:Bind ViewModel.ActivityLog, Mode=OneWay}"
-                                            ItemTemplate="{StaticResource ActivityLogTemplate}"/>
-                            </ScrollViewer>
-
-                            <!-- Empty Log State -->
-                            <Border Visibility="{x:Bind ViewModel.ActivityLog.Count, Mode=OneWay, Converter={StaticResource ZeroToVisibilityConverter}}"
-                                   Padding="20"
-                                   Background="#F9FAFB"
-                                   CornerRadius="6">
-                                <TextBlock Text="No activity yet"
-                                          FontSize="13"
-                                          Foreground="#9CA3AF"
-                                          HorizontalAlignment="Center"/>
-                            </Border>
-                        </StackPanel>
-                    </Border>
+            <!-- Activity -->
+            <Border Style="{StaticResource ToolsCard}">
+                <StackPanel Spacing="12">
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Uid="Approve_ActivityTitle" Text="Activity" Style="{StaticResource ToolsCardTitle}" VerticalAlignment="Center" />
+                        <Button Grid.Column="1" Style="{StaticResource ToolsSecondaryButton}" Command="{x:Bind ViewModel.ClearActivityLogCommand}">
+                            <TextBlock x:Uid="Approve_ActivityClear" Text="Clear" />
+                        </Button>
+                    </Grid>
+                    <ItemsControl ItemsSource="{x:Bind ViewModel.ActivityLog, Mode=OneWay}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ApprovalLogMessage">
+                                <Grid ColumnSpacing="12" Padding="0,8" BorderBrush="{ThemeResource FanousDividerBrush}" BorderThickness="0,0,0,1">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon Glyph="{x:Bind Glyph}" FontSize="14" VerticalAlignment="Top" Margin="0,3,0,0">
+                                        <FontIcon.Foreground>
+                                            <SolidColorBrush Color="{x:Bind GlyphColor, Converter={StaticResource ColorConverter}}" />
+                                        </FontIcon.Foreground>
+                                    </FontIcon>
+                                    <TextBlock Grid.Column="1" Text="{x:Bind Message}" Style="{StaticResource ToolsBody}" />
+                                    <TextBlock Grid.Column="2" Text="{x:Bind TimeText}" Style="{StaticResource ToolsMuted}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
                 </StackPanel>
-            </Grid>
-        </ScrollViewer>
-    </Grid>
+            </Border>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
 </Page>

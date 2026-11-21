@@ -46,6 +46,7 @@ public sealed class ToolsSession : IDisposable
     private readonly TimeSpan _timeout;
     private readonly (string En, string Ar) _successPage;
     private CancellationTokenSource? _signIn;
+    private Uri? _pendingSignIn;
 
     public ToolsSession(ToolsEnvironment environment, IAuthBackend auth, AdminApiClient api, IBrowserLauncher browser, (string En, string Ar) successPage, TimeSpan? timeout = null)
     {
@@ -106,8 +107,9 @@ public sealed class ToolsSession : IDisposable
         try
         {
             using var loopback = new LoopbackRedirect(_successPage.En, _successPage.Ar);
-            var url = _auth.BeginLogin(loopback.RedirectUri);
-            _browser.Open(new Uri(url));
+            var url = new Uri(_auth.BeginLogin(loopback.RedirectUri));
+            _pendingSignIn = url;
+            _browser.Open(url);
             var redirect = await loopback.WaitAsync(both.Token).ConfigureAwait(false);
             Account = await _auth.CompleteLoginAsync(redirect).ConfigureAwait(false);
         }
@@ -133,7 +135,11 @@ public sealed class ToolsSession : IDisposable
         }
 
         var superseded = !ReferenceEquals(_signIn, user);
-        if (!superseded) _signIn = null;
+        if (!superseded)
+        {
+            _signIn = null;
+            _pendingSignIn = null;
+        }
         // A replaced attempt leaves the state to the one that replaced it
         if (superseded) return;
         if (failure is { } reason)
@@ -147,6 +153,14 @@ public sealed class ToolsSession : IDisposable
 
     /// <summary>Stops a sign-in that is waiting for the browser.</summary>
     public void CancelSignIn() => _signIn?.Cancel();
+
+    /// <summary>Opens the waiting sign-in page again, for a browser tab that was closed or lost.</summary>
+    public bool ReopenSignInPage()
+    {
+        if (State != SessionState.SigningIn || _pendingSignIn is not { } url) return false;
+        _browser.Open(url);
+        return true;
+    }
 
     /// <summary>Asks admin-api who the account is; also the "Try again" of the Unreachable screen.</summary>
     public async Task CheckAsync(CancellationToken ct = default)

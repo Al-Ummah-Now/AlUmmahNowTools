@@ -6,6 +6,7 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Linq;
+using System.Collections.Generic;
 
 namespace AlUmmahNow.VisualImporterUno.Services
 {
@@ -172,7 +173,7 @@ namespace AlUmmahNow.VisualImporterUno.Services
                     // dotnet run command
                     var parts = serviceExecutable.Split('|');
                     processStartInfo.FileName = parts[0]; // "dotnet"
-                    processStartInfo.Arguments = string.Join(" ", parts.Skip(1)); // "run --project ..."
+                    processStartInfo.Arguments = string.Join(" ", parts.Skip(1).Select(QuoteArgument)); // "run --project ..." or the .dll
                 }
                 else
                 {
@@ -404,6 +405,32 @@ namespace AlUmmahNow.VisualImporterUno.Services
         }
 
         /// <summary>
+        /// Where the folder scanner can live, most likely first: beside Tools (installed together), then a build of the
+        /// FileScanService project next to this one. Each place is tried with this platform's executable name and the
+        /// framework-dependent .dll.
+        /// </summary>
+        public static IEnumerable<string> ScannerCandidates(string? solutionDirectory)
+        {
+            const string name = "AlUmmahNow.FileScanService";
+            var executable = OperatingSystem.IsWindows() ? name + ".exe" : name;
+            var places = new List<string> { AppContext.BaseDirectory, Directory.GetCurrentDirectory() };
+            foreach (var root in new[] { Path.Combine(Directory.GetCurrentDirectory(), ".."), solutionDirectory })
+            {
+                if (string.IsNullOrEmpty(root)) continue;
+                foreach (var configuration in new[] { "Release", "Debug" })
+                    places.Add(Path.Combine(root, name, "bin", configuration, "net8.0"));
+            }
+            foreach (var place in places.Distinct())
+            {
+                yield return Path.Combine(place, executable);
+                yield return Path.Combine(place, name + ".dll");
+            }
+        }
+
+        private static string QuoteArgument(string argument) =>
+            argument.Contains(' ') && !argument.StartsWith('"') ? $"\"{argument}\"" : argument;
+
+        /// <summary>
         /// Finds the FileScanService executable
         /// </summary>
         /// <returns>Path to executable or command to run with dotnet</returns>
@@ -431,30 +458,13 @@ namespace AlUmmahNow.VisualImporterUno.Services
                 }
             }
 
-            var currentDirectory = Directory.GetCurrentDirectory();
-            
-            // Look for built executable first
-            var possiblePaths = new[]
+            foreach (var path in ScannerCandidates(FindSolutionDirectory()))
             {
-                // Same directory (if published together)
-                Path.Combine(currentDirectory, "AlUmmahNow.FileScanService.exe"),
-                
-                // Relative paths from VisualImporter directory
-                Path.Combine(currentDirectory, "..", "AlUmmahNow.FileScanService", "bin", "Debug", "net8.0", "AlUmmahNow.FileScanService.exe"),
-                Path.Combine(currentDirectory, "..", "AlUmmahNow.FileScanService", "bin", "Release", "net8.0", "AlUmmahNow.FileScanService.exe"),
-                
-                // From solution directory
-                Path.Combine(FindSolutionDirectory() ?? "", "AlUmmahNow.FileScanService", "bin", "Debug", "net8.0", "AlUmmahNow.FileScanService.exe"),
-                Path.Combine(FindSolutionDirectory() ?? "", "AlUmmahNow.FileScanService", "bin", "Release", "net8.0", "AlUmmahNow.FileScanService.exe"),
-            };
-
-            foreach (var path in possiblePaths)
-            {
-                if (File.Exists(path))
-                {
-                    _logger.LogDebug("Found FileScanService executable at: {Path}", path);
-                    return Path.GetFullPath(path);
-                }
+                if (!File.Exists(path)) continue;
+                _logger.LogDebug("Found FileScanService at: {Path}", path);
+                var full = Path.GetFullPath(path);
+                // A framework-dependent build ships only the .dll on some platforms; run it through dotnet
+                return full.EndsWith(".dll", StringComparison.OrdinalIgnoreCase) ? $"dotnet|{full}" : full;
             }
 
             // Try to find project file for dotnet run

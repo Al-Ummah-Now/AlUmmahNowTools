@@ -1,3 +1,4 @@
+using AlUmmahNow.VisualImporterUno.Shell;
 using Microsoft.Extensions.Logging;
 using System;
 using System.ComponentModel;
@@ -17,6 +18,7 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
         private bool _isVerifying = false;
         private bool _isAutoDetecting = false;
         private string _statusMessage = "";
+        private string _statusTitle = Loc.Get("Video_Checking");
         private string _ffmpegVersion = "";
         private bool _isInstalled = false;
         private bool _autoDetected = false;
@@ -29,7 +31,7 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _ffmpegManager = ffmpegManager ?? throw new ArgumentNullException(nameof(ffmpegManager));
 
-            _installationInstructions = _ffmpegManager.GetInstallationInstructions();
+            _installationInstructions = InstallCommandForThisComputer;
 
             // Initialize with current paths
             _ffmpegPath = _ffmpegManager.FFmpegPath ?? "";
@@ -81,6 +83,13 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
             private set => SetProperty(ref _statusMessage, value);
         }
 
+        /// <summary>One line on the state of the video programs; <see cref="StatusMessage"/> explains it.</summary>
+        public string StatusTitle
+        {
+            get => _statusTitle;
+            private set => SetProperty(ref _statusTitle, value);
+        }
+
         public string FFmpegVersion
         {
             get => _ffmpegVersion;
@@ -99,6 +108,11 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
             private set => SetProperty(ref _autoDetected, value);
         }
 
+        /// <summary>The one command that installs both programs on this kind of computer.</summary>
+        public static string InstallCommandForThisComputer =>
+            OperatingSystem.IsWindows() ? "winget install Gyan.FFmpeg" :
+            OperatingSystem.IsMacOS() ? "brew install ffmpeg" : "sudo apt install ffmpeg";
+
         public string InstallationInstructions
         {
             get => _installationInstructions;
@@ -110,7 +124,8 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
             if (IsVerifying) return;
 
             IsVerifying = true;
-            StatusMessage = "Verifying FFmpeg installation...";
+            StatusTitle = Loc.Get("Video_Checking");
+            StatusMessage = "";
 
             try
             {
@@ -118,39 +133,33 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
 
                 IsInstalled = status.IsFullyInstalled;
                 AutoDetected = status.AutoDetected;
-                FFmpegVersion = status.FFmpegVersion ?? "Not detected";
+                FFmpegVersion = status.FFmpegVersion ?? "";
 
                 if (status.IsFullyInstalled)
                 {
-                    StatusMessage = $"✓ FFmpeg is installed and working correctly";
+                    // The path setters clear the message, so they go first
                     FFmpegPath = status.FFmpegPath ?? "";
                     FFprobePath = status.FFprobePath ?? "";
+                    StatusTitle = Loc.Get("Video_ReadyTitle");
+                    StatusMessage = Loc.Get("Video_ReadyBody");
                 }
                 else
                 {
-                    var messages = new System.Collections.Generic.List<string>();
-
-                    if (!status.FFmpegExists)
-                        messages.Add("FFmpeg executable not found");
-                    else if (!status.FFmpegWorks)
-                        messages.Add("FFmpeg found but not working");
-
-                    if (!status.FFprobeExists)
-                        messages.Add("FFprobe executable not found");
-                    else if (!status.FFprobeWorks)
-                        messages.Add("FFprobe found but not working");
-
-                    if (!string.IsNullOrEmpty(status.ErrorMessage))
-                        messages.Add($"Error: {status.ErrorMessage}");
-
-                    StatusMessage = "✗ " + string.Join(", ", messages);
+                    var lines = new System.Collections.Generic.List<string>();
+                    if (!status.FFmpegExists) lines.Add(Loc.Get("Video_ConverterMissing"));
+                    else if (!status.FFmpegWorks) lines.Add(Loc.Get("Video_ConverterBroken"));
+                    if (!status.FFprobeExists) lines.Add(Loc.Get("Video_ReaderMissing"));
+                    else if (!status.FFprobeWorks) lines.Add(Loc.Get("Video_ReaderBroken"));
+                    StatusTitle = Loc.Get("Video_MissingTitle");
+                    StatusMessage = Loc.WithDetail(string.Join("\n", lines), status.ErrorMessage);
                 }
 
                 _logger.LogInformation("FFmpeg verification complete: {IsInstalled}", IsInstalled);
             }
             catch (Exception ex)
             {
-                StatusMessage = $"✗ Error verifying installation: {ex.Message}";
+                StatusTitle = Loc.Get("Video_CheckFailed");
+                StatusMessage = ex.Message;
                 _logger.LogError(ex, "Error verifying FFmpeg installation");
                 IsInstalled = false;
             }
@@ -165,7 +174,8 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
             if (IsAutoDetecting) return;
 
             IsAutoDetecting = true;
-            StatusMessage = "Auto-detecting FFmpeg installation...";
+            StatusTitle = Loc.Get("Video_Detecting");
+            StatusMessage = "";
 
             try
             {
@@ -175,15 +185,13 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
                 {
                     FFmpegPath = _ffmpegManager.FFmpegPath ?? "";
                     FFprobePath = _ffmpegManager.FFprobePath ?? "";
-                    StatusMessage = "✓ FFmpeg auto-detected successfully";
                     AutoDetected = true;
-
-                    // Verify the detected installation
                     await VerifyInstallationAsync();
                 }
                 else
                 {
-                    StatusMessage = "✗ Could not auto-detect FFmpeg. Please install it or specify the path manually.";
+                    StatusTitle = Loc.Get("Video_MissingTitle");
+                    StatusMessage = Loc.Get("Video_NotDetected");
                     IsInstalled = false;
                 }
 
@@ -191,7 +199,8 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
             }
             catch (Exception ex)
             {
-                StatusMessage = $"✗ Error during auto-detection: {ex.Message}";
+                StatusTitle = Loc.Get("Video_CheckFailed");
+                StatusMessage = ex.Message;
                 _logger.LogError(ex, "Error during FFmpeg auto-detection");
                 IsInstalled = false;
             }
@@ -207,7 +216,7 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
             {
                 if (string.IsNullOrWhiteSpace(FFmpegPath) || string.IsNullOrWhiteSpace(FFprobePath))
                 {
-                    StatusMessage = "✗ Please provide both FFmpeg and FFprobe paths";
+                    StatusMessage = Loc.Get("Video_NeedBoth");
                     return false;
                 }
 
@@ -231,13 +240,13 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
                 }
                 else
                 {
-                    StatusMessage = "✗ The provided paths are not valid or not working";
+                    StatusMessage = Loc.Get("Video_PathsInvalid");
                     return false;
                 }
             }
             catch (Exception ex)
             {
-                StatusMessage = $"✗ Error saving paths: {ex.Message}";
+                StatusMessage = Loc.GetWithDetail("Video_SaveFailed", ex.Message);
                 _logger.LogError(ex, "Error saving FFmpeg paths");
                 return false;
             }

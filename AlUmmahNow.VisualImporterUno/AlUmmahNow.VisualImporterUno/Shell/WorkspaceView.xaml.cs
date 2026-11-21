@@ -1,13 +1,9 @@
-using AlUmmahNow.VisualImporterUno.ViewModels;
-using AlUmmahNow.VisualImporterUno.Services;
 using AlUmmahNow.VisualImporterUno.Views;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
 using System;
-using System.IO;
-using Windows.Storage.Pickers;
-using WinRT.Interop;
+using System.Linq;
 
 namespace AlUmmahNow.VisualImporterUno.Shell
 {
@@ -26,478 +22,108 @@ namespace AlUmmahNow.VisualImporterUno.Shell
             FFmpegSettings
         }
 
+        private static readonly (ViewState View, Type Page, string Key)[] Pages =
+        {
+            (ViewState.Dashboard, typeof(DashboardView), "Dashboard"),
+            (ViewState.Import, typeof(ImportView), "Import"),
+            (ViewState.WatchManagement, typeof(WatchManagementPage), "WatchManagement"),
+            (ViewState.ApprovalWorkflow, typeof(ApprovalWorkflowPage), "ApprovalWorkflow"),
+            (ViewState.Analytics, typeof(AnalyticsDashboardPage), "Analytics"),
+            (ViewState.ServiceStatus, typeof(ServiceStatusPage), "ServiceStatus"),
+            (ViewState.Settings, typeof(SettingsPage), "Settings"),
+            (ViewState.FFmpegSettings, typeof(FFmpegSettingsPage), "FFmpegSettings"),
+        };
+
         private ViewState _currentView = ViewState.Dashboard;
-        private ServiceStatusViewModel? _serviceStatusViewModel;
-        private bool _isClosing = false;
+        private bool _isClosing;
 
-        public WorkspaceView()
+        public WorkspaceView(string? startPage = null)
         {
-            this.InitializeComponent();
-            
-            // Initialize service status monitoring
-            InitializeServiceStatusMonitoring();
-            
-            // Set initial navigation to Dashboard
-            ContentFrame.Navigate(typeof(DashboardView));
-            
-            // Set initial status
-            UpdateStatusBarForCurrentView();
+            InitializeComponent();
+            var start = Pages.FirstOrDefault(p => string.Equals(p.Key, startPage, StringComparison.OrdinalIgnoreCase));
+            Select(start.Page == null ? ViewState.Dashboard : start.View);
         }
 
-        private void InitializeServiceStatusMonitoring()
-        {
-            try
-            {
-                // Get the service status view model from DI container
-                _serviceStatusViewModel = App.GetService<ServiceStatusViewModel>();
-                
-                // Subscribe to service status changes
-                if (_serviceStatusViewModel != null)
-                {
-                    _serviceStatusViewModel.PropertyChanged += ServiceStatusViewModel_PropertyChanged;
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Failed to initialize service status monitoring: {ex.Message}");
-                // Continue without service monitoring if it fails
-            }
-        }
+        public ViewState CurrentView => _currentView;
 
-        private void ServiceStatusViewModel_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+        public void NavigateToImportView() => Select(ViewState.Import);
+        public void NavigateToDashboardView() => Select(ViewState.Dashboard);
+        public void NavigateToSettingsView() => Select(ViewState.Settings);
+        public void NavigateToWatchManagementView() => Select(ViewState.WatchManagement);
+        public void NavigateToApprovalWorkflowView() => Select(ViewState.ApprovalWorkflow);
+        public void NavigateToAnalyticsView() => Select(ViewState.Analytics);
+        public void NavigateToServiceStatusView() => Select(ViewState.ServiceStatus);
+
+        private void Select(ViewState view)
         {
-            // Skip property change handling if window is closing
             if (_isClosing) return;
-
-            try
-            {
-                if (e.PropertyName == nameof(ServiceStatusViewModel.ServiceHealthStatus) ||
-                    e.PropertyName == nameof(ServiceStatusViewModel.ServiceHealthMessage) ||
-                    e.PropertyName == nameof(ServiceStatusViewModel.ServiceStatus) ||
-                    e.PropertyName == nameof(ServiceStatusViewModel.ServiceStatusMessage))
-                {
-                    UpdateStatusBarForCurrentView();
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error handling service status property change: {ex.Message}");
-            }
+            var key = Pages.First(p => p.View == view).Key;
+            var item = NavView.MenuItems.OfType<NavigationViewItem>().FirstOrDefault(i => (string?)i.Tag == key);
+            if (item == null) return;
+            if (ReferenceEquals(NavView.SelectedItem, item)) Show(view);
+            else NavView.SelectedItem = item;
         }
 
         private void NavView_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
         {
-            if (_isClosing) return;
+            if (_isClosing || args.SelectedItem is not NavigationViewItem item) return;
+            var page = Pages.FirstOrDefault(p => p.Key == (string?)item.Tag);
+            if (page.Page != null) Show(page.View);
+        }
 
-            try
-            {
-                if (args.SelectedItem is NavigationViewItem selectedItem)
-                {
-                    var tag = selectedItem.Tag?.ToString();
-                    switch (tag)
-                    {
-                        case "Dashboard":
-                            _currentView = ViewState.Dashboard;
-                            ContentFrame.Navigate(typeof(DashboardView));
-                            break;
-                        case "Import":
-                            _currentView = ViewState.Import;
-                            ContentFrame.Navigate(typeof(ImportView));
-                            break;
-                        case "WatchManagement":
-                            _currentView = ViewState.WatchManagement;
-                            ContentFrame.Navigate(typeof(WatchManagementPage));
-                            break;
-                        case "ApprovalWorkflow":
-                            _currentView = ViewState.ApprovalWorkflow;
-                            ContentFrame.Navigate(typeof(ApprovalWorkflowPage));
-                            break;
-                        case "Analytics":
-                            _currentView = ViewState.Analytics;
-                            ContentFrame.Navigate(typeof(AnalyticsDashboardPage));
-                            break;
-                        case "ServiceStatus":
-                            _currentView = ViewState.ServiceStatus;
-                            ContentFrame.Navigate(typeof(ServiceStatusPage));
-                            break;
-                        case "Settings":
-                            _currentView = ViewState.Settings;
-                            ContentFrame.Navigate(typeof(SettingsPage));
-                            break;
-                        case "FFmpegSettings":
-                            _currentView = ViewState.FFmpegSettings;
-                            ContentFrame.Navigate(typeof(FFmpegSettingsPage));
-                            break;
-                    }
+        private void Show(ViewState view)
+        {
+            var page = Pages.First(p => p.View == view);
+            _currentView = view;
+            PageTitle.Text = Loc.Get($"Page_{page.Key}_Title");
+            PageSubtitle.Text = Loc.Get($"Page_{page.Key}_Subtitle");
+            if (ContentFrame.CurrentSourcePageType != page.Page) ContentFrame.Navigate(page.Page);
+        }
 
-                    UpdateStatusBarForCurrentView();
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error during navigation: {ex.Message}");
-            }
+        private void NavView_DisplayModeChanged(NavigationView sender, NavigationViewDisplayModeChangedEventArgs args)
+        {
+            // The menu button only earns its place when the pane is folded; a wide window keeps the pane open
+            sender.IsPaneToggleButtonVisible = args.DisplayMode != NavigationViewDisplayMode.Expanded;
+            // Folded away, the menu button sits at the start of the top row; the title steps past it
+            PageHeader.Margin = args.DisplayMode == NavigationViewDisplayMode.Minimal ? new Thickness(64, 12, 16, 8) : new Thickness(24, 20, 24, 12);
+            PageSubtitle.Visibility = args.DisplayMode == NavigationViewDisplayMode.Minimal ? Visibility.Collapsed : Visibility.Visible;
         }
 
         private void ContentFrame_NavigationFailed(object sender, NavigationFailedEventArgs e)
         {
             System.Diagnostics.Debug.WriteLine($"Navigation failed: {e.Exception?.Message}");
-            // Fallback to Dashboard
-            if (!_isClosing)
-            {
-                try
-                {
-                    ContentFrame.Navigate(typeof(DashboardView));
-                    _currentView = ViewState.Dashboard;
-                    UpdateStatusBarForCurrentView();
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Error in navigation fallback: {ex.Message}");
-                }
-            }
+            e.Handled = true;
+            if (!_isClosing && PageOf(ViewState.Dashboard) != e.SourcePageType) Select(ViewState.Dashboard);
         }
 
-        /// <summary>
-        /// Navigate to the import view
-        /// </summary>
-        public void NavigateToImportView()
+        private static Type PageOf(ViewState state) => Pages.First(p => p.View == state).Page;
+
+        /// <summary>Shows a scan's progress in the strip under the pages.</summary>
+        public void UpdateScanProgress(double progressPercentage, string currentOperation, int processedFiles, int totalFiles, int filesFound) =>
+            ShowProgress(progressPercentage, Loc.Format("Progress_Scanning", processedFiles, totalFiles, filesFound));
+
+        /// <summary>Shows an import's progress in the strip under the pages.</summary>
+        public void UpdateOperationProgress(double globalProgress, double localProgress, string operation, int processedFiles, int totalFiles, string currentItem) =>
+            ShowProgress(globalProgress, string.IsNullOrEmpty(currentItem)
+                ? Loc.Format("Progress_Importing", processedFiles, totalFiles)
+                : Loc.Format("Progress_ImportingItem", processedFiles, totalFiles, currentItem));
+
+        private void ShowProgress(double percent, string text)
         {
             if (_isClosing) return;
-
-            try
+            DispatcherQueue.TryEnqueue(() =>
             {
-                // Update navigation view selection
-                foreach (var item in NavView.MenuItems)
-                {
-                    if (item is NavigationViewItem navItem && navItem.Tag?.ToString() == "Import")
-                    {
-                        NavView.SelectedItem = navItem;
-                        break;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error navigating to import view: {ex.Message}");
-            }
+                if (_isClosing) return;
+                var running = percent < 100;
+                ProgressStrip.Visibility = running ? Visibility.Visible : Visibility.Collapsed;
+                ProgressText.Text = text;
+                ProgressValue.Value = percent;
+            });
         }
 
-        /// <summary>
-        /// Navigate to the dashboard view
-        /// </summary>
-        public void NavigateToDashboardView()
-        {
-            if (_isClosing) return;
-
-            try
-            {
-                // Update navigation view selection
-                foreach (var item in NavView.MenuItems)
-                {
-                    if (item is NavigationViewItem navItem && navItem.Tag?.ToString() == "Dashboard")
-                    {
-                        NavView.SelectedItem = navItem;
-                        break;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error navigating to dashboard view: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Navigate to the settings view
-        /// </summary>
-        public void NavigateToSettingsView()
-        {
-            if (_isClosing) return;
-
-            try
-            {
-                // Update navigation view selection
-                foreach (var item in NavView.MenuItems)
-                {
-                    if (item is NavigationViewItem navItem && navItem.Tag?.ToString() == "Settings")
-                    {
-                        NavView.SelectedItem = navItem;
-                        break;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error navigating to settings view: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Navigate to the watch management view
-        /// </summary>
-        public void NavigateToWatchManagementView()
-        {
-            if (_isClosing) return;
-
-            try
-            {
-                // Update navigation view selection
-                foreach (var item in NavView.MenuItems)
-                {
-                    if (item is NavigationViewItem navItem && navItem.Tag?.ToString() == "WatchManagement")
-                    {
-                        NavView.SelectedItem = navItem;
-                        break;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error navigating to watch management view: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Navigate to the approval workflow view
-        /// </summary>
-        public void NavigateToApprovalWorkflowView()
-        {
-            if (_isClosing) return;
-
-            try
-            {
-                // Update navigation view selection
-                foreach (var item in NavView.MenuItems)
-                {
-                    if (item is NavigationViewItem navItem && navItem.Tag?.ToString() == "ApprovalWorkflow")
-                    {
-                        NavView.SelectedItem = navItem;
-                        break;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error navigating to approval workflow view: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Navigate to the analytics view
-        /// </summary>
-        public void NavigateToAnalyticsView()
-        {
-            if (_isClosing) return;
-
-            try
-            {
-                // Update navigation view selection
-                foreach (var item in NavView.MenuItems)
-                {
-                    if (item is NavigationViewItem navItem && navItem.Tag?.ToString() == "Analytics")
-                    {
-                        NavView.SelectedItem = navItem;
-                        break;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error navigating to analytics view: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Update status bar text based on current view and service status
-        /// </summary>
-        private void UpdateStatusBarForCurrentView()
-        {
-            if (_isClosing) return;
-
-            try
-            {
-                string baseStatus = _currentView switch
-                {
-                    ViewState.Dashboard => "Dashboard",
-                    ViewState.Import => "Import",
-                    ViewState.WatchManagement => "Watch Management",
-                    ViewState.ApprovalWorkflow => "Approval Workflow",
-                    ViewState.Analytics => "Analytics",
-                    ViewState.ServiceStatus => "Service Status",
-                    ViewState.Settings => "Settings",
-                    ViewState.FFmpegSettings => "FFmpeg Configuration",
-                    _ => "Ready"
-                };
-
-                string serviceStatus = GetServiceStatusText();
-                
-                string statusText = !string.IsNullOrEmpty(serviceStatus) 
-                    ? $"{baseStatus} - {serviceStatus}"
-                    : baseStatus;
-
-                // Ensure we're on the UI thread
-                this.DispatcherQueue.TryEnqueue(() =>
-                {
-                    if (!_isClosing && StatusBarTextBlock != null)
-                    {
-                        StatusBarTextBlock.Text = statusText;
-                    }
-                });
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error updating status bar: {ex.Message}");
-            }
-        }
-
-        private string GetServiceStatusText()
-        {
-            try
-            {
-                if (_serviceStatusViewModel == null)
-                    return "Service status unavailable";
-
-                // Prioritize service health status for more detailed information
-                var healthStatus = _serviceStatusViewModel.ServiceHealthStatus;
-                var connectionStatus = _serviceStatusViewModel.ServiceStatus;
-                
-                return healthStatus switch
-                {
-                    ServiceHealthStatus.Running when connectionStatus == ServiceStatus.Connected => 
-                        $"Service running & connected{(_serviceStatusViewModel.IsServiceManaged ? " (managed)" : "")}",
-                    ServiceHealthStatus.Running when connectionStatus != ServiceStatus.Connected =>
-                        $"Service running, not connected{(_serviceStatusViewModel.IsServiceManaged ? " (managed)" : "")}",
-                    ServiceHealthStatus.Starting => "Service starting...",
-                    ServiceHealthStatus.Stopping => "Service stopping...",
-                    ServiceHealthStatus.Stopped => "Service stopped",
-                    ServiceHealthStatus.Error => "Service error",
-                    ServiceHealthStatus.NotFound => "Service not found",
-                    ServiceHealthStatus.Unknown => "Service status unknown",
-                    _ => _serviceStatusViewModel.ServiceHealthMessage ?? "Service status unknown"
-                };
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error getting service status text: {ex.Message}");
-                return "Service status error";
-            }
-        }
-
-        /// <summary>
-        /// Update scan progress (called by ViewModel)
-        /// </summary>
-        public void UpdateScanProgress(double progressPercentage, string currentOperation, int processedFiles, int totalFiles, int filesFound)
-        {
-            if (_isClosing) return;
-
-            try
-            {
-                // Only update if we're in import view
-                if (_currentView == ViewState.Import)
-                {
-                    var statusText = $"Scanning: {currentOperation} - {processedFiles}/{totalFiles} folders ({filesFound} files found)";
-                    
-                    // Ensure we're on the UI thread
-                    this.DispatcherQueue.TryEnqueue(() =>
-                    {
-                        if (!_isClosing && StatusBarTextBlock != null)
-                        {
-                            StatusBarTextBlock.Text = statusText;
-                        }
-                    });
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error updating scan progress: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Update operation progress (called by ViewModel)
-        /// </summary>
-        public void UpdateOperationProgress(double globalProgress, double localProgress, string operation, int processedFiles, int totalFiles, string currentItem)
-        {
-            if (_isClosing) return;
-
-            try
-            {
-                // Update status bar with operation details
-                if (_currentView == ViewState.Import)
-                {
-                    string statusText;
-                    if (!string.IsNullOrEmpty(currentItem))
-                    {
-                        statusText = $"Import: {operation} - {processedFiles}/{totalFiles} files - {currentItem}";
-                    }
-                    else
-                    {
-                        statusText = $"Import: {operation} - {processedFiles}/{totalFiles} files";
-                    }
-                    
-                    // Ensure we're on the UI thread
-                    this.DispatcherQueue.TryEnqueue(() =>
-                    {
-                        if (!_isClosing && StatusBarTextBlock != null)
-                        {
-                            StatusBarTextBlock.Text = statusText;
-                        }
-                    });
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error updating operation progress: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Get current view state (for testing/debugging)
-        /// </summary>
-        public ViewState CurrentView => _currentView;
-
-        /// <summary>
-        /// Cleanup when window is closed
-        /// </summary>
         public void Dispose()
         {
-            _isClosing = true; // Set flag to prevent further operations
-
-            try
-            {
-                System.Diagnostics.Debug.WriteLine("Workspace closing - starting cleanup");
-
-                // Unsubscribe from events
-                if (_serviceStatusViewModel != null)
-                {
-                    try
-                    {
-                        _serviceStatusViewModel.PropertyChanged -= ServiceStatusViewModel_PropertyChanged;
-                        System.Diagnostics.Debug.WriteLine("Unsubscribed from service status events");
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"Error unsubscribing from service status events: {ex.Message}");
-                    }
-
-                    try
-                    {
-                        _serviceStatusViewModel.Dispose();
-                        System.Diagnostics.Debug.WriteLine("Disposed service status view model");
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"Error disposing service status view model: {ex.Message}");
-                    }
-                }
-
-                System.Diagnostics.Debug.WriteLine("Workspace cleanup completed");
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error during window cleanup: {ex.Message}");
-            }
+            _isClosing = true;
         }
     }
 }

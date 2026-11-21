@@ -128,7 +128,7 @@ public sealed class ShellDemo
     {
         Preferences = preferences;
         State = state;
-        Auth = new DemoAuth(signedIn: state is "checking" or "not-staff" or "unreachable" or "staff");
+        Auth = new DemoAuth(signedIn: state is "checking" or "not-staff" or "unreachable" or "staff", staff: state != "not-staff", offline: state == "offline");
         Api = new DemoApi(state);
         Browser = new DemoBrowser(redirects: state is not ("signing-in" or "failed"));
     }
@@ -147,6 +147,9 @@ public sealed class ShellDemo
         {
             case "signing-in":
                 _ = session.SignInAsync();
+                break;
+            case "offline":
+                await session.SignInAsync();
                 break;
             case "failed":
                 var signIn = session.SignInAsync();
@@ -167,8 +170,10 @@ public sealed class ShellDemo
         {
             Language = Environment.GetEnvironmentVariable("TOOLS_DEMO_LANG") == "ar" ? "ar" : "en",
             Theme = Environment.GetEnvironmentVariable("TOOLS_DEMO_THEME") == "light" ? ToolsTheme.Light : ToolsTheme.Dark,
-            Environment = Enum.TryParse<ToolsEnvironmentKind>(Environment.GetEnvironmentVariable("TOOLS_DEMO_ENV"), true, out var e) ? e : ToolsEnvironmentKind.Qa,
+            Environment = Enum.TryParse<ToolsEnvironmentKind>(Environment.GetEnvironmentVariable("TOOLS_DEMO_ENV"), true, out var e) ? e : ToolsEnvironmentKind.Production,
         };
+        // Screenshot runs never launch the folder scanner
+        AlUmmahNow.VisualImporterUno.ViewModels.ServiceStatusViewModel.AutoStart = false;
         return new ShellDemo(prefs, Environment.GetEnvironmentVariable("TOOLS_DEMO_STATE") ?? "staff");
     }
 
@@ -176,12 +181,23 @@ public sealed class ShellDemo
     {
         private ToolsAccount? _account;
 
-        public DemoAuth(bool signedIn) => _account = signedIn ? Amina : null;
+        private readonly ToolsAccount _person;
 
-        private static readonly ToolsAccount Amina = new("usr_demo", "amina@alummahnow.net", "Amina Staff");
+        private readonly bool _offline;
+
+        public DemoAuth(bool signedIn, bool staff, bool offline)
+        {
+            _offline = offline;
+            _person = staff ? Staff : Visitor;
+            _account = signedIn ? _person : null;
+        }
+
+        private static readonly ToolsAccount Staff = new("usr_demo", "mariam.haddad@alummahnow.net", "Mariam Haddad");
+        private static readonly ToolsAccount Visitor = new("usr_visitor", "yusuf.rahman@gmail.com", "Yusuf Rahman");
 
         public string BeginLogin(string redirectUri) => "https://auth.example/authorize?redirect_uri=" + Uri.EscapeDataString(redirectUri);
-        public Task<ToolsAccount> CompleteLoginAsync(string redirect) => Task.FromResult(_account = Amina);
+        public Task<ToolsAccount> CompleteLoginAsync(string redirect) =>
+            _offline ? Task.FromException<ToolsAccount>(new AlUmmahNow.Core.AunException.Network("demo: offline")) : Task.FromResult(_account = _person);
         public ToolsAccount? Active() => _account;
         public Task<string?> AccessTokenAsync() => Task.FromResult(_account == null ? null : "demo");
 
@@ -207,7 +223,7 @@ public sealed class ShellDemo
             if (_state == "checking") await Task.Delay(Timeout.Infinite, cancellationToken);
             if (_state == "unreachable") throw new HttpRequestException("demo: admin API down");
             if (_state == "not-staff") return new HttpResponseMessage(HttpStatusCode.Forbidden);
-            const string me = "{\"success\":true,\"result\":{\"userId\":\"usr_demo\",\"email\":\"amina@alummahnow.net\",\"roles\":[\"admin\"],\"permissions\":[\"imports:manage\"]}}";
+            const string me = "{\"success\":true,\"result\":{\"userId\":\"usr_demo\",\"email\":\"mariam.haddad@alummahnow.net\",\"roles\":[\"admin\"],\"permissions\":[\"imports:manage\"]}}";
             return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(me, Encoding.UTF8, "application/json") };
         }
     }

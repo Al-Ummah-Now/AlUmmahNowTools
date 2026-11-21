@@ -259,6 +259,23 @@ public class SessionTests
     }
 
     [Fact]
+    public async Task The_waiting_sign_in_page_can_be_opened_again_until_it_finishes()
+    {
+        var (session, _, browser, _) = Make();
+        Assert.False(session.ReopenSignInPage());
+        browser.Behaviour = null;
+        var waiting = session.SignInAsync();
+        await Task.Delay(100);
+        var first = browser.Opened;
+        browser.Opened = null;
+        Assert.True(session.ReopenSignInPage());
+        Assert.Equal(first, browser.Opened);
+        session.CancelSignIn();
+        await waiting;
+        Assert.False(session.ReopenSignInPage());
+    }
+
+    [Fact]
     public async Task Sign_out_revokes_and_clears()
     {
         var (session, auth, _, _) = Make();

@@ -2,6 +2,7 @@ using AlUmmahNow.Data.Models;
 using AlUmmahNow.Importer.Core;
 using AlUmmahNow.VisualImporterUno.Services;
 using AlUmmahNow.VisualImporterUno.Models;
+using AlUmmahNow.VisualImporterUno.Shell;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using System;
@@ -95,7 +96,7 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
             }
         }
 
-        private string _statusMessage = "Ready to import";
+        private string _statusMessage = Loc.Get("Import_Ready");
         public string StatusMessage
         {
             get => _statusMessage;
@@ -329,25 +330,15 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
                 if (SetProperty(ref _selectedFileCount, value))
                 {
                     OnPropertyChanged(nameof(HasSelectedFiles));
+                    OnPropertyChanged(nameof(SelectedFileCountText));
                 }
             }
         }
 
         public bool HasSelectedFiles => SelectedFileCount > 0;
 
-        private bool _hasDatabaseStats = false;
-        public bool HasDatabaseStats
-        {
-            get => _hasDatabaseStats;
-            set => SetProperty(ref _hasDatabaseStats, value);
-        }
+        public string SelectedFileCountText => Loc.Number(SelectedFileCount);
 
-        private string _databaseStatusMessage = string.Empty;
-        public string DatabaseStatusMessage
-        {
-            get => _databaseStatusMessage;
-            set => SetProperty(ref _databaseStatusMessage, value);
-        }
 
         // Collections
         public ObservableCollection<ImportSession> ImportSessions { get; } = new();
@@ -355,6 +346,9 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
         public ObservableCollection<ChannelStatus> ChannelStatuses { get; } = new();
         public ObservableCollection<VideoFileInfo> VideoFiles { get; } = new();
         public ObservableCollection<VideoFileInfo> FilteredVideoFiles { get; } = new();
+        /// <summary>The channel filter entry that shows every channel.</summary>
+        public static string AllChannels => Loc.Get("Import_AllChannels");
+
         public ObservableCollection<string> AvailableChannels { get; } = new();
 
         private List<VideoFileInfo> _allVideoFiles = new();
@@ -734,7 +728,7 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
             try
             {
                 // Set basic state
-                StatusMessage = "Application started in safe mode - limited functionality available";
+                StatusMessage = Loc.Get("Import_SafeMode");
                 IsImporting = false;
                 IsScanning = false;
                 HasScannedFiles = false;
@@ -778,7 +772,7 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
                 if (folder != null)
                 {
                     SelectedFolderPath = folder.Path;
-                    StatusMessage = $"Selected folder: {folder.Path}";
+                    StatusMessage = Loc.Get("Import_FolderChosen");
                     
                     // Clear previous scan results
                     SafeExecute(() => ClearScanResults(), "SelectFolder.ClearScanResults");
@@ -797,13 +791,13 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
                 // WindowsEventLogger.LogComMarshalingError(comEx, "SelectFolderAsync");
                 if (!HandleCOMException(comEx, "SelectFolderAsync"))
                 {
-                    StatusMessage = $"Error selecting folder: COM error occurred";
+                    StatusMessage = Loc.Get("Import_FolderFailed");
                 }
             }
             catch (Exception ex)
             {
                 // WindowsEventLogger.LogCriticalCrash(ex, "SelectFolderAsync");
-                StatusMessage = $"Error selecting folder: {ex.Message}";
+                StatusMessage = Loc.GetWithDetail("Import_FolderFailed", ex.Message);
             }
             finally
             {
@@ -823,7 +817,7 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
             try
             {
                 IsScanning = true;
-                StatusMessage = "Scanning for video files...";
+                StatusMessage = Loc.Get("Import_Scanning");
 
                 // WindowsEventLogger.LogEvent(EventLogEntryType.Information, 2200,
                     // "Folder Scan Started", $"Scanning path: {SelectedFolderPath}"
@@ -851,7 +845,7 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
                     // Update available channels
                     var channels = videoFiles.Select(v => v.ChannelName).Distinct().OrderBy(c => c).ToList();
                     AvailableChannels.Clear();
-                    AvailableChannels.Add("All Channels");
+                    AvailableChannels.Add(AllChannels);
                     foreach (var channel in channels)
                     {
                         AvailableChannels.Add(channel);
@@ -861,12 +855,11 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
                     ApplySortingAndFiltering();
                     UpdateStatistics();
                     UpdateSelectedFileCount();
-                    LoadDatabaseStats();
 
                     HasScannedFiles = videoFiles.Count > 0;
                 }, "ScanFolder.UpdateCollections");
 
-                StatusMessage = $"Found {videoFiles.Count} video files in {_allVideoFiles.Select(v => v.ChannelName).Distinct().Count()} channels";
+                StatusMessage = Loc.Format("Import_Found", videoFiles.Count, _allVideoFiles.Select(v => v.ChannelName).Distinct().Count());
                 
                 // Force UI update to show the file table immediately
                 SafeDispatcherExecute(() => {
@@ -881,14 +874,14 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
             }
             catch (OperationCanceledException)
             {
-                StatusMessage = "Scan operation was cancelled";
+                StatusMessage = Loc.Get("Import_ScanCancelled");
                 HasScannedFiles = false;
                 // WindowsEventLogger.LogEvent(EventLogEntryType.Warning, 2202,
                     // "Folder Scan Cancelled", "Scan operation was cancelled by user or system"
             }
             catch (Exception ex)
             {
-                StatusMessage = $"Error scanning folder: {ex.Message}";
+                StatusMessage = Loc.GetWithDetail("Import_ScanFailed", ex.Message);
                 HasScannedFiles = false;
                 // WindowsEventLogger.LogCriticalCrash(ex, "ScanFolderAsync");
             }
@@ -957,7 +950,7 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
             try
             {
                 IsImporting = true;
-                StatusMessage = "Starting import...";
+                StatusMessage = Loc.Get("Import_Starting");
 
                 // Get selected files for import
                 var selectedFiles = _allVideoFiles?
@@ -966,7 +959,7 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
 
                 if (!selectedFiles.Any())
                 {
-                    StatusMessage = "No files selected for import";
+                    StatusMessage = Loc.Get("Import_NoneSelected");
                     // WindowsEventLogger.LogEvent(EventLogEntryType.Warning, 2300,
                         // "Import Started with No Files", "No files were selected for import"
                     return;
@@ -981,13 +974,13 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
                 // Start the import process
                 await _importService.ImportVideosAsync(selectedFiles, SelectedFolderPath);
 
-                StatusMessage = $"Import completed successfully. {selectedFiles.Count} files processed.";
+                StatusMessage = Loc.Format("Import_Processed", selectedFiles.Count);
                 // WindowsEventLogger.LogEvent(EventLogEntryType.Information, 2302,
                     // "Import Completed Successfully", $"Processed {selectedFiles.Count} files"
             }
             catch (Exception ex)
             {
-                StatusMessage = $"Import failed: {ex.Message}";
+                StatusMessage = Loc.GetWithDetail("Import_Failed", ex.Message);
                 // WindowsEventLogger.LogCriticalCrash(ex, "StartImportAsync");
             }
             finally
@@ -1020,17 +1013,17 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
             try
             {
                 IsImporting = true;
-                StatusMessage = "Starting import from folder...";
+                StatusMessage = Loc.Get("Import_Starting");
                 ProgressPercentage = 0;
 
                 var sessionId = await _importService.StartImportAsync(SelectedFolderPath);
-                StatusMessage = $"Import started (Session: {sessionId})";
+                StatusMessage = Loc.Get("Import_Started");
                 
                 await LoadImportSessionsAsync();
             }
             catch (Exception ex)
             {
-                StatusMessage = $"Error starting import: {ex.Message}";
+                StatusMessage = Loc.GetWithDetail("Import_StartFailed", ex.Message);
                 // WindowsEventLogger.LogCriticalCrash(ex, "StartImportFromFolderAsync");
                 IsImporting = false;
             }
@@ -1109,7 +1102,7 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
 
             try
             {
-                StatusMessage = "Loading session details...";
+                StatusMessage = Loc.Get("Import_SessionLoading");
                 
                 // Load session videos
                 var videos = await _importService.GetSessionVideosAsync(SelectedSession.Id);
@@ -1133,11 +1126,11 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
                     }
                 }, "ViewSessionDetails.LoadChannels");
 
-                StatusMessage = $"Loaded details for session {SelectedSession.Id}";
+                StatusMessage = Loc.Get("Import_SessionLoaded");
             }
             catch (Exception ex)
             {
-                StatusMessage = $"Error loading session details: {ex.Message}";
+                StatusMessage = Loc.GetWithDetail("Import_SessionFailed", ex.Message);
                 // WindowsEventLogger.LogCriticalCrash(ex, "ViewSessionDetailsAsync");
             }
         }
@@ -1150,23 +1143,23 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
             try
             {
                 IsImporting = true;
-                StatusMessage = "Resuming import...";
+                StatusMessage = Loc.Get("Import_Resuming");
 
                 var success = await _importService.ResumeImportAsync(SelectedSession.Id);
                 if (success)
                 {
-                    StatusMessage = $"Import resumed (Session: {SelectedSession.Id})";
+                    StatusMessage = Loc.Get("Import_Resumed");
                     await LoadImportSessionsAsync();
                 }
                 else
                 {
-                    StatusMessage = "Failed to resume import";
+                    StatusMessage = Loc.Get("Import_ResumeFailed");
                     IsImporting = false;
                 }
             }
             catch (Exception ex)
             {
-                StatusMessage = $"Error resuming import: {ex.Message}";
+                StatusMessage = Loc.GetWithDetail("Import_ResumeFailed", ex.Message);
                 // WindowsEventLogger.LogCriticalCrash(ex, "ResumeImportAsync");
                 IsImporting = false;
             }
@@ -1185,27 +1178,6 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
             }
         }
 
-        private async void LoadDatabaseStats()
-        {
-            try
-            {
-                // TODO: Get actual database stats from service
-                // For now, show a placeholder to indicate database integration
-                await Task.Delay(100); // Placeholder async call
-
-                // This will be implemented when database service methods are available
-                HasDatabaseStats = false;
-                DatabaseStatusMessage = string.Empty;
-            }
-            catch (Exception ex)
-            {
-                // Don't show error to user, just log it
-                // WindowsEventLogger.LogEvent(EventLogEntryType.Warning, 2210,
-                    // "Database Stats Error", $"Failed to load database stats: {ex.Message}"
-                HasDatabaseStats = false;
-            }
-        }
-
         [RelayCommand]
         private async Task CancelImportAsync()
         {
@@ -1216,18 +1188,18 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
                 var success = await _importService.CancelImportAsync(SelectedSession.Id);
                 if (success)
                 {
-                    StatusMessage = $"Import cancelled (Session: {SelectedSession.Id})";
+                    StatusMessage = Loc.Get("Import_Cancelled");
                     IsImporting = false;
                     await LoadImportSessionsAsync();
                 }
                 else
                 {
-                    StatusMessage = "Failed to cancel import";
+                    StatusMessage = Loc.Get("Import_CancelFailed");
                 }
             }
             catch (Exception ex)
             {
-                StatusMessage = $"Error cancelling import: {ex.Message}";
+                StatusMessage = Loc.GetWithDetail("Import_CancelFailed", ex.Message);
                 // WindowsEventLogger.LogCriticalCrash(ex, "CancelImportAsync");
             }
         }
@@ -1266,7 +1238,7 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
 
                 // Apply filtering
                 var filtered = _importService.FilterVideoFiles(_allVideoFiles, HideDuplicates, ShowOnlySelected, 
-                    ChannelFilter == "All Channels" ? null : ChannelFilter);
+                    ChannelFilter == AllChannels ? null : ChannelFilter);
 
                 // Apply sorting
                 var sorted = _importService.SortVideoFiles(filtered, CurrentSortOption, CurrentSortDirection);
@@ -1324,7 +1296,7 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
             }
             catch (Exception ex)
             {
-                StatusMessage = $"Error loading sessions: {ex.Message}";
+                StatusMessage = Loc.GetWithDetail("Import_SessionsFailed", ex.Message);
                 // WindowsEventLogger.LogCriticalCrash(ex, "LoadImportSessionsAsync");
             }
         }
@@ -1348,7 +1320,7 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
                         {
                             // For import operations, show current file and progress through selected files
                             var currentItem = !string.IsNullOrEmpty(e.CurrentFile) ? 
-                                $"Uploading: {Path.GetFileName(e.CurrentFile)}" : "";
+                                Path.GetFileName(e.CurrentFile) : "";
                             
                             // Use global progress for overall import, local progress for current file upload
                             var globalProgress = e.ProgressPercentage;
@@ -1442,7 +1414,7 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
                     
                     if (e.IsSuccess)
                     {
-                        StatusMessage = $"Import completed! Uploaded: {e.TotalUploaded}, Failed: {e.TotalFailed}";
+                        StatusMessage = Loc.Format("Import_Completed", e.TotalUploaded, e.TotalFailed);
                         ProgressPercentage = 100;
                         
                         // WindowsEventLogger.LogEvent(EventLogEntryType.Information, 2400,
@@ -1451,7 +1423,7 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
                     }
                     else
                     {
-                        StatusMessage = $"Import failed: {e.ErrorMessage ?? "Unknown error"}";
+                        StatusMessage = Loc.GetWithDetail("Import_Failed", e.ErrorMessage);
                         ProgressPercentage = 0;
                         
                         // WindowsEventLogger.LogEvent(EventLogEntryType.Error, 2401,

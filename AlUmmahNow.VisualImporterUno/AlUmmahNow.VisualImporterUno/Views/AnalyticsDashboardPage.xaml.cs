@@ -1,55 +1,35 @@
+using AlUmmahNow.VisualImporterUno.Shell;
 using AlUmmahNow.VisualImporterUno.ViewModels;
-using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
-using System;
 
 namespace AlUmmahNow.VisualImporterUno.Views
 {
-    /// <summary>
-    /// Analytics Dashboard Page showing approval metrics and trends
-    /// </summary>
+    /// <summary>How watched-folder videos and their approvals have gone over a period.</summary>
     public sealed partial class AnalyticsDashboardPage : Page
     {
         public AnalyticsDashboardViewModel ViewModel { get; }
 
         public AnalyticsDashboardPage()
         {
-            this.InitializeComponent();
-
-            // Get ViewModel from DI container
-            try
-            {
-                ViewModel = App.GetService<AnalyticsDashboardViewModel>();
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Failed to get AnalyticsDashboardViewModel: {ex.Message}");
-                throw;
-            }
-
-            // Set DataContext
-            this.DataContext = ViewModel;
+            ViewModel = App.GetService<AnalyticsDashboardViewModel>();
+            InitializeComponent();
+            DataContext = ViewModel;
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(RefreshButton, Loc.Get("Watch_Refresh"));
         }
 
         protected override void OnNavigatedTo(NavigationEventArgs e)
         {
             base.OnNavigatedTo(e);
-
-            try
-            {
-                // Refresh data when navigating to the page
-                _ = ViewModel.RefreshAnalyticsCommand.ExecuteAsync(null);
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error refreshing analytics on navigation: {ex.Message}");
-            }
+            Refresh();
         }
 
-        protected override void OnNavigatedFrom(NavigationEventArgs e)
+        private void OfflineCard_Connected(object? sender, System.EventArgs e) => Refresh();
+
+        private void Refresh()
         {
-            base.OnNavigatedFrom(e);
+            ViewModel.RefreshAnalyticsCommand.NotifyCanExecuteChanged();
+            if (ViewModel.RefreshAnalyticsCommand.CanExecute(null)) _ = ViewModel.RefreshAnalyticsCommand.ExecuteAsync(null);
         }
     }
 }

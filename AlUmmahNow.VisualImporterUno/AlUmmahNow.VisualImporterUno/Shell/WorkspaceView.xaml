@@ -10,44 +10,62 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Navigation Structure -->
-        <NavigationView x:Name="NavView" 
-                       Grid.Row="0"
-                       IsPaneToggleButtonVisible="True"
-                       IsBackButtonVisible="Collapsed"
-                       IsSettingsVisible="False"
-                       SelectionChanged="NavView_SelectionChanged">
-            
+        <NavigationView x:Name="NavView"
+                        PaneDisplayMode="Auto"
+                        CompactModeThresholdWidth="560"
+                        ExpandedModeThresholdWidth="1000"
+                        OpenPaneLength="240"
+                        IsPaneToggleButtonVisible="False"
+                        IsBackButtonVisible="Collapsed"
+                        IsSettingsVisible="False"
+                        AlwaysShowHeader="False"
+                        DisplayModeChanged="NavView_DisplayModeChanged"
+                        SelectionChanged="NavView_SelectionChanged">
+
             <NavigationView.MenuItems>
-                <NavigationViewItem x:Uid="Nav_Dashboard" Content="Dashboard" Tag="Dashboard" Icon="Home" IsSelected="True"/>
+                <NavigationViewItem x:Uid="Nav_Dashboard" Content="Dashboard" Tag="Dashboard" Icon="Home"/>
                 <NavigationViewItem x:Uid="Nav_Import" Content="Import" Tag="Import" Icon="Upload"/>
-                <NavigationViewItem x:Uid="Nav_WatchManagement" Content="Watch Management" Tag="WatchManagement" Icon="View"/>
-                <NavigationViewItem x:Uid="Nav_ApprovalWorkflow" Content="Approval Workflow" Tag="ApprovalWorkflow" Icon="Accept"/>
+                <NavigationViewItem x:Uid="Nav_WatchManagement" Content="Watched folders" Tag="WatchManagement" Icon="View"/>
+                <NavigationViewItem x:Uid="Nav_ApprovalWorkflow" Content="Approvals" Tag="ApprovalWorkflow" Icon="Accept"/>
                 <NavigationViewItem x:Uid="Nav_Analytics" Content="Analytics" Tag="Analytics">
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE9D9;"/>
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
-                <NavigationViewItem x:Uid="Nav_ServiceStatus" Content="Service Status" Tag="ServiceStatus" Icon="Sync"/>
+                <NavigationViewItem x:Uid="Nav_ServiceStatus" Content="Folder scanner" Tag="ServiceStatus" Icon="Sync"/>
                 <NavigationViewItem x:Uid="Nav_Settings" Content="Settings" Tag="Settings" Icon="Setting"/>
-                <NavigationViewItem x:Uid="Nav_FFmpegSettings" Content="FFmpeg Configuration" Tag="FFmpegSettings">
+                <NavigationViewItem x:Uid="Nav_FFmpegSettings" Content="Video tools" Tag="FFmpegSettings">
                     <NavigationViewItem.Icon>
-                        <FontIcon Glyph="&#xE8B8;"/>
+                        <FontIcon Glyph="&#xE8B2;"/>
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
             </NavigationView.MenuItems>
 
-            <Frame x:Name="ContentFrame" NavigationFailed="ContentFrame_NavigationFailed"/>
+            <!-- The page header lives with the page, not in NavigationView.Header, so it inherits the shell font and lines up with the cards -->
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <StackPanel x:Name="PageHeader" Spacing="4" Margin="24,20,24,12" MaxWidth="1152" HorizontalAlignment="Stretch">
+                    <TextBlock x:Name="PageTitle" Style="{StaticResource ToolsPageTitle}" FontSize="24" />
+                    <TextBlock x:Name="PageSubtitle" Style="{StaticResource ToolsPageSubtitle}" />
+                </StackPanel>
+                <Frame x:Name="ContentFrame" Grid.Row="1" NavigationFailed="ContentFrame_NavigationFailed"/>
+            </Grid>
         </NavigationView>
 
-        <!-- Status Bar -->
-        <Border Grid.Row="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" Padding="20,10">
-            <StackPanel Orientation="Horizontal">
-                <Image Source="ms-appx:///Assets/Images/staff_mark.png" Width="16" Height="16" Margin="0,0,10,0"/>
-                <TextBlock x:Name="StatusBarTextBlock" x:Uid="Status_Ready" Text="Ready"
-                           Style="{ThemeResource CaptionTextBlockStyle}" VerticalAlignment="Center"/>
-            </StackPanel>
+        <!-- Shown only while a scan or an import runs -->
+        <Border x:Name="ProgressStrip" Grid.Row="1" Visibility="Collapsed" Padding="20,10"
+                Background="{ThemeResource FanousSurfaceBrush}" BorderBrush="{ThemeResource FanousDividerBrush}" BorderThickness="0,1,0,0">
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="200"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="ProgressText" Style="{StaticResource ToolsBody}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                <ProgressBar x:Name="ProgressValue" Grid.Column="1" Maximum="100" VerticalAlignment="Center" />
+            </Grid>
         </Border>
     </Grid>
 </UserControl>

@@ -51,11 +51,7 @@ public sealed partial class ToolsShell : UserControl
     /// <summary>The workspace, once shown (MainWindow forwards its navigation calls to it)</summary>
     public FrameworkElement? Workspace => _workspace;
 
-    internal static string L(string key)
-    {
-        var value = ResourceLoader.GetForViewIndependentUse().GetString(key);
-        return string.IsNullOrEmpty(value) ? key : value;
-    }
+    internal static string L(string key) => Loc.Get(key);
 
     private void OnStateChanged(object? sender, EventArgs e) => DispatcherQueue.TryEnqueue(Render);
 
@@ -166,9 +162,22 @@ public sealed partial class ToolsShell : UserControl
         var waiting = session.State == SessionState.SigningIn;
         SignInButton.Visibility = waiting ? Visibility.Collapsed : Visibility.Visible;
         WaitingPanel.Visibility = waiting ? Visibility.Visible : Visibility.Collapsed;
-        foreach (var b in new[] { EnvProduction, EnvStage, EnvQa }) b.IsEnabled = !waiting;
+        // While the browser is open the chosen environment stays visible, just not changeable
+        EnvironmentSegments.IsHitTestVisible = !waiting;
+        EnvironmentSegments.Opacity = waiting ? 0.7 : 1;
+        foreach (var b in new[] { EnvProduction, EnvStage, EnvQa }) b.IsTabStop = !waiting;
         if (session.LastFailure is { } failure && !waiting)
         {
+            var cancelled = failure == SignInFailure.Cancelled;
+            var res = Application.Current.Resources;
+            var tone = (Brush)res[cancelled ? "FanousTextSecondaryBrush" : "FanousErrorTextBrush"];
+            FailureText.Foreground = tone;
+            FailureIcon.Foreground = tone;
+            FailureIcon.Glyph = cancelled ? "\uE946" : "\uE7BA";
+            FailureBox.BorderBrush = (Brush)res[cancelled ? "FanousOutlineBrush" : "FanousErrorTextBrush"];
+            FailureBox.Background = cancelled
+                ? (Brush)res["FanousSurfaceRaisedBrush"]
+                : new SolidColorBrush(((SolidColorBrush)res["FanousErrorTextBrush"]).Color) { Opacity = 0.08 };
             FailureText.Text = L(failure switch
             {
                 SignInFailure.Cancelled => "SignIn_FailureCancelled",
@@ -239,6 +248,8 @@ public sealed partial class ToolsShell : UserControl
     private async void OnSignInClick(object sender, RoutedEventArgs e) => await _state.Session.SignInAsync();
 
     private void OnCancelSignInClick(object sender, RoutedEventArgs e) => _state.Session.CancelSignIn();
+
+    private void OnReopenBrowserClick(object sender, RoutedEventArgs e) => _state.Session.ReopenSignInPage();
 
     private async void OnSignOutClick(object sender, RoutedEventArgs e) => await _state.Session.SignOutAsync();
 
