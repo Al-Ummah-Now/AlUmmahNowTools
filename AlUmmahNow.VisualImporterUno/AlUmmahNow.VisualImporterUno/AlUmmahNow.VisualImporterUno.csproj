@@ -6,16 +6,16 @@
     <UnoSingleProject>true</UnoSingleProject>
 
     <!-- Display name -->
-    <ApplicationTitle>Al Ummah Now Visual Importer</ApplicationTitle>
+    <ApplicationTitle>Al Ummah Now Tools</ApplicationTitle>
     <!-- App Identifier -->
-    <ApplicationId>com.alummahnow.visualimporter</ApplicationId>
+    <ApplicationId>net.alummahnow.tools</ApplicationId>
     <!-- Versions -->
     <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
     <ApplicationVersion>1</ApplicationVersion>
     <!-- Package Publisher -->
     <ApplicationPublisher>Al Ummah Now</ApplicationPublisher>
     <!-- Package Description -->
-    <Description>Al Ummah Now Visual Importer - File scanning and import management tool.</Description>
+    <Description>Al Ummah Now Tools: the staff app for bulk imports into Al Ummah Now.</Description>
 
     <!--
       UnoFeatures let's you quickly add and manage implicit package references based on the features you want to use.
@@ -33,6 +33,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- The staff icon (Tools #44): the logo's lantern in a gold octagon ring, from AlUmmahNow
+         packages/app-icons (the app-icons build with app tools, its icon-512.png) -->
+    <UnoIcon Include="Assets\Icons\staff_icon.png" Color="#09151E" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\AlUmmahNow.ToolsCore\AlUmmahNow.ToolsCore.csproj" />
     <ProjectReference Include="..\..\AlUmmahNow.Data\AlUmmahNow.Data.csproj" />
     <ProjectReference Include="..\..\AlUmmahNow.Importer\AlUmmahNow.Importer.csproj" />
   </ItemGroup>

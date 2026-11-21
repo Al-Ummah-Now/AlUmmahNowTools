@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!--
     Microsoft ResX Schema
@@ -119,5 +119,152 @@
   </resheader>
   <data name="ApplicationName" xml:space="preserve">
     <value>AlUmmahNow.VisualImporterUno-en</value>
+  </data>
+  <data name="Shell_WindowTitle" xml:space="preserve">
+    <value>Al Ummah Now Tools</value>
+  </data>
+  <data name="Shell_Brand.Text" xml:space="preserve">
+    <value>AL UMMAH NOW</value>
+  </data>
+  <data name="Shell_AppName.Text" xml:space="preserve">
+    <value>Tools</value>
+  </data>
+  <data name="Shell_LanguageButtonLabel.Text" xml:space="preserve">
+    <value>العربية</value>
+  </data>
+  <data name="Shell_LanguageButtonName" xml:space="preserve">
+    <value>Switch to Arabic</value>
+  </data>
+  <data name="Shell_ThemeToLight" xml:space="preserve">
+    <value>Switch to light mode</value>
+  </data>
+  <data name="Shell_ThemeToDark" xml:space="preserve">
+    <value>Switch to dark mode</value>
+  </data>
+  <data name="Shell_AccountButtonName" xml:space="preserve">
+    <value>Account</value>
+  </data>
+  <data name="Shell_SignedInAs" xml:space="preserve">
+    <value>Signed in as {0}</value>
+  </data>
+  <data name="Shell_EnvironmentMenu.Text" xml:space="preserve">
+    <value>Environment</value>
+  </data>
+  <data name="Shell_EnvProduction.Text" xml:space="preserve">
+    <value>Production</value>
+  </data>
+  <data name="Shell_EnvStage.Text" xml:space="preserve">
+    <value>Stage</value>
+  </data>
+  <data name="Shell_EnvQa.Text" xml:space="preserve">
+    <value>QA</value>
+  </data>
+  <data name="Shell_EnvProductionButton.Content" xml:space="preserve">
+    <value>Production</value>
+  </data>
+  <data name="Shell_EnvStageButton.Content" xml:space="preserve">
+    <value>Stage</value>
+  </data>
+  <data name="Shell_EnvQaButton.Content" xml:space="preserve">
+    <value>QA</value>
+  </data>
+  <data name="Shell_BadgeStage" xml:space="preserve">
+    <value>STAGE</value>
+  </data>
+  <data name="Shell_BadgeQa" xml:space="preserve">
+    <value>QA</value>
+  </data>
+  <data name="Shell_SignOut.Text" xml:space="preserve">
+    <value>Sign out</value>
+  </data>
+  <data name="SignIn_Title.Text" xml:space="preserve">
+    <value>Al Ummah Now Tools</value>
+  </data>
+  <data name="SignIn_Subtitle.Text" xml:space="preserve">
+    <value>Bulk imports for Al Ummah Now staff. Sign in with your staff account.</value>
+  </data>
+  <data name="SignIn_EnvironmentLabel.Text" xml:space="preserve">
+    <value>Environment</value>
+  </data>
+  <data name="SignIn_Button.Text" xml:space="preserve">
+    <value>Sign in with your browser</value>
+  </data>
+  <data name="SignIn_Waiting.Text" xml:space="preserve">
+    <value>Finish signing in in your browser…</value>
+  </data>
+  <data name="SignIn_Cancel.Content" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="SignIn_Footnote.Text" xml:space="preserve">
+    <value>Sign-in opens in your browser. Your password never enters this app.</value>
+  </data>
+  <data name="SignIn_FailureCancelled" xml:space="preserve">
+    <value>Sign-in was cancelled. Sign in again when you're ready.</value>
+  </data>
+  <data name="SignIn_FailureTimedOut" xml:space="preserve">
+    <value>Sign-in took too long. Try again, and finish it in the browser window that opens.</value>
+  </data>
+  <data name="SignIn_FailureOffline" xml:space="preserve">
+    <value>Can't reach the sign-in service. Check your connection and try again.</value>
+  </data>
+  <data name="SignIn_FailureFailed" xml:space="preserve">
+    <value>Sign-in didn't finish. Try again.</value>
+  </data>
+  <data name="Gate_CheckingTitle" xml:space="preserve">
+    <value>Checking your access</value>
+  </data>
+  <data name="Gate_CheckingBody" xml:space="preserve">
+    <value>One moment while Al Ummah Now confirms your staff account.</value>
+  </data>
+  <data name="Gate_NotStaffTitle" xml:space="preserve">
+    <value>This app is for Al Ummah Now staff</value>
+  </data>
+  <data name="Gate_NotStaffBody" xml:space="preserve">
+    <value>This account can't import. Sign in with your staff account, or ask a super admin to give this account import access.</value>
+  </data>
+  <data name="Gate_NotStaffPrimary" xml:space="preserve">
+    <value>Sign in with another account</value>
+  </data>
+  <data name="Gate_UnreachableTitle" xml:space="preserve">
+    <value>Can't reach Al Ummah Now</value>
+  </data>
+  <data name="Gate_UnreachableBody" xml:space="preserve">
+    <value>You're still signed in. Check your connection, then try again.</value>
+  </data>
+  <data name="Gate_UnreachablePrimary" xml:space="preserve">
+    <value>Try again</value>
+  </data>
+  <data name="Gate_SignOut.Content" xml:space="preserve">
+    <value>Sign out</value>
+  </data>
+  <data name="Nav_Dashboard.Content" xml:space="preserve">
+    <value>Dashboard</value>
+  </data>
+  <data name="Nav_Import.Content" xml:space="preserve">
+    <value>Import</value>
+  </data>
+  <data name="Nav_WatchManagement.Content" xml:space="preserve">
+    <value>Watched folders</value>
+  </data>
+  <data name="Nav_ApprovalWorkflow.Content" xml:space="preserve">
+    <value>Approvals</value>
+  </data>
+  <data name="Nav_Analytics.Content" xml:space="preserve">
+    <value>Analytics</value>
+  </data>
+  <data name="Nav_ServiceStatus.Content" xml:space="preserve">
+    <value>Service status</value>
+  </data>
+  <data name="Nav_Settings.Content" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <data name="Nav_FFmpegSettings.Content" xml:space="preserve">
+    <value>FFmpeg</value>
+  </data>
+  <data name="Status_Ready.Text" xml:space="preserve">
+    <value>Ready</value>
+  </data>
+  <data name="Shell_Selected" xml:space="preserve">
+    <value>Selected</value>
   </data>
 </root>

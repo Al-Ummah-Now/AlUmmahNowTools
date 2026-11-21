@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Al Ummah Now Tools without UI: environments, sign-in on aun-core's AuthManager, token stores,
+       the staff check against admin-api and the app's preferences. Tested in AlUmmahNow.ToolsCore.Tests. -->
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Fetched and checksum-verified by scripts/fetch-core.sh into .nuget-local (nuget.config) -->
+    <PackageReference Include="AlUmmahNow.Core" Version="0.4.0-rc.3" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="9.0.0" />
+    <InternalsVisibleTo Include="AlUmmahNow.ToolsCore.Tests" />
+  </ItemGroup>
+</Project>

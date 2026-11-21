@@ -136,6 +136,29 @@ jobs:
         recreate: true
         path: code-coverage-results.md
 
+  # Tools sign-in core and the desktop app (net9.0)
+  tools:
+    name: Tools core and desktop build
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '9.0.x'
+
+    - name: Fetch AlUmmahNow.Core
+      run: scripts/fetch-core.sh
+
+    - name: Test ToolsCore
+      run: dotnet test AlUmmahNow.ToolsCore.Tests/AlUmmahNow.ToolsCore.Tests.csproj --configuration Release --logger "console;verbosity=normal"
+
+    - name: Build the desktop app
+      run: dotnet build AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno.csproj -f net9.0-desktop --configuration Release
+
   # Optional: Upload to Codecov
   codecov:
     name: Upload to Codecov

@@ -1,0 +1,270 @@
+<UserControl
+    x:Class="AlUmmahNow.VisualImporterUno.Shell.ToolsShell"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:shell="using:AlUmmahNow.VisualImporterUno.Shell">
+
+    <UserControl.Resources>
+        <!-- The header is dark in every theme and both modes (wiki Theming) -->
+        <LinearGradientBrush x:Key="ShellHeaderBrush" StartPoint="0,0" EndPoint="1,0">
+            <GradientStop Color="#FF0B1D2A" Offset="0" />
+            <GradientStop Color="#FF0E2B3D" Offset="0.55" />
+            <GradientStop Color="#FF09151E" Offset="1" />
+        </LinearGradientBrush>
+        <LinearGradientBrush x:Key="ShellHeaderRuleBrush" StartPoint="0,0" EndPoint="1,0">
+            <GradientStop Color="#00F4AE3A" Offset="0" />
+            <GradientStop Color="#CCF4AE3A" Offset="0.5" />
+            <GradientStop Color="#00F4AE3A" Offset="1" />
+        </LinearGradientBrush>
+
+        <Style x:Key="HeaderButton" TargetType="Button">
+            <Setter Property="Background" Value="#14FFFFFF" />
+            <Setter Property="Foreground" Value="#FFF7F1E8" />
+            <Setter Property="BorderBrush" Value="#33F5CF92" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="MinHeight" Value="36" />
+            <Setter Property="MinWidth" Value="36" />
+            <Setter Property="Padding" Value="12,0" />
+            <Setter Property="FontSize" Value="14" />
+        </Style>
+
+        <Style x:Key="PrimaryAction" TargetType="Button">
+            <Setter Property="Background" Value="{ThemeResource FanousPrimaryBrush}" />
+            <Setter Property="Foreground" Value="{ThemeResource FanousOnPrimaryBrush}" />
+            <Setter Property="BorderBrush" Value="{ThemeResource FanousPrimaryEdgeBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="MinHeight" Value="46" />
+            <Setter Property="Padding" Value="20,0" />
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+        </Style>
+
+        <Style x:Key="SecondaryAction" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{ThemeResource FanousTextPrimaryBrush}" />
+            <Setter Property="BorderBrush" Value="{ThemeResource FanousOutlineBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="MinHeight" Value="44" />
+            <Setter Property="Padding" Value="20,0" />
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+        </Style>
+
+        <SolidColorBrush x:Key="SegmentSelectedBrush" Color="#FFF4AE3A" />
+
+        <Style x:Key="SegmentButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{ThemeResource FanousTextSecondaryBrush}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="MinHeight" Value="36" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="FontSize" Value="14" />
+        </Style>
+
+        <!-- A gold edge along the card's top that fades into its outline -->
+        <LinearGradientBrush x:Key="CardEdgeBrush" StartPoint="0.5,0" EndPoint="0.5,1">
+            <GradientStop Color="#CCF4AE3A" Offset="0" />
+            <GradientStop Color="#40F5CF92" Offset="0.35" />
+            <GradientStop Color="#26B0C0C8" Offset="1" />
+        </LinearGradientBrush>
+        <!-- The lantern's light behind the card -->
+        <RadialGradientBrush x:Key="LanternGlowBrush" Center="0.5,0.32" RadiusX="0.55" RadiusY="0.5" GradientOrigin="0.5,0.32">
+            <GradientStop Color="#2EF4AE3A" Offset="0" />
+            <GradientStop Color="#0FF4AE3A" Offset="0.45" />
+            <GradientStop Color="#00F4AE3A" Offset="1" />
+        </RadialGradientBrush>
+
+        <Style x:Key="CardBorder" TargetType="Border">
+            <Setter Property="Background" Value="{ThemeResource FanousSurfaceBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource CardEdgeBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="20" />
+            <Setter Property="Padding" Value="36,32" />
+            <Setter Property="MaxWidth" Value="460" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="16" />
+        </Style>
+    </UserControl.Resources>
+
+    <Grid x:Name="Root" Background="{ThemeResource FanousBackgroundBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Header: logo lockup, language, light/dark, account, environment (the shared order) -->
+        <Grid Grid.Row="0" Background="{StaticResource ShellHeaderBrush}" Padding="16,10" ColumnSpacing="8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                <Border Width="34" Height="34" CornerRadius="8" BorderBrush="#66F4AE3A" BorderThickness="1">
+                    <Border.Background>
+                        <ImageBrush ImageSource="ms-appx:///Assets/Images/staff_mark.png" Stretch="UniformToFill" />
+                    </Border.Background>
+                </Border>
+                <StackPanel x:Name="BrandText" VerticalAlignment="Center">
+                    <TextBlock x:Uid="Shell_Brand" Text="Al Ummah Now" Foreground="#FFF5CF92" FontSize="11" FontWeight="SemiBold" CharacterSpacing="40" />
+                    <TextBlock x:Uid="Shell_AppName" Text="Tools" Foreground="#FFF7F1E8" FontSize="16" FontWeight="SemiBold" />
+                </StackPanel>
+            </StackPanel>
+
+            <Button x:Name="LanguageButton" Grid.Column="1" Style="{StaticResource HeaderButton}" Click="OnLanguageClick">
+                <TextBlock x:Uid="Shell_LanguageButtonLabel" Text="العربية" />
+            </Button>
+
+            <Button x:Name="ThemeButton" Grid.Column="2" Style="{StaticResource HeaderButton}" Padding="0" Width="36" Click="OnThemeClick">
+                <FontIcon x:Name="ThemeIcon" Glyph="&#xE706;" FontSize="16" />
+            </Button>
+
+            <Button x:Name="AccountButton" Grid.Column="3" Style="{StaticResource HeaderButton}" Padding="4,0,10,0" Visibility="Collapsed">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Border Width="28" Height="28" CornerRadius="14" Background="{ThemeResource FanousPrimaryBrush}">
+                        <TextBlock x:Name="AccountInitials" Text="A" Foreground="#FF09151E" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <TextBlock x:Name="AccountName" Text="" VerticalAlignment="Center" MaxWidth="180" TextTrimming="CharacterEllipsis" />
+                    <FontIcon Glyph="&#xE70D;" FontSize="10" />
+                </StackPanel>
+                <Button.Flyout>
+                    <MenuFlyout x:Name="AccountMenu" Placement="BottomEdgeAlignedRight">
+                        <MenuFlyoutItem x:Name="AccountEmailItem" IsEnabled="False" Text="" />
+                        <MenuFlyoutSeparator />
+                        <MenuFlyoutSubItem x:Uid="Shell_EnvironmentMenu" Text="Environment">
+                            <RadioMenuFlyoutItem x:Name="EnvProductionItem" x:Uid="Shell_EnvProduction" Text="Production" GroupName="env" Click="OnEnvironmentMenuClick" Tag="Production" />
+                            <RadioMenuFlyoutItem x:Name="EnvStageItem" x:Uid="Shell_EnvStage" Text="Stage" GroupName="env" Click="OnEnvironmentMenuClick" Tag="Stage" />
+                            <RadioMenuFlyoutItem x:Name="EnvQaItem" x:Uid="Shell_EnvQa" Text="QA" GroupName="env" Click="OnEnvironmentMenuClick" Tag="Qa" />
+                        </MenuFlyoutSubItem>
+                        <MenuFlyoutSeparator />
+                        <MenuFlyoutItem x:Uid="Shell_SignOut" Text="Sign out" Click="OnSignOutClick">
+                            <MenuFlyoutItem.Icon>
+                                <FontIcon Glyph="&#xF3B1;" />
+                            </MenuFlyoutItem.Icon>
+                        </MenuFlyoutItem>
+                    </MenuFlyout>
+                </Button.Flyout>
+            </Button>
+
+            <Border x:Name="EnvironmentBadge" Grid.Column="4" CornerRadius="13" Padding="10,4" VerticalAlignment="Center" Visibility="Collapsed" BorderThickness="1">
+                <TextBlock x:Name="EnvironmentBadgeText" Text="QA" FontSize="12" FontWeight="Bold" CharacterSpacing="40" />
+            </Border>
+
+            <Rectangle Grid.ColumnSpan="5" Height="1" VerticalAlignment="Bottom" Margin="-16,0,-16,-10" Fill="{StaticResource ShellHeaderRuleBrush}" />
+        </Grid>
+
+        <!-- Content -->
+        <Grid Grid.Row="1">
+            <Grid.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                    <GradientStop Color="{ThemeResource FanousHeroStartColor}" Offset="0" />
+                    <GradientStop Color="{ThemeResource FanousHeroEndColor}" Offset="1" />
+                </LinearGradientBrush>
+            </Grid.Background>
+
+            <Rectangle Fill="{StaticResource LanternGlowBrush}" IsHitTestVisible="False" />
+
+            <!-- Sign in -->
+            <ScrollViewer x:Name="SignInView" Visibility="Collapsed">
+                <Border Style="{StaticResource CardBorder}">
+                    <StackPanel Spacing="18">
+                        <Border Width="88" Height="88" CornerRadius="22" HorizontalAlignment="Center" BorderBrush="{ThemeResource FanousPrimaryEdgeBrush}" BorderThickness="1">
+                            <Border.Background>
+                                <ImageBrush ImageSource="ms-appx:///Assets/Images/staff_mark.png" Stretch="UniformToFill" />
+                            </Border.Background>
+                        </Border>
+                        <StackPanel Spacing="6">
+                            <TextBlock x:Uid="SignIn_Title" Text="Al Ummah Now Tools" HorizontalAlignment="Center" TextAlignment="Center" FontSize="26" FontWeight="Bold" Foreground="{ThemeResource FanousTextPrimaryBrush}" TextWrapping="Wrap" />
+                            <TextBlock x:Uid="SignIn_Subtitle" MaxWidth="340" Text="Bulk imports for Al Ummah Now staff. Sign in with your staff account." HorizontalAlignment="Center" TextAlignment="Center" FontSize="15" Foreground="{ThemeResource FanousTextSecondaryBrush}" TextWrapping="Wrap" />
+                        </StackPanel>
+
+                        <StackPanel Spacing="8">
+                            <TextBlock x:Uid="SignIn_EnvironmentLabel" Text="Environment" FontSize="13" FontWeight="SemiBold" Foreground="{ThemeResource FanousTextMutedBrush}" />
+                            <Border Background="{ThemeResource FanousBackgroundBrush}" CornerRadius="10" Padding="3" BorderBrush="{ThemeResource FanousOutlineBrush}" BorderThickness="1">
+                                <Grid ColumnSpacing="3">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Button x:Name="EnvProduction" x:Uid="Shell_EnvProductionButton" Content="Production" Style="{StaticResource SegmentButton}" Tag="Production" Click="OnEnvironmentSegmentClick" />
+                                    <Button x:Name="EnvStage" x:Uid="Shell_EnvStageButton" Grid.Column="1" Content="Stage" Style="{StaticResource SegmentButton}" Tag="Stage" Click="OnEnvironmentSegmentClick" />
+                                    <Button x:Name="EnvQa" x:Uid="Shell_EnvQaButton" Grid.Column="2" Content="QA" Style="{StaticResource SegmentButton}" Tag="Qa" Click="OnEnvironmentSegmentClick" />
+                                </Grid>
+                            </Border>
+                        </StackPanel>
+
+                        <Button x:Name="SignInButton" Style="{StaticResource PrimaryAction}" Click="OnSignInClick">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <FontIcon Glyph="&#xE774;" FontSize="16" />
+                                <TextBlock x:Uid="SignIn_Button" Text="Sign in with your browser" />
+                            </StackPanel>
+                        </Button>
+
+                        <StackPanel x:Name="WaitingPanel" Spacing="12" Visibility="Collapsed">
+                            <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center">
+                                <ProgressRing IsActive="True" Width="20" Height="20" Foreground="{ThemeResource FanousPrimaryBrush}" />
+                                <TextBlock x:Uid="SignIn_Waiting" Text="Finish signing in in your browser…" VerticalAlignment="Center" Foreground="{ThemeResource FanousTextPrimaryBrush}" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <Button x:Uid="SignIn_Cancel" Content="Cancel" Style="{StaticResource SecondaryAction}" Click="OnCancelSignInClick" />
+                        </StackPanel>
+
+                        <Border x:Name="FailureBox" Visibility="Collapsed" CornerRadius="10" Padding="14,10" BorderThickness="1" BorderBrush="{ThemeResource FanousErrorTextBrush}">
+                            <Border.Background>
+                                <SolidColorBrush Color="{ThemeResource FanousErrorTextColor}" Opacity="0.08" />
+                            </Border.Background>
+                            <TextBlock x:Name="FailureText" Text="" Foreground="{ThemeResource FanousErrorTextBrush}" TextWrapping="Wrap" />
+                        </Border>
+
+                        <Rectangle Height="1" Fill="{ThemeResource FanousDividerBrush}" />
+                        <Grid ColumnSpacing="8">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <FontIcon Glyph="&#xE72E;" FontSize="14" Foreground="{ThemeResource FanousTextMutedBrush}" VerticalAlignment="Top" Margin="0,2,0,0" />
+                            <TextBlock x:Uid="SignIn_Footnote" Grid.Column="1" Text="Sign-in opens in your browser. Your password never enters this app." FontSize="13" Foreground="{ThemeResource FanousTextMutedBrush}" TextWrapping="Wrap" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </ScrollViewer>
+
+            <!-- Checking, not staff, admin API unreachable -->
+            <ScrollViewer x:Name="GateView" Visibility="Collapsed">
+                <Border Style="{StaticResource CardBorder}">
+                    <StackPanel Spacing="16">
+                        <Border x:Name="GateIconRing" Width="64" Height="64" CornerRadius="32" HorizontalAlignment="Center" BorderThickness="1" BorderBrush="{ThemeResource FanousPrimaryEdgeBrush}">
+                            <Border.Background>
+                                <SolidColorBrush Color="{ThemeResource FanousPrimaryColor}" Opacity="0.12" />
+                            </Border.Background>
+                            <Grid>
+                                <FontIcon x:Name="GateIcon" Glyph="&#xE72E;" FontSize="26" Foreground="{ThemeResource FanousPrimaryBrush}" />
+                                <ProgressRing x:Name="GateRing" IsActive="False" Width="40" Height="40" Foreground="{ThemeResource FanousPrimaryBrush}" Visibility="Collapsed" />
+                            </Grid>
+                        </Border>
+                        <TextBlock x:Name="GateTitle" Text="" HorizontalAlignment="Center" TextAlignment="Center" FontSize="22" FontWeight="Bold" Foreground="{ThemeResource FanousTextPrimaryBrush}" TextWrapping="Wrap" />
+                        <TextBlock x:Name="GateBody" Text="" HorizontalAlignment="Center" TextAlignment="Center" FontSize="15" Foreground="{ThemeResource FanousTextSecondaryBrush}" TextWrapping="Wrap" />
+                        <Border x:Name="GateAccountChip" HorizontalAlignment="Center" CornerRadius="16" Padding="12,6" Background="{ThemeResource FanousSurfaceRaisedBrush}" Visibility="Collapsed">
+                            <TextBlock x:Name="GateAccountText" Text="" FontSize="13" Foreground="{ThemeResource FanousTextPrimaryBrush}" />
+                        </Border>
+                        <StackPanel x:Name="GateActions" Spacing="10">
+                            <Button x:Name="GatePrimary" Style="{StaticResource PrimaryAction}" Click="OnGatePrimaryClick">
+                                <TextBlock x:Name="GatePrimaryText" Text="" />
+                            </Button>
+                            <Button x:Uid="Gate_SignOut" Content="Sign out" Style="{StaticResource SecondaryAction}" Click="OnSignOutClick" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </ScrollViewer>
+
+            <!-- The app itself, once the account is staff -->
+            <ContentControl x:Name="WorkspaceHost" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Visibility="Collapsed" />
+        </Grid>
+    </Grid>
+</UserControl>
