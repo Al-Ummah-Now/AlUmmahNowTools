@@ -18,12 +18,22 @@
             <Border Style="{StaticResource ToolsCard}">
                 <StackPanel Spacing="12">
                     <TextBlock x:Uid="Settings_ScannerTitle" Text="Folder scanner" Style="{StaticResource ToolsCardTitle}" />
-                    <StackPanel Spacing="6">
-                        <TextBlock x:Uid="Settings_AddressLabel" Text="Address" Style="{StaticResource ToolsLabel}" />
-                        <TextBox x:Uid="Settings_AddressBox" PlaceholderText="http://localhost:5000" FlowDirection="LeftToRight"
-                                 Text="{x:Bind ViewModel.FileScanServiceUrl, Mode=TwoWay}" />
-                        <TextBlock x:Uid="Settings_AddressHint" Text="Where Tools reaches the scanner on this computer. Leave it as it is unless support asks you to change it." Style="{StaticResource ToolsMuted}" />
+                    <StackPanel Spacing="4">
+                        <TextBlock x:Uid="Settings_LocationLabel" Text="Runs on" Style="{StaticResource ToolsLabel}" />
+                        <TextBlock Text="{x:Bind ViewModel.ScannerLocationText, Mode=OneWay}" Style="{StaticResource ToolsBody}" Foreground="{ThemeResource FanousTextPrimaryBrush}" FontWeight="SemiBold" />
+                        <TextBlock x:Uid="Settings_LocationHint" Text="Tools finds and talks to the scanner by itself." Style="{StaticResource ToolsMuted}" />
                     </StackPanel>
+                    <Expander HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="0,8,0,0">
+                        <Expander.Header>
+                            <TextBlock x:Uid="Settings_Advanced" Text="Advanced" Style="{StaticResource ToolsBody}" />
+                        </Expander.Header>
+                        <StackPanel Spacing="6">
+                            <TextBlock x:Uid="Settings_AddressLabel" Text="Address" Style="{StaticResource ToolsLabel}" />
+                            <TextBox x:Uid="Settings_AddressBox" FlowDirection="LeftToRight"
+                                     Text="{x:Bind ViewModel.FileScanServiceUrl, Mode=TwoWay}" />
+                            <TextBlock x:Uid="Settings_AddressHint" Text="Change it only if support asks you to." Style="{StaticResource ToolsMuted}" />
+                        </StackPanel>
+                    </Expander>
                     <StackPanel Orientation="Horizontal" Spacing="12">
                         <Button Style="{StaticResource ToolsSecondaryButton}" Click="TestConnectionButton_Click"
                                 IsEnabled="{x:Bind ViewModel.IsTesting, Mode=OneWay, Converter={StaticResource InverseBoolConverter}}">

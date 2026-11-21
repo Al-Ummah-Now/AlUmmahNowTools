@@ -236,14 +236,18 @@
                                     <StackPanel Grid.Column="1" Spacing="3">
                                         <TextBlock Text="{x:Bind ChannelName}" Style="{StaticResource ToolsCardTitle}" FontSize="15" />
                                         <shell:PathText Path="{x:Bind WatchPath}" />
+                                        <TextBlock x:Uid="Watch_StoppedRow" Text="Not being watched" Style="{StaticResource ToolsMuted}" Foreground="{ThemeResource FanousTextSecondaryBrush}"
+                                                   Visibility="{x:Bind IsActive, Converter={StaticResource InverseBoolToVisibility}}" />
                                         <TextBlock Text="{x:Bind TotalFilesDetected, Converter={StaticResource LocFormat}, ConverterParameter=Watch_RowVideos}" Style="{StaticResource ToolsMuted}" />
                                         <TextBlock Text="{x:Bind PendingApprovals, Converter={StaticResource LocFormat}, ConverterParameter=Watch_RowWaiting}" Style="{StaticResource ToolsMuted}" />
                                     </StackPanel>
                                     <Button Grid.Column="2" Style="{StaticResource ToolsSecondaryButton}" VerticalAlignment="Center" Tag="{x:Bind}" Click="StopWatch_Click" Visibility="{x:Bind IsActive}">
                                         <TextBlock x:Uid="Watch_Stop" Text="Stop watching" />
                                     </Button>
-                                    <TextBlock Grid.Column="2" x:Uid="Watch_Stopped" Text="Not being watched" Style="{StaticResource ToolsMuted}" VerticalAlignment="Center"
-                                               Visibility="{x:Bind IsActive, Converter={StaticResource InverseBoolToVisibility}}" />
+                                    <Button Grid.Column="2" Style="{StaticResource ToolsSecondaryButton}" VerticalAlignment="Center" Tag="{x:Bind}" Click="ResumeWatch_Click"
+                                            Visibility="{x:Bind IsActive, Converter={StaticResource InverseBoolToVisibility}}">
+                                        <TextBlock x:Uid="Watch_Resume" Text="Watch again" />
+                                    </Button>
                                 </Grid>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>

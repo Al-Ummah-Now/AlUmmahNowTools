@@ -9,6 +9,7 @@
 
     <Page.Resources>
         <converters:InverseBoolConverter x:Key="InverseBoolConverter"/>
+        <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibility"/>
     </Page.Resources>
 
     <ScrollViewer HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled">
@@ -23,7 +24,9 @@
                     </StackPanel>
                     <TextBlock Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" Style="{StaticResource ToolsBody}" />
                     <StackPanel Orientation="Horizontal" Spacing="12">
+                        <!-- Once the programs work, finding them again isn't the next step; checking is still offered -->
                         <Button Style="{StaticResource ToolsPrimaryButton}" Click="AutoDetectButton_Click"
+                                Visibility="{x:Bind ViewModel.IsInstalled, Mode=OneWay, Converter={StaticResource InverseBoolToVisibility}}"
                                 IsEnabled="{x:Bind ViewModel.IsAutoDetecting, Mode=OneWay, Converter={StaticResource InverseBoolConverter}}">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <ProgressRing Width="16" Height="16" IsActive="{x:Bind ViewModel.IsAutoDetecting, Mode=OneWay}" Visibility="{x:Bind ViewModel.IsAutoDetecting, Mode=OneWay}" />

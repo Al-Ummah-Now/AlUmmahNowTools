@@ -74,5 +74,12 @@ public sealed partial class WatchManagementPage : Page
         if (ViewModel.StopWatchCommand.CanExecute(null)) ViewModel.StopWatchCommand.Execute(null);
     }
 
+    private void ResumeWatch_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.Tag is not WatchStatusDto watch) return;
+        ViewModel.SelectedWatch = watch;
+        if (ViewModel.ResumeWatchCommand.CanExecute(null)) ViewModel.ResumeWatchCommand.Execute(null);
+    }
+
     private void Approvals_Click(object sender, RoutedEventArgs e) => (App.Current.MainWindow as MainWindow)?.NavigateToApprovalWorkflowView();
 }

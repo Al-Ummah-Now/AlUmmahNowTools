@@ -35,6 +35,19 @@ namespace AlUmmahNow.VisualImporterUno.Views
             PeriodActions.HorizontalAlignment = stacked ? Microsoft.UI.Xaml.HorizontalAlignment.Left : Microsoft.UI.Xaml.HorizontalAlignment.Stretch;
         }
 
+        private BarStrip? _dailyStrip;
+
+        private void DailyStrip_Loaded(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+        {
+            _dailyStrip = (BarStrip)sender;
+            _dailyStrip.FillWidth = DailyScroll.ActualWidth;
+        }
+
+        private void DailyScroll_SizeChanged(object sender, Microsoft.UI.Xaml.SizeChangedEventArgs e)
+        {
+            if (_dailyStrip != null) _dailyStrip.FillWidth = e.NewSize.Width;
+        }
+
         private void OfflineCard_Connected(object? sender, System.EventArgs e) => Refresh();
 
         private void Refresh()

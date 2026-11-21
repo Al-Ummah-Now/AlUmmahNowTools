@@ -135,7 +135,7 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
     public string PendingText => Loc.Number(Statistics.TotalPending);
     public string ApprovedText => Loc.Number(Statistics.TotalApproved);
     public string RejectedText => Loc.Number(Statistics.TotalRejected);
-    public string PendingSizeText => Loc.Bytes(PendingApprovals.Sum(a => a.FileSize));
+    public string PendingSizeText => Loc.Bytes(PendingApprovals.Where(a => a.Status == ApprovalStatus.Pending).Sum(a => a.FileSize));
     public bool HasApprovals => FilteredApprovals.Count > 0;
     public string ListTitleText => Loc.Format("Approve_ListTitle", FilteredApprovals.Count);
     public string ApproveSelectedText => SelectedCount > 0 ? Loc.Format("Approve_ApproveN", SelectedCount) : Loc.Get("Approve_Approve");

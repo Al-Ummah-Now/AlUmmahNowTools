@@ -73,6 +73,36 @@ public class FileWatchRegistryTests : FileSystemTestBase
     }
 
     [Fact]
+    public async Task A_stopped_watch_can_be_resumed_and_keeps_its_record()
+    {
+        var watchId = await Registry.StartWatchAsync(Request(TestChannel1Directory));
+        await Registry.StopWatchAsync(watchId);
+
+        Assert.True(await Registry.ResumeWatchAsync(watchId));
+
+        Assert.Contains(watchId, Registry.RunningWatchIds);
+        await using var db = new ImportDbContext(_options);
+        var watches = await db.ChannelWatches.ToListAsync();
+        Assert.Single(watches);
+        Assert.True(watches[0].IsActive);
+    }
+
+    [Fact]
+    public async Task A_stopped_watch_is_not_resumed_onto_a_folder_another_watch_took_over()
+    {
+        var first = await Registry.StartWatchAsync(Request(TestChannel1Directory));
+        await Registry.StopWatchAsync(first);
+        var second = await Registry.StartWatchAsync(Request(TestChannel1Directory));
+
+        Assert.False(await Registry.ResumeWatchAsync(first));
+        Assert.False(await Registry.ResumeWatchAsync(Guid.NewGuid()));
+
+        Assert.Equal(new[] { second }, Registry.RunningWatchIds);
+        await using var db = new ImportDbContext(_options);
+        Assert.False((await db.ChannelWatches.SingleAsync(w => w.Id == first)).IsActive);
+    }
+
+    [Fact]
     public async Task Active_watches_are_restored_when_the_service_starts()
     {
         var active1 = new ChannelWatch { ChannelName = "a", WatchPath = TestChannel1Directory, IsActive = true };

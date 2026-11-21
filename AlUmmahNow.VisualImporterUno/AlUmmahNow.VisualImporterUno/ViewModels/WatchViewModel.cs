@@ -595,6 +595,36 @@ public partial class WatchViewModel : ObservableObject, IDisposable
     }
 
     [RelayCommand(CanExecute = nameof(HasSelectedWatch))]
+    private async Task ResumeWatchAsync()
+    {
+        if (SelectedWatch == null) return;
+        var watch = SelectedWatch;
+
+        try
+        {
+            IsLoading = true;
+            StatusMessage = Loc.GetWithDetail("Watch_Resuming", watch.ChannelName);
+            if (await _signalRClient.ResumeWatchAsync(watch.WatchId))
+            {
+                StatusMessage = Loc.GetWithDetail("Watch_Resumed", watch.ChannelName);
+                await RefreshWatchesAsync();
+            }
+            else
+            {
+                StatusMessage = Loc.GetWithDetail("Watch_ResumeFailed", watch.ChannelName);
+            }
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = Loc.GetWithDetail("Watch_ResumeFailed", ex.Message);
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(HasSelectedWatch))]
     private async Task DeleteWatchAsync()
     {
         if (SelectedWatch == null) return;
@@ -655,7 +685,7 @@ public partial class WatchViewModel : ObservableObject, IDisposable
                 UpdateAvailableChannels();
             });
 
-            StatusMessage = Loc.Format("Watch_Loaded", watches.Count);
+            StatusMessage = Loc.Get("Watch_Loaded");
         }
         catch (Exception ex)
         {

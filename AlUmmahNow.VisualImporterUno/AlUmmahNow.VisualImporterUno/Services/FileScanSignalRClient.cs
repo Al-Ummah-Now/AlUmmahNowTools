@@ -450,7 +450,7 @@ public class FileScanSignalRClient : IAsyncDisposable
     /// <summary>
     /// Stop a channel watch
     /// </summary>
-    public async Task<bool> StopWatchAsync(Guid watchId)
+    public virtual async Task<bool> StopWatchAsync(Guid watchId)
     {
         try
         {
@@ -468,6 +468,18 @@ public class FileScanSignalRClient : IAsyncDisposable
             ErrorOccurred?.Invoke(this, $"Failed to stop watch: {ex.Message}");
             throw new InvalidOperationException($"Failed to stop watch: {ex.Message}", ex);
         }
+    }
+
+    /// <summary>
+    /// Start watching a stopped watch's folder again, keeping its history
+    /// </summary>
+    public virtual async Task<bool> ResumeWatchAsync(Guid watchId)
+    {
+        if (!IsConnected)
+        {
+            throw new InvalidOperationException(AlUmmahNow.VisualImporterUno.Shell.Loc.Get("Watch_NotConnected"));
+        }
+        return await _connection!.InvokeAsync<bool>("ResumeWatch", watchId);
     }
 
     /// <summary>
