@@ -117,7 +117,7 @@ Advanced code search
   "type": "module",
   "main": "index.js",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^0.5.0",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "better-sqlite3": "^9.0.0"
   }
 }
