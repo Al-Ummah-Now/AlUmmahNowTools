@@ -10,6 +10,9 @@ public class Program
     public static void Main(string[] args)
     {
         var host = UnoPlatformHostBuilder.Create()
+            // One app for the three desktops (wiki TOOLS-ADMIN): AppKit on macOS, Win32 on Windows, X11 on Linux
+            .UseMacOS()
+            .UseWin32()
             .UseX11()
             .UseLinuxFrameBuffer()
             .App(() => new App())

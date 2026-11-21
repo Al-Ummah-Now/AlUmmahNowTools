@@ -7,9 +7,32 @@
       <ResourceDictionary.MergedDictionaries>
         <!-- Load WinUI resources -->
         <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+        <!-- Fawanees, the default site theme (vendored, see Themes/Fawanees/SOURCE.md) -->
+        <ResourceDictionary Source="ms-appx:///Themes/Fawanees/Fanous.Colors.xaml" />
+        <ResourceDictionary Source="ms-appx:///Themes/Fawanees/Fanous.Tokens.xaml" />
       </ResourceDictionary.MergedDictionaries>
 
-      <!-- Add resources here -->
+      <!-- WinUI accent follows the Fawanees accent (gold in dark, deep amber in light), not the OS accent -->
+      <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Dark">
+          <Color x:Key="SystemAccentColor">#FFF4AE3A</Color>
+          <Color x:Key="SystemAccentColorLight1">#FFF4AE3A</Color>
+          <Color x:Key="SystemAccentColorLight2">#FFF4AE3A</Color>
+          <Color x:Key="SystemAccentColorLight3">#FFF4AE3A</Color>
+          <Color x:Key="SystemAccentColorDark1">#FFF4AE3A</Color>
+          <Color x:Key="SystemAccentColorDark2">#FFF4AE3A</Color>
+          <Color x:Key="SystemAccentColorDark3">#FFF4AE3A</Color>
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Light">
+          <Color x:Key="SystemAccentColor">#FF8A4900</Color>
+          <Color x:Key="SystemAccentColorLight1">#FF8A4900</Color>
+          <Color x:Key="SystemAccentColorLight2">#FF8A4900</Color>
+          <Color x:Key="SystemAccentColorLight3">#FF8A4900</Color>
+          <Color x:Key="SystemAccentColorDark1">#FF8A4900</Color>
+          <Color x:Key="SystemAccentColorDark2">#FF8A4900</Color>
+          <Color x:Key="SystemAccentColorDark3">#FF8A4900</Color>
+        </ResourceDictionary>
+      </ResourceDictionary.ThemeDictionaries>
 
     </ResourceDictionary>
   </Application.Resources>

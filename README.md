@@ -11,6 +11,9 @@ A comprehensive .NET 8/9 solution for video content management, processing, and 
 
 ### Build & Run
 ```bash
+# Fetch the pinned AlUmmahNow.Core package once (sign-in and token storage)
+scripts/fetch-core.sh
+
 # Build entire solution (Note: Uno Platform project requires NET 9 SDK)
 dotnet build
 
@@ -32,9 +35,16 @@ dotnet run
 - **AlUmmahNow.Data** - Shared data models and storage services
 - **AlUmmahNow.Importer** - Core import business logic
 - **AlUmmahNow.DataImporter** - Command-line SignalR client for file scanning
+- **AlUmmahNow.ToolsCore** - Staff sign-in for Al Ummah Now Tools: browser sign-in through Al Ummah Now Auth (PKCE, loopback redirect), the staff check against the admin API, per-environment token storage (Windows DPAPI, macOS Keychain, Linux libsecret) and saved preferences
 - **AlUmmahNow.VisualImporterUno** - Cross-platform visual import interface (Uno Platform - Windows, Linux, macOS, Web, Mobile)
 - **AlUmmahNow.FileScanService** - Background file scanning service with SignalR Hub
 - **AlUmmahNow.Tests** - Comprehensive test suite (258 tests)
+
+## Al Ummah Now Tools sign-in
+
+The desktop app opens on a sign-in screen. Staff sign in with their browser (the password never enters the app), then the app checks `GET /api/admin/import/me` on the admin API: only accounts with import access reach the workspace. Production is the default environment; Stage and QA are picked on the sign-in screen or from the account menu, and each keeps its own sign-in. The header carries the language switch (English and Arabic, right to left), light and dark (the first run follows the device), the account menu and the environment badge.
+
+Arabic text uses the bundled IBM Plex Sans Arabic (SIL Open Font License, `Assets/Fonts`), because Uno's Skia text needs one font that carries both Arabic letters and Latin punctuation to order a line correctly.
 
 ## ??? Architecture
 

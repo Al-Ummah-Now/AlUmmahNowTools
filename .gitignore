@@ -369,3 +369,7 @@ TestResults/
 # Claude Code configuration with sensitive credentials
 .claude/claude_desktop_config.json
 .claude/settings.local.json
+
+# aun-core package fetched by scripts/fetch-core.sh
+.nuget-local/*
+!.nuget-local/.gitkeep

@@ -374,9 +374,20 @@ public partial class App : Application
             // Initialize services
             InitializeServices();
 
-            // Create and activate our custom MainWindow
-            MainWindow = new MainWindow();
+            // The shell (wiki TOOLS-ADMIN TA-10): preferences, language and the sign-in session first
+            var demo = Shell.ShellDemo.FromEnvironment();
+            var shellState = Shell.ShellState.Start(AlUmmahNow.ToolsCore.ToolsPreferences.DefaultPath, demo);
+            Shell.ShellState.ApplyLanguage(shellState.Preferences.Language);
+
+            MainWindow = new MainWindow(shellState);
             MainWindow.Activate();
+            _ = demo != null ? demo.DriveAsync(shellState.Session) : shellState.Session.RestoreAsync();
+#if !WINDOWS
+            if (Environment.GetEnvironmentVariable("TOOLS_SCREENSHOT") is { Length: > 0 } shot)
+            {
+                _ = Shell.ScreenshotRunner.RunAsync(MainWindow, shot);
+            }
+#endif
 
             Log.Information("Application Started: AlUmmahNow Visual Importer (Uno) application started successfully");
         }
