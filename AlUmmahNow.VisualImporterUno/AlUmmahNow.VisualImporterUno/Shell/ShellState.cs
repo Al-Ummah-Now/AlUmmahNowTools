@@ -193,7 +193,7 @@ public sealed class ShellDemo
         }
 
         private static readonly ToolsAccount Staff = new("usr_demo", "mariam.haddad@alummahnow.net", "Mariam Haddad");
-        private static readonly ToolsAccount Visitor = new("usr_visitor", "yusuf.rahman@example.com", "Yusuf Rahman");
+        private static readonly ToolsAccount Visitor = new("usr_visitor", "yusuf.rahman@mail.alummahnow.net", "Yusuf Rahman");
 
         public string BeginLogin(string redirectUri) => "https://auth.example/authorize?redirect_uri=" + Uri.EscapeDataString(redirectUri);
         public Task<ToolsAccount> CompleteLoginAsync(string redirect) =>

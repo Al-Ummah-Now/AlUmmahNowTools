@@ -303,18 +303,6 @@
   <data name="Page_FFmpegSettings_Subtitle" xml:space="preserve">
     <value>برامج المرئيات التي تستخدمها الأدوات لقراءة الملفات وتجهيزها.</value>
   </data>
-  <data name="Dashboard_FilesLabel.Text" xml:space="preserve">
-    <value>مرئيات وُجدت</value>
-  </data>
-  <data name="Dashboard_FilesHint.Text" xml:space="preserve">
-    <value>عثر عليها فاحص المجلدات منذ فتح الأدوات</value>
-  </data>
-  <data name="Dashboard_ScansLabel.Text" xml:space="preserve">
-    <value>عمليات فحص جارية</value>
-  </data>
-  <data name="Dashboard_ScansHint.Text" xml:space="preserve">
-    <value>مجلدات يجري البحث فيها عن مرئيات الآن</value>
-  </data>
   <data name="Dashboard_ProblemsLabel.Text" xml:space="preserve">
     <value>مشكلات</value>
   </data>
@@ -1444,10 +1432,10 @@
     <value>تعذّر حفظ الملف</value>
   </data>
   <data name="Stats_TrendUp" xml:space="preserve">
-    <value>وصل أكثر بنسبة {0} من الفترة السابقة</value>
+    <value>أكثر بنسبة {0} من الفترة السابقة</value>
   </data>
   <data name="Stats_TrendDown" xml:space="preserve">
-    <value>وصل أقل بنسبة {0} من الفترة السابقة</value>
+    <value>أقل بنسبة {0} من الفترة السابقة</value>
   </data>
   <data name="Stats_Priority" xml:space="preserve">
     <value>الأولوية {0}</value>
@@ -1961,5 +1949,44 @@
   </data>
   <data name="Settings_Advanced.Text" xml:space="preserve">
     <value>إعدادات متقدمة</value>
+  </data>
+  <data name="Dashboard_WaitingLabel.Text" xml:space="preserve">
+    <value>بانتظار الموافقة</value>
+  </data>
+  <data name="Dashboard_Review.Text" xml:space="preserve">
+    <value>راجعها</value>
+  </data>
+  <data name="Dashboard_WaitingHint.Text" xml:space="preserve">
+    <value>مرئيات من المجلدات المراقبة</value>
+  </data>
+  <data name="Dashboard_ArrivedLabel.Text" xml:space="preserve">
+    <value>مرئيات وصلت</value>
+  </data>
+  <data name="Dashboard_ArrivedHint.Text" xml:space="preserve">
+    <value>في المجلدات المراقبة</value>
+  </data>
+  <data name="Dashboard_WatchingLabel.Text" xml:space="preserve">
+    <value>مجلدات قيد المراقبة</value>
+  </data>
+  <data name="Dashboard_WatchingOf_One" xml:space="preserve">
+    <value>من أصل مجلد واحد</value>
+  </data>
+  <data name="Dashboard_WatchingOf_Other" xml:space="preserve">
+    <value>من أصل {0} مجلد</value>
+  </data>
+  <data name="Dashboard_WatchingOf_Zero" xml:space="preserve">
+    <value>لا مجلدات مراقبة بعد</value>
+  </data>
+  <data name="Dashboard_WatchingOf_Two" xml:space="preserve">
+    <value>من أصل مجلدين</value>
+  </data>
+  <data name="Dashboard_WatchingOf_Few" xml:space="preserve">
+    <value>من أصل {0} مجلدات</value>
+  </data>
+  <data name="Dashboard_WatchingOf_Many" xml:space="preserve">
+    <value>من أصل {0} مجلدًا</value>
+  </data>
+  <data name="Dashboard_ScannerNeeded" xml:space="preserve">
+    <value>تظهر عند تشغيل الفاحص</value>
   </data>
 </root>

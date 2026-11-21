@@ -17,20 +17,30 @@
     <ScrollViewer HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled">
         <StackPanel Spacing="16" Padding="24,8,24,24" MaxWidth="1200" HorizontalAlignment="Stretch">
 
-            <!-- At a glance -->
-            <shell:TileGrid MinItemWidth="190" MaxColumns="3" Spacing="16">
+            <!-- At a glance: the same figures as Watched folders and Approvals -->
+            <shell:TileGrid MinItemWidth="190" MaxColumns="4" Spacing="16">
                 <Border Style="{StaticResource ToolsCard}">
                     <StackPanel Spacing="6">
-                        <TextBlock x:Uid="Dashboard_FilesLabel" Text="Videos found" Style="{StaticResource ToolsLabel}" />
-                        <TextBlock Text="{x:Bind ViewModel.FilesScannedText, Mode=OneWay}" Style="{StaticResource ToolsStatValue}" />
-                        <TextBlock x:Uid="Dashboard_FilesHint" Text="By the folder scanner since Tools opened" Style="{StaticResource ToolsMuted}" />
+                        <TextBlock x:Uid="Dashboard_WaitingLabel" Text="Waiting for approval" Style="{StaticResource ToolsLabel}" />
+                        <TextBlock x:Name="WaitingValue" Text="–" Style="{StaticResource ToolsStatValue}" />
+                        <HyperlinkButton x:Name="ReviewLink" Style="{StaticResource ToolsLinkButton}" Padding="0" Click="Approvals_Click" Visibility="Collapsed">
+                            <TextBlock x:Uid="Dashboard_Review" Text="Review them" />
+                        </HyperlinkButton>
+                        <TextBlock x:Name="WaitingHint" x:Uid="Dashboard_WaitingHint" Text="Videos from watched folders" Style="{StaticResource ToolsMuted}" />
                     </StackPanel>
                 </Border>
                 <Border Style="{StaticResource ToolsCard}">
                     <StackPanel Spacing="6">
-                        <TextBlock x:Uid="Dashboard_ScansLabel" Text="Scans running" Style="{StaticResource ToolsLabel}" />
-                        <TextBlock Text="{x:Bind ViewModel.ActiveOperationsText, Mode=OneWay}" Style="{StaticResource ToolsStatValue}" />
-                        <TextBlock x:Uid="Dashboard_ScansHint" Text="Folders being searched for videos now" Style="{StaticResource ToolsMuted}" />
+                        <TextBlock x:Uid="Dashboard_ArrivedLabel" Text="Videos arrived" Style="{StaticResource ToolsLabel}" />
+                        <TextBlock x:Name="ArrivedValue" Text="–" Style="{StaticResource ToolsStatValue}" />
+                        <TextBlock x:Uid="Dashboard_ArrivedHint" Text="In watched folders" Style="{StaticResource ToolsMuted}" />
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource ToolsCard}">
+                    <StackPanel Spacing="6">
+                        <TextBlock x:Uid="Dashboard_WatchingLabel" Text="Folders being watched" Style="{StaticResource ToolsLabel}" />
+                        <TextBlock x:Name="WatchingValue" Text="–" Style="{StaticResource ToolsStatValue}" />
+                        <TextBlock x:Name="WatchingHint" Style="{StaticResource ToolsMuted}" />
                     </StackPanel>
                 </Border>
                 <Border Style="{StaticResource ToolsCard}">
@@ -70,7 +80,7 @@
                         <TextBlock Grid.Row="1" Text="{x:Bind ViewModel.ScannerDetail, Mode=OneWay}" Style="{StaticResource ToolsBody}" />
                         <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="12">
                             <Button Style="{StaticResource ToolsPrimaryButton}" Command="{x:Bind ViewModel.ScannerActionCommand}"
-                                    IsEnabled="{x:Bind ViewModel.CanRunScannerAction, Mode=OneWay}">
+                                    IsEnabled="{x:Bind ViewModel.CanRunScannerAction, Mode=OneWay}" Visibility="{x:Bind ViewModel.ShowScannerAction, Mode=OneWay}">
                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                     <ProgressRing Width="16" Height="16" IsActive="{x:Bind ViewModel.IsScannerBusy, Mode=OneWay}"
                                                   Visibility="{x:Bind ViewModel.IsScannerBusy, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />

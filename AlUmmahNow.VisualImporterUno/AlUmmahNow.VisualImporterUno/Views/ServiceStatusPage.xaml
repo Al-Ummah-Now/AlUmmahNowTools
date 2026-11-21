@@ -36,7 +36,7 @@
                         <TextBlock Text="{x:Bind ViewModel.ScannerDetail, Mode=OneWay}" Style="{StaticResource ToolsBody}" />
                     </StackPanel>
                     <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="12">
-                        <Button Style="{StaticResource ToolsPrimaryButton}" Command="{x:Bind ViewModel.ScannerActionCommand}" IsEnabled="{x:Bind ViewModel.CanRunScannerAction, Mode=OneWay}">
+                        <Button Style="{StaticResource ToolsPrimaryButton}" Command="{x:Bind ViewModel.ScannerActionCommand}" IsEnabled="{x:Bind ViewModel.CanRunScannerAction, Mode=OneWay}" Visibility="{x:Bind ViewModel.ShowScannerAction, Mode=OneWay}">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <ProgressRing Width="16" Height="16" IsActive="{x:Bind ViewModel.IsScannerBusy, Mode=OneWay}"
                                               Visibility="{x:Bind ViewModel.IsScannerBusy, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />

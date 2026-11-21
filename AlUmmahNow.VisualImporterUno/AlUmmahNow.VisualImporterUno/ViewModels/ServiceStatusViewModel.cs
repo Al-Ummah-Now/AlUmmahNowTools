@@ -50,6 +50,8 @@ public partial class ServiceStatusViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string _scannerDetail = Loc.Get("Scanner_CheckingDetail");
     [ObservableProperty] private string _scannerActionText = Loc.Get("Scanner_ActionTurnOn");
     [ObservableProperty] private bool _canRunScannerAction;
+    /// <summary>A scanner Tools didn't start can't be turned off from here, so its card has no button.</summary>
+    [ObservableProperty] private bool _showScannerAction = true;
     [ObservableProperty] private bool _isScannerBusy = true;
     [ObservableProperty] private string _scannerStatusColor = "#FF8BA3AE";
 
@@ -109,7 +111,13 @@ public partial class ServiceStatusViewModel : ObservableObject, IDisposable
         {
             await Task.Delay(500);
             await RefreshHealthAsync();
-            if (await _serviceManager.IsServiceRunningAsync())
+            if (_signalRClient.IsConnected)
+            {
+                // Already talking to a scanner (one started outside Tools): it is running
+                OnUi(() => SetHealth(ServiceHealthStatus.Running));
+                await ConnectAsync();
+            }
+            else if (await _serviceManager.IsServiceRunningAsync())
             {
                 Log(ActivityKind.Success, "Activity_ScannerFound");
                 await ConnectAsync();
@@ -332,6 +340,12 @@ public partial class ServiceStatusViewModel : ObservableObject, IDisposable
                 OngoingOperations.Clear();
                 UpdateOperationCounts();
             }
+            // A scanner Tools is connected to is running, even when Tools didn't start it
+            if (e.Status == ServiceStatus.Connected && ServiceHealthStatus != ServiceHealthStatus.Running)
+            {
+                SetHealth(ServiceHealthStatus.Running);
+                return;
+            }
             UpdateScanner();
         });
     }
@@ -427,6 +441,7 @@ public partial class ServiceStatusViewModel : ObservableObject, IDisposable
         };
         IsScannerBusy = state is ScannerState.Checking or ScannerState.Starting or ScannerState.Stopping;
         CanRunScannerAction = !IsScannerBusy && (state != ScannerState.On || IsServiceManaged);
+        ShowScannerAction = state != ScannerState.On || IsServiceManaged;
         ScannerStatusColor = state switch
         {
             ScannerState.On => "#FF2FA866",
