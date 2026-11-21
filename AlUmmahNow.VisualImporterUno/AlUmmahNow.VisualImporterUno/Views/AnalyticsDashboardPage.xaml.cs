@@ -24,6 +24,17 @@ namespace AlUmmahNow.VisualImporterUno.Views
             Refresh();
         }
 
+        /// <summary>The period buttons and the actions share a row while both fit; otherwise the actions go underneath.</summary>
+        private void PeriodBar_SizeChanged(object sender, Microsoft.UI.Xaml.SizeChangedEventArgs e)
+        {
+            PeriodButtons.Measure(new Windows.Foundation.Size(double.PositiveInfinity, double.PositiveInfinity));
+            PeriodActions.Measure(new Windows.Foundation.Size(double.PositiveInfinity, double.PositiveInfinity));
+            var stacked = PeriodButtons.DesiredSize.Width + PeriodBar.ColumnSpacing + PeriodActions.DesiredSize.Width > e.NewSize.Width;
+            Grid.SetRow(PeriodActions, stacked ? 1 : 0);
+            Grid.SetColumn(PeriodActions, stacked ? 0 : 1);
+            PeriodActions.HorizontalAlignment = stacked ? Microsoft.UI.Xaml.HorizontalAlignment.Left : Microsoft.UI.Xaml.HorizontalAlignment.Stretch;
+        }
+
         private void OfflineCard_Connected(object? sender, System.EventArgs e) => Refresh();
 
         private void Refresh()

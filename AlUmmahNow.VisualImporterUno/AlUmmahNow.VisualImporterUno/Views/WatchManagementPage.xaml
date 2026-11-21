@@ -164,7 +164,7 @@
                                 <DataTemplate x:DataType="models:CreateWatchRequest">
                                     <StackPanel Spacing="2" Padding="0,8" BorderBrush="{ThemeResource FanousDividerBrush}" BorderThickness="0,0,0,1">
                                         <TextBlock Text="{x:Bind ChannelName}" Style="{StaticResource ToolsBody}" Foreground="{ThemeResource FanousTextPrimaryBrush}" />
-                                        <TextBlock Text="{x:Bind WatchPath}" Style="{StaticResource ToolsMuted}" FlowDirection="LeftToRight" HorizontalAlignment="Left" />
+                                        <shell:PathText Path="{x:Bind WatchPath}" />
                                     </StackPanel>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
@@ -235,7 +235,7 @@
                                     </Grid>
                                     <StackPanel Grid.Column="1" Spacing="3">
                                         <TextBlock Text="{x:Bind ChannelName}" Style="{StaticResource ToolsCardTitle}" FontSize="15" />
-                                        <TextBlock Text="{x:Bind WatchPath}" Style="{StaticResource ToolsMuted}" FlowDirection="LeftToRight" HorizontalAlignment="Left" TextTrimming="CharacterEllipsis" />
+                                        <shell:PathText Path="{x:Bind WatchPath}" />
                                         <TextBlock Text="{x:Bind TotalFilesDetected, Converter={StaticResource LocFormat}, ConverterParameter=Watch_RowVideos}" Style="{StaticResource ToolsMuted}" />
                                         <TextBlock Text="{x:Bind PendingApprovals, Converter={StaticResource LocFormat}, ConverterParameter=Watch_RowWaiting}" Style="{StaticResource ToolsMuted}" />
                                     </StackPanel>

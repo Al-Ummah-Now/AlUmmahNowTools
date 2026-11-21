@@ -598,10 +598,13 @@ public class ChannelStatistic
     public int RejectedFiles { get; set; }
     public int PendingFiles { get; set; }
     public long TotalSize { get; set; }
-    public double ApprovalRate => TotalFiles > 0 ? (double)ApprovedFiles / TotalFiles * 100 : 0;
+    private int Decided => ApprovedFiles + RejectedFiles;
+
+    /// <summary>Approved out of those decided, the same measure as the page's overall rate.</summary>
+    public double ApprovalRate => Decided > 0 ? ApprovedFiles * 100.0 / Decided : 0;
     public string TotalSizeFormatted => Loc.Bytes(TotalSize);
     public string SummaryText => Loc.Format("Stats_ChannelSummary", TotalFiles, Loc.Bytes(TotalSize));
-    public string ApprovalRateText => Loc.Percent(ApprovalRate);
+    public string ApprovalRateText => Decided > 0 ? Loc.Format("Stats_ChannelApproved", Loc.Percent(ApprovalRate)) : Loc.Get("Stats_ChannelNoneDecided");
 }
 
 public class HourlyActivity
