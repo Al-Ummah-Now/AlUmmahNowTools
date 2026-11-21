@@ -254,7 +254,10 @@ namespace AlUmmahNow.Tests.DataImporter
             var repository = new Repository<AlUmmahNow.Importer.Core.Video>(mockR2Client.Object);
             var mockVideoStorageClient = new Mock<IStorageClient<AlUmmahNow.Importer.Core.Video>>();
             var mockImageStorageClient = new Mock<IStorageClient<AlUmmahNow.Importer.Core.Image>>();
-            var bunnyStreamClient = new BunnyStreamClient("invalid-test-key");
+            // Bunny's real answer to an unknown library / bad key, served locally (no live API in tests)
+            using var bunny = new AlUmmahNow.Tests.Video.StubBunnyServer(System.Net.HttpStatusCode.NotFound,
+                "{\"Success\":false,\"Message\":\"The requested video library was not found.\",\"StatusCode\":404}");
+            var bunnyStreamClient = new BunnyStreamClient("invalid-test-key", bunny.BaseUrl);
             
             var importer = new VideoImporter(
                 repository,
@@ -279,8 +282,8 @@ namespace AlUmmahNow.Tests.DataImporter
                     videoStoreRoot, videoStoreUrl, imageStoreRoot, imageStoreUrl);
             });
 
-            // Should throw due to invalid API credentials
-            Assert.NotNull(exception);
+            // Should throw due to invalid API credentials, not import an empty library
+            Assert.IsType<System.Net.Http.HttpRequestException>(exception);
         }
 
         public void Dispose()

@@ -45,6 +45,8 @@ namespace AlUmmahNow.Data.Video
                     PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
                     WriteIndented = true
                 };
+                // An error (bad AccessKey, unknown library) is JSON too: never read it as an empty page
+                EnsureSuccess(response, $"listing library {libraryId}");
                 if (response.Content is null)
                     return null;
 
@@ -70,7 +72,36 @@ namespace AlUmmahNow.Data.Video
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
                 WriteIndented = true
             };
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                return null;
+            EnsureSuccess(response, $"reading video {videoId}");
             return response.Content is null ? null : JsonSerializer.Deserialize<BunnyVideo>(response.Content, opt);
+        }
+
+        /// <summary>
+        /// Throws when Bunny answered with an error. Its error bodies are JSON
+        /// ({"Success":false,"Message":...}), so deserializing them would pass as an empty result.
+        /// </summary>
+        internal static void EnsureSuccess(RestResponse response, string action)
+        {
+            if (response.IsSuccessful)
+                return;
+            var detail = response.ErrorMessage;
+            if (!string.IsNullOrEmpty(response.Content))
+            {
+                try
+                {
+                    using var doc = JsonDocument.Parse(response.Content);
+                    if (doc.RootElement.ValueKind == JsonValueKind.Object && doc.RootElement.TryGetProperty("Message", out var message))
+                        detail = message.GetString();
+                }
+                catch (JsonException)
+                {
+                    // not JSON: keep the transport message
+                }
+            }
+            var status = response.StatusCode == 0 ? "no response" : $"HTTP {(int)response.StatusCode}";
+            throw new HttpRequestException($"Bunny Stream {action} failed ({status}): {detail}", response.ErrorException, response.StatusCode == 0 ? null : response.StatusCode);
         }
 
         public async Task<bool> UploadVideoAsync(string libraryId, string videoId, Stream videoStream)
