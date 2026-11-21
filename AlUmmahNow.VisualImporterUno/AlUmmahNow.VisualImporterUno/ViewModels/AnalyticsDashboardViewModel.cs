@@ -250,7 +250,7 @@ public partial class AnalyticsDashboardViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// Videos that arrived each day of the period by what happened to them, and how arrivals compare with the period of
+    /// Videos that arrived each day of the period by what happened to them, and how approvals compare with the period of
     /// the same length before it. All Time has nothing before it, so it has no trend.
     /// </summary>
     private void CalculateTrends(List<PendingApprovalDto> allApprovals)
@@ -260,8 +260,10 @@ public partial class AnalyticsDashboardViewModel : ObservableObject, IDisposable
         var start = SelectedPeriod == TimePeriod.AllTime ? DateTime.Today.AddDays(1 - days) : PeriodStartDate.Date;
         var arrivals = allApprovals.Select(a => (Day: a.DetectedAt.ToLocalTime().Date, a.Status)).ToList();
 
-        var current = arrivals.Count(a => a.Day >= start && a.Day < start.AddDays(days));
-        var previous = SelectedPeriod == TimePeriod.AllTime ? 0 : arrivals.Count(a => a.Day >= start.AddDays(-days) && a.Day < start);
+        // The trend sits under "Approved in this period", so it compares approvals with the period before
+        var approvedDays = arrivals.Where(a => a.Status == ApprovalStatus.Approved).Select(a => a.Day).ToList();
+        var current = approvedDays.Count(d => d >= start && d < start.AddDays(days));
+        var previous = SelectedPeriod == TimePeriod.AllTime ? 0 : approvedDays.Count(d => d >= start.AddDays(-days) && d < start);
         var trend = previous == 0 ? 0.0 : (current - previous) * 100.0 / previous;
 
         var daily = Enumerable.Range(0, days).Select(i =>

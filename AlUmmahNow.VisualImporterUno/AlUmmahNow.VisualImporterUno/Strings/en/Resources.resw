@@ -315,18 +315,6 @@
   <data name="Page_FFmpegSettings_Subtitle" xml:space="preserve">
     <value>The video programs Tools uses to read and prepare files.</value>
   </data>
-  <data name="Dashboard_FilesLabel.Text" xml:space="preserve">
-    <value>Videos found</value>
-  </data>
-  <data name="Dashboard_FilesHint.Text" xml:space="preserve">
-    <value>By the folder scanner since Tools opened</value>
-  </data>
-  <data name="Dashboard_ScansLabel.Text" xml:space="preserve">
-    <value>Scans running</value>
-  </data>
-  <data name="Dashboard_ScansHint.Text" xml:space="preserve">
-    <value>Folders being searched for videos now</value>
-  </data>
   <data name="Dashboard_ProblemsLabel.Text" xml:space="preserve">
     <value>Problems</value>
   </data>
@@ -1456,10 +1444,10 @@
     <value>Couldn't save the file</value>
   </data>
   <data name="Stats_TrendUp" xml:space="preserve">
-    <value>{0} more arrived than the period before</value>
+    <value>{0} more than the period before</value>
   </data>
   <data name="Stats_TrendDown" xml:space="preserve">
-    <value>{0} fewer arrived than the period before</value>
+    <value>{0} fewer than the period before</value>
   </data>
   <data name="Stats_Priority" xml:space="preserve">
     <value>Priority {0}</value>
@@ -1721,5 +1709,35 @@
   </data>
   <data name="Settings_Advanced.Text" xml:space="preserve">
     <value>Advanced</value>
+  </data>
+  <data name="Dashboard_WaitingLabel.Text" xml:space="preserve">
+    <value>Waiting for approval</value>
+  </data>
+  <data name="Dashboard_Review.Text" xml:space="preserve">
+    <value>Review them</value>
+  </data>
+  <data name="Dashboard_WaitingHint.Text" xml:space="preserve">
+    <value>Videos from watched folders</value>
+  </data>
+  <data name="Dashboard_ArrivedLabel.Text" xml:space="preserve">
+    <value>Videos arrived</value>
+  </data>
+  <data name="Dashboard_ArrivedHint.Text" xml:space="preserve">
+    <value>In watched folders</value>
+  </data>
+  <data name="Dashboard_WatchingLabel.Text" xml:space="preserve">
+    <value>Folders being watched</value>
+  </data>
+  <data name="Dashboard_WatchingOf_One" xml:space="preserve">
+    <value>Out of 1 watched folder</value>
+  </data>
+  <data name="Dashboard_WatchingOf_Other" xml:space="preserve">
+    <value>Out of {0} watched folders</value>
+  </data>
+  <data name="Dashboard_WatchingOf_Zero" xml:space="preserve">
+    <value>No watched folders yet</value>
+  </data>
+  <data name="Dashboard_ScannerNeeded" xml:space="preserve">
+    <value>Shown while the scanner is on</value>
   </data>
 </root>
