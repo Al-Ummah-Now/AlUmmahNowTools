@@ -1593,4 +1593,13 @@
   <data name="Notify_Ok" xml:space="preserve">
     <value>OK</value>
   </data>
+  <data name="Import_StorageNotSet" xml:space="preserve">
+    <value>Uploading isn't set up on this computer yet. Finding and checking videos still works.</value>
+  </data>
+  <data name="Stats_ChannelApproved" xml:space="preserve">
+    <value>{0} approved</value>
+  </data>
+  <data name="Stats_ChannelNoneDecided" xml:space="preserve">
+    <value>None decided yet</value>
+  </data>
 </root>

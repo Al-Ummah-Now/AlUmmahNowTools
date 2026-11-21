@@ -1581,4 +1581,13 @@
   <data name="Notify_Ok" xml:space="preserve">
     <value>حسنًا</value>
   </data>
+  <data name="Import_StorageNotSet" xml:space="preserve">
+    <value>الرفع غير مُعدّ على هذا الجهاز بعد. البحث عن الفيديوهات وفحصها يعملان على أي حال.</value>
+  </data>
+  <data name="Stats_ChannelApproved" xml:space="preserve">
+    <value>{0} موافق عليها</value>
+  </data>
+  <data name="Stats_ChannelNoneDecided" xml:space="preserve">
+    <value>لم يُبتّ في أي منها بعد</value>
+  </data>
 </root>

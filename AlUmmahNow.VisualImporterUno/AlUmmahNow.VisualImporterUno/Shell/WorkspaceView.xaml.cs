@@ -77,7 +77,24 @@ namespace AlUmmahNow.VisualImporterUno.Shell
             _currentView = view;
             PageTitle.Text = Loc.Get($"Page_{page.Key}_Title");
             PageSubtitle.Text = Loc.Get($"Page_{page.Key}_Subtitle");
-            if (ContentFrame.CurrentSourcePageType != page.Page) ContentFrame.Navigate(page.Page);
+            if (ContentFrame.CurrentSourcePageType == page.Page) return;
+            try
+            {
+                ContentFrame.Navigate(page.Page);
+                // A page that opens with a text box first (Settings) would otherwise open mid-edit, caret blinking;
+                // focus stays with the menu item that opened it
+                DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+                {
+                    if (XamlRoot != null && Microsoft.UI.Xaml.Input.FocusManager.GetFocusedElement(XamlRoot) is TextBox or AutoSuggestBox or PasswordBox)
+                        (NavView.SelectedItem as NavigationViewItem)?.Focus(FocusState.Programmatic);
+                });
+            }
+            catch (Exception ex)
+            {
+                // A page that can't be built must not leave the workspace blank: the dashboard opens instead
+                Serilog.Log.Error(ex, "Couldn't open the {Page} page", page.Key);
+                if (view != ViewState.Dashboard) Select(ViewState.Dashboard);
+            }
         }
 
         private void NavView_DisplayModeChanged(NavigationView sender, NavigationViewDisplayModeChangedEventArgs args)

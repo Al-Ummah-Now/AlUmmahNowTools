@@ -229,6 +229,7 @@ public partial class App : Application
                         services.AddSingleton<IR2Client>(sp =>
                         {
                             var r2Config = configuration.GetSection("R2DB");
+                            if (string.IsNullOrWhiteSpace(r2Config["S3Api"])) return new UnconfiguredR2Client();
                             return new R2Client(
                                 r2Config["S3Api"] ?? "",
                                 r2Config["S3Key"] ?? "",
