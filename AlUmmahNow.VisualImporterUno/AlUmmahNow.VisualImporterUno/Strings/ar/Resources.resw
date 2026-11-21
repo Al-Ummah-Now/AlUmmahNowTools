@@ -1956,14 +1956,8 @@
   <data name="Dashboard_Review.Text" xml:space="preserve">
     <value>راجعها</value>
   </data>
-  <data name="Dashboard_WaitingHint.Text" xml:space="preserve">
-    <value>مرئيات من المجلدات المراقبة</value>
-  </data>
   <data name="Dashboard_ArrivedLabel.Text" xml:space="preserve">
     <value>مرئيات وصلت</value>
-  </data>
-  <data name="Dashboard_ArrivedHint.Text" xml:space="preserve">
-    <value>في المجلدات المراقبة</value>
   </data>
   <data name="Dashboard_WatchingLabel.Text" xml:space="preserve">
     <value>مجلدات قيد المراقبة</value>
@@ -1988,5 +1982,14 @@
   </data>
   <data name="Dashboard_ScannerNeeded" xml:space="preserve">
     <value>تظهر عند تشغيل الفاحص</value>
+  </data>
+  <data name="Dashboard_WaitingCaption" xml:space="preserve">
+    <value>مرئيات من المجلدات المراقبة</value>
+  </data>
+  <data name="Dashboard_ArrivedCaption" xml:space="preserve">
+    <value>في المجلدات المراقبة</value>
+  </data>
+  <data name="Dashboard_ProblemsNone.Text" xml:space="preserve">
+    <value>لا مشكلات</value>
   </data>
 </root>

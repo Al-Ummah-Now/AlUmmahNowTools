@@ -1716,14 +1716,8 @@
   <data name="Dashboard_Review.Text" xml:space="preserve">
     <value>Review them</value>
   </data>
-  <data name="Dashboard_WaitingHint.Text" xml:space="preserve">
-    <value>Videos from watched folders</value>
-  </data>
   <data name="Dashboard_ArrivedLabel.Text" xml:space="preserve">
     <value>Videos arrived</value>
-  </data>
-  <data name="Dashboard_ArrivedHint.Text" xml:space="preserve">
-    <value>In watched folders</value>
   </data>
   <data name="Dashboard_WatchingLabel.Text" xml:space="preserve">
     <value>Folders being watched</value>
@@ -1739,5 +1733,14 @@
   </data>
   <data name="Dashboard_ScannerNeeded" xml:space="preserve">
     <value>Shown while the scanner is on</value>
+  </data>
+  <data name="Dashboard_WaitingCaption" xml:space="preserve">
+    <value>Videos from watched folders</value>
+  </data>
+  <data name="Dashboard_ArrivedCaption" xml:space="preserve">
+    <value>In watched folders</value>
+  </data>
+  <data name="Dashboard_ProblemsNone.Text" xml:space="preserve">
+    <value>No problems</value>
   </data>
 </root>
