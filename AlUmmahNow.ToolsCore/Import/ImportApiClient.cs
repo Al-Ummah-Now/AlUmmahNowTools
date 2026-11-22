@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
+using AlUmmahNow.ToolsCore.Transcription;
 
 namespace AlUmmahNow.ToolsCore.Import;
 
@@ -169,6 +170,19 @@ public sealed record ErrorReport(
     }
 }
 
+/// <summary>admin-api's <c>GET /quran-index</c>: the index and when the app must drop it.</summary>
+public sealed record QuranIndexReply(
+    [property: JsonPropertyName("index")] AlUmmahNow.ToolsCore.Transcription.QuranIndexFile Index,
+    [property: JsonPropertyName("expiresAt")] DateTimeOffset ExpiresAt);
+
+/// <summary>One language of a translation request: its caption job, or why there is none.</summary>
+public sealed record TranslationResult(
+    [property: JsonPropertyName("language")] string Language,
+    [property: JsonPropertyName("jobId")] string? JobId,
+    [property: JsonPropertyName("status")] string? Status,
+    [property: JsonPropertyName("existing")] bool? Existing,
+    [property: JsonPropertyName("error")] string? Error);
+
 /// <summary>A refused or failed admin-api call: the status (0 when it was never answered), code and message.</summary>
 public sealed class ImportApiException : Exception
 {
@@ -316,6 +330,36 @@ public class ImportApiClient
     {
         var result = await SendAsync(HttpMethod.Get, $"/api/admin/import/items/{Uri.EscapeDataString(itemId)}/delivery", null, ct).ConfigureAwait(false);
         return result?.Deserialize<DeliveryState>(Json) ?? throw Unreadable();
+    }
+
+    /// <summary>
+    /// The Quran matcher's index (TA-13), built from the server's fresh Content Sync copy; kept in memory only and
+    /// dropped at <see cref="QuranIndexReply.ExpiresAt"/> (QF terms). 503 quran_index_unavailable while there is no
+    /// fresh copy.
+    /// </summary>
+    public virtual async Task<QuranIndexReply> GetQuranIndexAsync(CancellationToken ct = default)
+    {
+        var result = await SendAsync(HttpMethod.Get, "/api/admin/import/quran-index", null, ct).ConfigureAwait(false);
+        return result?.Deserialize<QuranIndexReply>(Json) ?? throw Unreadable();
+    }
+
+    /// <summary>
+    /// A transcript made on this computer, Quran spans as references only (TA-7); the server's claim job drafts it.
+    /// 409 draft_exists or claim_pending when the language already has one.
+    /// </summary>
+    public virtual Task PostTranscriptAsync(string itemId, TranscriptUpload transcript, string model, CancellationToken ct = default) =>
+        SendAsync(HttpMethod.Post, $"/api/admin/import/items/{Uri.EscapeDataString(itemId)}/transcript", new
+        {
+            language = transcript.Language,
+            segments = transcript.Segments,
+            engine = new { provider = "whisper.cpp", model },
+        }, ct);
+
+    /// <summary>A caption job per language from the video's source draft (TA-7, TA-20); each language answers on its own.</summary>
+    public virtual async Task<IReadOnlyList<TranslationResult>> RequestTranslationsAsync(string itemId, string sourceLanguage, IReadOnlyList<string> languages, CancellationToken ct = default)
+    {
+        var result = await SendAsync(HttpMethod.Post, $"/api/admin/import/items/{Uri.EscapeDataString(itemId)}/translations", new { sourceLanguage, languages }, ct).ConfigureAwait(false);
+        return result?["results"]?.Deserialize<List<TranslationResult>>(Json) ?? throw Unreadable();
     }
 
     public virtual Task ReportErrorsAsync(IReadOnlyList<ErrorReport> events, CancellationToken ct = default) =>

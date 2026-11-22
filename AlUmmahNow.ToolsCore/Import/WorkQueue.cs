@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 
 namespace AlUmmahNow.ToolsCore.Import;
 
-/// <summary>The steps a file goes through, in order. Later stories add theirs (transcribe, suggest).</summary>
+/// <summary>The steps a file goes through, in order. Later stories add theirs (suggest).</summary>
 [JsonConverter(typeof(JsonStringEnumConverter))]
 public enum ImportStepKind
 {
@@ -12,8 +12,12 @@ public enum ImportStepKind
     Encode,
     Upload,
     Attach,
+    /// <summary>Speech to text on this computer, sent as the caption draft (TA-13); after the upload, so it never holds it up</summary>
+    Transcribe,
     /// <summary>Waits for the server's verdict on the renditions: used, or encoded again and why</summary>
     Check,
+    /// <summary>Asks the server to translate the transcript into the other site language (TA-13, TA-20)</summary>
+    Translate,
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter))]
@@ -98,6 +102,14 @@ public sealed class QueueItem
     public RenditionSet? Renditions { get; set; }
     /// <summary>The server's verdict on the renditions, once its transcode has run</summary>
     public RenditionVerdict? Verdict { get; set; }
+    /// <summary>"Transcribe on this computer" was chosen for the file's batch (TA-13)</summary>
+    public bool Transcribes { get; set; }
+    /// <summary>The batch's spoken language (ISO 639-1), or null to detect it per file</summary>
+    public string? SpokenLanguage { get; set; }
+    /// <summary>The speech model the batch chose (aun-core catalog id)</summary>
+    public string? SpeechModel { get; set; }
+    /// <summary>The transcript made here, waiting to be sent or sent</summary>
+    public TranscriptState? Transcript { get; set; }
     public List<LogLine> Log { get; set; } = new();
 
     /// <summary>Progress of the running step, 0–1 (not saved)</summary>
@@ -121,13 +133,16 @@ public sealed class QueueItem
         }
     }
 
-    public static QueueItem For(ScannedVideo video, string batchId, string channelId, DateTimeOffset now, bool serverEncodes = false) => new()
+    public static QueueItem For(ScannedVideo video, string batchId, string channelId, DateTimeOffset now, bool serverEncodes = false, TranscribeChoice? transcribe = null) => new()
     {
         BatchId = batchId,
         ChannelId = channelId,
         Video = video,
         CreatedAt = now,
         ServerEncodes = serverEncodes,
+        Transcribes = transcribe is not null,
+        SpokenLanguage = transcribe?.Language,
+        SpeechModel = transcribe?.Model,
         Steps = Enum.GetValues<ImportStepKind>().Select(k => new StepState { Kind = k }).ToList(),
     };
 
@@ -143,6 +158,9 @@ public sealed class QueueItem
         Steps = kinds.Select(k => saved.TryGetValue(k, out var s) ? s : new StepState { Kind = k, Status = StepStatus.Skipped }).ToList();
     }
 }
+
+/// <summary>A batch's transcription choice: the spoken language (null: detect it per file) and the speech model.</summary>
+public sealed record TranscribeChoice(string? Language, string Model);
 
 /// <summary>A step's outcome when it did not throw.</summary>
 public enum StepResult
@@ -208,7 +226,9 @@ public sealed class QueueSettings
         [ImportStepKind.Encode] = 1,
         [ImportStepKind.Upload] = 3,
         [ImportStepKind.Attach] = 2,
+        [ImportStepKind.Transcribe] = 1,
         [ImportStepKind.Check] = 8,
+        [ImportStepKind.Translate] = 4,
     };
 
     /// <summary>An encode uses the whole processor (or its one hardware encoder): at most this many at once.</summary>
@@ -218,8 +238,9 @@ public sealed class QueueSettings
 
     public int ParallelFor(ImportStepKind kind)
     {
-        var fallback = kind == ImportStepKind.Check ? 8 : 1;
-        var max = kind switch { ImportStepKind.Upload => MaxUploads, ImportStepKind.Encode => MaxEncodes, ImportStepKind.Check => 16, _ => 8 };
+        var fallback = kind switch { ImportStepKind.Check => 8, ImportStepKind.Translate => 4, _ => 1 };
+        // One transcription at a time: whisper takes the whole GPU (or every processor core)
+        var max = kind switch { ImportStepKind.Upload => MaxUploads, ImportStepKind.Encode => MaxEncodes, ImportStepKind.Transcribe => 1, ImportStepKind.Check => 16, _ => 8 };
         return Math.Clamp(Parallel.TryGetValue(kind, out var n) ? n : fallback, 1, max);
     }
 }

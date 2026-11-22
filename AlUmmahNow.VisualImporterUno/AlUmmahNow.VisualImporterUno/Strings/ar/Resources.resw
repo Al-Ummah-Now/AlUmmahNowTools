@@ -2616,4 +2616,199 @@
   <data name="ImportEncoder_other" xml:space="preserve">
     <value>أداة الترميز</value>
   </data>
+  <data name="Import_TranscribeTitle.Text" xml:space="preserve">
+    <value>تفريغ الكلام</value>
+  </data>
+  <data name="Import_TranscribeBody.Text" xml:space="preserve">
+    <value>لكل مرئي بلا ملفات ترجمة خاصة به، تكتب الأدوات ما يُقال فيه على هذا الجهاز، وترسله إلى الخادم مسودةً للترجمة يراجعها شخص. وتُرسل تلاوة القرآن مواضعَ آيات فقط، لا نصًا أبدًا. ثم يترجم الخادم المسودة إلى لغة الموقع الأخرى.</value>
+  </data>
+  <data name="Import_TranscribeHere.Content" xml:space="preserve">
+    <value>فرّغ كلام المرئيات التي ليس لها ترجمة</value>
+  </data>
+  <data name="Import_SpokenLanguageLabel.Text" xml:space="preserve">
+    <value>لغة الكلام فيها</value>
+  </data>
+  <data name="Import_SpokenLanguageDetect.Content" xml:space="preserve">
+    <value>تُعرف من كل مرئي</value>
+  </data>
+  <data name="Import_SpokenLanguageAr.Content" xml:space="preserve">
+    <value>العربية</value>
+  </data>
+  <data name="Import_SpokenLanguageEn.Content" xml:space="preserve">
+    <value>الإنجليزية</value>
+  </data>
+  <data name="Import_SpeechModelLabel.Text" xml:space="preserve">
+    <value>نموذج الكلام</value>
+  </data>
+  <data name="Import_TranscribeUnavailable.Text" xml:space="preserve">
+    <value>لا تستطيع هذه النسخة من الأدوات تفريغ الكلام على هذا الجهاز، فتُستورد هذه المرئيات بلا تفريغ.</value>
+  </data>
+  <data name="Import_TranscribeModelItem" xml:space="preserve">
+    <value>{0}، {1}</value>
+  </data>
+  <data name="Import_TranscribeModelHere" xml:space="preserve">
+    <value>موجود على هذا الجهاز.</value>
+  </data>
+  <data name="Import_TranscribeModelDownload" xml:space="preserve">
+    <value>يُنزَّل مرة واحدة، {0}، أول ما يُستخدم.</value>
+  </data>
+  <data name="Import_TranscribeDeviceGpu" xml:space="preserve">
+    <value>يعمل على بطاقة الرسوميات في هذا الجهاز:</value>
+  </data>
+  <data name="Import_TranscribeDeviceCpu" xml:space="preserve">
+    <value>لم توجد بطاقة رسوميات يمكن استخدامها، فيعمل على المعالج، وهو أبطأ.</value>
+  </data>
+  <data name="ImportModel_large-v3-turbo" xml:space="preserve">
+    <value>الأدق</value>
+  </data>
+  <data name="ImportModel_large-v3-turbo-q5_0" xml:space="preserve">
+    <value>يقاربه دقةً، وتنزيله الثلث</value>
+  </data>
+  <data name="ImportModel_medium-q5_0" xml:space="preserve">
+    <value>متوازن</value>
+  </data>
+  <data name="ImportModel_small-q5_1" xml:space="preserve">
+    <value>أسرع، وأقل دقة</value>
+  </data>
+  <data name="ImportModel_base-q5_1" xml:space="preserve">
+    <value>الأسرع، والأقل دقة</value>
+  </data>
+  <data name="ImportStep_Transcribe" xml:space="preserve">
+    <value>تفريغ الكلام</value>
+  </data>
+  <data name="ImportStep_Translate" xml:space="preserve">
+    <value>الترجمة</value>
+  </data>
+  <data name="ImportPhase_Transcribing" xml:space="preserve">
+    <value>جار تفريغ الكلام هنا، {0}</value>
+  </data>
+  <data name="ImportPhase_Running_Transcribe" xml:space="preserve">
+    <value>جار تفريغ الكلام هنا…</value>
+  </data>
+  <data name="ImportPhase_Running_Translate" xml:space="preserve">
+    <value>جار طلب الترجمة…</value>
+  </data>
+  <data name="ImportPhase_WaitingQuranIndex" xml:space="preserve">
+    <value>في انتظار فهرس القرآن من الخادم</value>
+  </data>
+  <data name="ImportPhase_WaitingDraft" xml:space="preserve">
+    <value>في انتظار أن يكتب الخادم مسودة التفريغ</value>
+  </data>
+  <data name="ImportRow_TranscriptSent" xml:space="preserve">
+    <value>أُرسل التفريغ باللغة {0}</value>
+  </data>
+  <data name="ImportLog_transcribe_off" xml:space="preserve">
+    <value>لم يُختر تفريغ الكلام لهذا الملف.</value>
+  </data>
+  <data name="ImportLog_transcribe_sidecar" xml:space="preserve">
+    <value>لهذا الملف ملفات ترجمة خاصة به، فتُستخدم بدل التفريغ.</value>
+  </data>
+  <data name="ImportLog_transcribe_unavailable" xml:space="preserve">
+    <value>لا تستطيع هذه النسخة من الأدوات تفريغ الكلام على هذا الجهاز. يُستورد الملف بلا تفريغ.</value>
+  </data>
+  <data name="ImportLog_quran_index_wait" xml:space="preserve">
+    <value>في انتظار فهرس القرآن من الخادم قبل التفريغ. تعيد الأدوات المحاولة بعد عشر دقائق.</value>
+  </data>
+  <data name="ImportLog_transcribe_no_audio" xml:space="preserve">
+    <value>لا صوت في هذا الملف لتفريغه.</value>
+  </data>
+  <data name="ImportLog_transcribe_silent" xml:space="preserve">
+    <value>لم يُسمع كلام في هذا الملف.</value>
+  </data>
+  <data name="ImportLog_model_download" xml:space="preserve">
+    <value>جار تنزيل نموذج الكلام مرة واحدة: {0}</value>
+  </data>
+  <data name="ImportLog_transcribed" xml:space="preserve">
+    <value>فُرّغ الكلام باللغة {0}: {1}، {2}. عمل على:</value>
+  </data>
+  <data name="ImportCount_segments_One" xml:space="preserve">
+    <value>سطر واحد</value>
+  </data>
+  <data name="ImportCount_segments_Two" xml:space="preserve">
+    <value>سطران</value>
+  </data>
+  <data name="ImportCount_segments_Few" xml:space="preserve">
+    <value>{0} أسطر</value>
+  </data>
+  <data name="ImportCount_segments_Many" xml:space="preserve">
+    <value>{0} سطرًا</value>
+  </data>
+  <data name="ImportCount_segments_Other" xml:space="preserve">
+    <value>{0} سطر</value>
+  </data>
+  <data name="ImportCount_segments_Zero" xml:space="preserve">
+    <value>لا أسطر</value>
+  </data>
+  <data name="ImportCount_quran_One" xml:space="preserve">
+    <value>موضع قرآني واحد</value>
+  </data>
+  <data name="ImportCount_quran_Two" xml:space="preserve">
+    <value>موضعان قرآنيان</value>
+  </data>
+  <data name="ImportCount_quran_Few" xml:space="preserve">
+    <value>{0} مواضع قرآنية</value>
+  </data>
+  <data name="ImportCount_quran_Many" xml:space="preserve">
+    <value>{0} موضعًا قرآنيًا</value>
+  </data>
+  <data name="ImportCount_quran_Other" xml:space="preserve">
+    <value>{0} موضع قرآني</value>
+  </data>
+  <data name="ImportCount_quran_Zero" xml:space="preserve">
+    <value>لا مواضع قرآنية</value>
+  </data>
+  <data name="ImportLog_transcript_sent" xml:space="preserve">
+    <value>التفريغ عند الخادم، ويصير مسودة الترجمة باللغة {0}.</value>
+  </data>
+  <data name="ImportLog_transcript_exists" xml:space="preserve">
+    <value>لهذا المرئي مسودة ترجمة باللغة {0} من قبل، فأُبقيت.</value>
+  </data>
+  <data name="ImportLog_transcript_refused" xml:space="preserve">
+    <value>رفض الخادم التفريغ، فيُستورد الملف بلا تفريغ. كلامه:</value>
+  </data>
+  <data name="ImportLog_transcribe_failed" xml:space="preserve">
+    <value>تعذّر تفريغ الكلام هنا، فيُستورد الملف بلا تفريغ. تعرضه صفحة الأخطاء.</value>
+  </data>
+  <data name="ImportLog_translation_requested" xml:space="preserve">
+    <value>طُلبت الترجمة إلى {0}، وتصير مسودة ترجمة يراجعها شخص.</value>
+  </data>
+  <data name="ImportLog_translation_exists" xml:space="preserve">
+    <value>لهذا المرئي مسودة ترجمة باللغة {0} من قبل، فأُبقيت.</value>
+  </data>
+  <data name="ImportLog_translation_refused" xml:space="preserve">
+    <value>لم يترجم الخادم إلى {0}، إذ {1}</value>
+  </data>
+  <data name="ImportLog_translate_gave_up" xml:space="preserve">
+    <value>لم يكتب الخادم مسودة التفريغ بعد يوم. تعرض إدارة المرئيات مهمة الترجمة.</value>
+  </data>
+  <data name="ImportTranscribeError_unavailable" xml:space="preserve">
+    <value>لا تستطيع هذه النسخة من الأدوات تفريغ الكلام</value>
+  </data>
+  <data name="ImportTranscribeError_model_download" xml:space="preserve">
+    <value>تعذّر تنزيل نموذج الكلام</value>
+  </data>
+  <data name="ImportTranscribeError_decode" xml:space="preserve">
+    <value>تعذّرت قراءة الصوت</value>
+  </data>
+  <data name="ImportTranscribeError_transcribe" xml:space="preserve">
+    <value>توقف نموذج الكلام</value>
+  </data>
+  <data name="ImportTranscribeError_disk" xml:space="preserve">
+    <value>تعذّر حفظ التفريغ على هذا الجهاز</value>
+  </data>
+  <data name="ImportTranscribeError_ffmpeg_failed" xml:space="preserve">
+    <value>تعذّر استخراج الصوت من المرئي</value>
+  </data>
+  <data name="ImportTranslateError_same_language" xml:space="preserve">
+    <value>هي لغة التفريغ نفسها</value>
+  </data>
+  <data name="ImportTranslateError_unsupported_language" xml:space="preserve">
+    <value>لا يترجم الخادم إلى هذه اللغة</value>
+  </data>
+  <data name="ImportTranslateError_translation_paused" xml:space="preserve">
+    <value>الترجمة موقوفة في إدارة المرئيات</value>
+  </data>
+  <data name="ImportTranslateError_other" xml:space="preserve">
+    <value>تعرض إدارة المرئيات السبب</value>
+  </data>
 </root>

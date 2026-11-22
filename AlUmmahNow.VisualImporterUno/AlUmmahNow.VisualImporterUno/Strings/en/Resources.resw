@@ -2322,4 +2322,178 @@
   <data name="ImportEncoder_other" xml:space="preserve">
     <value>the encoding tool</value>
   </data>
+  <data name="Import_TranscribeTitle.Text" xml:space="preserve">
+    <value>Speech to text</value>
+  </data>
+  <data name="Import_TranscribeBody.Text" xml:space="preserve">
+    <value>For each video without caption files of its own, Tools writes down what is said, on this computer, and sends it to the server as a caption draft for a person to check. Quran recitation is sent only as verse references, never as text. The server then translates the draft into the site’s other language.</value>
+  </data>
+  <data name="Import_TranscribeHere.Content" xml:space="preserve">
+    <value>Transcribe the videos that have no captions</value>
+  </data>
+  <data name="Import_SpokenLanguageLabel.Text" xml:space="preserve">
+    <value>What they speak</value>
+  </data>
+  <data name="Import_SpokenLanguageDetect.Content" xml:space="preserve">
+    <value>Find out from each video</value>
+  </data>
+  <data name="Import_SpokenLanguageAr.Content" xml:space="preserve">
+    <value>Arabic</value>
+  </data>
+  <data name="Import_SpokenLanguageEn.Content" xml:space="preserve">
+    <value>English</value>
+  </data>
+  <data name="Import_SpeechModelLabel.Text" xml:space="preserve">
+    <value>Speech model</value>
+  </data>
+  <data name="Import_TranscribeUnavailable.Text" xml:space="preserve">
+    <value>This copy of Tools can’t transcribe on this computer, so these videos are imported without a transcript.</value>
+  </data>
+  <data name="Import_TranscribeModelItem" xml:space="preserve">
+    <value>{0}, {1}</value>
+  </data>
+  <data name="Import_TranscribeModelHere" xml:space="preserve">
+    <value>Already on this computer.</value>
+  </data>
+  <data name="Import_TranscribeModelDownload" xml:space="preserve">
+    <value>Downloaded once, {0}, the first time it’s used.</value>
+  </data>
+  <data name="Import_TranscribeDeviceGpu" xml:space="preserve">
+    <value>Runs on this computer’s graphics card:</value>
+  </data>
+  <data name="Import_TranscribeDeviceCpu" xml:space="preserve">
+    <value>No graphics card it can use was found, so it runs on the processor, which is slower.</value>
+  </data>
+  <data name="ImportModel_large-v3-turbo" xml:space="preserve">
+    <value>Most accurate</value>
+  </data>
+  <data name="ImportModel_large-v3-turbo-q5_0" xml:space="preserve">
+    <value>Nearly as accurate, a third of the download</value>
+  </data>
+  <data name="ImportModel_medium-q5_0" xml:space="preserve">
+    <value>Balanced</value>
+  </data>
+  <data name="ImportModel_small-q5_1" xml:space="preserve">
+    <value>Faster, less accurate</value>
+  </data>
+  <data name="ImportModel_base-q5_1" xml:space="preserve">
+    <value>Fastest, least accurate</value>
+  </data>
+  <data name="ImportStep_Transcribe" xml:space="preserve">
+    <value>speech to text</value>
+  </data>
+  <data name="ImportStep_Translate" xml:space="preserve">
+    <value>translation</value>
+  </data>
+  <data name="ImportPhase_Transcribing" xml:space="preserve">
+    <value>Transcribing here, {0}</value>
+  </data>
+  <data name="ImportPhase_Running_Transcribe" xml:space="preserve">
+    <value>Transcribing here…</value>
+  </data>
+  <data name="ImportPhase_Running_Translate" xml:space="preserve">
+    <value>Asking for translation…</value>
+  </data>
+  <data name="ImportPhase_WaitingQuranIndex" xml:space="preserve">
+    <value>Waiting for the server’s Quran index</value>
+  </data>
+  <data name="ImportPhase_WaitingDraft" xml:space="preserve">
+    <value>Waiting for the server to draft the transcript</value>
+  </data>
+  <data name="ImportRow_TranscriptSent" xml:space="preserve">
+    <value>Transcript sent, in {0}</value>
+  </data>
+  <data name="ImportLog_transcribe_off" xml:space="preserve">
+    <value>Speech to text wasn’t chosen for this file.</value>
+  </data>
+  <data name="ImportLog_transcribe_sidecar" xml:space="preserve">
+    <value>This file has its own captions, so they’re used instead of a transcript.</value>
+  </data>
+  <data name="ImportLog_transcribe_unavailable" xml:space="preserve">
+    <value>This copy of Tools can’t transcribe on this computer. The file is imported without a transcript.</value>
+  </data>
+  <data name="ImportLog_quran_index_wait" xml:space="preserve">
+    <value>Waiting for the server’s Quran index before transcribing. Tools tries again in 10 minutes.</value>
+  </data>
+  <data name="ImportLog_transcribe_no_audio" xml:space="preserve">
+    <value>This file has no sound to transcribe.</value>
+  </data>
+  <data name="ImportLog_transcribe_silent" xml:space="preserve">
+    <value>No speech was heard in this file.</value>
+  </data>
+  <data name="ImportLog_model_download" xml:space="preserve">
+    <value>Downloading the speech model once: {0}</value>
+  </data>
+  <data name="ImportLog_transcribed" xml:space="preserve">
+    <value>Transcribed in {0}: {1}, {2}. Ran on:</value>
+  </data>
+  <data name="ImportCount_segments_One" xml:space="preserve">
+    <value>1 line</value>
+  </data>
+  <data name="ImportCount_segments_Other" xml:space="preserve">
+    <value>{0} lines</value>
+  </data>
+  <data name="ImportCount_quran_One" xml:space="preserve">
+    <value>1 Quran reference</value>
+  </data>
+  <data name="ImportCount_quran_Other" xml:space="preserve">
+    <value>{0} Quran references</value>
+  </data>
+  <data name="ImportCount_quran_Zero" xml:space="preserve">
+    <value>no Quran references</value>
+  </data>
+  <data name="ImportLog_transcript_sent" xml:space="preserve">
+    <value>The transcript is with the server. It becomes the {0} caption draft.</value>
+  </data>
+  <data name="ImportLog_transcript_exists" xml:space="preserve">
+    <value>This video already has a {0} caption draft, so it was kept.</value>
+  </data>
+  <data name="ImportLog_transcript_refused" xml:space="preserve">
+    <value>The server refused the transcript, so the file is imported without one. Its words:</value>
+  </data>
+  <data name="ImportLog_transcribe_failed" xml:space="preserve">
+    <value>Couldn’t transcribe here, so the file is imported without a transcript. The Errors page shows it.</value>
+  </data>
+  <data name="ImportLog_translation_requested" xml:space="preserve">
+    <value>Translation into {0} requested. It becomes a caption draft for a person to check.</value>
+  </data>
+  <data name="ImportLog_translation_exists" xml:space="preserve">
+    <value>This video already has a {0} caption draft, so it was kept.</value>
+  </data>
+  <data name="ImportLog_translation_refused" xml:space="preserve">
+    <value>The server didn’t translate into {0}: {1}</value>
+  </data>
+  <data name="ImportLog_translate_gave_up" xml:space="preserve">
+    <value>The server hasn’t drafted the transcript after a day. The videos admin shows the caption job.</value>
+  </data>
+  <data name="ImportTranscribeError_unavailable" xml:space="preserve">
+    <value>this copy of Tools can’t transcribe</value>
+  </data>
+  <data name="ImportTranscribeError_model_download" xml:space="preserve">
+    <value>the speech model couldn’t be downloaded</value>
+  </data>
+  <data name="ImportTranscribeError_decode" xml:space="preserve">
+    <value>the sound couldn’t be read</value>
+  </data>
+  <data name="ImportTranscribeError_transcribe" xml:space="preserve">
+    <value>the speech model stopped</value>
+  </data>
+  <data name="ImportTranscribeError_disk" xml:space="preserve">
+    <value>the transcript couldn’t be saved on this computer</value>
+  </data>
+  <data name="ImportTranscribeError_ffmpeg_failed" xml:space="preserve">
+    <value>the sound couldn’t be taken out of the video</value>
+  </data>
+  <data name="ImportTranslateError_same_language" xml:space="preserve">
+    <value>it’s the transcript’s own language</value>
+  </data>
+  <data name="ImportTranslateError_unsupported_language" xml:space="preserve">
+    <value>the server doesn’t translate that language</value>
+  </data>
+  <data name="ImportTranslateError_translation_paused" xml:space="preserve">
+    <value>translation is paused in the videos admin</value>
+  </data>
+  <data name="ImportTranslateError_other" xml:space="preserve">
+    <value>the videos admin shows why</value>
+  </data>
 </root>

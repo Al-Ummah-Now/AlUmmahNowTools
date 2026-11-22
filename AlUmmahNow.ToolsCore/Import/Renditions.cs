@@ -37,7 +37,7 @@ public sealed class LocalEncodeException : Exception
 {
     public LocalEncodeException(string code, string message, Exception? inner = null) : base(message, inner) => Code = code;
 
-    /// <summary>ffmpeg_missing, probe_failed, no_video, disk_space, ffmpeg_failed, package_failed, too_large or settings_invalid</summary>
+    /// <summary>ffmpeg_missing, probe_failed, no_video, no_audio, disk_space, ffmpeg_failed, package_failed, too_large or settings_invalid</summary>
     public string Code { get; }
 }
 
@@ -139,6 +139,11 @@ public interface IMediaTools
     Task<string?> PickEncoderAsync(CancellationToken ct);
     /// <summary>One decode, one progressive MP4 per rung (<paramref name="outputs"/>, in rung order). Progress 0–1.</summary>
     Task EncodeAsync(string source, SourceInfo info, IReadOnlyList<PlannedRung> rungs, IReadOnlyList<string> outputs, string encoder, EncodeLadderSettings settings, IProgress<double> progress, CancellationToken ct);
+    /// <summary>
+    /// The first audio track as 16 kHz mono 16-bit WAV, what whisper reads (TA-13): any container and codec ffmpeg
+    /// reads, where aun-core's own decoder takes only WAV, MP3, AAC/M4A, FLAC and Vorbis.
+    /// </summary>
+    Task ExtractAudioAsync(string source, string wavPath, CancellationToken ct);
 }
 
 /// <summary>Packages a rung's MP4 into fMP4 HLS cut like the server's encode (aun-core <c>hls_package_mp4</c>).</summary>
@@ -295,6 +300,16 @@ public sealed class FfmpegMediaTools : IMediaTools
     {
         var line = text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).LastOrDefault() ?? "";
         return line.Length > 300 ? line[..300] : line;
+    }
+
+    public async Task ExtractAudioAsync(string source, string wavPath, CancellationToken ct)
+    {
+        var (ffmpeg, _) = await Paths(ct).ConfigureAwait(false);
+        var (code, _, error) = await RunAsync(ffmpeg, new[] { "-nostdin", "-y", "-v", "error", "-i", source, "-map", "0:a:0", "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", wavPath }, null, ct).ConfigureAwait(false);
+        if (code == 0) return;
+        try { File.Delete(wavPath); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+        // "-map 0:a:0" matches nothing in a file without sound
+        throw new LocalEncodeException(error.Contains("matches no streams", StringComparison.Ordinal) ? "no_audio" : "ffmpeg_failed", "ffmpeg could not read the file's sound: " + LastLine(error));
     }
 
     private static async Task<(int Code, string Output, string Error)> RunAsync(string exe, IEnumerable<string> args, Action<string>? onLine, CancellationToken ct)

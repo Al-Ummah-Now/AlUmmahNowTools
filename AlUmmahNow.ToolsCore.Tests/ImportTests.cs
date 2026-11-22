@@ -574,7 +574,7 @@ public class ImportQueueTests
 
         await Drain(queue, () => queue.Items.All(i => i.Phase == ItemPhase.Done));
 
-        Assert.Equal(new[] { "a.mp4:Hash", "a.mp4:Encode", "a.mp4:Upload", "a.mp4:Attach", "a.mp4:Check" }, order.Where(o => o.StartsWith("a")));
+        Assert.Equal(new[] { "a.mp4:Hash", "a.mp4:Encode", "a.mp4:Upload", "a.mp4:Attach", "a.mp4:Transcribe", "a.mp4:Check", "a.mp4:Translate" }, order.Where(o => o.StartsWith("a")));
         Assert.DoesNotContain("b.mp4:Attach", order);
         Assert.Equal(StepStatus.Skipped, queue.Items[1].Steps.Single(s => s.Kind == ImportStepKind.Attach).Status);
         Assert.Contains("Finished", queue.LogText(a.Id));
@@ -725,7 +725,7 @@ public class ImportQueueTests
         await Drain(first, () => first.Items[0].UploadOffset == 42);
 
         // The app closes mid-upload: the saved file still says Running
-        var second = new ImportQueue(path, new IImportStep[] { new ScriptedStep(ImportStepKind.Upload), new ScriptedStep(ImportStepKind.Attach), new ScriptedStep(ImportStepKind.Check) });
+        var second = new ImportQueue(path, new IImportStep[] { new ScriptedStep(ImportStepKind.Upload), new ScriptedStep(ImportStepKind.Attach), new ScriptedStep(ImportStepKind.Transcribe), new ScriptedStep(ImportStepKind.Check), new ScriptedStep(ImportStepKind.Translate) });
         var restored = Assert.Single(second.Items);
         Assert.Equal("abc", restored.Sha256);
         Assert.Equal(42, restored.UploadOffset);
