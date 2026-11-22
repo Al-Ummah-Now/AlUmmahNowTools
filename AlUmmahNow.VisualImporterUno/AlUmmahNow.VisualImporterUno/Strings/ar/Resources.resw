@@ -2404,10 +2404,10 @@
     <value>دع الخادم يرمّز هذه المرئيات</value>
   </data>
   <data name="Import_EncodeNote_ffmpeg_missing" xml:space="preserve">
-    <value>لا توجد أداة الترميز على هذا الجهاز، فيرمّز الخادم هذه المرئيات. أضفها من صفحة أدوات المرئيات.</value>
+    <value>لا توجد أداة الترميز (البرنامج الذي يجهّز المرئي بمقاسات العرض) على هذا الجهاز، فيرمّز الخادم هذه المرئيات. أضفها من صفحة أدوات المرئيات.</value>
   </data>
   <data name="Import_EncodeNote_no_encoder" xml:space="preserve">
-    <value>أداة الترميز على هذا الجهاز لا تدعم ما يحتاجه الخادم، فيرمّز الخادم هذه المرئيات. اختر غيرها من صفحة أدوات المرئيات.</value>
+    <value>أداة الترميز (البرنامج الذي يجهّز المرئي بمقاسات العرض) على هذا الجهاز لا تدعم ما يحتاجه الخادم، فيرمّز الخادم هذه المرئيات. اختر غيرها من صفحة أدوات المرئيات.</value>
   </data>
   <data name="Import_ParallelEncode.Header" xml:space="preserve">
     <value>الترميز</value>
@@ -2437,10 +2437,10 @@
     <value>يُعرض كما رُمّز على هذا الجهاز</value>
   </data>
   <data name="ImportVerdict_rejected" xml:space="preserve">
-    <value>أعاد الخادم ترميزه: {0}</value>
+    <value>أعاد الخادم ترميز هذا المرئي، إذ {0}</value>
   </data>
   <data name="ImportVerdict_rejected_rung" xml:space="preserve">
-    <value>أعاد الخادم ترميزه: {0}، في الدقة {1}</value>
+    <value>أعاد الخادم ترميز هذا المرئي بالدقة {1}، إذ {0}</value>
   </data>
   <data name="ImportVerdict_failed" xml:space="preserve">
     <value>توقفت معالجة الخادم. تعرضها إدارة المرئيات مع زر إعادة المحاولة.</value>
@@ -2452,13 +2452,13 @@
     <value>المقاسات لا تطابق مقاسات الخادم</value>
   </data>
   <data name="ImportReason_file_missing" xml:space="preserve">
-    <value>ملف ناقص</value>
+    <value>كان أحد الملفات ناقصًا</value>
   </data>
   <data name="ImportReason_playlist" xml:space="preserve">
     <value>ملف قائمة الأجزاء لا يطابق ما يكتبه الخادم</value>
   </data>
   <data name="ImportReason_no_video" xml:space="preserve">
-    <value>لا توجد صورة</value>
+    <value>لم تكن فيه صورة</value>
   </data>
   <data name="ImportReason_video_codec" xml:space="preserve">
     <value>ترميز الصورة ليس ما يستخدمه الخادم</value>
@@ -2467,7 +2467,7 @@
     <value>تنسيق الألوان ليس تنسيق الخادم</value>
   </data>
   <data name="ImportReason_size" xml:space="preserve">
-    <value>مقاس صورة غير مطابق</value>
+    <value>أحد مقاسات الصورة غير مطابق</value>
   </data>
   <data name="ImportReason_audio" xml:space="preserve">
     <value>الصوت ليس كما يحتاجه الخادم</value>
@@ -2479,13 +2479,13 @@
     <value>المدة لا تطابق الأصل</value>
   </data>
   <data name="ImportReason_keyframes" xml:space="preserve">
-    <value>الإطارات المفتاحية ليست حيث يحتاجها الخادم</value>
+    <value>تعذّر بدء التشغيل من كل نقطة يحتاجها الخادم</value>
   </data>
   <data name="ImportReason_bitrate" xml:space="preserve">
-    <value>معدل البت فوق الحد</value>
+    <value>كمية البيانات في الثانية فوق الحد</value>
   </data>
   <data name="ImportReason_decode" xml:space="preserve">
-    <value>ملف لم يُشغَّل حتى آخره</value>
+    <value>أحد الملفات لم يُشغَّل حتى آخره</value>
   </data>
   <data name="ImportReason_content_mismatch" xml:space="preserve">
     <value>الصورة لا تطابق الأصل</value>
@@ -2494,10 +2494,10 @@
     <value>الصوت لا يطابق الأصل</value>
   </data>
   <data name="ImportReason_error" xml:space="preserve">
-    <value>تعذّر الفحص نفسه</value>
+    <value>الفحص نفسه تعذّر</value>
   </data>
   <data name="ImportReason_not_carried" xml:space="preserve">
-    <value>لم تصل الملفات إلى الترميز في وقتها</value>
+    <value>الملفات لم تصل إلى الترميز في وقتها</value>
   </data>
   <data name="ImportEncodeError_ffmpeg_missing" xml:space="preserve">
     <value>لا توجد أداة الترميز على هذا الجهاز</value>
@@ -2545,7 +2545,7 @@
     <value>بدأ الخادم ترميزه أصلًا، فلا شيء يُرمَّز هنا</value>
   </data>
   <data name="ImportLog_encode_plan" xml:space="preserve">
-    <value>يُرمَّز هنا بهذه المقاسات وهذا المرمِّز:</value>
+    <value>يُرمَّز هنا بالدقات {0}، باستخدام {1}</value>
   </data>
   <data name="ImportLog_encoded" xml:space="preserve">
     <value>رُمِّز هنا، {0} إجمالًا، ويُرسل مع الرفع</value>
@@ -2554,7 +2554,7 @@
     <value>تعذّر الترميز هنا، فيرمّزه الخادم:</value>
   </data>
   <data name="ImportLog_renditions_staged" xml:space="preserve">
-    <value>إرسال الملفات المرمّزة: {0}</value>
+    <value>إرسال المرئي المرمّز في {0} من الأجزاء القصيرة، بالشكل الذي يعرضه الخادم</value>
   </data>
   <data name="ImportLog_renditions_sent" xml:space="preserve">
     <value>وصلت الملفات المرمّزة إلى الخادم، ويفحصها حين يعالج المرئي</value>
@@ -2588,5 +2588,29 @@
   </data>
   <data name="ImportEncodeError_settings_invalid" xml:space="preserve">
     <value>لا يمكن استخدام إعدادات الترميز من الخادم هنا</value>
+  </data>
+  <data name="ImportLog_encoded_from" xml:space="preserve">
+    <value>رُمِّز هنا: {0}، والأصل {1}، ويُرسل مع الرفع</value>
+  </data>
+  <data name="ImportLog_renditions_staged_size" xml:space="preserve">
+    <value>إرسال المرئي المرمّز ({0}) في {1} من الأجزاء القصيرة، بالشكل الذي يعرضه الخادم</value>
+  </data>
+  <data name="ImportEncoder_apple" xml:space="preserve">
+    <value>مرمّز أبل المدمج</value>
+  </data>
+  <data name="ImportEncoder_nvidia" xml:space="preserve">
+    <value>مرمّز بطاقة إنفيديا</value>
+  </data>
+  <data name="ImportEncoder_intel" xml:space="preserve">
+    <value>مرمّز إنتل المدمج</value>
+  </data>
+  <data name="ImportEncoder_amd" xml:space="preserve">
+    <value>مرمّز بطاقة إيه إم دي</value>
+  </data>
+  <data name="ImportEncoder_software" xml:space="preserve">
+    <value>المرمّز البرمجي في أداة الترميز</value>
+  </data>
+  <data name="ImportEncoder_other" xml:space="preserve">
+    <value>أداة الترميز</value>
   </data>
 </root>

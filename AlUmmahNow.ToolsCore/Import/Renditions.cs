@@ -443,7 +443,8 @@ public sealed class EncodeStep : IImportStep
             };
             context.Save();
             var size = (bytes / 1048576.0).ToString("0.#", CultureInfo.InvariantCulture);
-            context.Log(LogLevel.Info, "encoded", $"Encoded {item.Renditions.Rungs.Count} rungs here ({size} MB); they go with the upload", item.Renditions.Rungs.Count.ToString(CultureInfo.InvariantCulture), bytes.ToString(CultureInfo.InvariantCulture));
+            // Args: rungs, encoded bytes, the original file's bytes (shown beside each other)
+            context.Log(LogLevel.Info, "encoded", $"Encoded {item.Renditions.Rungs.Count} rungs here ({size} MB); they go with the upload", item.Renditions.Rungs.Count.ToString(CultureInfo.InvariantCulture), bytes.ToString(CultureInfo.InvariantCulture), item.Video.Size.ToString(CultureInfo.InvariantCulture));
             return StepResult.Done;
         }
         catch (OperationCanceledException)
@@ -573,7 +574,7 @@ public sealed class RenditionSender
             set.StagingId = staging.StagingId;
             set.FirstPassDone = false;
             context.Save();
-            context.Log(LogLevel.Info, "renditions_staged", $"Sending the renditions ({set.Files.Count} files)", set.Files.Count.ToString(CultureInfo.InvariantCulture));
+            context.Log(LogLevel.Info, "renditions_staged", $"Sending the renditions ({set.Files.Count} files)", set.Files.Count.ToString(CultureInfo.InvariantCulture), set.Bytes.ToString(CultureInfo.InvariantCulture));
         }
         var sent = 0L;
         if (!set.FirstPassDone)

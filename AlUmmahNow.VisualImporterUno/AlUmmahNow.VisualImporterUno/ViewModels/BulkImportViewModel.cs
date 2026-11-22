@@ -51,16 +51,34 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
 
     // ---------------------------------------------------------------- Encoding (TA-12)
 
-    /// <summary>"Let the server encode": the batch's files are not encoded on this computer.</summary>
+    /// <summary>"Let the server encode", as the admin chose it: the batch's files are not encoded on this computer.</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ServerEncodesShown))]
     private bool _serverEncodes;
 
     /// <summary>Why this computer cannot encode (no ffmpeg, no H.264 encoder), or empty.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasEncodeNote))]
+    [NotifyPropertyChangedFor(nameof(HasEncodeNote), nameof(CanChooseEncode), nameof(ServerEncodesShown))]
     private string _encodeNote = "";
 
     public bool HasEncodeNote => EncodeNote.Length > 0;
+
+    /// <summary>The box can be changed only when this computer can encode.</summary>
+    public bool CanChooseEncode => !HasEncodeNote;
+
+    /// <summary>
+    /// The box: ticked when the admin chose it, and always when this computer cannot encode (the server encodes them then),
+    /// so it never contradicts the note under it.
+    /// </summary>
+    public bool ServerEncodesShown
+    {
+        get => ServerEncodes || HasEncodeNote;
+        set
+        {
+            if (CanChooseEncode) ServerEncodes = value;
+            else OnPropertyChanged();
+        }
+    }
 
     private async Task CheckEncodingAsync()
     {
@@ -278,7 +296,7 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
         try
         {
             var name = Path.GetFileName(FolderPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
-            var serverEncodes = ServerEncodes;
+            var serverEncodes = ServerEncodesShown;
             var batch = await _workspace.Api.CreateBatchAsync(channel.Id, string.IsNullOrWhiteSpace(name) ? null : name);
             _channelNames[channel.Id] = channel.Name;
             var now = DateTimeOffset.UtcNow;
@@ -472,16 +490,46 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
             "left_out_unreadable" => Loc.WithDetail(Loc.WithDetail(Loc.Get("ImportLog_left_out_unreadable"), Arg(0)), Arg(1)),
             // Encoding here and the server's verdict (TA-12); sizes, encoder names and the server's raw words on their own lines
             "server_encode_chosen" or "server_encodes_target" or "server_encodes_started" or "renditions_sent" or "renditions_used" or "check_gave_up" => Loc.Get("ImportLog_" + line.Code),
-            "encode_plan" => Loc.WithDetail(Loc.WithDetail(Loc.Get("ImportLog_encode_plan"), Arg(1)), Arg(0)),
-            "encoded" => Loc.Format("ImportLog_encoded", long.TryParse(Arg(1), NumberStyles.Integer, CultureInfo.InvariantCulture, out var bytes) ? Loc.Bytes(bytes) : Arg(1)),
+            "encode_plan" => Loc.Format("ImportLog_encode_plan", RungList(Arg(1)), EncoderName(Arg(0))),
+            "encoded" => Arg(2).Length > 0
+                ? Loc.Format("ImportLog_encoded_from", Bytes(Arg(1)), Bytes(Arg(2)))
+                : Loc.Format("ImportLog_encoded", Bytes(Arg(1))),
             "encode_failed" => Loc.WithDetail(Loc.WithDetail(Loc.Get("ImportLog_encode_failed"), EncodeErrorText(Arg(0))), Arg(1)),
-            "renditions_staged" => Loc.Format("ImportLog_renditions_staged", Num(0)),
+            "renditions_staged" => Arg(1).Length > 0
+                ? Loc.Format("ImportLog_renditions_staged_size", Bytes(Arg(1)), Num(0))
+                : Loc.Format("ImportLog_renditions_staged", Num(0)),
             "renditions_dropped" => Loc.WithDetail(Loc.WithDetail(Loc.Get("ImportLog_renditions_dropped"), DropText(Arg(0))), Arg(1)),
             "renditions_rejected" => Loc.WithDetail(Loc.WithDetail(Loc.Get("ImportLog_renditions_rejected"), ReasonText(Arg(0))), Arg(1)),
             "transcode_failed" => Loc.WithDetail(Loc.Get("ImportLog_transcode_failed"), Arg(0)),
             "server_working" => Loc.Format("ImportLog_server_working", StepName(Arg(0))),
             _ => line.Text,
         };
+    }
+
+    private static string Bytes(string value) =>
+        long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var bytes) ? Loc.Bytes(bytes) : value;
+
+    /// <summary>The sizes to encode ("360p, 480p, 720p"): "360p, 480p and 720p", in Arabic «٣٦٠، ٤٨٠، ٧٢٠».</summary>
+    internal static string RungList(string rungs)
+    {
+        var names = rungs.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(RungText).ToList();
+        if (Loc.IsArabic || names.Count < 2) return string.Join(Loc.IsArabic ? "، " : ", ", names);
+        return string.Join(", ", names.Take(names.Count - 1)) + " and " + names[^1];
+    }
+
+    /// <summary>The encoder ffmpeg uses, in plain words: "Apple's built-in encoder" rather than h264_videotoolbox.</summary>
+    internal static string EncoderName(string encoder)
+    {
+        var key = encoder switch
+        {
+            "h264_videotoolbox" => "apple",
+            "h264_nvenc" => "nvidia",
+            "h264_qsv" => "intel",
+            "h264_amf" => "amd",
+            "libx264" => "software",
+            _ => "other",
+        };
+        return Loc.Get("ImportEncoder_" + key);
     }
 
     /// <summary>Why the server encoded a file again (shared-types PREBUILT_REJECTIONS), in the app's words.</summary>
