@@ -33,9 +33,24 @@ public static class ScreenshotRunner
             foreach (var popup in Microsoft.UI.Xaml.Media.VisualTreeHelper.GetOpenPopupsForXamlRoot(xamlRoot))
                 if (popup.Child is FrameworkElement child && child.ActualHeight > 0)
                     popupBottom = Math.Max(popupBottom, child.TransformToVisual(null).TransformBounds(new Windows.Foundation.Rect(0, 0, child.ActualWidth, child.ActualHeight)).Bottom);
-        var end = Environment.GetEnvironmentVariable("TOOLS_SCREENSHOT_CROP") != "0" ? EndAtEdge((UIElement)window.Content!, popupBottom) : null;
-        var cropTo = end is { } y ? Math.Min(full.Height, (int)Math.Ceiling(y * scale)) : full.Height;
-        using var image = cropTo < full.Height ? full.Subset(new SKRectI(0, 0, full.Width, cropTo)) : SKImage.FromBitmap(SKBitmap.FromImage(full));
+        // The window never grows past the screen: a page taller than that (Arabic wraps longer) is scrolled on by the
+        // missing height and the rows that come into view are added below, so it ends where its English frame does
+        var shot = full;
+        var shift = popupBottom > 0 ? 0 : await ScrollForMissingAsync(window, h);
+        if (shift > 0)
+        {
+            using var below = await RenderAsync(root);
+            var add = Math.Min(below.Height, (int)Math.Round(shift * scale));
+            var info = new SKImageInfo(full.Width, full.Height + add, SKColorType.Bgra8888, SKAlphaType.Premul);
+            using var surface = SKSurface.Create(info);
+            surface.Canvas.DrawImage(full, 0, 0);
+            surface.Canvas.DrawImage(below, new SKRectI(0, below.Height - add, below.Width, below.Height), new SKRectI(0, full.Height, full.Width, full.Height + add));
+            shot = surface.Snapshot();
+        }
+        var end = Environment.GetEnvironmentVariable("TOOLS_SCREENSHOT_CROP") != "0" ? EndAtEdge((UIElement)window.Content!, popupBottom) + shift : null;
+        var cropTo = end is { } y ? Math.Min(shot.Height, (int)Math.Ceiling(y * scale)) : shot.Height;
+        using var image = cropTo < shot.Height ? shot.Subset(new SKRectI(0, 0, shot.Width, cropTo)) : SKImage.FromBitmap(SKBitmap.FromImage(shot));
+        if (!ReferenceEquals(shot, full)) shot.Dispose();
         using var data = image.Encode(SKEncodedImageFormat.Png, 100);
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
         await using (var file = File.Create(path)) data.SaveTo(file);
@@ -65,6 +80,23 @@ public static class ScreenshotRunner
             return cut;
         }
         return null;
+    }
+
+    /// <summary>
+    /// When the screen kept the window shorter than the asked height and the page's scroll area runs to the window's
+    /// bottom, scrolls it on by the missing height (or what is left to scroll); returns how far it moved.
+    /// </summary>
+    private static async Task<double> ScrollForMissingAsync(Window window, int askedHeight)
+    {
+        if (window.Content is not FrameworkElement content || Largest<Microsoft.UI.Xaml.Controls.ScrollViewer>(content) is not { } page) return 0;
+        var missing = askedHeight - content.ActualHeight;
+        var pageBottom = page.TransformToVisual(null).TransformPoint(new Windows.Foundation.Point(0, page.ActualHeight)).Y;
+        var room = page.ScrollableHeight - page.VerticalOffset;
+        if (missing < 1 || room < 1 || Math.Abs(pageBottom - content.ActualHeight) > 1) return 0;
+        var from = page.VerticalOffset;
+        page.ChangeView(null, from + Math.Min(missing, room), null, true);
+        await Task.Delay(1000);
+        return page.VerticalOffset - from;
     }
 
     private static void Collect(DependencyObject parent, List<(double, double)> leaves, List<double> edges)
