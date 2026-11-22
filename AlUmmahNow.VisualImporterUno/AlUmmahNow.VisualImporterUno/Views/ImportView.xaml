@@ -165,6 +165,16 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
+                    <!-- Encoding: on this computer unless the server is asked to (TA-12) -->
+                    <Border Style="{StaticResource ToolsInsetCard}">
+                        <StackPanel Spacing="8">
+                            <TextBlock x:Uid="Import_EncodeTitle" Text="Encoding" Style="{StaticResource ToolsLabel}" />
+                            <TextBlock x:Uid="Import_EncodeBody" Text="Tools encodes each video on this computer and sends the result with the upload." Style="{StaticResource ToolsMuted}" TextWrapping="Wrap" />
+                            <CheckBox x:Uid="Import_EncodeServer" Content="Let the server encode these videos" IsChecked="{x:Bind ViewModel.ServerEncodes, Mode=TwoWay}" />
+                            <TextBlock Text="{x:Bind ViewModel.EncodeNote, Mode=OneWay}" Style="{StaticResource ToolsMuted}" Foreground="{ThemeResource FanousAccentBrush}"
+                                       TextWrapping="Wrap" Visibility="{x:Bind ViewModel.HasEncodeNote, Mode=OneWay}" />
+                        </StackPanel>
+                    </Border>
                     <Button Style="{StaticResource ToolsPrimaryButton}" Command="{x:Bind ViewModel.AddToQueueCommand}">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <ProgressRing Width="16" Height="16" IsIndeterminate="{x:Bind ViewModel.SpinnerMovesHere}" Value="100" IsActive="{x:Bind ViewModel.IsAdding, Mode=OneWay}" Visibility="{x:Bind ViewModel.IsAdding, Mode=OneWay}" />
@@ -218,11 +228,12 @@
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
-                                        <!-- The state at a glance: tick, warning, clock (waiting), arrows (trying again), pause or spinner -->
+                                        <!-- The state at a glance: tick, warning, clock (waiting), arrows (trying again), cloud (the server is working), pause or spinner -->
                                         <Grid Width="20" VerticalAlignment="Top" Margin="0,2,0,0">
                                             <FontIcon Glyph="&#xE73E;" FontSize="16" Foreground="{ThemeResource FanousSuccessTextBrush}" Visibility="{x:Bind IsDone, Mode=OneWay}" />
                                             <FontIcon Glyph="&#xE7BA;" FontSize="16" Foreground="{ThemeResource FanousErrorTextBrush}" Visibility="{x:Bind IsFailed, Mode=OneWay}" />
                                             <FontIcon Glyph="&#xE823;" FontSize="16" Foreground="{ThemeResource FanousTextSecondaryBrush}" Visibility="{x:Bind IsWaiting, Mode=OneWay}" />
+                                            <FontIcon Glyph="&#xE753;" FontSize="16" Foreground="{ThemeResource FanousTextSecondaryBrush}" Visibility="{x:Bind IsServerWorking, Mode=OneWay}" />
                                             <FontIcon Glyph="&#xE72C;" FontSize="16" Foreground="{ThemeResource FanousTextSecondaryBrush}" Visibility="{x:Bind IsRetrying, Mode=OneWay}" />
                                             <FontIcon Glyph="&#xE769;" FontSize="16" Foreground="{ThemeResource FanousTextSecondaryBrush}" Visibility="{x:Bind IsPaused, Mode=OneWay}" />
                                             <ProgressRing Width="16" Height="16" IsIndeterminate="{x:Bind SpinnerMoves}" Value="100" IsActive="{x:Bind ShowProgress, Mode=OneWay}" Visibility="{x:Bind ShowProgress, Mode=OneWay}" />
@@ -233,6 +244,9 @@
                                             <ProgressBar Value="{x:Bind Progress, Mode=OneWay}" Maximum="100" Visibility="{x:Bind ShowProgress, Mode=OneWay}" Margin="0,4" />
                                             <TextBlock Text="{x:Bind Detail, Mode=OneWay}" Style="{StaticResource ToolsMuted}" Foreground="{ThemeResource FanousErrorTextBrush}"
                                                        TextWrapping="Wrap" Visibility="{x:Bind HasDetail, Mode=OneWay}" />
+                                            <TextBlock Text="{x:Bind Note, Mode=OneWay}" Style="{StaticResource ToolsMuted}" TextWrapping="Wrap" Visibility="{x:Bind ShowNote, Mode=OneWay}" />
+                                            <TextBlock Text="{x:Bind Note, Mode=OneWay}" Style="{StaticResource ToolsMuted}" Foreground="{ThemeResource FanousAccentBrush}"
+                                                       TextWrapping="Wrap" Visibility="{x:Bind ShowProblemNote, Mode=OneWay}" />
                                             <StackPanel Orientation="Horizontal" Spacing="4" Margin="-8,2,0,0">
                                                 <HyperlinkButton Style="{StaticResource ToolsLinkButton}" Padding="8,4" Tag="{x:Bind}" Click="Pause_Click" Visibility="{x:Bind CanPause, Mode=OneWay}">
                                                     <TextBlock x:Uid="Import_RowPause" Text="Pause" />
@@ -296,16 +310,20 @@
                     <Border Style="{StaticResource ToolsInsetCard}">
                         <StackPanel Spacing="10">
                             <TextBlock x:Uid="Import_ParallelTitle" Text="At the same time" Style="{StaticResource ToolsLabel}" />
-                            <TextBlock x:Uid="Import_ParallelBody" Text="More at once is faster on a fast connection. Uploads go up to 5." Style="{StaticResource ToolsMuted}" TextWrapping="Wrap" />
+                            <TextBlock x:Uid="Import_ParallelBody" Text="More at once is faster on a fast computer and connection. Encodes go up to 4 and uploads up to 5." Style="{StaticResource ToolsMuted}" TextWrapping="Wrap" />
                             <Grid ColumnSpacing="12" RowSpacing="8" x:Name="ParallelGrid">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
                                 <ComboBox x:Name="HashBox" x:Uid="Import_ParallelHash" Header="Checking files" HorizontalAlignment="Stretch" ItemsSource="{x:Bind ViewModel.ParallelChoices}" SelectedIndex="{x:Bind ViewModel.HashParallel, Mode=TwoWay}" />
-                                <ComboBox x:Name="UploadBox" Grid.Column="1" x:Uid="Import_ParallelUpload" Header="Uploads" HorizontalAlignment="Stretch" ItemsSource="{x:Bind ViewModel.UploadChoices}" SelectedIndex="{x:Bind ViewModel.UploadParallel, Mode=TwoWay}" />
-                                <ComboBox x:Name="AttachBox" Grid.Column="2" x:Uid="Import_ParallelAttach" Header="Captions and extras" HorizontalAlignment="Stretch" ItemsSource="{x:Bind ViewModel.ParallelChoices}" SelectedIndex="{x:Bind ViewModel.AttachParallel, Mode=TwoWay}" />
+                                <ComboBox x:Name="EncodeBox" Grid.Column="1" x:Uid="Import_ParallelEncode" Header="Encodes" HorizontalAlignment="Stretch" ItemsSource="{x:Bind ViewModel.EncodeChoices}" SelectedIndex="{x:Bind ViewModel.EncodeParallel, Mode=TwoWay}" />
+                                <ComboBox x:Name="UploadBox" Grid.Row="1" x:Uid="Import_ParallelUpload" Header="Uploads" HorizontalAlignment="Stretch" ItemsSource="{x:Bind ViewModel.UploadChoices}" SelectedIndex="{x:Bind ViewModel.UploadParallel, Mode=TwoWay}" />
+                                <ComboBox x:Name="AttachBox" Grid.Row="1" Grid.Column="1" x:Uid="Import_ParallelAttach" Header="Captions and extras" HorizontalAlignment="Stretch" ItemsSource="{x:Bind ViewModel.ParallelChoices}" SelectedIndex="{x:Bind ViewModel.AttachParallel, Mode=TwoWay}" />
                             </Grid>
                         </StackPanel>
                     </Border>

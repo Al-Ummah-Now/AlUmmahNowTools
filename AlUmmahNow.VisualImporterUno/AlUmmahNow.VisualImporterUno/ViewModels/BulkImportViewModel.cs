@@ -34,6 +34,7 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
         Attach();
         var settings = _workspace.Queue.Settings;
         _hashParallel = settings.ParallelFor(ImportStepKind.Hash) - 1;
+        _encodeParallel = settings.ParallelFor(ImportStepKind.Encode) - 1;
         _uploadParallel = settings.ParallelFor(ImportStepKind.Upload) - 1;
         _attachParallel = settings.ParallelFor(ImportStepKind.Attach) - 1;
         if (_workspace.IsDemo && !DemoImport.Empty)
@@ -45,6 +46,27 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
             CaptionLanguageIndex = 1;
             ShowScan(DemoImport.Scan());
         }
+        _ = CheckEncodingAsync();
+    }
+
+    // ---------------------------------------------------------------- Encoding (TA-12)
+
+    /// <summary>"Let the server encode": the batch's files are not encoded on this computer.</summary>
+    [ObservableProperty]
+    private bool _serverEncodes;
+
+    /// <summary>Why this computer cannot encode (no ffmpeg, no H.264 encoder), or empty.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasEncodeNote))]
+    private string _encodeNote = "";
+
+    public bool HasEncodeNote => EncodeNote.Length > 0;
+
+    private async Task CheckEncodingAsync()
+    {
+        var problem = await _workspace.EncodeProblemAsync().ConfigureAwait(true);
+        if (_disposed) return;
+        EncodeNote = problem is null ? "" : Loc.Get("Import_EncodeNote_" + (problem == "ffmpeg_missing" ? "ffmpeg_missing" : "no_encoder"));
     }
 
     // ---------------------------------------------------------------- Channel
@@ -256,10 +278,11 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
         try
         {
             var name = Path.GetFileName(FolderPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+            var serverEncodes = ServerEncodes;
             var batch = await _workspace.Api.CreateBatchAsync(channel.Id, string.IsNullOrWhiteSpace(name) ? null : name);
             _channelNames[channel.Id] = channel.Name;
             var now = DateTimeOffset.UtcNow;
-            _workspace.Queue.Add(chosen.Select((r, i) => QueueItem.For(r.Video, batch.Id, channel.Id, now.AddMilliseconds(i))));
+            _workspace.Queue.Add(chosen.Select((r, i) => QueueItem.For(r.Video, batch.Id, channel.Id, now.AddMilliseconds(i), serverEncodes)));
             foreach (var r in chosen) ReviewRows.Remove(r);
             ReviewCount = ReviewRows.Count;
             CountSelected();
@@ -295,8 +318,10 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private bool _hasFinished;
 
-    /// <summary>The choices for how many run at once, written per language (1 to 8; uploads 1 to 5).</summary>
+    /// <summary>The choices for how many run at once, written per language (1 to 8; encodes 1 to 4; uploads 1 to 5).</summary>
     public IReadOnlyList<string> ParallelChoices { get; } = Enumerable.Range(1, 8).Select(n => Loc.Number(n)).ToList();
+
+    public IReadOnlyList<string> EncodeChoices { get; } = Enumerable.Range(1, QueueSettings.MaxEncodes).Select(n => Loc.Number(n)).ToList();
 
     public IReadOnlyList<string> UploadChoices { get; } = Enumerable.Range(1, QueueSettings.MaxUploads).Select(n => Loc.Number(n)).ToList();
 
@@ -305,12 +330,16 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
     private int _hashParallel;
 
     [ObservableProperty]
+    private int _encodeParallel;
+
+    [ObservableProperty]
     private int _uploadParallel;
 
     [ObservableProperty]
     private int _attachParallel;
 
     partial void OnHashParallelChanged(int value) => SetParallel(ImportStepKind.Hash, value);
+    partial void OnEncodeParallelChanged(int value) => SetParallel(ImportStepKind.Encode, value);
     partial void OnUploadParallelChanged(int value) => SetParallel(ImportStepKind.Upload, value);
     partial void OnAttachParallelChanged(int value) => SetParallel(ImportStepKind.Attach, value);
 
@@ -391,6 +420,7 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
         }
         Add(ItemPhase.Done, "Import_SumDone");
         Add(ItemPhase.Running, "Import_SumRunning");
+        Add(ItemPhase.ServerWorking, "Import_SumServer");
         Add(ItemPhase.Waiting, "Import_SumWaiting");
         Add(ItemPhase.RetryWaiting, "Import_SumRetrying");
         Add(ItemPhase.Paused, "Import_SumPaused");
@@ -440,9 +470,61 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
             "sent" => Loc.Format("ImportLog_sent", Loc.Groups(a.Skip(1).Select(Part))),
             "left_out_size" => Loc.WithDetail(Loc.Format("ImportLog_left_out_size", Num(1)), Arg(0)),
             "left_out_unreadable" => Loc.WithDetail(Loc.WithDetail(Loc.Get("ImportLog_left_out_unreadable"), Arg(0)), Arg(1)),
+            // Encoding here and the server's verdict (TA-12); sizes, encoder names and the server's raw words on their own lines
+            "server_encode_chosen" or "server_encodes_target" or "server_encodes_started" or "renditions_sent" or "renditions_used" or "check_gave_up" => Loc.Get("ImportLog_" + line.Code),
+            "encode_plan" => Loc.WithDetail(Loc.WithDetail(Loc.Get("ImportLog_encode_plan"), Arg(1)), Arg(0)),
+            "encoded" => Loc.Format("ImportLog_encoded", long.TryParse(Arg(1), NumberStyles.Integer, CultureInfo.InvariantCulture, out var bytes) ? Loc.Bytes(bytes) : Arg(1)),
+            "encode_failed" => Loc.WithDetail(Loc.WithDetail(Loc.Get("ImportLog_encode_failed"), EncodeErrorText(Arg(0))), Arg(1)),
+            "renditions_staged" => Loc.Format("ImportLog_renditions_staged", Num(0)),
+            "renditions_dropped" => Loc.WithDetail(Loc.WithDetail(Loc.Get("ImportLog_renditions_dropped"), DropText(Arg(0))), Arg(1)),
+            "renditions_rejected" => Loc.WithDetail(Loc.WithDetail(Loc.Get("ImportLog_renditions_rejected"), ReasonText(Arg(0))), Arg(1)),
+            "transcode_failed" => Loc.WithDetail(Loc.Get("ImportLog_transcode_failed"), Arg(0)),
+            "server_working" => Loc.Format("ImportLog_server_working", StepName(Arg(0))),
             _ => line.Text,
         };
     }
+
+    /// <summary>Why the server encoded a file again (shared-types PREBUILT_REJECTIONS), in the app's words.</summary>
+    internal static string ReasonText(string? code)
+    {
+        var key = code is { } c && c.StartsWith("playlist_", StringComparison.Ordinal) ? "ImportReason_playlist" : "ImportReason_" + (code ?? "error");
+        var text = Loc.Get(key);
+        return text == key ? Loc.Get("ImportReason_error") : text;
+    }
+
+    private static string EncodeErrorText(string code)
+    {
+        var text = Loc.Get("ImportEncodeError_" + code);
+        return text == "ImportEncodeError_" + code ? Loc.Get("ImportEncodeError_ffmpeg_failed") : text;
+    }
+
+    private static string DropText(string code) => code is "too_late" or "not_uploading" or "local_files_missing"
+        ? Loc.Get("ImportDrop_" + code)
+        : Loc.Get("ImportDrop_refused");
+
+    /// <summary>What the server did with the file's encoded files, once its processing ran; empty before.</summary>
+    internal static string VerdictText(QueueItem item)
+    {
+        if (item.Verdict is { } verdict)
+        {
+            if (verdict.TranscodeFailed) return Loc.Get("ImportVerdict_failed");
+            if (verdict.Used) return Loc.Get("ImportVerdict_used");
+            return verdict.Rung is { Length: > 0 } rung
+                ? Loc.Format("ImportVerdict_rejected_rung", ReasonText(verdict.Reason), RungText(rung))
+                : Loc.Format("ImportVerdict_rejected", ReasonText(verdict.Reason));
+        }
+        var gaveUp = item.Phase == ItemPhase.Done && item.Log.Any(l => l.Code == "check_gave_up");
+        return gaveUp ? Loc.Get("ImportVerdict_gave_up") : "";
+    }
+
+    /// <summary>
+    /// A rung as the language writes it: "720p" in English, «٧٢٠» in Arabic (Latin at the end of an Arabic line is laid
+    /// out at the wrong end by Uno, see Loc.RightToLeftLine).
+    /// </summary>
+    private static string RungText(string rung) =>
+        Loc.IsArabic && rung.EndsWith('p') && long.TryParse(rung.AsSpan(0, rung.Length - 1), NumberStyles.None, CultureInfo.InvariantCulture, out var lines)
+            ? Loc.Number(lines)
+            : rung;
 
     private static string Part(string part) => part.StartsWith("captions=", StringComparison.Ordinal)
         ? Loc.Format("ImportPart_captions", Loc.Languages(part["captions=".Length..].Split(',').Select(LanguageName)))
@@ -555,12 +637,16 @@ public sealed partial class QueueRow : ObservableObject
     [ObservableProperty] private string? _statusTip;
     [ObservableProperty] private string _detail = "";
     [ObservableProperty] private bool _hasDetail;
+    [ObservableProperty] private string _note = "";
+    [ObservableProperty] private bool _showNote;
+    [ObservableProperty] private bool _showProblemNote;
     [ObservableProperty] private double _progress;
     [ObservableProperty] private bool _showProgress;
     [ObservableProperty] private bool _isDone;
     [ObservableProperty] private bool _isFailed;
     [ObservableProperty] private bool _isWaiting;
     [ObservableProperty] private bool _isRetrying;
+    [ObservableProperty] private bool _isServerWorking;
     [ObservableProperty] private bool _isPaused;
     [ObservableProperty] private bool _canPause;
     [ObservableProperty] private bool _canResume;
@@ -590,16 +676,19 @@ public sealed partial class QueueRow : ObservableObject
         IsFailed = phase == ItemPhase.Failed;
         IsWaiting = phase == ItemPhase.Waiting;
         IsRetrying = phase == ItemPhase.RetryWaiting;
+        IsServerWorking = phase == ItemPhase.ServerWorking;
         IsPaused = phase == ItemPhase.Paused;
         ShowProgress = phase == ItemPhase.Running;
         Progress = Math.Round(item.Progress * 100, 1);
-        CanPause = phase is ItemPhase.Waiting or ItemPhase.Running or ItemPhase.RetryWaiting;
+        CanPause = phase is ItemPhase.Waiting or ItemPhase.Running or ItemPhase.RetryWaiting or ItemPhase.ServerWorking;
         CanResume = phase == ItemPhase.Paused;
         CanRetry = phase is ItemPhase.Failed or ItemPhase.RetryWaiting;
         Status = phase switch
         {
             ItemPhase.Done => item.AlreadyImported ? Loc.Get("ImportPhase_AlreadyImported") : Loc.Get("ImportPhase_Done"),
             ItemPhase.Running when step!.Kind == ImportStepKind.Upload => Loc.Format("ImportPhase_Uploading", Loc.Percent(item.Progress * 100)),
+            ItemPhase.Running when step!.Kind == ImportStepKind.Encode => Loc.Format("ImportPhase_Encoding", Loc.Percent(item.Progress * 100)),
+            ItemPhase.ServerWorking => Loc.Get("ImportPhase_ServerWorking"),
             ItemPhase.Running => Loc.Get("ImportPhase_Running_" + step!.Kind),
             ItemPhase.RetryWaiting => Loc.Format("ImportPhase_RetryAt", Loc.TimeWithZone(step!.NextAttemptAt!.Value.LocalDateTime)),
             ItemPhase.Paused => Loc.Get("ImportPhase_Paused"),
@@ -609,5 +698,12 @@ public sealed partial class QueueRow : ObservableObject
         StatusTip = phase == ItemPhase.RetryWaiting ? Loc.UtcText(step!.NextAttemptAt!.Value) : null;
         Detail = phase is ItemPhase.Failed or ItemPhase.RetryWaiting ? Loc.KeepLastWords(BulkImportViewModel.ErrorText(step!.LastErrorCode, step.LastError)) : "";
         HasDetail = Detail.Length > 0;
+        // The server's verdict once it has one; before that, a file the server encodes says so
+        var verdict = BulkImportViewModel.VerdictText(item);
+        Note = verdict.Length > 0 ? verdict : item.ServerEncodes && phase != ItemPhase.Done ? Loc.Get("ImportRow_ServerEncodes") : "";
+        // Encoded again, stopped or not processed: worth a second look, in the accent colour
+        var problem = verdict.Length > 0 && item.Verdict is not { Used: true };
+        ShowProblemNote = Note.Length > 0 && problem;
+        ShowNote = Note.Length > 0 && !problem;
     }
 }

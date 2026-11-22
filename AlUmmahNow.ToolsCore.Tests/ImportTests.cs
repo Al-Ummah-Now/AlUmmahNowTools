@@ -312,6 +312,8 @@ internal sealed class RecordingContext : IStepContext
     public void Log(LogLevel level, string code, string text, params string[] args) => Lines.Add((level, text, code));
     public void Progress(double fraction) => LastProgress = fraction;
     public void Save() => Saves++;
+    public TimeSpan? LaterDelay;
+    public void Later(TimeSpan delay) => LaterDelay = delay;
 }
 
 public class ImportApiClientTests
@@ -541,6 +543,12 @@ public class ImportQueueTests
 
     private static string QueuePath() => Path.Combine(Temp.Folder(), "queue.json");
 
+    /// <summary>Every step, done at once, except the ones given.</summary>
+    internal static IImportStep[] All(params ScriptedStep[] given) =>
+        Enum.GetValues<ImportStepKind>().Select(k => (IImportStep?)given.FirstOrDefault(g => g.Kind == k) ?? new ScriptedStep(k)).ToArray();
+
+    private static StepState S(QueueItem item, ImportStepKind kind) => item.Steps.Single(s => s.Kind == kind);
+
     private static async Task Drain(ImportQueue queue, Func<bool> done)
     {
         await Temp.WaitUntil(() =>
@@ -566,9 +574,9 @@ public class ImportQueueTests
 
         await Drain(queue, () => queue.Items.All(i => i.Phase == ItemPhase.Done));
 
-        Assert.Equal(new[] { "a.mp4:Hash", "a.mp4:Upload", "a.mp4:Attach" }, order.Where(o => o.StartsWith("a")));
+        Assert.Equal(new[] { "a.mp4:Hash", "a.mp4:Encode", "a.mp4:Upload", "a.mp4:Attach", "a.mp4:Check" }, order.Where(o => o.StartsWith("a")));
         Assert.DoesNotContain("b.mp4:Attach", order);
-        Assert.Equal(StepStatus.Skipped, queue.Items[1].Steps[2].Status);
+        Assert.Equal(StepStatus.Skipped, queue.Items[1].Steps.Single(s => s.Kind == ImportStepKind.Attach).Status);
         Assert.Contains("Finished", queue.LogText(a.Id));
     }
 
@@ -652,7 +660,7 @@ public class ImportQueueTests
     {
         var gate = new TaskCompletionSource();
         var upload = new ScriptedStep(ImportStepKind.Upload, async (_, _, _) => { await gate.Task; return StepResult.Done; });
-        using var queue = new ImportQueue(QueuePath(), new IImportStep[] { new ScriptedStep(ImportStepKind.Hash), upload, new ScriptedStep(ImportStepKind.Attach) });
+        using var queue = new ImportQueue(QueuePath(), ImportQueueTests.All(upload));
         queue.SetParallel(ImportStepKind.Upload, 2);
         queue.SetParallel(ImportStepKind.Hash, 99);
         Assert.Equal(8, queue.Settings.ParallelFor(ImportStepKind.Hash));
@@ -661,7 +669,7 @@ public class ImportQueueTests
         queue.SetParallel(ImportStepKind.Upload, 2);
         queue.Add(Enumerable.Range(0, 5).Select(i => QueueItem.For(Video($"{i}.mp4"), "b1", "ch1", DateTimeOffset.UtcNow.AddSeconds(i))));
 
-        await Drain(queue, () => upload.Running == 2 && queue.Items.Count(i => i.Steps[1].Status == StepStatus.Pending && i.Steps[0].Status == StepStatus.Done) == 3);
+        await Drain(queue, () => upload.Running == 2 && queue.Items.Count(i => S(i, ImportStepKind.Upload).Status == StepStatus.Pending && S(i, ImportStepKind.Encode).Status == StepStatus.Done) == 3);
         queue.Pump();
         Assert.Equal(2, upload.Running);
         gate.SetResult();
@@ -683,7 +691,7 @@ public class ImportQueueTests
             }
             return StepResult.Done;
         });
-        using var queue = new ImportQueue(QueuePath(), new IImportStep[] { new ScriptedStep(ImportStepKind.Hash), upload, new ScriptedStep(ImportStepKind.Attach) });
+        using var queue = new ImportQueue(QueuePath(), ImportQueueTests.All(upload));
         var item = QueueItem.For(Video(), "b1", "ch1", DateTimeOffset.UtcNow);
         queue.Add(new[] { item });
         var pump = Drain(queue, () => started.Task.IsCompleted);
@@ -691,7 +699,7 @@ public class ImportQueueTests
 
         queue.Pause(item.Id);
         await Temp.WaitUntil(() => queue.Items[0].Phase == ItemPhase.Paused);
-        Assert.Equal(0, queue.Items[0].Steps[1].Attempts);
+        Assert.Equal(0, S(queue.Items[0], ImportStepKind.Upload).Attempts);
         Assert.Equal(0, queue.Pump());
 
         queue.Resume(item.Id);
@@ -711,18 +719,18 @@ public class ImportQueueTests
     {
         var path = QueuePath();
         var hold = new TaskCompletionSource<StepResult>();
-        var first = new ImportQueue(path, new IImportStep[] { new ScriptedStep(ImportStepKind.Hash, (i, _, _) => { i.Sha256 = "abc"; return Task.FromResult(StepResult.Done); }), new ScriptedStep(ImportStepKind.Upload, (i, ctx, _) => { i.UploadOffset = 42; ctx.Save(); return hold.Task; }) });
+        var first = new ImportQueue(path, new IImportStep[] { new ScriptedStep(ImportStepKind.Hash, (i, _, _) => { i.Sha256 = "abc"; return Task.FromResult(StepResult.Done); }), new ScriptedStep(ImportStepKind.Encode), new ScriptedStep(ImportStepKind.Upload, (i, ctx, _) => { i.UploadOffset = 42; ctx.Save(); return hold.Task; }) });
         var item = QueueItem.For(Video(), "b1", "ch1", DateTimeOffset.UtcNow);
         first.Add(new[] { item });
         await Drain(first, () => first.Items[0].UploadOffset == 42);
 
         // The app closes mid-upload: the saved file still says Running
-        var second = new ImportQueue(path, new IImportStep[] { new ScriptedStep(ImportStepKind.Upload), new ScriptedStep(ImportStepKind.Attach) });
+        var second = new ImportQueue(path, new IImportStep[] { new ScriptedStep(ImportStepKind.Upload), new ScriptedStep(ImportStepKind.Attach), new ScriptedStep(ImportStepKind.Check) });
         var restored = Assert.Single(second.Items);
         Assert.Equal("abc", restored.Sha256);
         Assert.Equal(42, restored.UploadOffset);
-        Assert.Equal(StepStatus.Done, restored.Steps[0].Status);
-        Assert.Equal(StepStatus.Pending, restored.Steps[1].Status);
+        Assert.Equal(StepStatus.Done, S(restored, ImportStepKind.Hash).Status);
+        Assert.Equal(StepStatus.Pending, S(restored, ImportStepKind.Upload).Status);
         Assert.Contains("Upload: started", second.LogText(restored.Id));
         await Drain(second, () => second.Items[0].Phase == ItemPhase.Done);
         hold.SetResult(StepResult.Done);
@@ -733,7 +741,7 @@ public class ImportQueueTests
     [Fact]
     public async Task Remove_and_clear_done_take_files_out_of_the_queue()
     {
-        using var queue = new ImportQueue(QueuePath(), new IImportStep[] { new ScriptedStep(ImportStepKind.Hash), new ScriptedStep(ImportStepKind.Upload), new ScriptedStep(ImportStepKind.Attach) });
+        using var queue = new ImportQueue(QueuePath(), ImportQueueTests.All());
         var a = QueueItem.For(Video("a.mp4"), "b1", "ch1", DateTimeOffset.UtcNow);
         var b = QueueItem.For(Video("b.mp4"), "b1", "ch1", DateTimeOffset.UtcNow);
         queue.Add(new[] { a, b });
@@ -800,7 +808,7 @@ public class ErrorReportingTests
         using var reporter = new ErrorReporter(api.ReportErrorsAsync, "1", () => "en", TimeSpan.FromHours(1));
         var item = QueueItem.For(new ScannedVideo("/x/a.mp4", 10, 0, "video/mp4", Array.Empty<CaptionFile>(), null, null, null, new ImportMetadata(), Array.Empty<ScanNote>()), "b1", "ch1", DateTimeOffset.UtcNow);
         item.ServerItemId = "item-7";
-        var step = item.Steps[1];
+        var step = item.Steps.Single(s => s.Kind == ImportStepKind.Upload);
         step.Attempts = 6;
 
         await new ServerFailureSink(api, reporter).ItemFailedAsync(item, step, new TusException(503, "PATCH failed with 503"), "ERR-AAAA-BBBB", default);
