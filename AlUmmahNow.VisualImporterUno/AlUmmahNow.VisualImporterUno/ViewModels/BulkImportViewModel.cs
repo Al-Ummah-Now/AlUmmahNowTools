@@ -800,6 +800,9 @@ public sealed partial class QueueRow : ObservableObject
     [ObservableProperty] private bool _hasDetail;
     [ObservableProperty] private string _note = "";
     [ObservableProperty] private bool _showNote;
+    /// <summary>A transcript made here is with the server (TA-13), under the encoding note.</summary>
+    [ObservableProperty] private string _transcriptNote = "";
+    [ObservableProperty] private bool _showTranscriptNote;
     [ObservableProperty] private bool _showProblemNote;
     [ObservableProperty] private double _progress;
     [ObservableProperty] private bool _showProgress;
@@ -864,11 +867,12 @@ public sealed partial class QueueRow : ObservableObject
         HasDetail = Detail.Length > 0;
         // The server's verdict once it has one; before that, a file the server encodes says so
         var verdict = BulkImportViewModel.VerdictText(item);
-        // and a transcript made here says it is with the server (TA-13)
-        Note = verdict.Length > 0 ? Loc.KeepLastWords(verdict)
-            : item.ServerEncodes && phase != ItemPhase.Done ? Loc.Get("ImportRow_ServerEncodes")
-            : item.Transcript is { Sent: true } t ? Loc.Format("ImportRow_TranscriptSent", BulkImportViewModel.LanguageName(t.Language))
-            : "";
+        var encoding = verdict.Length > 0 ? Loc.KeepLastWords(verdict) : item.ServerEncodes && phase != ItemPhase.Done ? Loc.Get("ImportRow_ServerEncodes") : "";
+        // and a transcript made here says it is with the server, on a line of its own (TA-13)
+        var transcript = item.Transcript is { Sent: true } t ? Loc.Format("ImportRow_TranscriptSent", BulkImportViewModel.LanguageName(t.Language)) : "";
+        Note = encoding;
+        TranscriptNote = transcript;
+        ShowTranscriptNote = transcript.Length > 0;
         // Encoded again, stopped or not processed: worth a second look, in the accent colour
         var problem = verdict.Length > 0 && item.Verdict is not { Used: true };
         ShowProblemNote = Note.Length > 0 && problem;
