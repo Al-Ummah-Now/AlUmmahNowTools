@@ -110,6 +110,12 @@ public sealed class QueueItem
     public string? SpeechModel { get; set; }
     /// <summary>The transcript made here, waiting to be sent or sent</summary>
     public TranscriptState? Transcript { get; set; }
+    /// <summary>"Ask the server to translate the captions" was chosen for the file's batch (TA-13, TA-20)</summary>
+    public bool Translates { get; set; }
+    /// <summary>Languages asked for (or given up on) from the file's own caption files, which the server reads published</summary>
+    public List<string> CaptionTranslations { get; set; } = new();
+    /// <summary>When the first translation of the file's own captions was asked for (the day's wait counts from it)</summary>
+    public DateTimeOffset? TranslateSince { get; set; }
     public List<LogLine> Log { get; set; } = new();
 
     /// <summary>Progress of the running step, 0–1 (not saved)</summary>
@@ -133,7 +139,7 @@ public sealed class QueueItem
         }
     }
 
-    public static QueueItem For(ScannedVideo video, string batchId, string channelId, DateTimeOffset now, bool serverEncodes = false, TranscribeChoice? transcribe = null) => new()
+    public static QueueItem For(ScannedVideo video, string batchId, string channelId, DateTimeOffset now, bool serverEncodes = false, TranscribeChoice? transcribe = null, bool translate = false) => new()
     {
         BatchId = batchId,
         ChannelId = channelId,
@@ -143,6 +149,7 @@ public sealed class QueueItem
         Transcribes = transcribe is not null,
         SpokenLanguage = transcribe?.Language,
         SpeechModel = transcribe?.Model,
+        Translates = translate,
         Steps = Enum.GetValues<ImportStepKind>().Select(k => new StepState { Kind = k }).ToList(),
     };
 

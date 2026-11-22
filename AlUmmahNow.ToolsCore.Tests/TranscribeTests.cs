@@ -379,7 +379,7 @@ public class TranslateStepTests
 {
     private static (QueueItem Item, TranscribeServer Server, ImportApiClient Api, ManualTime Time) Setup(string language = "ar")
     {
-        var item = new QueueItem { ServerItemId = "item-1", VideoId = "vid-1" };
+        var item = new QueueItem { ServerItemId = "item-1", VideoId = "vid-1", Translates = true };
         var time = new ManualTime(DateTimeOffset.UtcNow);
         item.Transcript = new TranscriptState { Language = language, Sent = true, SentAt = time.Now, Model = "large-v3-turbo" };
         var server = new TranscribeServer();
@@ -436,6 +436,62 @@ public class TranslateStepTests
         context = new RecordingContext();
         Assert.Equal(StepResult.Done, await new TranslateStep(api2, time2).RunAsync(waiting, context, default));
         Assert.Contains(context.Lines, l => l.Code == "translate_gave_up");
+    }
+
+    private static ScannedVideo WithCaptions(params string[] languages) => new(
+        "/videos/a.mp4", 1, 0, "video/mp4", languages.Select(l => new CaptionFile(l, "/videos/a." + l + ".srt")).ToArray(),
+        null, null, null, new ImportMetadata { FallbackTitle = "a" }, Array.Empty<ScanNote>());
+
+    [Fact]
+    public async Task The_files_own_arabic_captions_are_translated_into_english_from_the_published_track()
+    {
+        var (item, server, api, time) = Setup();
+        item.Transcript = null;
+        item.Video = WithCaptions("ar");
+        server.Translations["en"] = new Queue<string?>(["video_not_ready", null]);
+        var step = new TranslateStep(api, time);
+
+        var context = new RecordingContext();
+        Assert.Equal(StepResult.Later, await step.RunAsync(item, context, default));
+        Assert.Equal("ar", server.TranslationBody!["sourceLanguage"]!.GetValue<string>());
+        Assert.Equal(["en"], server.TranslationBody["languages"]!.AsArray().Select(n => n!.GetValue<string>()));
+        Assert.Equal(time.Now, item.TranslateSince);
+
+        time.Now = time.Now.AddMinutes(1);
+        context = new RecordingContext();
+        Assert.Equal(StepResult.Done, await step.RunAsync(item, context, default));
+        Assert.Equal(["en"], item.CaptionTranslations);
+        Assert.Contains(context.Lines, l => l.Code == "translation_requested");
+    }
+
+    [Fact]
+    public async Task The_day_counts_from_the_first_ask_for_the_files_own_captions()
+    {
+        var (item, server, api, time) = Setup();
+        item.Transcript = null;
+        item.Video = WithCaptions("en");
+        item.TranslateSince = time.Now;
+        server.Translations["ar"] = new Queue<string?>(["source_missing"]);
+        time.Now = time.Now.AddHours(25);
+        var context = new RecordingContext();
+        Assert.Equal(StepResult.Done, await new TranslateStep(api, time).RunAsync(item, context, default));
+        Assert.Equal("en", server.TranslationBody!["sourceLanguage"]!.GetValue<string>());
+        Assert.Contains(context.Lines, l => l.Code == "translate_gave_up");
+        Assert.Equal(["ar"], item.CaptionTranslations);
+    }
+
+    [Fact]
+    public async Task A_file_with_captions_in_every_site_language_or_a_batch_that_did_not_choose_it_asks_nothing()
+    {
+        var (both, server, api, time) = Setup();
+        both.Transcript = null;
+        both.Video = WithCaptions("ar", "en");
+        Assert.Equal(StepResult.Skipped, await new TranslateStep(api, time).RunAsync(both, new RecordingContext(), default));
+
+        var (off, _, _, _) = Setup();
+        off.Translates = false;
+        Assert.Equal(StepResult.Skipped, await new TranslateStep(api, time).RunAsync(off, new RecordingContext(), default));
+        Assert.Empty(server.Calls);
     }
 
     [Fact]

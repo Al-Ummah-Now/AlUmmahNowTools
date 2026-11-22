@@ -98,6 +98,13 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private bool _transcribeHere = true;
 
+    /// <summary>
+    /// Ask the server to translate each video's captions (its transcript, or its own caption files, TA-20) into the
+    /// site's other language: machine-made drafts a person publishes. Works without on-device transcription.
+    /// </summary>
+    [ObservableProperty]
+    private bool _translateCaptions = true;
+
     /// <summary>What is said in the videos: 0 detect it, 1 Arabic, 2 English.</summary>
     [ObservableProperty]
     private int _spokenLanguageIndex;
@@ -382,10 +389,11 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
             var name = Path.GetFileName(FolderPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
             var serverEncodes = ServerEncodesShown;
             var transcribe = Transcription();
+            var translate = TranslateCaptions;
             var batch = await _workspace.Api.CreateBatchAsync(channel.Id, string.IsNullOrWhiteSpace(name) ? null : name);
             _channelNames[channel.Id] = channel.Name;
             var now = DateTimeOffset.UtcNow;
-            _workspace.Queue.Add(chosen.Select((r, i) => QueueItem.For(r.Video, batch.Id, channel.Id, now.AddMilliseconds(i), serverEncodes, transcribe)));
+            _workspace.Queue.Add(chosen.Select((r, i) => QueueItem.For(r.Video, batch.Id, channel.Id, now.AddMilliseconds(i), serverEncodes, transcribe, translate)));
             foreach (var r in chosen) ReviewRows.Remove(r);
             ReviewCount = ReviewRows.Count;
             CountSelected();

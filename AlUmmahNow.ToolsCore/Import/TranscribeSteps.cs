@@ -274,9 +274,11 @@ public sealed class TranscribeStep : IImportStep
 }
 
 /// <summary>
-/// Asks the server to translate the local transcript into the other site language (TA-13, TA-20): a caption job per
-/// language from the transcript's draft, which a person publishes. The draft is written by the server's claim job and
-/// a translation needs the processed video, so until both exist the step waits on the server.
+/// Asks the server to translate a file's captions into the other site language (TA-13, TA-20): from the transcript made
+/// here (its draft, written by the server's claim job), or from the file's own caption files, which the server keeps
+/// published and translates from (TA-20). Each language becomes a machine-translated draft a person publishes. A
+/// translation needs the processed video and its source, so until both exist the step waits on the server. Only when
+/// the batch chose it.
 /// </summary>
 public sealed class TranslateStep : IImportStep
 {
@@ -300,11 +302,34 @@ public sealed class TranslateStep : IImportStep
 
     public async Task<StepResult> RunAsync(QueueItem item, IStepContext context, CancellationToken ct)
     {
-        if (item.Transcript is not { Sent: true } transcript || item.ServerItemId is null) return StepResult.Skipped;
-        var wanted = SiteLanguages.Where(l => l != transcript.Language && !transcript.Translations.Contains(l)).ToList();
-        if (wanted.Count == 0) return transcript.Translations.Count > 0 ? StepResult.Done : StepResult.Skipped;
+        if (!item.Translates || item.ServerItemId is null) return StepResult.Skipped;
+        var captions = item.Video?.Captions.Select(c => c.Language).ToHashSet() ?? [];
+        string source;
+        List<string> done;
+        DateTimeOffset since;
+        if (item.Transcript is { Sent: true } transcript)
+        {
+            (source, done, since) = (transcript.Language, transcript.Translations, transcript.SentAt ?? _time.GetUtcNow());
+        }
+        else if (SiteLanguages.FirstOrDefault(captions.Contains) is { } own)
+        {
+            // The file's own captions, published by the Attach step: the server translates from the published track
+            if (item.TranslateSince is null)
+            {
+                item.TranslateSince = _time.GetUtcNow();
+                context.Save();
+            }
+            (source, done, since) = (own, item.CaptionTranslations, item.TranslateSince.Value);
+        }
+        else
+        {
+            return StepResult.Skipped;
+        }
+        // Never over a language the file already brings captions in
+        var wanted = SiteLanguages.Where(l => l != source && !captions.Contains(l) && !done.Contains(l)).ToList();
+        if (wanted.Count == 0) return done.Count > 0 ? StepResult.Done : StepResult.Skipped;
 
-        var results = await _api.RequestTranslationsAsync(item.ServerItemId, transcript.Language, wanted, ct).ConfigureAwait(false);
+        var results = await _api.RequestTranslationsAsync(item.ServerItemId, source, wanted, ct).ConfigureAwait(false);
         var waiting = new List<string>();
         foreach (var language in wanted)
         {
@@ -314,7 +339,7 @@ public sealed class TranslateStep : IImportStep
                 waiting.Add(language);
                 continue;
             }
-            transcript.Translations.Add(language);
+            done.Add(language);
             if (r.JobId is not null) context.Log(LogLevel.Info, "translation_requested", $"Translation into {language} requested: it becomes a caption draft for a person to publish", language);
             else if (r.Error == "draft_exists") context.Log(LogLevel.Info, "translation_exists", $"This video already has a caption draft in {language}: it was kept", language);
             else context.Log(LogLevel.Warning, "translation_refused", $"The server did not translate into {language}: {r.Error}", language, r.Error ?? "");
@@ -322,12 +347,12 @@ public sealed class TranslateStep : IImportStep
         context.Save();
         if (waiting.Count == 0) return StepResult.Done;
 
-        var waited = _time.GetUtcNow() - (transcript.SentAt ?? _time.GetUtcNow());
+        var waited = _time.GetUtcNow() - since;
         if (waited > GiveUpAfter)
         {
-            transcript.Translations.AddRange(waiting);
+            done.AddRange(waiting);
             context.Save();
-            context.Log(LogLevel.Warning, "translate_gave_up", "The server has not drafted the transcript after a day; videos admin shows the caption job", string.Join(", ", waiting));
+            context.Log(LogLevel.Warning, "translate_gave_up", "The server could not start the translation after a day; videos admin shows the caption job", string.Join(", ", waiting));
             return StepResult.Done;
         }
         context.Later(waited < TimeSpan.FromMinutes(10) ? TimeSpan.FromSeconds(30) : TimeSpan.FromMinutes(2));

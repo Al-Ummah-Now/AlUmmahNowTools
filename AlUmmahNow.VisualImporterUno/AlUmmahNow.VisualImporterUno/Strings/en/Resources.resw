@@ -2323,10 +2323,10 @@
     <value>the encoding tool</value>
   </data>
   <data name="Import_TranscribeTitle.Text" xml:space="preserve">
-    <value>Speech to text</value>
+    <value>Speech to text and translation</value>
   </data>
   <data name="Import_TranscribeBody.Text" xml:space="preserve">
-    <value>For each video without caption files of its own, Tools writes down what is said, on this computer, and sends it to the server as a caption draft for a person to check. Quran recitation is sent only as verse references, never as text. The server then translates the draft into the site’s other language.</value>
+    <value>For each video without caption files of its own, Tools writes down what is said, on this computer, and sends it to the server as a caption draft for a person to check. Quran recitation is sent only as verse references, never as text.</value>
   </data>
   <data name="Import_TranscribeHere.Content" xml:space="preserve">
     <value>Transcribe the videos that have no captions</value>
@@ -2464,7 +2464,7 @@
     <value>The server didn’t translate into {0}: {1}</value>
   </data>
   <data name="ImportLog_translate_gave_up" xml:space="preserve">
-    <value>The server hasn’t drafted the transcript after a day. The videos admin shows the caption job.</value>
+    <value>The server couldn’t start the translation after a day. The videos admin shows the caption job.</value>
   </data>
   <data name="ImportTranscribeError_unavailable" xml:space="preserve">
     <value>this copy of Tools can’t transcribe</value>
@@ -2495,5 +2495,11 @@
   </data>
   <data name="ImportTranslateError_other" xml:space="preserve">
     <value>the videos admin shows why</value>
+  </data>
+  <data name="Import_TranslateCaptions.Content" xml:space="preserve">
+    <value>Ask the server to translate the captions into the site’s other language</value>
+  </data>
+  <data name="Import_TranslateNote.Text" xml:space="preserve">
+    <value>Each translation is a machine-made draft that a person checks and publishes. A video with its own caption files is translated from them, and they stay as they are.</value>
   </data>
 </root>
