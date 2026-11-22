@@ -69,6 +69,9 @@ public static class FolderScanner
         [".avi"] = "video/x-msvideo",
     };
 
+    /// <summary>Hidden and system files, and links (a link could point outside the folder, or loop back into it)</summary>
+    private const System.IO.FileAttributes Skipped = System.IO.FileAttributes.Hidden | System.IO.FileAttributes.System | System.IO.FileAttributes.ReparsePoint;
+
     private static readonly string[] CaptionTypes = { ".vtt", ".srt", ".sbv" };
 
     internal static readonly Dictionary<string, string> ImageTypes = new(StringComparer.OrdinalIgnoreCase)
@@ -93,7 +96,7 @@ public static class FolderScanner
         var videos = new List<ScannedVideo>();
         var notes = new List<ScanNote>();
         var folders = includeSubfolders
-            ? new[] { folder }.Concat(Directory.EnumerateDirectories(folder, "*", new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true, AttributesToSkip = System.IO.FileAttributes.Hidden | System.IO.FileAttributes.System }))
+            ? new[] { folder }.Concat(Directory.EnumerateDirectories(folder, "*", new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true, AttributesToSkip = Skipped }))
             : new[] { folder };
         foreach (var dir in folders)
         {
@@ -105,7 +108,7 @@ public static class FolderScanner
 
     private static void ScanOne(string dir, string? batchLanguage, List<ScannedVideo> videos, List<ScanNote> notes)
     {
-        var files = Directory.EnumerateFiles(dir, "*", new EnumerationOptions { IgnoreInaccessible = true, AttributesToSkip = System.IO.FileAttributes.Hidden | System.IO.FileAttributes.System })
+        var files = Directory.EnumerateFiles(dir, "*", new EnumerationOptions { IgnoreInaccessible = true, AttributesToSkip = Skipped })
             .Where(f => !Path.GetFileName(f).StartsWith('.'))
             .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
             .ToList();

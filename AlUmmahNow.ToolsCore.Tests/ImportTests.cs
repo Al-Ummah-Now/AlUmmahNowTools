@@ -137,6 +137,25 @@ public class FolderScannerTests
     }
 }
 
+public class FolderScannerLinkTests
+{
+    [Fact]
+    public void Links_are_not_followed_as_videos_sidecars_or_folders()
+    {
+        var outside = Temp.Folder();
+        var secret = Temp.Write(outside, "secret.txt", "not for upload");
+        var dir = Temp.Folder();
+        Temp.Bytes(dir, "v.mp4", 10);
+        File.CreateSymbolicLink(Path.Combine(dir, "v.en.srt"), secret);
+        File.CreateSymbolicLink(Path.Combine(dir, "w.mp4"), Path.Combine(dir, "v.mp4"));
+        Directory.CreateSymbolicLink(Path.Combine(dir, "loop"), dir);
+
+        var result = FolderScanner.Scan(dir, includeSubfolders: true, null);
+        var video = Assert.Single(result.Videos);
+        Assert.Empty(video.Captions);
+    }
+}
+
 public class MetadataFileTests
 {
     [Fact]
