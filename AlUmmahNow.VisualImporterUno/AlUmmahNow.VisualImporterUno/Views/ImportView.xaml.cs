@@ -45,6 +45,9 @@ public sealed partial class ImportView : Page
     private async void OpenDemoDialog()
     {
         if (!ImportWorkspace.Current.IsDemo) return;
+        // Frames of the import form alone (TOOLS_DEMO_IMPORT_FRAME=form): the queue card is left out, so the frame ends at
+        // the form card's edge in every language, never part way into the queue (AUDIT-2 2026-11-22)
+        if (Environment.GetEnvironmentVariable("TOOLS_DEMO_IMPORT_FRAME") == "form") QueueCard.Visibility = Visibility.Collapsed;
         if (Environment.GetEnvironmentVariable("TOOLS_DEMO_IMPORT_SCROLL") == "end")
         {
             // Room below the queue, so its card can sit at the top however short it is. A fixed amount, not the
