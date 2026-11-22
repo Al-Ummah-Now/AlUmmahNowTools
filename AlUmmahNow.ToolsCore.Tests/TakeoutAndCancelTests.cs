@@ -250,3 +250,58 @@ public class TakeoutTests
         }
     }
 }
+
+/// <summary>The reasons api-videos stores (<c>"&lt;code&gt;: &lt;detail&gt;"</c>) and how the app explains them.</summary>
+public class ReasonTests
+{
+    [Theory]
+    [InlineData("source_unreachable: The source could not be read (http_503)", "source_unreachable", 503, null)]
+    [InlineData("source_unreachable: The source could not be read (no_answer)", "source_unreachable", null, null)]
+    [InlineData("source_not_found: The source was not found (http_404)", "source_not_found", 404, null)]
+    [InlineData("source_forbidden: The source refused access (http_403)", "source_forbidden", 403, null)]
+    [InlineData("source_bad_response: The source gave an answer the sync can't use (too_large)", "source_bad_response", null, null)]
+    [InlineData("source_not_a_feed: The address is not an RSS or Atom feed", "source_not_a_feed", null, null)]
+    [InlineData("not_connected: the owner's connection to this account was removed", "not_connected", null, null)]
+    [InlineData("channel_unavailable: The channel is deleted or suspended", "channel_unavailable", null, null)]
+    [InlineData("post_refused: The upload was refused", "post_refused", null, null)]
+    [InlineData("upload_incomplete: the video v1 of a.mp4 has not finished uploading", "upload_incomplete", null, null)]
+    [InlineData("sync_failed: The image could not be stored", "sync_failed", null, "The image could not be stored")]
+    [InlineData("takeout_failed: D1 is busy", "takeout_failed", null, "D1 is busy")]
+    public void A_coded_reason_gives_its_code_its_status_and_only_an_unexpected_failures_words(string stored, string code, int? status, string? detail)
+    {
+        var reason = SourceText.Explain(stored);
+        Assert.Equal(code, reason.Code);
+        Assert.Equal(status, reason.HttpStatus);
+        Assert.Equal(detail, reason.Detail);
+    }
+
+    [Theory]
+    [InlineData("The source could not be read (http_503)", "The source could not be read (http_503)")]
+    [InlineData("weird_code: something new", "something new")]
+    public void An_uncoded_or_unknown_reason_is_shown_as_the_servers_words(string stored, string detail)
+    {
+        var reason = SourceText.Explain(stored);
+        Assert.Null(reason.Code);
+        Assert.Null(reason.HttpStatus);
+        Assert.Equal(detail, reason.Detail);
+    }
+
+    [Fact]
+    public void Every_reason_code_is_worded_in_English_and_in_Arabic_without_Latin_letters()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !Directory.Exists(Path.Combine(dir.FullName, "AlUmmahNow.VisualImporterUno"))) dir = dir.Parent;
+        Assert.NotNull(dir);
+        var strings = Path.Combine(dir!.FullName, "AlUmmahNow.VisualImporterUno", "AlUmmahNow.VisualImporterUno", "Strings");
+        foreach (var lang in new[] { "en", "ar" })
+        {
+            var resw = System.Xml.Linq.XDocument.Load(Path.Combine(strings, lang, "Resources.resw"));
+            var values = resw.Root!.Elements("data").ToDictionary(d => (string)d.Attribute("name")!, d => (string?)d.Element("value") ?? "");
+            foreach (var key in SourceText.ReasonCodes.Select(c => "SocialReason_" + c).Append("SocialReason_HttpStatus"))
+            {
+                Assert.True(values.TryGetValue(key, out var text) && text.Length > 0, $"{lang}: {key} is missing");
+                if (lang == "ar") Assert.DoesNotMatch("[A-Za-z]", text);
+            }
+        }
+    }
+}

@@ -88,7 +88,8 @@ public sealed partial class SocialSourcesPage : Page
             case "takeout" when Row(DemoSocial.YouTubeId) is { } youtube:
                 await ViewModel.ToggleTakeoutAsync(youtube);
                 await ViewModel.ListTakeoutFolderAsync(youtube, "/Takeout");
-                ScrollTo(youtube);
+                // From the top of the Sources card, so the frame shows the card whole (TOOLS_SCREENSHOT_SIZE tall enough)
+                ScrollTo(SourcesCard);
                 break;
         }
     }

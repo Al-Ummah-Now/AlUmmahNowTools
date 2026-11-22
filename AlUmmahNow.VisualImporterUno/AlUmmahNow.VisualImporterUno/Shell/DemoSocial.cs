@@ -87,7 +87,7 @@ internal static class DemoSocial
             new { posted = 48, skipped = 3 });
         yield return Source(FailedId, channel, "mastodon", "ahmadalazhari@mastodon.social", "Mastodon posts", false,
             ("Shaykh Ahmad al-Azhari", "Signed letter of 20 Nov 2026, kept by the office", Now.AddDays(-2)), "weekly", true, Now.AddDays(6), Now.AddDays(-1), "job_demo_mastodon",
-            "The source could not be read (http_503)", new { posted = 14 });
+            "source_unreachable: The source could not be read (http_503)", new { posted = 14 });
         yield return Source(BlueskyId, channel, "bluesky", "did:plc:4kq7x2m3w5r6tay7u2i3o4pa", "ahmadalazhari.bsky.social", true, null, "daily", false, null, Now.AddDays(-3), "job_demo_bluesky",
             "not_connected: the owner's connection to this account was removed; the source is off until they connect it again", new { posted = 31 });
         yield return Source(YouTubeId, channel, "youtube", "UCq3Zx9LmT4Kd7Vn2Wp8RbYs", "Shaykh Ahmad al-Azhari", true, null, "manual", true, null, Now.AddDays(-2), "job_demo_youtube", null,
@@ -167,7 +167,7 @@ internal static class DemoSocial
             case "job_demo_mastodon":
             {
                 // Six attempts, backing off 10 s × 2ⁿ, then the DLQ and the Errors page
-                const string error = "The source could not be read (http_503)";
+                const string error = "source_unreachable: The source could not be read (http_503)";
                 var at = Now.AddMinutes(-58);
                 var log = new List<object> { new { at = Iso(at), @event = "queued" } };
                 var t = at.AddSeconds(1);
