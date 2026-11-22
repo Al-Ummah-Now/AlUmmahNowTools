@@ -27,8 +27,13 @@ public static class ScreenshotRunner
         UIElement root = (UIElement)window.Content!;
         while (Microsoft.UI.Xaml.Media.VisualTreeHelper.GetParent(root) is UIElement parent) root = parent;
         using var full = await RenderAsync(root);
-        var popups = window.Content?.XamlRoot is { } xamlRoot ? Microsoft.UI.Xaml.Media.VisualTreeHelper.GetOpenPopupsForXamlRoot(xamlRoot).Count : 0;
-        var end = popups == 0 && Environment.GetEnvironmentVariable("TOOLS_SCREENSHOT_CROP") != "0" ? EndAtEdge((UIElement)window.Content!) : null;
+        // An open popup (suggestions, a dialog) stays whole: the frame ends at an edge below it
+        var popupBottom = 0.0;
+        if (window.Content?.XamlRoot is { } xamlRoot)
+            foreach (var popup in Microsoft.UI.Xaml.Media.VisualTreeHelper.GetOpenPopupsForXamlRoot(xamlRoot))
+                if (popup.Child is FrameworkElement child && child.ActualHeight > 0)
+                    popupBottom = Math.Max(popupBottom, child.TransformToVisual(null).TransformBounds(new Windows.Foundation.Rect(0, 0, child.ActualWidth, child.ActualHeight)).Bottom);
+        var end = Environment.GetEnvironmentVariable("TOOLS_SCREENSHOT_CROP") != "0" ? EndAtEdge((UIElement)window.Content!, popupBottom) : null;
         var cropTo = end is { } y ? Math.Min(full.Height, (int)Math.Ceiling(y * scale)) : full.Height;
         using var image = cropTo < full.Height ? full.Subset(new SKRectI(0, 0, full.Width, cropTo)) : SKImage.FromBitmap(SKBitmap.FromImage(full));
         using var data = image.Encode(SKEncodedImageFormat.Png, 100);
@@ -41,9 +46,10 @@ public static class ScreenshotRunner
     /// <summary>
     /// Where a page's frame ends (logical pixels from the top), or null for the whole window: the lowest edge of a card, a
     /// row or a divider inside the page's scroll area that no text or control crosses, plus a 4px margin, so a frame never
-    /// ends half way through a row (AUDIT-2 2026-11-22). Only when that keeps most of the window.
+    /// ends half way through a row (AUDIT-2 2026-11-22). Only when that keeps most of the window, and never above
+    /// <paramref name="below"/> (the bottom of an open popup).
     /// </summary>
-    internal static double? EndAtEdge(UIElement content)
+    internal static double? EndAtEdge(UIElement content, double below = 0)
     {
         var height = content.ActualSize.Y;
         if (height <= 0 || Largest<Microsoft.UI.Xaml.Controls.ScrollViewer>(content) is not { } page) return null;
@@ -53,7 +59,7 @@ public static class ScreenshotRunner
         const double margin = 4;
         foreach (var edge in edges.Where((e) => e + margin <= height).OrderByDescending((e) => e))
         {
-            if (edge < height * 0.5) break;
+            if (edge < height * 0.5 || edge < below) break;
             var cut = edge + margin;
             if (leaves.Any((l) => l.Top < cut - 0.5 && l.Bottom > edge + 0.5)) continue;
             return cut;
