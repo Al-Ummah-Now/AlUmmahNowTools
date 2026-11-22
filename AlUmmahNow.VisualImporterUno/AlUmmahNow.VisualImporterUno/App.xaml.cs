@@ -323,6 +323,7 @@ public partial class App : Application
 
                         // Register view models with safe initialization
                         services.AddTransient<BulkImportViewModel>();
+                        services.AddTransient<SocialSourcesViewModel>();
                         services.AddSingleton<ServiceStatusViewModel>();
                         services.AddTransient<SettingsViewModel>();
 

@@ -25,6 +25,12 @@
             <NavigationView.MenuItems>
                 <NavigationViewItem x:Uid="Nav_Dashboard" Content="Dashboard" Tag="Dashboard" Icon="Home"/>
                 <NavigationViewItem x:Uid="Nav_Import" Content="Import" Tag="Import" Icon="Upload"/>
+                <!-- Super admins only (import_sources:manage); hidden for everyone else (WorkspaceView.xaml.cs) -->
+                <NavigationViewItem x:Name="SocialSourcesItem" x:Uid="Nav_SocialSources" Content="Social sources" Tag="SocialSources">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE909;"/>
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
                 <NavigationViewItem x:Uid="Nav_WatchManagement" Content="Watched folders" Tag="WatchManagement" Icon="View"/>
                 <NavigationViewItem x:Uid="Nav_ApprovalWorkflow" Content="Approvals" Tag="ApprovalWorkflow" Icon="Accept"/>
                 <NavigationViewItem x:Uid="Nav_Analytics" Content="Analytics" Tag="Analytics">

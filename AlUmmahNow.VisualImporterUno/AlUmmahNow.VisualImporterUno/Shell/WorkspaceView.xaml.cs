@@ -14,6 +14,7 @@ namespace AlUmmahNow.VisualImporterUno.Shell
         {
             Dashboard,
             Import,
+            SocialSources,
             WatchManagement,
             ApprovalWorkflow,
             Analytics,
@@ -26,6 +27,7 @@ namespace AlUmmahNow.VisualImporterUno.Shell
         {
             (ViewState.Dashboard, typeof(DashboardView), "Dashboard"),
             (ViewState.Import, typeof(ImportView), "Import"),
+            (ViewState.SocialSources, typeof(SocialSourcesPage), "SocialSources"),
             (ViewState.WatchManagement, typeof(WatchManagementPage), "WatchManagement"),
             (ViewState.ApprovalWorkflow, typeof(ApprovalWorkflowPage), "ApprovalWorkflow"),
             (ViewState.Analytics, typeof(AnalyticsDashboardPage), "Analytics"),
@@ -40,6 +42,8 @@ namespace AlUmmahNow.VisualImporterUno.Shell
         public WorkspaceView(string? startPage = null)
         {
             InitializeComponent();
+            // Social sources are managed by super admins only (wiki TOOLS-ADMIN TA-13): nobody else sees the page in the menu
+            SocialSourcesItem.Visibility = ShellState.Current?.Session.Profile?.Can(ViewModels.SocialSourcesViewModel.Permission) == true ? Visibility.Visible : Visibility.Collapsed;
             var start = Pages.FirstOrDefault(p => string.Equals(p.Key, startPage, StringComparison.OrdinalIgnoreCase));
             Select(start.Page == null ? ViewState.Dashboard : start.View);
         }

@@ -2501,5 +2501,436 @@
   </data>
   <data name="Import_TranslateNote.Text" xml:space="preserve">
     <value>Each translation is a machine-made draft that a person checks and publishes. A video with its own caption files is translated from them, and they stay as they are.</value>
+  <data name="Nav_SocialSources.Content" xml:space="preserve">
+    <value>Social sources</value>
+  </data>
+  <data name="Page_SocialSources_Title" xml:space="preserve">
+    <value>Social sources</value>
+  </data>
+  <data name="Page_SocialSources_Subtitle" xml:space="preserve">
+    <value>Bring a channel owner’s posts from their feeds and accounts onto the channel, on demand or on a schedule.</value>
+  </data>
+  <data name="Social_SuperAdminTitle.Text" xml:space="preserve">
+    <value>Social sources are for super admins</value>
+  </data>
+  <data name="Social_SuperAdminBody.Text" xml:space="preserve">
+    <value>Ask a super admin to add, run or change a channel’s social sources.</value>
+  </data>
+  <data name="Social_ChannelTitle.Text" xml:space="preserve">
+    <value>Channel</value>
+  </data>
+  <data name="Social_ChannelBody.Text" xml:space="preserve">
+    <value>Choose a channel to see and add its sources, or leave it empty to see every channel’s sources.</value>
+  </data>
+  <data name="Social_ChannelBox.PlaceholderText" xml:space="preserve">
+    <value>Search channels</value>
+  </data>
+  <data name="Social_ShowAllChannels.Text" xml:space="preserve">
+    <value>Every channel</value>
+  </data>
+  <data name="Social_NoChannelFound" xml:space="preserve">
+    <value>No channel has that name or handle.</value>
+  </data>
+  <data name="Social_SourcesTitle.Text" xml:space="preserve">
+    <value>Sources</value>
+  </data>
+  <data name="Social_Refresh.Text" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+  <data name="Social_NoSourcesTitle.Text" xml:space="preserve">
+    <value>No sources yet</value>
+  </data>
+  <data name="Social_NoSourcesBody" xml:space="preserve">
+    <value>Add one below: a feed or an account of the channel’s owner.</value>
+  </data>
+  <data name="Social_NoSourcesAnyBody" xml:space="preserve">
+    <value>No channel has a social source yet. Choose a channel to add one.</value>
+  </data>
+  <data name="Social_SourceCount_Zero" xml:space="preserve">
+    <value>No sources</value>
+  </data>
+  <data name="Social_SourceCount_One" xml:space="preserve">
+    <value>{0} source</value>
+  </data>
+  <data name="Social_SourceCount_Two" xml:space="preserve">
+    <value>{0} sources</value>
+  </data>
+  <data name="Social_SourceCount_Few" xml:space="preserve">
+    <value>{0} sources</value>
+  </data>
+  <data name="Social_SourceCount_Many" xml:space="preserve">
+    <value>{0} sources</value>
+  </data>
+  <data name="Social_SourceCount_Other" xml:space="preserve">
+    <value>{0} sources</value>
+  </data>
+  <data name="Social_AttentionCount_One" xml:space="preserve">
+    <value>{0} needs attention</value>
+  </data>
+  <data name="Social_AttentionCount_Other" xml:space="preserve">
+    <value>{0} need attention</value>
+  </data>
+  <data name="Social_Channel" xml:space="preserve">
+    <value>Channel</value>
+  </data>
+  <data name="Social_AuthConnected" xml:space="preserve">
+    <value>Connected by the owner in Studio</value>
+  </data>
+  <data name="Social_AuthRecorded" xml:space="preserve">
+    <value>Owner’s written permission, recorded</value>
+  </data>
+  <data name="Social_AuthRecordedAt" xml:space="preserve">
+    <value>Owner’s written permission, recorded {0}</value>
+  </data>
+  <data name="Social_StatusManual" xml:space="preserve">
+    <value>Syncs only when you press Sync now</value>
+  </data>
+  <data name="Social_StatusScheduled" xml:space="preserve">
+    <value>{0}. Next sync: {1}</value>
+  </data>
+  <data name="Social_StatusSyncing" xml:space="preserve">
+    <value>Syncing now</value>
+  </data>
+  <data name="Social_StatusRetrying" xml:space="preserve">
+    <value>A sync attempt failed. It tries again at {0}</value>
+  </data>
+  <data name="Social_StatusRetryingSoon" xml:space="preserve">
+    <value>A sync attempt failed. It tries again shortly</value>
+  </data>
+  <data name="Social_StatusFailed" xml:space="preserve">
+    <value>The last sync failed. It is on the Errors page too, with Retry</value>
+  </data>
+  <data name="Social_StatusOff" xml:space="preserve">
+    <value>Off: nothing is imported until it is turned on</value>
+  </data>
+  <data name="Social_StatusOffNotConnected" xml:space="preserve">
+    <value>Off: the owner disconnected this account. It can be turned on again once they connect it</value>
+  </data>
+  <data name="Social_LastSync" xml:space="preserve">
+    <value>Last synced: {0}</value>
+  </data>
+  <data name="Social_NeverSynced" xml:space="preserve">
+    <value>Not synced yet</value>
+  </data>
+  <data name="Social_Count_posted" xml:space="preserve">
+    <value>{0} posted</value>
+  </data>
+  <data name="Social_Count_pending" xml:space="preserve">
+    <value>{0} to post</value>
+  </data>
+  <data name="Social_Count_awaiting_file" xml:space="preserve">
+    <value>{0} waiting for their file</value>
+  </data>
+  <data name="Social_Count_skipped" xml:space="preserve">
+    <value>{0} left out</value>
+  </data>
+  <data name="Social_Reason" xml:space="preserve">
+    <value>Reason</value>
+  </data>
+  <data name="SocialReason_not_connected" xml:space="preserve">
+    <value>The owner’s connection to this account was removed.</value>
+  </data>
+  <data name="SocialReason_channel_unavailable" xml:space="preserve">
+    <value>The channel is deleted or suspended.</value>
+  </data>
+  <data name="Social_ScheduleLabel.Text" xml:space="preserve">
+    <value>Schedule</value>
+  </data>
+  <data name="Social_SyncNow.Text" xml:space="preserve">
+    <value>Sync now</value>
+  </data>
+  <data name="Social_JobLink.Text" xml:space="preserve">
+    <value>Sync job</value>
+  </data>
+  <data name="Social_ItemsLink.Text" xml:space="preserve">
+    <value>Items</value>
+  </data>
+  <data name="Social_TurnOff.Text" xml:space="preserve">
+    <value>Turn off</value>
+  </data>
+  <data name="Social_TurnOn.Text" xml:space="preserve">
+    <value>Turn on</value>
+  </data>
+  <data name="Social_Remove.Text" xml:space="preserve">
+    <value>Remove</value>
+  </data>
+  <data name="Social_RetryJob.Text" xml:space="preserve">
+    <value>Try again</value>
+  </data>
+  <data name="Social_CopyLog.Text" xml:space="preserve">
+    <value>Copy log</value>
+  </data>
+  <data name="Social_Copied.Text" xml:space="preserve">
+    <value>Copied</value>
+  </data>
+  <data name="Social_ItemsTitle.Text" xml:space="preserve">
+    <value>Latest items</value>
+  </data>
+  <data name="Social_ItemsLoading" xml:space="preserve">
+    <value>Loading the items…</value>
+  </data>
+  <data name="Social_ItemsEmpty" xml:space="preserve">
+    <value>Nothing has come from this source yet.</value>
+  </data>
+  <data name="Social_ItemFirstPosted" xml:space="preserve">
+    <value>First posted {0}</value>
+  </data>
+  <data name="SocialJob_queued" xml:space="preserve">
+    <value>Waiting in the queue</value>
+  </data>
+  <data name="SocialJob_running" xml:space="preserve">
+    <value>Syncing, attempt {0} of {1}</value>
+  </data>
+  <data name="SocialJob_retrying" xml:space="preserve">
+    <value>Attempt {0} of {1} failed. It tries again at {2}</value>
+  </data>
+  <data name="SocialJob_retryingSoon" xml:space="preserve">
+    <value>Attempt {0} of {1} failed. It tries again shortly</value>
+  </data>
+  <data name="SocialJob_failed" xml:space="preserve">
+    <value>Stopped after {0} of {1} attempts. Try again runs it once more</value>
+  </data>
+  <data name="SocialJob_succeededAt" xml:space="preserve">
+    <value>Finished {0}</value>
+  </data>
+  <data name="SocialJob_succeeded" xml:space="preserve">
+    <value>Finished</value>
+  </data>
+  <data name="SocialLog_queued" xml:space="preserve">
+    <value>Queued</value>
+  </data>
+  <data name="SocialLog_queued_retried" xml:space="preserve">
+    <value>Queued again by Try again</value>
+  </data>
+  <data name="SocialLog_started" xml:space="preserve">
+    <value>Attempt {0} started</value>
+  </data>
+  <data name="SocialLog_waiting" xml:space="preserve">
+    <value>A step finished; the next starts in {0}</value>
+  </data>
+  <data name="SocialLog_waiting_now" xml:space="preserve">
+    <value>A step finished; the next starts now</value>
+  </data>
+  <data name="SocialLog_failed_attempt" xml:space="preserve">
+    <value>Attempt {0} failed; the next in {1}</value>
+  </data>
+  <data name="SocialLog_failed" xml:space="preserve">
+    <value>Stopped: no attempts left</value>
+  </data>
+  <data name="SocialLog_succeeded" xml:space="preserve">
+    <value>Finished</value>
+  </data>
+  <data name="SocialLog_cancelled" xml:space="preserve">
+    <value>Stopped by an admin</value>
+  </data>
+  <data name="SocialKind_text" xml:space="preserve">
+    <value>Text post</value>
+  </data>
+  <data name="SocialKind_image" xml:space="preserve">
+    <value>Images</value>
+  </data>
+  <data name="SocialKind_link" xml:space="preserve">
+    <value>Link</value>
+  </data>
+  <data name="SocialKind_video" xml:space="preserve">
+    <value>Video</value>
+  </data>
+  <data name="SocialKind_unknown" xml:space="preserve">
+    <value>Item</value>
+  </data>
+  <data name="SocialItemState_pending" xml:space="preserve">
+    <value>to post</value>
+  </data>
+  <data name="SocialItemState_posted" xml:space="preserve">
+    <value>posted</value>
+  </data>
+  <data name="SocialItemState_skipped" xml:space="preserve">
+    <value>left out</value>
+  </data>
+  <data name="SocialItemState_awaiting_file" xml:space="preserve">
+    <value>waiting for its file</value>
+  </data>
+  <data name="SocialItemNote_too_large_for_bot_api" xml:space="preserve">
+    <value>Too large for Telegram’s bot to download. The file has to come from the owner.</value>
+  </data>
+  <data name="SocialItemNote_takeout_file" xml:space="preserve">
+    <value>The file comes from the owner’s Google Takeout export.</value>
+  </data>
+  <data name="SocialItemNote_too_large" xml:space="preserve">
+    <value>Larger than a source may bring.</value>
+  </data>
+  <data name="SocialItemNote_unsupported_media" xml:space="preserve">
+    <value>A kind of media the site does not take.</value>
+  </data>
+  <data name="SocialItemNote_empty" xml:space="preserve">
+    <value>Nothing in it to post.</value>
+  </data>
+  <data name="SocialItemNote_reply_or_repost" xml:space="preserve">
+    <value>A reply or a repost.</value>
+  </data>
+  <data name="SocialItemNote_posted_by_us" xml:space="preserve">
+    <value>Our own post to this account, never imported back.</value>
+  </data>
+  <data name="SocialItemNote_media_unavailable" xml:space="preserve">
+    <value>Its media could not be downloaded.</value>
+  </data>
+  <data name="SocialItemNote_post_refused" xml:space="preserve">
+    <value>The site refused the post.</value>
+  </data>
+  <data name="Social_AddTitle.Text" xml:space="preserve">
+    <value>Add a source</value>
+  </data>
+  <data name="Social_AddBody.Text" xml:space="preserve">
+    <value>Imports go only into a channel whose owner allowed it: an account they connected in Studio, or their written permission, recorded here. Each new post on the source becomes a post on the channel.</value>
+  </data>
+  <data name="Social_PickChannelFirst.Text" xml:space="preserve">
+    <value>Choose a channel above first.</value>
+  </data>
+  <data name="Social_ScheduleNewLabel.Text" xml:space="preserve">
+    <value>How often to sync</value>
+  </data>
+  <data name="Social_ConnectionsTitle.Text" xml:space="preserve">
+    <value>Accounts the owner connected</value>
+  </data>
+  <data name="Social_NoConnections.Text" xml:space="preserve">
+    <value>The owner hasn’t connected an account in Studio. Add a source with their written permission below.</value>
+  </data>
+  <data name="Social_AddConnection.Text" xml:space="preserve">
+    <value>Add</value>
+  </data>
+  <data name="Social_ConnectionAdded.Text" xml:space="preserve">
+    <value>Added</value>
+  </data>
+  <data name="Social_OtherTitle.Text" xml:space="preserve">
+    <value>Another feed or account</value>
+  </data>
+  <data name="Social_NetworkLabel.Text" xml:space="preserve">
+    <value>Where</value>
+  </data>
+  <data name="Social_TelegramNote.Text" xml:space="preserve">
+    <value>A Telegram channel is added from the owner’s connection above, once they connect it in Studio: our bot reads its posts.</value>
+  </data>
+  <data name="Social_AddressLabel.Text" xml:space="preserve">
+    <value>Address</value>
+  </data>
+  <data name="Social_LabelLabel.Text" xml:space="preserve">
+    <value>Name in the list (optional)</value>
+  </data>
+  <data name="Social_PermissionTitle.Text" xml:space="preserve">
+    <value>The owner’s permission</value>
+  </data>
+  <data name="Social_PermissionBody.Text" xml:space="preserve">
+    <value>Unless the owner connected this account, record whose written permission you have and what they agreed to. It is saved with the source and in the audit log.</value>
+  </data>
+  <data name="Social_PermissionByLabel.Text" xml:space="preserve">
+    <value>Who gave permission</value>
+  </data>
+  <data name="Social_PermissionNoteLabel.Text" xml:space="preserve">
+    <value>How they gave it, and what they agreed to</value>
+  </data>
+  <data name="Social_AddButton.Text" xml:space="preserve">
+    <value>Add source</value>
+  </data>
+  <data name="Social_Added" xml:space="preserve">
+    <value>Source added. Sync it now, or it syncs on its schedule.</value>
+  </data>
+  <data name="Social_Hint_rss" xml:space="preserve">
+    <value>The address of the feed (RSS, Atom or a podcast), starting with</value>
+  </data>
+  <data name="Social_Hint_bluesky" xml:space="preserve">
+    <value>The account’s handle, such as</value>
+  </data>
+  <data name="Social_Hint_mastodon" xml:space="preserve">
+    <value>The account with its server, such as</value>
+  </data>
+  <data name="Social_Hint_youtube" xml:space="preserve">
+    <value>The YouTube channel’s id, which starts with</value>
+  </data>
+  <data name="SocialNetwork_rss" xml:space="preserve">
+    <value>Feed or podcast</value>
+  </data>
+  <data name="SocialNetwork_bluesky" xml:space="preserve">
+    <value>Bluesky</value>
+  </data>
+  <data name="SocialNetwork_mastodon" xml:space="preserve">
+    <value>Mastodon</value>
+  </data>
+  <data name="SocialNetwork_telegram" xml:space="preserve">
+    <value>Telegram channel</value>
+  </data>
+  <data name="SocialNetwork_youtube" xml:space="preserve">
+    <value>YouTube channel</value>
+  </data>
+  <data name="SocialSchedule_manual" xml:space="preserve">
+    <value>Only when asked</value>
+  </data>
+  <data name="SocialSchedule_hourly" xml:space="preserve">
+    <value>Every hour</value>
+  </data>
+  <data name="SocialSchedule_daily" xml:space="preserve">
+    <value>Every day</value>
+  </data>
+  <data name="SocialSchedule_weekly" xml:space="preserve">
+    <value>Every week</value>
+  </data>
+  <data name="Social_RemoveTitle" xml:space="preserve">
+    <value>Remove this source?</value>
+  </data>
+  <data name="Social_RemoveBody" xml:space="preserve">
+    <value>Nothing more is imported from it. The posts and videos it already brought stay on the channel.</value>
+  </data>
+  <data name="Social_RemoveConfirm" xml:space="preserve">
+    <value>Remove</value>
+  </data>
+  <data name="SocialError_channel_missing" xml:space="preserve">
+    <value>Choose a channel first.</value>
+  </data>
+  <data name="SocialError_address_missing" xml:space="preserve">
+    <value>Enter the address of the feed or account.</value>
+  </data>
+  <data name="SocialError_invalid_address" xml:space="preserve">
+    <value>That address doesn’t look right for this kind of source. Check the example under the box.</value>
+  </data>
+  <data name="SocialError_invalid_network" xml:space="preserve">
+    <value>Choose where the source is.</value>
+  </data>
+  <data name="SocialError_invalid_schedule" xml:space="preserve">
+    <value>Choose how often to sync.</value>
+  </data>
+  <data name="SocialError_not_connected" xml:space="preserve">
+    <value>The owner’s connection to this account is gone, or they never connected it. They need to connect it in Studio first.</value>
+  </data>
+  <data name="SocialError_permission_required" xml:space="preserve">
+    <value>The owner hasn’t connected this account: record who gave written permission and what they agreed to.</value>
+  </data>
+  <data name="SocialError_forbidden" xml:space="preserve">
+    <value>Only super admins can manage social sources.</value>
+  </data>
+  <data name="SocialError_source_not_found" xml:space="preserve">
+    <value>The source wasn’t found: it may have been removed. Refresh the list.</value>
+  </data>
+  <data name="SocialError_channel_not_found" xml:space="preserve">
+    <value>The channel wasn’t found.</value>
+  </data>
+  <data name="SocialError_job_not_found" xml:space="preserve">
+    <value>The sync job wasn’t found. Refresh the list.</value>
+  </data>
+  <data name="SocialError_signed_out" xml:space="preserve">
+    <value>Sign in again to carry on.</value>
+  </data>
+  <data name="SocialError_unreachable" xml:space="preserve">
+    <value>The admin API could not be reached. Check the connection and try again.</value>
+  </data>
+  <data name="SocialError_server" xml:space="preserve">
+    <value>The server ran into a problem. Try again in a moment; it is on the Errors page.</value>
+  </data>
+  <data name="SocialError_refused" xml:space="preserve">
+    <value>The server refused this</value>
+  </data>
+  <data name="SocialError_unreadable" xml:space="preserve">
+    <value>The server answered something Tools can’t read. Try again.</value>
+  </data>
+  <data name="When_Tomorrow" xml:space="preserve">
+    <value>Tomorrow, {0}</value>
   </data>
 </root>

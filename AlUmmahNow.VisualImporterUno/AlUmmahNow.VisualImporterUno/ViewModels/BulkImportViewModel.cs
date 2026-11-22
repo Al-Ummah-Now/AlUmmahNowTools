@@ -627,6 +627,28 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
         return text == "ImportTranslateError_" + code ? Loc.Get("ImportTranslateError_other") : text;
     }
 
+    /// <summary>
+    /// A line of a social source's sync job log (wiki TOOLS-ADMIN TA-13): the server logs events, not sentences
+    /// (shared-types AdminJobLogEntry), so each is worded here; the server's own error text goes on its own line.
+    /// </summary>
+    internal static string LogText(AlUmmahNow.ToolsCore.Social.SyncJobLogLine line)
+    {
+        var attempt = Loc.Number(line.Attempt ?? 0);
+        var delay = Loc.Duration(TimeSpan.FromSeconds(Math.Max(0, line.DelaySeconds ?? 0)));
+        var text = line.Event switch
+        {
+            "queued" => Loc.Get(line.Retried == true ? "SocialLog_queued_retried" : "SocialLog_queued"),
+            "started" => Loc.Format("SocialLog_started", attempt),
+            "waiting" => line.DelaySeconds is > 0 ? Loc.Format("SocialLog_waiting", delay) : Loc.Get("SocialLog_waiting_now"),
+            "failed_attempt" => Loc.Format("SocialLog_failed_attempt", attempt, delay),
+            "failed" => Loc.Get("SocialLog_failed"),
+            "succeeded" => Loc.Get("SocialLog_succeeded"),
+            "cancelled" => Loc.Get("SocialLog_cancelled"),
+            _ => line.Event,
+        };
+        return line.Error is { Length: > 0 } error ? Loc.WithDetail(text, SourceRow.ReasonText(error, labelled: false)) : text;
+    }
+
     private static string Bytes(string value) =>
         long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var bytes) ? Loc.Bytes(bytes) : value;
 
