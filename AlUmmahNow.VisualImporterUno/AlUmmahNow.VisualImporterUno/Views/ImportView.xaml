@@ -275,6 +275,7 @@
                                             <TextBlock Text="{x:Bind Note, Mode=OneWay}" Style="{StaticResource ToolsMuted}" TextWrapping="Wrap" Visibility="{x:Bind ShowNote, Mode=OneWay}" />
                                             <TextBlock Text="{x:Bind Note, Mode=OneWay}" Style="{StaticResource ToolsMuted}" Foreground="{ThemeResource FanousAccentBrush}"
                                                        TextWrapping="Wrap" Visibility="{x:Bind ShowProblemNote, Mode=OneWay}" />
+                                            <TextBlock Text="{x:Bind TranscriptNote, Mode=OneWay}" Style="{StaticResource ToolsMuted}" TextWrapping="Wrap" Visibility="{x:Bind ShowTranscriptNote, Mode=OneWay}" />
                                             <StackPanel Orientation="Horizontal" Spacing="4" Margin="-8,2,0,0">
                                                 <HyperlinkButton Style="{StaticResource ToolsLinkButton}" Padding="8,4" Tag="{x:Bind}" Click="Pause_Click" Visibility="{x:Bind CanPause, Mode=OneWay}">
                                                     <TextBlock x:Uid="Import_RowPause" Text="Pause" />

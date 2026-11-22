@@ -233,6 +233,8 @@ internal static class DemoImport
         ["fiqh-of-fasting-07.mp4"] = "The Fiqh of Fasting, lesson 7: Eid",
         ["fiqh-of-fasting-08.mp4"] = "The Fiqh of Fasting, lesson 8: the night prayer",
         ["fiqh-of-fasting-09.mp4"] = "The Fiqh of Fasting, lesson 9: Laylat al-Qadr",
+        ["fiqh-of-fasting-14.mp4"] = "The Fiqh of Fasting, lesson 14: the verses of fasting",
+        ["fiqh-of-fasting-15.mp4"] = "The Fiqh of Fasting, lesson 15: review",
         ["fiqh-of-fasting-10.mp4"] = "The Fiqh of Fasting, lesson 10: voluntary fasts",
         ["fiqh-of-fasting-11.mp4"] = "The Fiqh of Fasting, lesson 11: questions and answers",
         ["fiqh-of-fasting-12.mp4"] = "The Fiqh of Fasting, lesson 12: the ransom",
