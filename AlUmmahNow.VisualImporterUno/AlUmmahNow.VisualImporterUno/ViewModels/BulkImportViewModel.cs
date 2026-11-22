@@ -127,7 +127,7 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
     public string ModelStatus => ModelIndex >= 0 && ModelIndex < _models.Count
         ? _workspace.Transcriber.InstalledPath(_models[ModelIndex].Id) is not null
             ? Loc.Get("Import_TranscribeModelHere")
-            : Loc.Format("Import_TranscribeModelDownload", Loc.Bytes(_models[ModelIndex].SizeBytes))
+            : Loc.Get("Import_TranscribeModelDownload")
         : "";
 
     private void SetUpTranscription()

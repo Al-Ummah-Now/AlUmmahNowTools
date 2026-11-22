@@ -2650,7 +2650,7 @@
     <value>موجود على هذا الجهاز.</value>
   </data>
   <data name="Import_TranscribeModelDownload" xml:space="preserve">
-    <value>يُنزَّل مرة واحدة، {0}، أول ما يُستخدم.</value>
+    <value>ليس على هذا الجهاز بعد، ويُنزَّل مرة واحدة أول ما يُستخدم.</value>
   </data>
   <data name="Import_TranscribeDeviceGpu" xml:space="preserve">
     <value>يعمل على بطاقة الرسوميات في هذا الجهاز:</value>
