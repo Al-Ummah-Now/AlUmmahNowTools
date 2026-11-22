@@ -1948,7 +1948,7 @@
     <value>Something unexpected went wrong.</value>
   </data>
   <data name="ImportNote_CaptionLanguageUnknown" xml:space="preserve">
-    <value>A caption file has no language in its name, so it's left out. Choose a language for such files and find the videos again:</value>
+    <value>{0} has no language in its name, so it's left out. Choose a language for such caption files and find the videos again.</value>
   </data>
   <data name="ImportNote_CaptionLanguageTwice" xml:space="preserve">
     <value>Two caption files have the same language; this one is left out:</value>
@@ -2014,13 +2014,13 @@
     <value>Nothing to do for {0}</value>
   </data>
   <data name="ImportLog_attempt" xml:space="preserve">
-    <value>{0}: attempt {1}</value>
+    <value>Trying {0} again, attempt {1}</value>
   </data>
   <data name="ImportLog_attempt_failed" xml:space="preserve">
-    <value>{0}: attempt {1} failed; next try in {2} s</value>
+    <value>Couldn't finish {0} on attempt {1}; trying again in {2} s</value>
   </data>
   <data name="ImportLog_failed" xml:space="preserve">
-    <value>{0}: stopped after {1} attempts</value>
+    <value>Stopped {0} after {1} attempts</value>
   </data>
   <data name="ImportLog_reference" xml:space="preserve">
     <value>Reference {0}</value>

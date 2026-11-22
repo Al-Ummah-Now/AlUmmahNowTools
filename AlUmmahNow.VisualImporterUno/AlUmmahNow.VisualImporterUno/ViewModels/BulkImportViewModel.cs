@@ -15,6 +15,10 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels;
 /// </summary>
 public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
 {
+    /// <summary>Spinners turn, except in demo frames, where they are drawn as a still, full ring (a ring caught mid-arc reads as "(" or «ر»).</summary>
+    public static bool SpinnersMove => !(ImportWorkspace.IfStarted?.IsDemo ?? false);
+    public bool SpinnerMovesHere => SpinnersMove;
+
     private readonly ImportWorkspace _workspace;
     private readonly DispatcherQueue? _dispatcher;
     private readonly Dictionary<string, string> _channelNames = new();
@@ -395,8 +399,13 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
 
     // ---------------------------------------------------------------- Words
 
-    internal static string NoteText(ScanNote note) =>
-        Loc.WithDetail(Loc.Get("ImportNote_" + note.Code), note.Detail);
+    internal static string NoteText(ScanNote note)
+    {
+        var text = Loc.Get("ImportNote_" + note.Code);
+        // A note that names its file inside the sentence ({0}); the others, and Arabic (a Latin name cannot sit inside an
+        // Arabic line in Uno's text), take it on its own line after a colon
+        return text.Contains("{0}") ? text.Replace("{0}", note.Detail ?? "") : Loc.WithDetail(text, note.Detail);
+    }
 
     /// <summary>A failure in the app's words; admin-api's own words follow when it explained itself.</summary>
     internal static string ErrorText(string? code, string? raw)
@@ -488,8 +497,8 @@ public sealed partial class ReviewRow : ObservableObject
         if (video.ChaptersPath is not null) parts.Add(Loc.Get("ImportPart_chapters"));
         if (video.ThumbnailPath is not null) parts.Add(Loc.Get("ImportPart_thumbnail"));
         if (video.MetadataPath is not null) parts.Add(Loc.Get("ImportPart_metadata"));
-        Sidecars = parts.Count == 0 ? Loc.Get("Import_NoSidecars") : string.Join(Loc.IsArabic ? "، " : " · ", parts);
-        Notes = string.Join("\n", video.Notes.Select(BulkImportViewModel.NoteText));
+        Sidecars = Loc.KeepLastWords(parts.Count == 0 ? Loc.Get("Import_NoSidecars") : string.Join(Loc.IsArabic ? "، " : "\u00A0· ", parts));
+        Notes = Loc.KeepLastWords(string.Join("\n", video.Notes.Select(BulkImportViewModel.NoteText)));
     }
 
     public ScannedVideo Video { get; }
@@ -535,6 +544,9 @@ public sealed partial class QueueRow : ObservableObject
     public string FileName { get; }
     public string Title { get; }
     public string TitleShown => Loc.RightToLeftLine(Title);
+
+    /// <summary>False in demo frames: the ring is drawn whole and still, never caught mid-arc where it reads as a letter.</summary>
+    public bool SpinnerMoves => BulkImportViewModel.SpinnersMove;
 
     [ObservableProperty] private string _channel = "";
     [ObservableProperty] private string _status = "";

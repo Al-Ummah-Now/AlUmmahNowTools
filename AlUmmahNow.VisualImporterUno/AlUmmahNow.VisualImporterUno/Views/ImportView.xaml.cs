@@ -27,9 +27,11 @@ public sealed partial class ImportView : Page
         InitializeComponent();
         DataContext = ViewModel;
         if (ViewModel.SelectedChannel is { } channel) ChannelBox.Text = channel.Name;
+        SuggestionsUnderBox.Attach(ChannelBox);
         Loaded += (_, _) =>
         {
             ViewModel.Attach();
+            KeepLastWords(PageContent);
             OpenDemoDialog();
         };
         Unloaded += (_, _) => ViewModel.Detach();
@@ -68,6 +70,17 @@ public sealed partial class ImportView : Page
                 ChannelBox.Focus(FocusState.Keyboard);
                 ChannelBox.IsSuggestionListOpen = true;
                 break;
+        }
+    }
+
+    /// <summary>The page's own wrapping text (headings and help) never ends a line on a lone word.</summary>
+    private static void KeepLastWords(DependencyObject parent)
+    {
+        for (var i = 0; i < Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChildrenCount(parent); i++)
+        {
+            var child = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChild(parent, i);
+            if (child is TextBlock { TextWrapping: TextWrapping.Wrap } text && text.Text is { Length: > 0 } value) text.Text = Loc.KeepLastWords(value);
+            KeepLastWords(child);
         }
     }
 
@@ -137,12 +150,14 @@ public sealed partial class ImportView : Page
 
     private async void NewChannel_Click(object sender, RoutedEventArgs e)
     {
-        var name = new TextBox { Header = Loc.PopupLine(Loc.Get("Import_NewChannelName")) };
+        // Name and description are typed in the interface's language, so an Arabic field starts on the right
+        var typed = Loc.IsArabic ? FlowDirection.RightToLeft : FlowDirection.LeftToRight;
+        var name = new TextBox { Header = Loc.PopupLine(Loc.Get("Import_NewChannelName")), FlowDirection = typed };
         // The handle is typed left to right in both languages; its label follows the dialog's direction
         var handle = new TextBox { FlowDirection = FlowDirection.LeftToRight, PlaceholderText = "@" };
         var handleLabel = new TextBlock { Text = Loc.PopupLine(Loc.Get("Import_NewChannelHandle")), Margin = new Thickness(0, 0, 0, -6) };
         AutomationProperties.SetName(handle, Loc.Get("Import_NewChannelHandle"));
-        var description = new TextBox { Header = Loc.PopupLine(Loc.Get("Import_NewChannelDescription")), AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 80 };
+        var description = new TextBox { Header = Loc.PopupLine(Loc.Get("Import_NewChannelDescription")), AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 80, FlowDirection = typed };
         var error = new TextBlock { Style = (Style)Application.Current.Resources["ToolsMuted"], Visibility = Visibility.Collapsed };
         error.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["FanousErrorTextBrush"];
         var panel = new StackPanel { Spacing = 12, MinWidth = 320 };
@@ -209,7 +224,7 @@ public sealed partial class ImportView : Page
     private static StackPanel DialogText(params string[] lines)
     {
         var panel = new StackPanel { Spacing = 6 };
-        foreach (var line in lines) panel.Children.Add(new TextBlock { Text = Loc.PopupLine(line), TextWrapping = TextWrapping.Wrap });
+        foreach (var line in lines) panel.Children.Add(new TextBlock { Text = Loc.PopupLine(Loc.KeepLastWords(line)), TextWrapping = TextWrapping.Wrap });
         return panel;
     }
 
