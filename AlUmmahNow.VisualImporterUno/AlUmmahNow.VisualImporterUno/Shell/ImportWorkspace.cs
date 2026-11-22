@@ -274,7 +274,7 @@ internal static class DemoImport
         for (var i = 0; i < files.Length; i++)
         {
             // The ninth file's batch was added with "Let the server encode"; the last two were transcribed here
-            yield return QueueItem.For(files[i], "batch_demo", ChannelId, start.AddSeconds(i), serverEncodes: i == 8, transcribe: i >= 9 ? new TranscribeChoice(null, CoreTranscriber.DefaultModel) : null);
+            yield return QueueItem.For(files[i], "batch_demo", ChannelId, start.AddSeconds(i), serverEncodes: i == 8, transcribe: i >= 9 ? new TranscribeChoice(null, CoreTranscriber.DefaultModel) : null, translate: i >= 9);
         }
     }
 

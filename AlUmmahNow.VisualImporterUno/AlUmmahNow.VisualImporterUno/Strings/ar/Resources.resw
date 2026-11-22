@@ -2617,10 +2617,10 @@
     <value>أداة الترميز</value>
   </data>
   <data name="Import_TranscribeTitle.Text" xml:space="preserve">
-    <value>تفريغ الكلام</value>
+    <value>تفريغ الكلام والترجمة</value>
   </data>
   <data name="Import_TranscribeBody.Text" xml:space="preserve">
-    <value>لكل مرئي بلا ملفات ترجمة خاصة به، تكتب الأدوات ما يُقال فيه على هذا الجهاز، وترسله إلى الخادم مسودةً للترجمة يراجعها شخص. وتُرسل تلاوة القرآن مواضعَ آيات فقط، لا نصًا أبدًا. ثم يترجم الخادم المسودة إلى لغة الموقع الأخرى.</value>
+    <value>لكل مرئي بلا ملفات ترجمة خاصة به، تكتب الأدوات ما يُقال فيه على هذا الجهاز، وترسله إلى الخادم مسودةً للترجمة يراجعها شخص. وتُرسل تلاوة القرآن مواضعَ آيات فقط، لا نصًا أبدًا.</value>
   </data>
   <data name="Import_TranscribeHere.Content" xml:space="preserve">
     <value>فرّغ كلام المرئيات التي ليس لها ترجمة</value>
@@ -2779,7 +2779,7 @@
     <value>لم يترجم الخادم إلى {0}، إذ {1}</value>
   </data>
   <data name="ImportLog_translate_gave_up" xml:space="preserve">
-    <value>لم يكتب الخادم مسودة التفريغ بعد يوم. تعرض إدارة المرئيات مهمة الترجمة.</value>
+    <value>لم يستطع الخادم بدء الترجمة بعد يوم. تعرض إدارة المرئيات مهمة الترجمة.</value>
   </data>
   <data name="ImportTranscribeError_unavailable" xml:space="preserve">
     <value>لا تستطيع هذه النسخة من الأدوات تفريغ الكلام</value>
@@ -2810,5 +2810,11 @@
   </data>
   <data name="ImportTranslateError_other" xml:space="preserve">
     <value>تعرض إدارة المرئيات السبب</value>
+  </data>
+  <data name="Import_TranslateCaptions.Content" xml:space="preserve">
+    <value>اطلب من الخادم ترجمة النصوص إلى لغة الموقع الأخرى</value>
+  </data>
+  <data name="Import_TranslateNote.Text" xml:space="preserve">
+    <value>كل ترجمة آلية مسودةٌ يراجعها شخص وينشرها. والمرئي الذي له ملفات ترجمة خاصة به يُترجم منها، وتبقى كما هي.</value>
   </data>
 </root>
