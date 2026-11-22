@@ -65,6 +65,83 @@ public sealed record SidecarPayload(
     public bool IsEmpty => (Captions is null || Captions.Count == 0) && Chapters is null && Thumbnail is null && PlaylistId is null && PublishAt is null;
 }
 
+/// <summary>One rung of the server's ladder (shared-types ENCODE_LADDER): named by the short side.</summary>
+public sealed record EncodeRungSetting(
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("short")] int Short,
+    [property: JsonPropertyName("maxrate")] int Maxrate,
+    [property: JsonPropertyName("audio")] int Audio);
+
+public sealed record EncodeFpsCap(
+    [property: JsonPropertyName("aboveFps")] double AboveFps,
+    [property: JsonPropertyName("fps")] double Fps);
+
+public sealed record EncodeProfileHigh(
+    [property: JsonPropertyName("minHeight")] int MinHeight,
+    [property: JsonPropertyName("minWidth")] int MinWidth);
+
+/// <summary><c>high</c> from these sizes, else <c>main</c>.</summary>
+public sealed record EncodeProfileRule(
+    [property: JsonPropertyName("high")] EncodeProfileHigh? High);
+
+public sealed record EncodeVideoSettings(
+    [property: JsonPropertyName("codec")] string Codec,
+    [property: JsonPropertyName("pixelFormat")] string PixelFormat,
+    [property: JsonPropertyName("crf")] int Crf,
+    [property: JsonPropertyName("bufsizeFactor")] double BufsizeFactor,
+    [property: JsonPropertyName("fpsCap")] EncodeFpsCap FpsCap,
+    [property: JsonPropertyName("profile")] EncodeProfileRule? Profile = null);
+
+/// <summary>The server's HLS encode settings (<c>GET /api/admin/import/encoding</c>), the same the media container uses.</summary>
+public sealed record EncodeLadderSettings(
+    [property: JsonPropertyName("version")] int Version,
+    [property: JsonPropertyName("rungs")] IReadOnlyList<EncodeRungSetting> Rungs,
+    [property: JsonPropertyName("shortSideTolerance")] int ShortSideTolerance,
+    [property: JsonPropertyName("segmentSeconds")] int SegmentSeconds,
+    [property: JsonPropertyName("gopSeconds")] int GopSeconds,
+    [property: JsonPropertyName("video")] EncodeVideoSettings Video);
+
+public sealed record PrebuiltLimits(
+    [property: JsonPropertyName("maxFiles")] int MaxFiles,
+    [property: JsonPropertyName("maxFileBytes")] long MaxFileBytes,
+    [property: JsonPropertyName("maxTotalBytes")] long MaxTotalBytes);
+
+public sealed record EncodingSettings(
+    [property: JsonPropertyName("ladder")] EncodeLadderSettings Ladder,
+    [property: JsonPropertyName("prebuiltLimits")] PrebuiltLimits PrebuiltLimits,
+    [property: JsonPropertyName("takesRenditions")] bool? TakesRenditions);
+
+/// <summary>A rendition file as <c>POST /renditions</c> declares it: <c>&lt;rung&gt;/&lt;file&gt;</c> and its size.</summary>
+public sealed record RenditionFile(
+    [property: JsonPropertyName("path")] string Path,
+    [property: JsonPropertyName("bytes")] long Bytes);
+
+public sealed record RenditionStaging(
+    [property: JsonPropertyName("stagingId")] string StagingId,
+    [property: JsonPropertyName("status")] string Status);
+
+/// <summary>What the server's transcode did with the renditions (shared-types TranscodeResult.prebuilt).</summary>
+public sealed record PrebuiltOutcome(
+    [property: JsonPropertyName("used")] bool Used,
+    [property: JsonPropertyName("reason")] string? Reason,
+    [property: JsonPropertyName("rung")] string? Rung);
+
+public sealed record DeliveryTranscode(
+    [property: JsonPropertyName("status")] string Status,
+    [property: JsonPropertyName("progress")] double? Progress,
+    [property: JsonPropertyName("error")] string? Error,
+    [property: JsonPropertyName("prebuilt")] PrebuiltOutcome? Prebuilt);
+
+public sealed record DeliveryStaging(
+    [property: JsonPropertyName("stagingId")] string StagingId,
+    [property: JsonPropertyName("status")] string Status);
+
+/// <summary><c>GET /api/admin/import/items/:id/delivery</c>.</summary>
+public sealed record DeliveryState(
+    [property: JsonPropertyName("takesRenditions")] bool TakesRenditions,
+    [property: JsonPropertyName("staging")] DeliveryStaging? Staging,
+    [property: JsonPropertyName("r2")] DeliveryTranscode? R2);
+
 /// <summary>An error the app reports to the Errors page (<c>POST /api/admin/import/errors</c>, app <c>tools</c>).</summary>
 public sealed record ErrorReport(
     [property: JsonPropertyName("kind")] string Kind,
@@ -95,13 +172,17 @@ public sealed record ErrorReport(
 /// <summary>A refused or failed admin-api call: the status (0 when it was never answered), code and message.</summary>
 public sealed class ImportApiException : Exception
 {
-    public ImportApiException(int status, string code, string message, TimeSpan? retryAfter = null, Exception? inner = null)
+    public ImportApiException(int status, string code, string message, TimeSpan? retryAfter = null, Exception? inner = null, JsonNode? body = null)
         : base(message, inner)
     {
         Status = status;
         Code = code;
         RetryAfter = retryAfter;
+        Body = body;
     }
+
+    /// <summary>The whole answer, for details next to the code (files_missing lists the files still to send)</summary>
+    public JsonNode? Body { get; }
 
     public int Status { get; }
     public string Code { get; }
@@ -184,6 +265,59 @@ public class ImportApiClient
     public virtual Task MarkFailedAsync(string itemId, string error, CancellationToken ct = default) =>
         SendAsync(HttpMethod.Post, $"/api/admin/import/items/{Uri.EscapeDataString(itemId)}/failed", new { error }, ct);
 
+    /// <summary>The server's ladder and limits; with a channel, whether R2 transcodes its uploads (renditions are used only then).</summary>
+    public virtual async Task<EncodingSettings> GetEncodingAsync(string? channelId, CancellationToken ct = default)
+    {
+        var q = string.IsNullOrEmpty(channelId) ? "" : "?channelId=" + Uri.EscapeDataString(channelId);
+        var result = await SendAsync(HttpMethod.Get, "/api/admin/import/encoding" + q, null, ct).ConfigureAwait(false);
+        return result?.Deserialize<EncodingSettings>(Json) ?? throw Unreadable();
+    }
+
+    /// <summary>Declares the rungs and files for the item's video; answers the staging.</summary>
+    public virtual async Task<RenditionStaging> StageRenditionsAsync(string itemId, IReadOnlyList<string> rungs, IReadOnlyList<RenditionFile> files, string encoder, CancellationToken ct = default)
+    {
+        var result = await SendAsync(HttpMethod.Post, $"/api/admin/import/items/{Uri.EscapeDataString(itemId)}/renditions", new { rungs, files, encoder }, ct).ConfigureAwait(false);
+        return result?.Deserialize<RenditionStaging>(Json) ?? throw Unreadable();
+    }
+
+    /// <summary>One file of the staging, exactly its declared size.</summary>
+    public virtual Task PutRenditionFileAsync(string itemId, string stagingId, string path, Stream content, long length, CancellationToken ct = default)
+    {
+        var slash = path.IndexOf('/');
+        var url = $"/api/admin/import/items/{Uri.EscapeDataString(itemId)}/renditions/{Uri.EscapeDataString(stagingId)}/files/{Uri.EscapeDataString(path[..slash])}/{Uri.EscapeDataString(path[(slash + 1)..])}";
+        var body = new StreamContent(content);
+        body.Headers.ContentLength = length;
+        body.Headers.ContentType = new MediaTypeHeaderValue(path.EndsWith(".m3u8", StringComparison.Ordinal) ? "application/vnd.apple.mpegurl" : "video/mp4");
+        return SendAsync(HttpMethod.Put, url, body, ct);
+    }
+
+    /// <summary>
+    /// Every file is there: the renditions wait for the original's transcode. Answers the files the server is still
+    /// missing (at most 50 at a time), empty when it took the staging.
+    /// </summary>
+    public virtual async Task<IReadOnlyList<string>> CompleteRenditionsAsync(string itemId, string stagingId, CancellationToken ct = default)
+    {
+        try
+        {
+            await SendAsync(HttpMethod.Post, $"/api/admin/import/items/{Uri.EscapeDataString(itemId)}/renditions/{Uri.EscapeDataString(stagingId)}/complete", new { }, ct).ConfigureAwait(false);
+            return Array.Empty<string>();
+        }
+        catch (ImportApiException missing) when (missing.Code == "files_missing" && missing.Body?["missing"] is JsonArray list)
+        {
+            return list.Select(n => n?.GetValue<string>()).Where(p => !string.IsNullOrEmpty(p)).Select(p => p!).ToList();
+        }
+    }
+
+    public virtual Task CancelRenditionsAsync(string itemId, string stagingId, CancellationToken ct = default) =>
+        SendAsync(HttpMethod.Delete, $"/api/admin/import/items/{Uri.EscapeDataString(itemId)}/renditions/{Uri.EscapeDataString(stagingId)}", null, ct);
+
+    /// <summary>Whether the server takes renditions for the item's video, and what its transcode did with them.</summary>
+    public virtual async Task<DeliveryState> GetDeliveryAsync(string itemId, CancellationToken ct = default)
+    {
+        var result = await SendAsync(HttpMethod.Get, $"/api/admin/import/items/{Uri.EscapeDataString(itemId)}/delivery", null, ct).ConfigureAwait(false);
+        return result?.Deserialize<DeliveryState>(Json) ?? throw Unreadable();
+    }
+
     public virtual Task ReportErrorsAsync(IReadOnlyList<ErrorReport> events, CancellationToken ct = default) =>
         SendAsync(HttpMethod.Post, "/api/admin/import/errors", new { events }, ct);
 
@@ -195,7 +329,8 @@ public class ImportApiClient
         if (string.IsNullOrEmpty(token)) throw new ImportApiException(401, "signed_out", "Sign in again");
         using var request = new HttpRequestMessage(method, new Uri(_base, path));
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        if (body is not null) request.Content = JsonContent.Create(body, body.GetType(), options: Json);
+        if (body is HttpContent raw) request.Content = raw;
+        else if (body is not null) request.Content = JsonContent.Create(body, body.GetType(), options: Json);
         HttpResponseMessage response;
         try
         {
@@ -228,7 +363,7 @@ public class ImportApiClient
                 if (item is not null) throw new AlreadyImportedException(item);
             }
             var retryAfter = response.Headers.RetryAfter?.Delta;
-            throw new ImportApiException((int)response.StatusCode, code, message, retryAfter);
+            throw new ImportApiException((int)response.StatusCode, code, message, retryAfter, body: json);
         }
     }
 }

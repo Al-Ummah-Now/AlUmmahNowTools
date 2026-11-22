@@ -3,13 +3,17 @@ using System.Text.Json.Serialization;
 
 namespace AlUmmahNow.ToolsCore.Import;
 
-/// <summary>The steps a file goes through, in order. Later stories add theirs (transcode, transcribe, suggest).</summary>
+/// <summary>The steps a file goes through, in order. Later stories add theirs (transcribe, suggest).</summary>
 [JsonConverter(typeof(JsonStringEnumConverter))]
 public enum ImportStepKind
 {
     Hash,
+    /// <summary>The server's HLS ladder encoded on this computer (TA-12), unless the server encodes</summary>
+    Encode,
     Upload,
     Attach,
+    /// <summary>Waits for the server's verdict on the renditions: used, or encoded again and why</summary>
+    Check,
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter))]
@@ -34,6 +38,8 @@ public sealed class StepState
     public string? LastError { get; set; }
     /// <summary>What kind of failure it was, for the app's words (<see cref="ImportQueue.ErrorCode"/>)</summary>
     public string? LastErrorCode { get; set; }
+    /// <summary>The step is waiting on the server's own work (its transcode), not on a retry</summary>
+    public bool WaitingOnServer { get; set; }
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter))]
@@ -57,6 +63,8 @@ public enum ItemPhase
     Running,
     /// <summary>A step failed and is tried again at <see cref="QueueItem.NextAttemptAt"/></summary>
     RetryWaiting,
+    /// <summary>The server is working on the file (its transcode); the app looks again at <see cref="QueueItem.NextAttemptAt"/></summary>
+    ServerWorking,
     Paused,
     Failed,
     Done,
@@ -84,6 +92,12 @@ public sealed class QueueItem
     public string? AttachJobId { get; set; }
     /// <summary>The channel already had this file: nothing was uploaded</summary>
     public bool AlreadyImported { get; set; }
+    /// <summary>"Let the server encode" was chosen for the file's batch: no local encode</summary>
+    public bool ServerEncodes { get; set; }
+    /// <summary>The renditions encoded here, waiting to be sent (deleted once the server has them)</summary>
+    public RenditionSet? Renditions { get; set; }
+    /// <summary>The server's verdict on the renditions, once its transcode has run</summary>
+    public RenditionVerdict? Verdict { get; set; }
     public List<LogLine> Log { get; set; } = new();
 
     /// <summary>Progress of the running step, 0–1 (not saved)</summary>
@@ -102,18 +116,32 @@ public sealed class QueueItem
             if (step.Status == StepStatus.Failed) return ItemPhase.Failed;
             if (step.Status == StepStatus.Running) return ItemPhase.Running;
             if (Paused) return ItemPhase.Paused;
+            if (step.WaitingOnServer) return ItemPhase.ServerWorking;
             return step.NextAttemptAt is not null ? ItemPhase.RetryWaiting : ItemPhase.Waiting;
         }
     }
 
-    public static QueueItem For(ScannedVideo video, string batchId, string channelId, DateTimeOffset now) => new()
+    public static QueueItem For(ScannedVideo video, string batchId, string channelId, DateTimeOffset now, bool serverEncodes = false) => new()
     {
         BatchId = batchId,
         ChannelId = channelId,
         Video = video,
         CreatedAt = now,
+        ServerEncodes = serverEncodes,
         Steps = Enum.GetValues<ImportStepKind>().Select(k => new StepState { Kind = k }).ToList(),
     };
+
+    /// <summary>
+    /// A file saved by an older app has fewer steps: the missing ones are put in their places, as nothing to do
+    /// (the file was queued before they existed), so its saved steps keep their meaning.
+    /// </summary>
+    internal void AddMissingSteps()
+    {
+        var kinds = Enum.GetValues<ImportStepKind>();
+        if (Steps.Count == kinds.Length && Steps.Select(s => s.Kind).SequenceEqual(kinds)) return;
+        var saved = Steps.GroupBy(s => s.Kind).ToDictionary(g => g.Key, g => g.First());
+        Steps = kinds.Select(k => saved.TryGetValue(k, out var s) ? s : new StepState { Kind = k, Status = StepStatus.Skipped }).ToList();
+    }
 }
 
 /// <summary>A step's outcome when it did not throw.</summary>
@@ -124,6 +152,11 @@ public enum StepResult
     Skipped,
     /// <summary>Done, and the steps after it have nothing to do either (the file was already imported)</summary>
     SkipRest,
+    /// <summary>
+    /// Not finished: the server is still working. The step runs again after the delay the step asked for
+    /// (<see cref="IStepContext.Later"/>), without counting an attempt and without holding a slot meanwhile.
+    /// </summary>
+    Later,
 }
 
 /// <summary>A failure a step knows the nature of. Anything else is classified by <see cref="ImportQueue.IsRetryable"/>.</summary>
@@ -148,6 +181,8 @@ public interface IStepContext
     void Progress(double fraction);
     /// <summary>Writes the queue to disk now (after a change a restart must not lose, such as an upload offset).</summary>
     void Save();
+    /// <summary>With <see cref="StepResult.Later"/>: when to run the step again.</summary>
+    void Later(TimeSpan delay);
 }
 
 public interface IImportStep
@@ -170,13 +205,23 @@ public sealed class QueueSettings
     public Dictionary<ImportStepKind, int> Parallel { get; set; } = new()
     {
         [ImportStepKind.Hash] = 2,
+        [ImportStepKind.Encode] = 1,
         [ImportStepKind.Upload] = 3,
         [ImportStepKind.Attach] = 2,
+        [ImportStepKind.Check] = 8,
     };
+
+    /// <summary>An encode uses the whole processor (or its one hardware encoder): at most this many at once.</summary>
+    public const int MaxEncodes = 4;
 
     public int MaxAttempts { get; set; } = 6;
 
-    public int ParallelFor(ImportStepKind kind) => Math.Clamp(Parallel.TryGetValue(kind, out var n) ? n : 1, 1, kind == ImportStepKind.Upload ? MaxUploads : 8);
+    public int ParallelFor(ImportStepKind kind)
+    {
+        var fallback = kind == ImportStepKind.Check ? 8 : 1;
+        var max = kind switch { ImportStepKind.Upload => MaxUploads, ImportStepKind.Encode => MaxEncodes, ImportStepKind.Check => 16, _ => 8 };
+        return Math.Clamp(Parallel.TryGetValue(kind, out var n) ? n : fallback, 1, max);
+    }
 }
 
 /// <summary>
@@ -330,6 +375,7 @@ public sealed class ImportQueue : IDisposable
         step.NextAttemptAt = null;
         step.LastError = null;
         step.LastErrorCode = null;
+        step.WaitingOnServer = false;
         item.Paused = false;
         AppendLog(item, LogLevel.Info, "retry", $"Retry: {step.Kind}", step.Kind.ToString());
         return true;
@@ -435,7 +481,8 @@ public sealed class ImportQueue : IDisposable
                 step.Attempts++;
                 step.NextAttemptAt = null;
                 item.Progress = 0;
-                if (step.Attempts == 1) AppendLog(item, LogLevel.Info, "started", $"{step.Kind}: started", step.Kind.ToString());
+                if (step.WaitingOnServer) { }
+                else if (step.Attempts == 1) AppendLog(item, LogLevel.Info, "started", $"{step.Kind}: started", step.Kind.ToString());
                 else AppendLog(item, LogLevel.Info, "attempt", $"{step.Kind}: attempt {step.Attempts}", step.Kind.ToString(), step.Attempts.ToString(System.Globalization.CultureInfo.InvariantCulture));
                 var cts = CancellationTokenSource.CreateLinkedTokenSource(_loop?.Token ?? CancellationToken.None);
                 _running[item.Id] = cts;
@@ -470,6 +517,8 @@ public sealed class ImportQueue : IDisposable
     private async Task RunStepAsync(QueueItem item, StepState step, CancellationTokenSource cts)
     {
         var context = new Context(this, item);
+        var wasWaiting = step.WaitingOnServer;
+        step.WaitingOnServer = false;
         Exception? failure = null;
         StepResult result = StepResult.Done;
         try
@@ -484,6 +533,7 @@ public sealed class ImportQueue : IDisposable
                 // Paused, stopped or removed: the attempt does not count, and the step waits to run again
                 step.Status = StepStatus.Pending;
                 step.Attempts = Math.Max(0, step.Attempts - 1);
+                step.WaitingOnServer = wasWaiting;
                 AppendLog(item, LogLevel.Info, "stopped", $"{step.Kind}: stopped", step.Kind.ToString());
                 Finish(item);
             }
@@ -499,7 +549,17 @@ public sealed class ImportQueue : IDisposable
         string? reference = null;
         lock (_gate)
         {
-            if (failure is null)
+            if (failure is null && result == StepResult.Later)
+            {
+                // The server is still at it: look again later; the attempt does not count and no slot is held
+                var first = !wasWaiting;
+                step.Status = StepStatus.Pending;
+                step.Attempts = Math.Max(0, step.Attempts - 1);
+                step.WaitingOnServer = true;
+                step.NextAttemptAt = _time.GetUtcNow() + (context.LaterDelay ?? TimeSpan.FromSeconds(30));
+                if (first) AppendLog(item, LogLevel.Info, "server_working", $"{step.Kind}: the server is working on the file; the app looks again now and then", step.Kind.ToString());
+            }
+            else if (failure is null)
             {
                 step.Status = result == StepResult.Skipped ? StepStatus.Skipped : StepStatus.Done;
                 step.LastError = null;
@@ -629,6 +689,7 @@ public sealed class ImportQueue : IDisposable
             {
                 // A step that was running when the app closed starts again (an upload from its saved offset)
                 foreach (var step in item.Steps.Where(s => s.Status == StepStatus.Running)) step.Status = StepStatus.Pending;
+                item.AddMissingSteps();
                 _items.Add(item);
             }
         }
@@ -678,5 +739,9 @@ public sealed class ImportQueue : IDisposable
         {
             lock (_queue._gate) _queue.SaveLocked();
         }
+
+        public TimeSpan? LaterDelay { get; private set; }
+
+        public void Later(TimeSpan delay) => LaterDelay = delay;
     }
 }

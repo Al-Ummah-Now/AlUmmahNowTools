@@ -21,8 +21,9 @@ public sealed class HashStep : IImportStep
 }
 
 /// <summary>
-/// Opens the file on admin-api (a new video for the channel, or the unfinished one of this same file), sends it over
-/// TUS from where the server has it, and marks it uploaded. A file the channel already has is skipped.
+/// Opens the file on admin-api (a new video for the channel, or the unfinished one of this same file), sends the
+/// renditions encoded here (TA-12; the server takes them only before the original completes), sends the file over TUS
+/// from where the server has it, and marks it uploaded. A file the channel already has is skipped.
 /// </summary>
 public sealed class UploadStep : IImportStep
 {
@@ -31,6 +32,7 @@ public sealed class UploadStep : IImportStep
     private readonly TusClient _tus;
     private readonly Uri _tusEndpoint;
     private readonly Func<CancellationToken, Task<string?>> _token;
+    private readonly RenditionSender _renditions;
 
     public UploadStep(ImportApiClient api, TusClient tus, Uri videosApi, Func<CancellationToken, Task<string?>> token)
     {
@@ -38,6 +40,7 @@ public sealed class UploadStep : IImportStep
         _tus = tus;
         _tusEndpoint = new Uri(videosApi, "/api/videos/tus");
         _token = token;
+        _renditions = new RenditionSender(api);
     }
 
     public ImportStepKind Kind => ImportStepKind.Upload;
@@ -61,7 +64,15 @@ public sealed class UploadStep : IImportStep
         CheckUnchanged(item);
         if (item.ServerItemId is null || item.TusSessionId is null)
         {
-            if (!await OpenAsync(item, context, ct).ConfigureAwait(false)) return StepResult.SkipRest;
+            if (!await OpenAsync(_api, _tusEndpoint, item, context, ct).ConfigureAwait(false)) return StepResult.SkipRest;
+        }
+
+        // The renditions' share of the step's progress, by bytes
+        var share = 0.0;
+        if (item.Renditions is { Sent: false } set)
+        {
+            share = (double)set.Bytes / Math.Max(1, set.Bytes + item.Video.Size);
+            await _renditions.SendAsync(item, context, new Progress<double>(p => context.Progress(p * share)), ct).ConfigureAwait(false);
         }
 
         var reopened = false;
@@ -69,7 +80,7 @@ public sealed class UploadStep : IImportStep
         {
             try
             {
-                await TransferAsync(item, context, ct).ConfigureAwait(false);
+                await TransferAsync(item, context, share, ct).ConfigureAwait(false);
                 break;
             }
             catch (TusGoneException) when (!reopened)
@@ -79,7 +90,7 @@ public sealed class UploadStep : IImportStep
                 context.Log(LogLevel.Warning, "session_ended", "The upload session ended; opening it again");
                 item.TusSessionId = null;
                 item.UploadUrl = null;
-                if (!await OpenAsync(item, context, ct).ConfigureAwait(false)) return StepResult.SkipRest;
+                if (!await OpenAsync(_api, _tusEndpoint, item, context, ct).ConfigureAwait(false)) return StepResult.SkipRest;
             }
         }
 
@@ -88,8 +99,8 @@ public sealed class UploadStep : IImportStep
         return StepResult.Done;
     }
 
-    /// <summary>False when the channel already has the file.</summary>
-    private async Task<bool> OpenAsync(QueueItem item, IStepContext context, CancellationToken ct)
+    /// <summary>Opens the file on admin-api (the Encode step does it first, to encode only what will be uploaded); false when the channel already has the file.</summary>
+    internal static async Task<bool> OpenAsync(ImportApiClient api, Uri tusEndpoint, QueueItem item, IStepContext context, CancellationToken ct)
     {
         var v = item.Video;
         var request = new ItemUploadRequest(
@@ -101,12 +112,12 @@ public sealed class UploadStep : IImportStep
             v.Metadata);
         try
         {
-            var opened = await _api.OpenItemAsync(item.BatchId, request, ct).ConfigureAwait(false);
+            var opened = await api.OpenItemAsync(item.BatchId, request, ct).ConfigureAwait(false);
             item.ServerItemId = opened.Item.Id;
             item.VideoId = opened.Upload.VideoId;
             item.TusSessionId = opened.Upload.TusSessionId;
             item.ChunkSize = opened.Upload.ChunkSize > 0 ? opened.Upload.ChunkSize : DefaultChunk;
-            item.UploadUrl = string.IsNullOrEmpty(opened.Upload.TusUploadId) ? null : new Uri(_tusEndpoint, _tusEndpoint.AbsolutePath.TrimEnd('/') + "/" + opened.Upload.TusUploadId).ToString();
+            item.UploadUrl = string.IsNullOrEmpty(opened.Upload.TusUploadId) ? null : new Uri(tusEndpoint, tusEndpoint.AbsolutePath.TrimEnd('/') + "/" + opened.Upload.TusUploadId).ToString();
             // A resumed upload keeps its offset until the server's HEAD says where it is
             if (item.UploadUrl is null) item.UploadOffset = 0;
             context.Save();
@@ -125,7 +136,7 @@ public sealed class UploadStep : IImportStep
         }
     }
 
-    private async Task TransferAsync(QueueItem item, IStepContext context, CancellationToken ct)
+    private async Task TransferAsync(QueueItem item, IStepContext context, double from, CancellationToken ct)
     {
         var size = item.Video.Size;
         var token = await Token(ct).ConfigureAwait(false);
@@ -164,7 +175,7 @@ public sealed class UploadStep : IImportStep
             }
             item.UploadOffset = offset;
             context.Save();
-            context.Progress(size == 0 ? 1 : (double)offset / size);
+            context.Progress(from + ((1 - from) * (size == 0 ? 1 : (double)offset / size)));
         }
     }
 

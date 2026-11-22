@@ -114,7 +114,7 @@ public sealed partial class ImportView : Page
         Bindings.Update();
     }
 
-    /// <summary>Narrow windows stack the queue's buttons under its title and the three counts under each other.</summary>
+    /// <summary>Narrow windows stack the queue's buttons under its title and the four counts under each other.</summary>
     private void Page_SizeChanged(object sender, SizeChangedEventArgs e)
     {
         var narrow = e.NewSize.Width < NarrowWidth;
@@ -134,18 +134,15 @@ public sealed partial class ImportView : Page
             header.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             header.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         }
-        var boxes = new FrameworkElement[] { HashBox, UploadBox, AttachBox };
-        if (narrow && ParallelGrid.RowDefinitions.Count < 3)
-        {
-            for (var i = 0; i < 3; i++) ParallelGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        }
+        // Two by two, or one column when narrow
+        var boxes = new FrameworkElement[] { HashBox, EncodeBox, UploadBox, AttachBox };
+        while (narrow && ParallelGrid.RowDefinitions.Count < boxes.Length) ParallelGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         ParallelGrid.ColumnDefinitions[1].Width = narrow ? new GridLength(0) : new GridLength(1, GridUnitType.Star);
-        ParallelGrid.ColumnDefinitions[2].Width = narrow ? new GridLength(0) : new GridLength(1, GridUnitType.Star);
         ParallelGrid.ColumnSpacing = narrow ? 0 : 12;
         for (var i = 0; i < boxes.Length; i++)
         {
-            Grid.SetRow(boxes[i], narrow ? i : 0);
-            Grid.SetColumn(boxes[i], narrow ? 0 : i);
+            Grid.SetRow(boxes[i], narrow ? i : i / 2);
+            Grid.SetColumn(boxes[i], narrow ? 0 : i % 2);
         }
     }
 

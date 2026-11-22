@@ -31,11 +31,14 @@ public sealed class ImportWorkspace : IDisposable
         HttpMessageHandler? adminHandler = IsDemo ? new DemoImportServer() : null;
         Api = new ImportApiClient(Environment.AdminApi, token, adminHandler);
         Reporter = new ErrorReporter(Api.ReportErrorsAsync, Release, () => shell.Preferences.Language);
+        Media = new FfmpegMediaTools(LocateFfmpegAsync);
         var steps = new IImportStep[]
         {
             new HashStep(),
+            new EncodeStep(Api, Environment.VideosApi, Media, new CoreRenditionPackager(), EncodeStep.DefaultWorkRoot, "Al Ummah Now Tools " + Release, ReportEncodeFailure),
             new UploadStep(Api, new TusClient(), Environment.VideosApi, token),
             new AttachStep(Api),
+            new CheckStep(Api),
         };
         var path = IsDemo
             ? Path.Combine(Path.GetTempPath(), "aun-tools-demo-" + Guid.NewGuid().ToString("N"), "queue.json")
@@ -61,6 +64,59 @@ public sealed class ImportWorkspace : IDisposable
     public ImportApiClient Api { get; }
     public ImportQueue Queue { get; }
     public ErrorReporter Reporter { get; }
+
+    /// <summary>ffprobe and ffmpeg for encoding on this computer (TA-12)</summary>
+    public IMediaTools Media { get; }
+
+    /// <summary>
+    /// What stops encoding here, or null when it can: <c>ffmpeg_missing</c>, or <c>no_encoder</c> when this ffmpeg has
+    /// no H.264 encoder. The page says so, and the server encodes those files.
+    /// </summary>
+    public async Task<string?> EncodeProblemAsync(CancellationToken ct = default)
+    {
+        if (IsDemo) return System.Environment.GetEnvironmentVariable("TOOLS_DEMO_IMPORT_ENCODE") is { Length: > 0 } demo ? demo : null;
+        try
+        {
+            return await Media.PickEncoderAsync(ct).ConfigureAwait(false) is null ? "no_encoder" : null;
+        }
+        catch (LocalEncodeException ex)
+        {
+            return ex.Code;
+        }
+    }
+
+    /// <summary>The paths saved on the Video tools page, else the ones the app found on this computer.</summary>
+    private static async Task<(string Ffmpeg, string Ffprobe)?> LocateFfmpegAsync(CancellationToken ct)
+    {
+        try
+        {
+            var settings = Windows.Storage.ApplicationData.Current.LocalSettings;
+            if (settings.Containers.TryGetValue("FFmpegSettings", out var saved)
+                && saved.Values["FFmpegPath"] is string ffmpeg && saved.Values["FFprobePath"] is string ffprobe
+                && File.Exists(ffmpeg) && File.Exists(ffprobe))
+            {
+                return (ffmpeg, ffprobe);
+            }
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException or System.Runtime.InteropServices.COMException)
+        {
+            // No saved settings on this platform: the found paths follow
+        }
+        var manager = App.GetService<AlUmmahNow.Data.Services.IFFmpegManagerService>();
+        if (manager.FFmpegPath is null || manager.FFprobePath is null) await manager.AutoDetectFFmpegAsync().WaitAsync(ct).ConfigureAwait(false);
+        return manager.FFmpegPath is { } found && manager.FFprobePath is { } probe ? (found, probe) : null;
+    }
+
+    /// <summary>A local encode that failed goes to the Errors page; the file itself carries on, encoded by the server.</summary>
+    private void ReportEncodeFailure(Exception error, QueueItem item) =>
+        Reporter.Report("caught", error, "Import Encode on this computer failed; the server encodes the file: " + error.Message, "/import/encode", new Dictionary<string, object?>
+        {
+            ["step"] = nameof(ImportStepKind.Encode),
+            ["code"] = (error as LocalEncodeException)?.Code ?? "disk",
+            ["itemId"] = item.ServerItemId,
+            ["videoId"] = item.VideoId,
+            ["fileSize"] = item.Video.Size,
+        });
 
     /// <summary>The app's version, sent with each error report</summary>
     public static string Release { get; } =
@@ -160,6 +216,8 @@ internal static class DemoImport
         ["fiqh-of-fasting-09.mp4"] = "The Fiqh of Fasting, lesson 9: Laylat al-Qadr",
         ["fiqh-of-fasting-10.mp4"] = "The Fiqh of Fasting, lesson 10: voluntary fasts",
         ["fiqh-of-fasting-11.mp4"] = "The Fiqh of Fasting, lesson 11: questions and answers",
+        ["fiqh-of-fasting-12.mp4"] = "The Fiqh of Fasting, lesson 12: the ransom",
+        ["fiqh-of-fasting-13.mp4"] = "The Fiqh of Fasting, lesson 13: closing",
     };
 
     public const string Folder = "/Volumes/Media/Lessons/Fiqh of Fasting";
@@ -186,14 +244,21 @@ internal static class DemoImport
             Video(folder, "fiqh-of-fasting-05.mp4", 966_367_641, "فقه الصيام، الدرس الخامس: الاعتكاف", Array.Empty<string>(), false, false),
             Video(folder, "fiqh-of-fasting-06.mp4", 1_234_567_890, "فقه الصيام، الدرس السادس: زكاة الفطر", new[] { "ar" }, false, true),
             Video(folder, "fiqh-of-fasting-07.mp4", 1_098_765_432, "فقه الصيام، الدرس السابع: العيد", new[] { "ar" }, false, true),
+            Video(folder, "fiqh-of-fasting-12.mp4", 1_152_921_504, "فقه الصيام، الدرس الثاني عشر: الفدية", new[] { "ar" }, false, true),
+            Video(folder, "fiqh-of-fasting-13.mp4", 1_020_054_732, "فقه الصيام، الدرس الثالث عشر: خاتمة", Array.Empty<string>(), false, false),
         };
         for (var i = 0; i < files.Length; i++)
         {
-            yield return QueueItem.For(files[i], "batch_demo", ChannelId, start.AddSeconds(i));
+            // The last file's batch was added with "Let the server encode"
+            yield return QueueItem.For(files[i], "batch_demo", ChannelId, start.AddSeconds(i), serverEncodes: i == files.Length - 1);
         }
     }
 
-    /// <summary>Puts the demo files in the states the screenshots show: done, uploading, waiting to retry, failed, paused, waiting.</summary>
+    /// <summary>
+    /// Puts the demo files in the states the screenshots show: served as encoded here, encoded again by the server, the
+    /// server processing, waiting to retry (its log), encoding here, uploading, failed, paused, and waiting with the
+    /// server encoding.
+    /// </summary>
     public static void Settle(ImportQueue queue)
     {
         var items = queue.Items;
@@ -203,40 +268,66 @@ internal static class DemoImport
         {
             for (var i = 0; i < item.Log.Count; i++) if (item.Log[i].Code == "added") item.Log[i] = item.Log[i] with { At = item.CreatedAt };
         }
-        void Steps(QueueItem item, params StepStatus[] statuses)
+        StepState S(QueueItem item, ImportStepKind kind) => item.Steps.First(s => s.Kind == kind);
+        // Every step before the given one done, that one in the given state, the rest pending
+        void At(QueueItem item, ImportStepKind? kind, StepStatus status = StepStatus.Pending)
         {
-            for (var i = 0; i < statuses.Length; i++) item.Steps[i].Status = statuses[i];
+            foreach (var step in item.Steps)
+            {
+                step.Status = kind is null || step.Kind < kind ? StepStatus.Done : step.Kind == kind ? status : StepStatus.Pending;
+            }
         }
-        Steps(items[0], StepStatus.Done, StepStatus.Done, StepStatus.Done);
+        void Progress(QueueItem item, double value) => typeof(QueueItem).GetProperty(nameof(QueueItem.Progress))!.SetValue(item, value);
+
+        At(items[0], null);
         items[0].VideoId = "v8Kq2LmT4x";
-        Steps(items[1], StepStatus.Done, StepStatus.Done, StepStatus.Done);
+        items[0].Verdict = new RenditionVerdict(true, null, null);
+        At(items[1], null);
         items[1].VideoId = "v3Hn7PwR1c";
-        Steps(items[2], StepStatus.Done, StepStatus.Running, StepStatus.Pending);
-        items[2].Steps[1].Attempts = 1;
-        typeof(QueueItem).GetProperty(nameof(QueueItem.Progress))!.SetValue(items[2], 0.64);
-        Steps(items[3], StepStatus.Done, StepStatus.Pending, StepStatus.Pending);
-        items[3].Steps[1].Attempts = 2;
-        items[3].Steps[1].NextAttemptAt = Now.AddSeconds(40);
-        items[3].Steps[1].LastError = "The videos API could not be reached";
-        items[3].Steps[1].LastErrorCode = "videos_unreachable";
-        var at = Now.AddMinutes(-6);
+        items[1].Verdict = new RenditionVerdict(false, "keyframes", "720p");
+        At(items[2], ImportStepKind.Check);
+        items[2].VideoId = "v6Jd4NcY8b";
+        S(items[2], ImportStepKind.Check).WaitingOnServer = true;
+        S(items[2], ImportStepKind.Check).Attempts = 3;
+        S(items[2], ImportStepKind.Check).NextAttemptAt = Now.AddSeconds(20);
+
+        At(items[3], ImportStepKind.Upload);
+        var upload = S(items[3], ImportStepKind.Upload);
+        upload.Attempts = 2;
+        upload.NextAttemptAt = Now.AddSeconds(40);
+        upload.LastError = "The videos API could not be reached";
+        upload.LastErrorCode = "videos_unreachable";
+        var at = Now.AddMinutes(-26);
         items[3].Log.AddRange(new[]
         {
             new LogLine(at, LogLevel.Info, "Hash: started", "started", new[] { "Hash" }),
             new LogLine(at.AddSeconds(9), LogLevel.Info, "SHA-256", "sha", new[] { "9f2c4e81b7a05d3c6e1f48a2d9b07c5e3a61f8d24b9e07c1a5d36f2e8b40c917" }),
             new LogLine(at.AddSeconds(9), LogLevel.Info, "Hash: done", "done", new[] { "Hash" }),
-            new LogLine(at.AddSeconds(10), LogLevel.Info, "Upload: started", "started", new[] { "Upload" }),
+            new LogLine(at.AddSeconds(10), LogLevel.Info, "Encode: started", "started", new[] { "Encode" }),
             new LogLine(at.AddSeconds(11), LogLevel.Info, "Upload opened", "upload_opened", new[] { "v5Tg9KdQ2m" }),
-            new LogLine(at.AddMinutes(4), LogLevel.Warning, "Upload: attempt 1 failed", "attempt_failed", new[] { "Upload", "1", "videos_unreachable", "20", "The videos API could not be reached" }),
-            new LogLine(at.AddMinutes(4).AddSeconds(20), LogLevel.Info, "Upload: attempt 2", "attempt", new[] { "Upload", "2" }),
-            new LogLine(at.AddMinutes(5), LogLevel.Warning, "Upload: attempt 2 failed", "attempt_failed", new[] { "Upload", "2", "videos_unreachable", "40", "The videos API could not be reached" }),
+            new LogLine(at.AddSeconds(12), LogLevel.Info, "Encoding", "encode_plan", new[] { "h264_videotoolbox", "360p, 480p, 720p, 1080p" }),
+            new LogLine(at.AddMinutes(19), LogLevel.Info, "Encoded", "encoded", new[] { "4", "1530143539" }),
+            new LogLine(at.AddMinutes(19), LogLevel.Info, "Encode: done", "done", new[] { "Encode" }),
+            new LogLine(at.AddMinutes(19).AddSeconds(1), LogLevel.Info, "Upload: started", "started", new[] { "Upload" }),
+            new LogLine(at.AddMinutes(19).AddSeconds(2), LogLevel.Info, "Sending the renditions", "renditions_staged", new[] { "1460" }),
+            new LogLine(at.AddMinutes(24), LogLevel.Warning, "Upload: attempt 1 failed", "attempt_failed", new[] { "Upload", "1", "videos_unreachable", "20", "The videos API could not be reached" }),
+            new LogLine(at.AddMinutes(24).AddSeconds(20), LogLevel.Info, "Upload: attempt 2", "attempt", new[] { "Upload", "2" }),
+            new LogLine(at.AddMinutes(25), LogLevel.Warning, "Upload: attempt 2 failed", "attempt_failed", new[] { "Upload", "2", "videos_unreachable", "40", "The videos API could not be reached" }),
         });
-        Steps(items[4], StepStatus.Failed, StepStatus.Pending, StepStatus.Pending);
-        items[4].Steps[0].Attempts = 1;
-        items[4].Steps[0].LastError = "The file changed after it was scanned. Scan the folder again";
-        items[4].Steps[0].LastErrorCode = "file_changed";
-        Steps(items[5], StepStatus.Done, StepStatus.Pending, StepStatus.Pending);
-        items[5].Paused = true;
+
+        At(items[4], ImportStepKind.Encode, StepStatus.Running);
+        S(items[4], ImportStepKind.Encode).Attempts = 1;
+        Progress(items[4], 0.38);
+        At(items[5], ImportStepKind.Upload, StepStatus.Running);
+        S(items[5], ImportStepKind.Upload).Attempts = 1;
+        Progress(items[5], 0.64);
+        At(items[6], ImportStepKind.Hash, StepStatus.Failed);
+        S(items[6], ImportStepKind.Hash).Attempts = 1;
+        S(items[6], ImportStepKind.Hash).LastError = "The file changed after it was scanned. Scan the folder again";
+        S(items[6], ImportStepKind.Hash).LastErrorCode = "file_changed";
+        At(items[7], ImportStepKind.Encode);
+        items[7].Paused = true;
+        At(items[8], ImportStepKind.Hash);
     }
 }
 
