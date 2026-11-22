@@ -16,12 +16,18 @@ public sealed class ImportWorkspace : IDisposable
 {
     private static ImportWorkspace? _current;
     private static readonly object Gate = new();
+    private static bool _watching;
+    private volatile bool _disposed;
 
     private ImportWorkspace(ShellState shell)
     {
         Environment = shell.Session.Environment;
         IsDemo = shell.Demo is not null;
-        Func<CancellationToken, Task<string?>> token = _ => ShellState.Current.Session.AccessTokenAsync();
+        // The token of the session this workspace was made for, and none once the app has moved to another session:
+        // a queue must never send one environment's token to another environment's APIs
+        var session = Session = shell.Session;
+        Func<CancellationToken, Task<string?>> token = _ =>
+            _disposed || !ReferenceEquals(ShellState.Current.Session, session) ? Task.FromResult<string?>(null) : session.AccessTokenAsync();
         HttpMessageHandler? adminHandler = IsDemo ? new DemoImportServer() : null;
         Api = new ImportApiClient(Environment.AdminApi, token, adminHandler);
         Reporter = new ErrorReporter(Api.ReportErrorsAsync, Release, () => shell.Preferences.Language);
@@ -48,6 +54,9 @@ public sealed class ImportWorkspace : IDisposable
     }
 
     public ToolsEnvironment Environment { get; }
+
+    /// <summary>The session the workspace belongs to; a new session gets a new workspace.</summary>
+    private ToolsSession Session { get; }
     public bool IsDemo { get; }
     public ImportApiClient Api { get; }
     public ImportQueue Queue { get; }
@@ -65,11 +74,27 @@ public sealed class ImportWorkspace : IDisposable
             lock (Gate)
             {
                 var shell = ShellState.Current;
-                if (_current is not null && _current.Environment.Kind == shell.Session.Environment.Kind) return _current;
+                if (!_watching)
+                {
+                    // Stop the old environment's queue as soon as the environment changes, not when the page is next opened
+                    shell.Changed += (_, _) => DropIfStale();
+                    _watching = true;
+                }
+                if (_current is not null && ReferenceEquals(_current.Session, shell.Session)) return _current;
                 _current?.Dispose();
                 _current = new ImportWorkspace(shell);
                 return _current;
             }
+        }
+    }
+
+    private static void DropIfStale()
+    {
+        lock (Gate)
+        {
+            if (_current is null || ReferenceEquals(_current.Session, ShellState.Current.Session)) return;
+            _current.Dispose();
+            _current = null;
         }
     }
 
@@ -81,6 +106,7 @@ public sealed class ImportWorkspace : IDisposable
 
     public void Dispose()
     {
+        _disposed = true;
         Queue.Dispose();
         _ = Reporter.FlushAsync().ContinueWith(_ => Reporter.Dispose(), TaskScheduler.Default);
     }
