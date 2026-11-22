@@ -31,6 +31,7 @@ public sealed partial class ImportView : Page
         Loaded += (_, _) =>
         {
             ViewModel.Attach();
+            SetChannelValueDirection();
             KeepLastWords(PageContent);
             OpenDemoDialog();
         };
@@ -83,11 +84,32 @@ public sealed partial class ImportView : Page
         }
     }
 
-    /// <summary>A path reads left to right; the empty field's placeholder reads in the interface's language, on its side.</summary>
-    private void FolderBox_TextChanged(object sender, RoutedEventArgs e)
+    /// <summary>
+    /// A path reads left to right but starts at the field's start edge, the right in Arabic (AUDIT-2 2026-11-22); the empty
+    /// field's placeholder reads in the interface's language, on its side.
+    /// </summary>
+    private void FolderBox_TextChanged(object sender, RoutedEventArgs e) => SetValueDirection(FolderBox, latinOnly: true);
+
+    /// <summary>
+    /// A typed value in a field of an Arabic page: Arabic text runs right to left; a Latin value (a path, a Latin channel
+    /// name) keeps its left-to-right order but starts at the right edge, like the rows under it. English pages: left.
+    /// </summary>
+    private static void SetValueDirection(TextBox box, bool latinOnly = false)
     {
-        var direction = Loc.IsArabic && string.IsNullOrEmpty(FolderBox.Text) ? FlowDirection.RightToLeft : FlowDirection.LeftToRight;
-        if (FolderBox.FlowDirection != direction) FolderBox.FlowDirection = direction;
+        var text = box.Text ?? "";
+        var arabicText = !latinOnly && text.Any(c => c is >= '\u0600' and <= '\u06FF');
+        var direction = Loc.IsArabic && (text.Length == 0 || arabicText) ? FlowDirection.RightToLeft : FlowDirection.LeftToRight;
+        // In a left-to-right box, Right is the visual right edge
+        var align = Loc.IsArabic && direction == FlowDirection.LeftToRight ? TextAlignment.Right : TextAlignment.Left;
+        if (box.FlowDirection != direction) box.FlowDirection = direction;
+        if (box.TextAlignment != align) box.TextAlignment = align;
+    }
+
+    /// <summary>The channel box's own text box, once its template has loaded.</summary>
+    private void SetChannelValueDirection()
+    {
+        // The box stays right to left in Arabic, so its search button keeps the mirrored side; only the value moves
+        if (FindChild<TextBox>(ChannelBox) is { } typed && Loc.IsArabic && typed.TextAlignment != TextAlignment.Right) typed.TextAlignment = TextAlignment.Right;
     }
 
     private static T? FindChild<T>(DependencyObject parent) where T : class
@@ -154,6 +176,7 @@ public sealed partial class ImportView : Page
 
     private void ChannelBox_TextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)
     {
+        SetChannelValueDirection();
         if (args.Reason != AutoSuggestionBoxTextChangeReason.UserInput) return;
         _ = ViewModel.SearchChannelsAsync(sender.Text);
         sender.IsSuggestionListOpen = true;
