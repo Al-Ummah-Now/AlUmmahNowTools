@@ -15,7 +15,7 @@ public sealed class HashStep : IImportStep
         var (sha256, fingerprint) = await FileHasher.HashAsync(item.Video.Path, progress, ct).ConfigureAwait(false);
         item.Sha256 = sha256;
         item.FingerprintHash = fingerprint;
-        context.Log(LogLevel.Info, $"SHA-256 {sha256}");
+        context.Log(LogLevel.Info, "sha", $"SHA-256 {sha256}", sha256);
         return StepResult.Done;
     }
 }
@@ -46,18 +46,18 @@ public sealed class UploadStep : IImportStep
     internal static void CheckUnchanged(QueueItem item)
     {
         var info = new FileInfo(item.Video.Path);
-        if (!info.Exists) throw new StepFailedException("The file is no longer in its folder", retryable: false);
-        if (info.LinkTarget is not null) throw new StepFailedException("The file is now a link to another file. Scan the folder again", retryable: false);
+        if (!info.Exists) throw new StepFailedException("file_missing", "The file is no longer in its folder", retryable: false);
+        if (info.LinkTarget is not null) throw new StepFailedException("file_link", "The file is now a link to another file. Scan the folder again", retryable: false);
         var modified = new DateTimeOffset(info.LastWriteTimeUtc).ToUnixTimeMilliseconds();
         if (info.Length != item.Video.Size || modified != item.Video.LastModifiedMs)
         {
-            throw new StepFailedException("The file changed after it was scanned. Scan the folder again", retryable: false);
+            throw new StepFailedException("file_changed", "The file changed after it was scanned. Scan the folder again", retryable: false);
         }
     }
 
     public async Task<StepResult> RunAsync(QueueItem item, IStepContext context, CancellationToken ct)
     {
-        if (item.Sha256 is null || item.FingerprintHash is null) throw new StepFailedException("The file has not been checked yet", retryable: false);
+        if (item.Sha256 is null || item.FingerprintHash is null) throw new StepFailedException("not_hashed", "The file has not been checked yet", retryable: false);
         CheckUnchanged(item);
         if (item.ServerItemId is null || item.TusSessionId is null)
         {
@@ -76,7 +76,7 @@ public sealed class UploadStep : IImportStep
             {
                 // The proxy session or upload expired: admin-api opens the same video again (from its offset)
                 reopened = true;
-                context.Log(LogLevel.Warning, "The upload session ended; opening it again");
+                context.Log(LogLevel.Warning, "session_ended", "The upload session ended; opening it again");
                 item.TusSessionId = null;
                 item.UploadUrl = null;
                 if (!await OpenAsync(item, context, ct).ConfigureAwait(false)) return StepResult.SkipRest;
@@ -84,7 +84,7 @@ public sealed class UploadStep : IImportStep
         }
 
         await _api.MarkUploadedAsync(item.ServerItemId!, ct).ConfigureAwait(false);
-        context.Log(LogLevel.Info, $"Uploaded: video {item.VideoId}");
+        context.Log(LogLevel.Info, "uploaded", $"Uploaded: video {item.VideoId}", item.VideoId ?? "");
         return StepResult.Done;
     }
 
@@ -110,7 +110,8 @@ public sealed class UploadStep : IImportStep
             // A resumed upload keeps its offset until the server's HEAD says where it is
             if (item.UploadUrl is null) item.UploadOffset = 0;
             context.Save();
-            context.Log(LogLevel.Info, opened.Upload.Reused ? $"Upload opened again: video {item.VideoId}" : $"Upload opened: video {item.VideoId}");
+            if (opened.Upload.Reused) context.Log(LogLevel.Info, "upload_reopened", $"Upload opened again: video {item.VideoId}", item.VideoId);
+            else context.Log(LogLevel.Info, "upload_opened", $"Upload opened: video {item.VideoId}", item.VideoId);
             return true;
         }
         catch (AlreadyImportedException already)
@@ -119,7 +120,7 @@ public sealed class UploadStep : IImportStep
             item.ServerItemId = already.Item.Id;
             item.VideoId = already.Item.VideoId;
             context.Save();
-            context.Log(LogLevel.Info, $"Already in this channel: video {already.Item.VideoId}. Nothing to upload");
+            context.Log(LogLevel.Info, "already_imported", $"Already in this channel: video {already.Item.VideoId}. Nothing to upload", already.Item.VideoId ?? "");
             return false;
         }
     }
@@ -187,18 +188,19 @@ public sealed class AttachStep : IImportStep
 
     public async Task<StepResult> RunAsync(QueueItem item, IStepContext context, CancellationToken ct)
     {
-        if (item.ServerItemId is null) throw new StepFailedException("The file was not uploaded", retryable: false);
+        if (item.ServerItemId is null) throw new StepFailedException("not_uploaded", "The file was not uploaded", retryable: false);
         var payload = await BuildAsync(item.Video, context, ct).ConfigureAwait(false);
         if (payload.IsEmpty) return StepResult.Skipped;
         var jobId = await _api.AttachSidecarsAsync(item.ServerItemId, payload, ct).ConfigureAwait(false);
         item.AttachJobId = jobId;
+        // Arguments: the job, then each part sent (captions as "captions=ar,en")
         var parts = new List<string>();
-        if (payload.Captions is { Count: > 0 } c) parts.Add("captions " + string.Join(", ", c.Select(t => t.Language)));
+        if (payload.Captions is { Count: > 0 } c) parts.Add("captions=" + string.Join(",", c.Select(t => t.Language)));
         if (payload.Chapters is not null) parts.Add("chapters");
         if (payload.Thumbnail is not null) parts.Add("thumbnail");
         if (payload.PlaylistId is not null) parts.Add("playlist");
-        if (payload.PublishAt is not null) parts.Add("publish date");
-        context.Log(LogLevel.Info, $"Sent {string.Join(", ", parts)}; the server attaches them (job {jobId})");
+        if (payload.PublishAt is not null) parts.Add("publish_date");
+        context.Log(LogLevel.Info, "sent", $"Sent {string.Join(", ", parts)}; the server attaches them (job {jobId})", new[] { jobId ?? "" }.Concat(parts).ToArray());
         return StepResult.Done;
     }
 
@@ -212,7 +214,7 @@ public sealed class AttachStep : IImportStep
             if (text is null) continue;
             if (string.IsNullOrWhiteSpace(text) || text.Length > MaxCaptionChars)
             {
-                context.Log(LogLevel.Warning, $"{Path.GetFileName(caption.Path)} is empty or larger than 2 MB; left out");
+                context.Log(LogLevel.Warning, "left_out_size", $"{Path.GetFileName(caption.Path)} is empty or larger than 2 MB; left out", Path.GetFileName(caption.Path), "2");
                 continue;
             }
             captions.Add(new CaptionSidecar(caption.Language, text));
@@ -228,7 +230,7 @@ public sealed class AttachStep : IImportStep
             }
             catch (Exception ex) when (ex is FormatException or IOException or UnauthorizedAccessException)
             {
-                context.Log(LogLevel.Warning, $"{Path.GetFileName(video.ChaptersPath)} could not be read ({ex.Message}); left out");
+                context.Log(LogLevel.Warning, "left_out_unreadable", $"{Path.GetFileName(video.ChaptersPath)} could not be read ({ex.Message}); left out", Path.GetFileName(video.ChaptersPath), ex.Message);
             }
         }
 
@@ -240,7 +242,7 @@ public sealed class AttachStep : IImportStep
                 var info = new FileInfo(video.ThumbnailPath);
                 if (info.Length > MaxThumbnailBytes)
                 {
-                    context.Log(LogLevel.Warning, $"{info.Name} is larger than 6 MB; left out");
+                    context.Log(LogLevel.Warning, "left_out_size", $"{info.Name} is larger than 6 MB; left out", info.Name, "6");
                 }
                 else
                 {
@@ -250,7 +252,7 @@ public sealed class AttachStep : IImportStep
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                context.Log(LogLevel.Warning, $"{Path.GetFileName(video.ThumbnailPath)} could not be read ({ex.Message}); left out");
+                context.Log(LogLevel.Warning, "left_out_unreadable", $"{Path.GetFileName(video.ThumbnailPath)} could not be read ({ex.Message}); left out", Path.GetFileName(video.ThumbnailPath), ex.Message);
             }
         }
 
@@ -270,7 +272,7 @@ public sealed class AttachStep : IImportStep
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            context.Log(LogLevel.Warning, $"{Path.GetFileName(path)} could not be read ({ex.Message}); left out");
+            context.Log(LogLevel.Warning, "left_out_unreadable", $"{Path.GetFileName(path)} could not be read ({ex.Message}); left out", Path.GetFileName(path), ex.Message);
             return null;
         }
     }

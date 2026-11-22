@@ -30,7 +30,10 @@ public sealed class StepState
     public StepStatus Status { get; set; }
     public int Attempts { get; set; }
     public DateTimeOffset? NextAttemptAt { get; set; }
+    /// <summary>The failure in English, as the server or the system put it (for the log and support)</summary>
     public string? LastError { get; set; }
+    /// <summary>What kind of failure it was, for the app's words (<see cref="ImportQueue.ErrorCode"/>)</summary>
+    public string? LastErrorCode { get; set; }
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter))]
@@ -41,7 +44,11 @@ public enum LogLevel
     Error,
 }
 
-public sealed record LogLine(DateTimeOffset At, LogLevel Level, string Text);
+/// <summary>
+/// A line of a file's log: the English text (copied for support), and a code with its arguments so the app can show
+/// the line in its own language. An argument naming a step is the step's <see cref="ImportStepKind"/> name.
+/// </summary>
+public sealed record LogLine(DateTimeOffset At, LogLevel Level, string Text, string? Code = null, string[]? Args = null);
 
 /// <summary>How a file stands, for the queue's table.</summary>
 public enum ItemPhase
@@ -122,14 +129,22 @@ public enum StepResult
 /// <summary>A failure a step knows the nature of. Anything else is classified by <see cref="ImportQueue.IsRetryable"/>.</summary>
 public sealed class StepFailedException : Exception
 {
-    public StepFailedException(string message, bool retryable, Exception? inner = null) : base(message, inner) => Retryable = retryable;
+    public StepFailedException(string code, string message, bool retryable, Exception? inner = null) : base(message, inner)
+    {
+        Code = code;
+        Retryable = retryable;
+    }
+
+    /// <summary>file_missing, file_link, file_changed, not_hashed or not_uploaded</summary>
+    public string Code { get; }
     public bool Retryable { get; }
 }
 
 /// <summary>What a running step may do besides its work.</summary>
 public interface IStepContext
 {
-    void Log(LogLevel level, string text);
+    /// <param name="code">What happened, for the app's words; <paramref name="text"/> is the English line.</param>
+    void Log(LogLevel level, string code, string text, params string[] args);
     void Progress(double fraction);
     /// <summary>Writes the queue to disk now (after a change a restart must not lose, such as an upload offset).</summary>
     void Save();
@@ -261,7 +276,7 @@ public sealed class ImportQueue : IDisposable
             foreach (var item in items)
             {
                 if (_items.Any(i => i.Id == item.Id)) continue;
-                AppendLog(item, LogLevel.Info, $"Added: {item.Video.FileName}");
+                AppendLog(item, LogLevel.Info, "added", $"Added: {item.Video.FileName}", item.Video.FileName);
                 _items.Add(item);
             }
             SaveLocked();
@@ -274,7 +289,7 @@ public sealed class ImportQueue : IDisposable
     {
         if (item.Paused || item.Phase == ItemPhase.Done) return false;
         item.Paused = true;
-        AppendLog(item, LogLevel.Info, "Paused");
+        AppendLog(item, LogLevel.Info, "paused", "Paused");
         if (_running.TryGetValue(id, out var cts)) cts.Cancel();
         return true;
     });
@@ -283,7 +298,7 @@ public sealed class ImportQueue : IDisposable
     {
         if (!item.Paused) return false;
         item.Paused = false;
-        AppendLog(item, LogLevel.Info, "Resumed");
+        AppendLog(item, LogLevel.Info, "resumed", "Resumed");
         return true;
     });
 
@@ -314,8 +329,9 @@ public sealed class ImportQueue : IDisposable
         step.Attempts = 0;
         step.NextAttemptAt = null;
         step.LastError = null;
+        step.LastErrorCode = null;
         item.Paused = false;
-        AppendLog(item, LogLevel.Info, $"Retry: {step.Kind}");
+        AppendLog(item, LogLevel.Info, "retry", $"Retry: {step.Kind}", step.Kind.ToString());
         return true;
     });
 
@@ -346,7 +362,13 @@ public sealed class ImportQueue : IDisposable
         return removed;
     }
 
-    /// <summary>The file's log as text, oldest first, to read or copy.</summary>
+    /// <summary>The file's log lines, oldest first.</summary>
+    public IReadOnlyList<LogLine> LogLines(string id)
+    {
+        lock (_gate) return _items.FirstOrDefault(i => i.Id == id)?.Log.ToList() ?? new List<LogLine>();
+    }
+
+    /// <summary>The file's log as English text, oldest first, for support.</summary>
     public string LogText(string id)
     {
         lock (_gate)
@@ -413,7 +435,8 @@ public sealed class ImportQueue : IDisposable
                 step.Attempts++;
                 step.NextAttemptAt = null;
                 item.Progress = 0;
-                AppendLog(item, LogLevel.Info, step.Attempts == 1 ? $"{step.Kind}: started" : $"{step.Kind}: attempt {step.Attempts}");
+                if (step.Attempts == 1) AppendLog(item, LogLevel.Info, "started", $"{step.Kind}: started", step.Kind.ToString());
+                else AppendLog(item, LogLevel.Info, "attempt", $"{step.Kind}: attempt {step.Attempts}", step.Kind.ToString(), step.Attempts.ToString(System.Globalization.CultureInfo.InvariantCulture));
                 var cts = CancellationTokenSource.CreateLinkedTokenSource(_loop?.Token ?? CancellationToken.None);
                 _running[item.Id] = cts;
                 started.Add((item, step, cts));
@@ -461,7 +484,7 @@ public sealed class ImportQueue : IDisposable
                 // Paused, stopped or removed: the attempt does not count, and the step waits to run again
                 step.Status = StepStatus.Pending;
                 step.Attempts = Math.Max(0, step.Attempts - 1);
-                AppendLog(item, LogLevel.Info, $"{step.Kind}: stopped");
+                AppendLog(item, LogLevel.Info, "stopped", $"{step.Kind}: stopped", step.Kind.ToString());
                 Finish(item);
             }
             Notify(item.Id);
@@ -480,18 +503,23 @@ public sealed class ImportQueue : IDisposable
             {
                 step.Status = result == StepResult.Skipped ? StepStatus.Skipped : StepStatus.Done;
                 step.LastError = null;
+                step.LastErrorCode = null;
                 item.Progress = 1;
-                AppendLog(item, LogLevel.Info, $"{step.Kind}: {(result == StepResult.Skipped ? "nothing to do" : "done")}");
+                if (result == StepResult.Skipped) AppendLog(item, LogLevel.Info, "skipped", $"{step.Kind}: nothing to do", step.Kind.ToString());
+                else AppendLog(item, LogLevel.Info, "done", $"{step.Kind}: done", step.Kind.ToString());
                 if (result == StepResult.SkipRest)
                 {
                     foreach (var later in item.Steps.Where(s => s.Status == StepStatus.Pending)) later.Status = StepStatus.Skipped;
                 }
-                if (item.CurrentStep is null) AppendLog(item, LogLevel.Info, "Finished");
+                if (item.CurrentStep is null) AppendLog(item, LogLevel.Info, "finished", "Finished");
             }
             else
             {
                 var message = Describe(failure);
+                var code = ErrorCode(failure);
                 step.LastError = message;
+                step.LastErrorCode = code;
+                var attempts = step.Attempts.ToString(System.Globalization.CultureInfo.InvariantCulture);
                 if (IsRetryable(failure) && step.Attempts < _settings.MaxAttempts)
                 {
                     var wait = _backoff(step.Attempts);
@@ -499,13 +527,14 @@ public sealed class ImportQueue : IDisposable
                     if (serverWait > wait) wait = serverWait.Value;
                     step.Status = StepStatus.Pending;
                     step.NextAttemptAt = _time.GetUtcNow() + wait;
-                    AppendLog(item, LogLevel.Warning, $"{step.Kind}: attempt {step.Attempts} failed: {message}. Next try in {Math.Ceiling(wait.TotalSeconds)} s");
+                    var seconds = Math.Ceiling(wait.TotalSeconds).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    AppendLog(item, LogLevel.Warning, "attempt_failed", $"{step.Kind}: attempt {step.Attempts} failed: {message}. Next try in {seconds} s", step.Kind.ToString(), attempts, code, seconds, message);
                 }
                 else
                 {
                     step.Status = StepStatus.Failed;
                     reference = ErrorReport.NewRef();
-                    AppendLog(item, LogLevel.Error, $"{step.Kind}: failed after {step.Attempts} attempt(s): {message} (reference {reference})");
+                    AppendLog(item, LogLevel.Error, "failed", $"{step.Kind}: failed after {step.Attempts} attempt(s): {message} (reference {reference})", step.Kind.ToString(), attempts, code, reference, message);
                 }
             }
             Finish(item);
@@ -521,7 +550,7 @@ public sealed class ImportQueue : IDisposable
             }
             catch (Exception ex)
             {
-                lock (_gate) AppendLog(item, LogLevel.Warning, $"The failure could not be reported to the server: {Describe(ex)}");
+                lock (_gate) AppendLog(item, LogLevel.Warning, "report_failed", $"The failure could not be reported to the server: {Describe(ex)}", ErrorCode(ex), Describe(ex));
             }
         }
 
@@ -531,6 +560,27 @@ public sealed class ImportQueue : IDisposable
             SaveLocked();
         }
     }
+
+    /// <summary>
+    /// The kind of failure, for the app's words: the step's own code, admin_unreachable, videos_unreachable,
+    /// signed_out, already_imported, upload_gone, upload_refused, file_missing, file_denied, file_read, server
+    /// (admin-api's own words follow) or unexpected.
+    /// </summary>
+    public static string ErrorCode(Exception error) => error switch
+    {
+        StepFailedException f => f.Code,
+        ImportApiException { Status: 0 } => "admin_unreachable",
+        ImportApiException { Status: 401 } => "signed_out",
+        ImportApiException => "server",
+        TusException { Status: 0 } => "videos_unreachable",
+        TusException => "upload_refused",
+        TusGoneException => "upload_gone",
+        AlreadyImportedException => "already_imported",
+        FileNotFoundException or DirectoryNotFoundException => "file_missing",
+        UnauthorizedAccessException => "file_denied",
+        IOException => "file_read",
+        _ => "unexpected",
+    };
 
     internal static string Describe(Exception error) => error switch
     {
@@ -559,9 +609,9 @@ public sealed class ImportQueue : IDisposable
 
     private void Notify(string? id) => Changed?.Invoke(id);
 
-    private static void AppendLog(QueueItem item, LogLevel level, string text)
+    private static void AppendLog(QueueItem item, LogLevel level, string code, string text, params string[] args)
     {
-        item.Log.Add(new LogLine(DateTimeOffset.UtcNow, level, text));
+        item.Log.Add(new LogLine(DateTimeOffset.UtcNow, level, text, code, args.Length == 0 ? null : args));
         if (item.Log.Count > MaxLogLines) item.Log.RemoveRange(0, item.Log.Count - MaxLogLines);
     }
 
@@ -609,9 +659,9 @@ public sealed class ImportQueue : IDisposable
             _item = item;
         }
 
-        public void Log(LogLevel level, string text)
+        public void Log(LogLevel level, string code, string text, params string[] args)
         {
-            lock (_queue._gate) AppendLog(_item, level, text);
+            lock (_queue._gate) AppendLog(_item, level, code, text, args);
             _queue.Notify(_item.Id);
         }
 

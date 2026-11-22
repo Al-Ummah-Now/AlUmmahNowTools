@@ -306,10 +306,10 @@ internal sealed class FakeServer : HttpMessageHandler
 
 internal sealed class RecordingContext : IStepContext
 {
-    public readonly List<(LogLevel Level, string Text)> Lines = new();
+    public readonly List<(LogLevel Level, string Text, string Code)> Lines = new();
     public int Saves;
     public double LastProgress;
-    public void Log(LogLevel level, string text) => Lines.Add((level, text));
+    public void Log(LogLevel level, string code, string text, params string[] args) => Lines.Add((level, text, code));
     public void Progress(double fraction) => LastProgress = fraction;
     public void Save() => Saves++;
 }
@@ -413,7 +413,7 @@ public class UploadStepTests
 
         Assert.Equal(2, server.OpenCount);
         Assert.Equal(File.ReadAllBytes(path), Assert.Single(server.Uploads).Value.Data.ToArray());
-        Assert.Contains(context.Lines, l => l.Text.Contains("opening it again"));
+        Assert.Contains(context.Lines, l => l.Code == "session_ended");
     }
 
     [Fact]
@@ -448,6 +448,7 @@ public class UploadStepTests
         File.AppendAllText(path, "more");
         var failure = await Assert.ThrowsAsync<StepFailedException>(() => Step(new FakeServer()).RunAsync(item, new RecordingContext(), default));
         Assert.False(failure.Retryable);
+        Assert.Equal("file_changed", ImportQueue.ErrorCode(failure));
     }
 }
 
@@ -588,6 +589,9 @@ public class ImportQueueTests
         var step = queue.Items[0].Steps[0];
         Assert.Equal(StepStatus.Failed, step.Status);
         Assert.Equal("down (503 internal_error)", step.LastError);
+        Assert.Equal("server", step.LastErrorCode);
+        var failedLine = queue.LogLines(item.Id).Last(l => l.Code == "failed");
+        Assert.Equal(new[] { "Hash", "3", "server", sink.Failed[0].Reference, "down (503 internal_error)" }, failedLine.Args);
         var log = queue.LogText(item.Id);
         Assert.Contains("attempt 1 failed", log);
         Assert.Contains(sink.Failed[0].Reference, log);
@@ -597,6 +601,22 @@ public class ImportQueueTests
         queue.Retry(item.Id);
         Assert.Equal(StepStatus.Pending, queue.Items[0].Steps[0].Status);
         Assert.Equal(0, queue.Items[0].Steps[0].Attempts);
+    }
+
+    [Fact]
+    public void Each_failure_has_a_code_for_the_apps_words()
+    {
+        Assert.Equal("admin_unreachable", ImportQueue.ErrorCode(new ImportApiException(0, "unreachable", "x")));
+        Assert.Equal("signed_out", ImportQueue.ErrorCode(new ImportApiException(401, "signed_out", "x")));
+        Assert.Equal("server", ImportQueue.ErrorCode(new ImportApiException(409, "channel_suspended", "x")));
+        Assert.Equal("videos_unreachable", ImportQueue.ErrorCode(new TusException(0, "x")));
+        Assert.Equal("upload_refused", ImportQueue.ErrorCode(new TusException(413, "x")));
+        Assert.Equal("upload_gone", ImportQueue.ErrorCode(new TusGoneException("x")));
+        Assert.Equal("file_missing", ImportQueue.ErrorCode(new FileNotFoundException("x")));
+        Assert.Equal("file_denied", ImportQueue.ErrorCode(new UnauthorizedAccessException("x")));
+        Assert.Equal("file_read", ImportQueue.ErrorCode(new IOException("x")));
+        Assert.Equal("not_hashed", ImportQueue.ErrorCode(new StepFailedException("not_hashed", "x", false)));
+        Assert.Equal("unexpected", ImportQueue.ErrorCode(new InvalidOperationException("x")));
     }
 
     [Fact]
