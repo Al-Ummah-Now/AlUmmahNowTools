@@ -2107,7 +2107,7 @@
     <value>إزالة من قائمة الرفع؟</value>
   </data>
   <data name="Import_RemoveBody" xml:space="preserve">
-    <value>يتوقف العمل عليه هنا، ويبقى على القناة ما رُفع منه.</value>
+    <value>يتوقف العمل عليه الآن، ويبقى على القناة ما رُفع منه.</value>
   </data>
   <data name="Import_RemoveConfirm" xml:space="preserve">
     <value>إزالة</value>
@@ -2275,7 +2275,7 @@
     <value>المرجع {0}</value>
   </data>
   <data name="ImportLog_sha" xml:space="preserve">
-    <value>SHA-256:</value>
+    <value>بصمة SHA-256 للملف:</value>
   </data>
   <data name="ImportLog_upload_opened" xml:space="preserve">
     <value>فُتح الرفع للمرئي:</value>

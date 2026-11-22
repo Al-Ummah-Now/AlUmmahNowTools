@@ -87,6 +87,16 @@ public static class Loc
     /// <summary>A resource string followed by a raw detail on its own line.</summary>
     public static string GetWithDetail(string key, string? detail) => WithDetail(Get(key), detail);
 
+    /// <summary>
+    /// The last two words of each sentence and of each line joined by a no-break space, so wrapped text never leaves a
+    /// lone word on a line.
+    /// </summary>
+    public static string KeepLastWords(string text) =>
+        string.Join("\n", text.Split('\n').Select(line => LastWords.Replace(line.TrimEnd(), "\u00A0")));
+
+    // A space before the last word of a sentence (one ending in . ! ? ؟ :) or of the line
+    private static readonly System.Text.RegularExpressions.Regex LastWords = new(@"(?<=\S) (?=\S+(?:[.!?؟:](?=\s)|$))");
+
     /// <summary>An exact whole number: "4,887" in English, «٤٨٨٧» in Arabic.</summary>
     public static string Number(long value) =>
         IsArabic ? ToArabicDigits(value.ToString(CultureInfo.InvariantCulture)) : value.ToString("N0", CultureInfo.InvariantCulture);
