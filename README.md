@@ -46,6 +46,10 @@ The desktop app opens on a sign-in screen. Staff sign in with their browser (the
 
 Arabic text uses the bundled IBM Plex Sans Arabic (SIL Open Font License, `Assets/Fonts`), because Uno's Skia text needs one font that carries both Arabic letters and Latin punctuation to order a line correctly.
 
+## Speech to text on import (TA-13)
+
+When a batch is added with "Transcribe the videos that have no captions", each video without caption files of its own is transcribed on the admin's computer after its upload, with whisper.cpp inside aun-core (Metal on macOS, Vulkan on Windows and Linux, the CPU otherwise). The model (default `large-v3-turbo`; smaller ones can be chosen) downloads once into the app's data folder and its checksum is checked. Quran recitation is matched against the server's Quran index (`GET /api/admin/import/quran-index`) and sent only as verse references, never as text. The transcript goes to `POST /api/admin/import/items/:id/transcript` as a caption draft, and once that draft exists the app asks the server to translate it into the site's other language (`POST /items/:id/translations`). A transcription that fails here goes to the Errors page; the video is imported without a transcript.
+
 ## ??? Architecture
 
 - **Cross-Platform GUI** - Uno Platform for Windows, Linux, macOS, Web, iOS, Android
