@@ -2397,8 +2397,11 @@
   <data name="Import_EncodeTitle.Text" xml:space="preserve">
     <value>الترميز</value>
   </data>
-  <data name="Import_EncodeBody.Text" xml:space="preserve">
+  <data name="Import_EncodeBodyHere" xml:space="preserve">
     <value>ترمّز الأدوات كل مرئي على هذا الجهاز وترسل الناتج مع الرفع، فيجهز للمشاهدة أسرع. ويفحص الخادم كل ملف، ويعيد ترميز المرئي بنفسه إن وجد خللًا.</value>
+  </data>
+  <data name="Import_EncodeBodyServer" xml:space="preserve">
+    <value>يرمّز الخادم كل مرئي بعد رفعه، فيتأخر قليلًا حتى يجهز للمشاهدة.</value>
   </data>
   <data name="Import_EncodeServer.Content" xml:space="preserve">
     <value>دع الخادم يرمّز هذه المرئيات</value>
