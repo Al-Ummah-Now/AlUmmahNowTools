@@ -105,8 +105,12 @@ jobs:
           ./coverage/**/coverage.cobertura.xml
         retention-days: 30
 
+    # The report goes to this job's summary, not to a check run of its own: v1 created
+    # ".NET Tests (<os>)" through the API (filed under the CodeQL dynamic suite) and, when its
+    # final update got a 404, left it in_progress on the PR for good (Tools #53, 2026-11-22).
+    # The tests themselves gate through this job's own result.
     - name: Test Report
-      uses: dorny/test-reporter@d61b558e8df85cb60d09ca3e5b09653b4477cea7 # v1
+      uses: dorny/test-reporter@df6247429542221bc30d46a036ee47af1102c451 # v2.7.0
       if: always()
       continue-on-error: true
       with:
@@ -114,6 +118,7 @@ jobs:
         path: '**/*.trx'
         reporter: dotnet-trx
         fail-on-error: false
+        use-actions-summary: 'true'
 
     - name: Code Coverage Report
       uses: irongut/CodeCoverageSummary@51cc3a756ddcd398d447c044c02cb6aa83fdae95 # v1.3.0
