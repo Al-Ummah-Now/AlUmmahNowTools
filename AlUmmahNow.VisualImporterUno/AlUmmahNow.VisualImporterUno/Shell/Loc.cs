@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using Windows.ApplicationModel.Resources;
@@ -126,6 +127,12 @@ public static class Loc
     /// <summary>A percentage of 0 to 100: "42%" / «٤٢٪».</summary>
     public static string Percent(double value) => IsArabic ? Decimal(value, 0) + "٪" : Decimal(value, 0) + "%";
 
+    /// <summary>Languages in a list: "Arabic, English" / «العربية والإنجليزية» (Arabic joins with «و», so «،» is left to separate groups).</summary>
+    public static string Languages(IEnumerable<string> names) => string.Join(IsArabic ? " و" : ", ", names);
+
+    /// <summary>Groups on one line: "captions: Arabic, English · chapters" / «ترجمات: العربية والإنجليزية؛ فصول».</summary>
+    public static string Groups(IEnumerable<string> groups) => string.Join(IsArabic ? "؛ " : "\u00A0· ", groups);
+
     /// <summary>A time of day in the device's zone: "2:05 PM" / «٢:٠٥ م».</summary>
     public static string Time(DateTime local)
     {
@@ -134,21 +141,57 @@ public static class Loc
     }
 
     /// <summary>
-    /// The device's zone at that moment as an offset, as the admin pages label times: "UTC−5" / «غرينتش−٥»
-    /// (all Arabic, so the line keeps its order in the Arabic layout).
+    /// The device's zone at that moment as the admin pages name it (Intl's short zone name, as on admin
+    /// Costs): "EST" / "EDT" and the other US zones' names in English, else "GMT+3" / "GMT-3:30"; Arabic
+    /// always «غرينتش-٥» (Arabic digits, a hyphen), all Arabic so the line keeps its order. UTC is in the
+    /// tooltip (<see cref="UtcText"/>).
     /// </summary>
-    public static string ZoneLabel(DateTime local)
+    public static string ZoneLabel(DateTime local) => ZoneLabel(local, TimeZoneInfo.Local, IsArabic);
+
+    /// <summary>The label for a given zone (tests pin the zone and the language).</summary>
+    public static string ZoneLabel(DateTime local, TimeZoneInfo zone, bool arabic)
     {
-        var offset = TimeZoneInfo.Local.GetUtcOffset(local);
-        var name = IsArabic ? "غرينتش" : "UTC";
+        var offset = zone.GetUtcOffset(local);
+        if (!arabic && UsZoneName(zone, local) is { } us) return us;
+        if (IsUtc(zone)) return arabic ? "غرينتش" : "UTC";
+        var name = arabic ? "غرينتش" : "GMT";
         if (offset == TimeSpan.Zero) return name;
         var hours = Math.Abs(offset.Hours).ToString(CultureInfo.InvariantCulture);
         var number = offset.Minutes == 0 ? hours : hours + ":" + Math.Abs(offset.Minutes).ToString("00", CultureInfo.InvariantCulture);
-        return name + (offset < TimeSpan.Zero ? "−" : "+") + (IsArabic ? ToArabicDigits(number) : number);
+        return name + (offset < TimeSpan.Zero ? "-" : "+") + (arabic ? ToArabicDigits(number) : number);
     }
 
-    /// <summary>A time of day with the device's zone: "2:05 PM UTC−5" / «٢:٠٥ م غرينتش−٥».</summary>
+    // The zones Intl names in English (en-US short names); every other zone shows its offset
+    private static readonly Dictionary<string, (string Standard, string Daylight)> UsZones = new(StringComparer.Ordinal)
+    {
+        ["America/New_York"] = ("EST", "EDT"), ["America/Detroit"] = ("EST", "EDT"), ["America/Toronto"] = ("EST", "EDT"),
+        ["America/Indiana/Indianapolis"] = ("EST", "EDT"), ["America/Kentucky/Louisville"] = ("EST", "EDT"),
+        ["America/Chicago"] = ("CST", "CDT"), ["America/Winnipeg"] = ("CST", "CDT"),
+        ["America/Denver"] = ("MST", "MDT"), ["America/Edmonton"] = ("MST", "MDT"), ["America/Boise"] = ("MST", "MDT"),
+        ["America/Phoenix"] = ("MST", "MST"),
+        ["America/Los_Angeles"] = ("PST", "PDT"), ["America/Vancouver"] = ("PST", "PDT"),
+        ["America/Anchorage"] = ("AKST", "AKDT"),
+        ["Pacific/Honolulu"] = ("HST", "HST"),
+    };
+
+    private static string IanaId(TimeZoneInfo zone) =>
+        zone.HasIanaId ? zone.Id : TimeZoneInfo.TryConvertWindowsIdToIanaId(zone.Id, out var iana) ? iana : zone.Id;
+
+    private static bool IsUtc(TimeZoneInfo zone) => IanaId(zone) is "UTC" or "Etc/UTC" or "Etc/UCT" or "Etc/Universal" or "Etc/Zulu";
+
+    private static string? UsZoneName(TimeZoneInfo zone, DateTime local) =>
+        UsZones.TryGetValue(IanaId(zone), out var names) ? (zone.IsDaylightSavingTime(local) ? names.Daylight : names.Standard) : null;
+
+    /// <summary>A time of day with the device's zone: "2:05 PM EST" / «٢:٠٥ م غرينتش-٥».</summary>
     public static string TimeWithZone(DateTime local) => Time(local) + " " + ZoneLabel(local);
+
+    /// <summary>The same moment in UTC, with its date, for a time's tooltip: "Nov 22, 2026, 7:05 PM UTC" / «٢٢ نوفمبر ٢٠٢٦، ٧:٠٥ م غرينتش».</summary>
+    public static string UtcText(DateTimeOffset at)
+    {
+        var utc = at.UtcDateTime;
+        var text = Format("When_Date", utc.ToString("d MMM yyyy", CultureInfo.CurrentUICulture), utc.ToString("t", CultureInfo.CurrentUICulture)) + " " + (IsArabic ? "غرينتش" : "UTC");
+        return IsArabic ? ToArabicDigits(text) : text;
+    }
 
     /// <summary>A date and time in the device's zone, digits per language.</summary>
     public static string When(DateTime local)

@@ -56,6 +56,8 @@ public sealed partial class ImportView : Page
             });
         }
         var dialog = Environment.GetEnvironmentVariable("TOOLS_DEMO_IMPORT_DIALOG");
+        // No caret in a frame unless it shows typing: focus rests on a button, without its keyboard ring
+        if (dialog != "suggest") DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => BrowseButton.Focus(FocusState.Programmatic));
         if (dialog is null) return;
         // A dialog needs the window's XamlRoot, which is ready a moment after the page loads
         await System.Threading.Tasks.Task.Delay(1000);
@@ -68,9 +70,29 @@ public sealed partial class ImportView : Page
             case "channel": NewChannel_Click(this, new RoutedEventArgs()); break;
             case "suggest":
                 ChannelBox.Focus(FocusState.Keyboard);
+                // The caret after the typed name, as when typing, never through its first letter
+                if (FindChild<TextBox>(ChannelBox) is { } typed) typed.Select(typed.Text.Length, 0);
                 ChannelBox.IsSuggestionListOpen = true;
                 break;
         }
+    }
+
+    /// <summary>A path reads left to right; the empty field's placeholder reads in the interface's language, on its side.</summary>
+    private void FolderBox_TextChanged(object sender, RoutedEventArgs e)
+    {
+        var direction = Loc.IsArabic && string.IsNullOrEmpty(FolderBox.Text) ? FlowDirection.RightToLeft : FlowDirection.LeftToRight;
+        if (FolderBox.FlowDirection != direction) FolderBox.FlowDirection = direction;
+    }
+
+    private static T? FindChild<T>(DependencyObject parent) where T : class
+    {
+        for (var i = 0; i < Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChildrenCount(parent); i++)
+        {
+            var child = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChild(parent, i);
+            if (child is T match) return match;
+            if (FindChild<T>(child) is { } deeper) return deeper;
+        }
+        return null;
     }
 
     /// <summary>The page's own wrapping text (headings and help) never ends a line on a lone word.</summary>
@@ -152,12 +174,14 @@ public sealed partial class ImportView : Page
     {
         // Name and description are typed in the interface's language, so an Arabic field starts on the right
         var typed = Loc.IsArabic ? FlowDirection.RightToLeft : FlowDirection.LeftToRight;
-        var name = new TextBox { Header = Loc.PopupLine(Loc.Get("Import_NewChannelName")), FlowDirection = typed };
+        // Uno places an empty field's caret by its alignment, not its direction: an Arabic field is aligned right too
+        var typedAlign = Loc.IsArabic ? TextAlignment.Right : TextAlignment.Left;
+        var name = new TextBox { Header = Loc.PopupLine(Loc.Get("Import_NewChannelName")), FlowDirection = typed, TextAlignment = typedAlign };
         // The handle is typed left to right in both languages; its label follows the dialog's direction
         var handle = new TextBox { FlowDirection = FlowDirection.LeftToRight, PlaceholderText = "@" };
         var handleLabel = new TextBlock { Text = Loc.PopupLine(Loc.Get("Import_NewChannelHandle")), Margin = new Thickness(0, 0, 0, -6) };
         AutomationProperties.SetName(handle, Loc.Get("Import_NewChannelHandle"));
-        var description = new TextBox { Header = Loc.PopupLine(Loc.Get("Import_NewChannelDescription")), AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 80, FlowDirection = typed };
+        var description = new TextBox { Header = Loc.PopupLine(Loc.Get("Import_NewChannelDescription")), AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 80, FlowDirection = typed, TextAlignment = typedAlign };
         var error = new TextBlock { Style = (Style)Application.Current.Resources["ToolsMuted"], Visibility = Visibility.Collapsed };
         error.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["FanousErrorTextBrush"];
         var panel = new StackPanel { Spacing = 12, MinWidth = 320 };

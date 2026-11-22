@@ -2152,7 +2152,7 @@
     <value>بانتظار {0}</value>
   </data>
   <data name="ImportError_admin_unreachable" xml:space="preserve">
-    <value>تعذّر الوصول إلى واجهة الإدارة. تحقّق من الاتصال.</value>
+    <value>تعذّر الوصول إلى خدمة الإدارة في الأمة الآن. تحقّق من الاتصال.</value>
   </data>
   <data name="ImportError_signed_out" xml:space="preserve">
     <value>انتهت جلستك. سجّل الدخول مجددًا ويُستأنف العمل.</value>
@@ -2161,7 +2161,7 @@
     <value>رفض الخادم الطلب.</value>
   </data>
   <data name="ImportError_videos_unreachable" xml:space="preserve">
-    <value>تعذّر الوصول إلى واجهة المرئيات. تحقّق من الاتصال.</value>
+    <value>تعذّر الوصول إلى خدمة المرئيات في الأمة الآن. تحقّق من الاتصال.</value>
   </data>
   <data name="ImportError_upload_refused" xml:space="preserve">
     <value>رُفض الرفع.</value>
@@ -2263,13 +2263,13 @@
     <value>لا شيء لـ{0}</value>
   </data>
   <data name="ImportLog_attempt" xml:space="preserve">
-    <value>{0}: المحاولة {1}</value>
+    <value>محاولة {0} من جديد، المحاولة {1}</value>
   </data>
   <data name="ImportLog_attempt_failed" xml:space="preserve">
-    <value>{0}: فشلت المحاولة {1}، والتالية بعد {2} ث</value>
+    <value>تعذّر إتمام {0} في المحاولة {1}، والتالية بعد {2} ث</value>
   </data>
   <data name="ImportLog_failed" xml:space="preserve">
-    <value>{0}: توقف بعد {1} محاولات</value>
+    <value>توقف {0} بعد {1} محاولات</value>
   </data>
   <data name="ImportLog_reference" xml:space="preserve">
     <value>المرجع {0}</value>
@@ -2290,7 +2290,7 @@
     <value>موجود في هذه القناة أصلًا، فلا شيء يُرفع. المرئي:</value>
   </data>
   <data name="ImportLog_sent" xml:space="preserve">
-    <value>أُرسلت: {0}، ويُلحقها الخادم</value>
+    <value>أُرسلت {0}، ويُلحقها الخادم</value>
   </data>
   <data name="ImportLog_left_out_size" xml:space="preserve">
     <value>أكبر من {0} ميغابايت أو فارغ، فتُرك:</value>
