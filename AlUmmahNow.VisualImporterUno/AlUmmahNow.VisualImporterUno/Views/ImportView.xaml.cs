@@ -47,8 +47,10 @@ public sealed partial class ImportView : Page
         if (!ImportWorkspace.Current.IsDemo) return;
         if (Environment.GetEnvironmentVariable("TOOLS_DEMO_IMPORT_SCROLL") == "end")
         {
-            // Room below the queue, so its card can sit at the top however short it is
-            PageContent.Padding = new Thickness(PageContent.Padding.Left, PageContent.Padding.Top, PageContent.Padding.Right, PageScroll.ViewportHeight);
+            // Room below the queue, so its card can sit at the top however short it is. A fixed amount, not the
+            // viewport's height: the screenshot window grows after this, and a smaller room clamped the scroll back
+            // (the page subtitle's divider showed above the card, AUDIT-2 2026-11-22)
+            PageContent.Padding = new Thickness(PageContent.Padding.Left, PageContent.Padding.Top, PageContent.Padding.Right, Math.Max(PageScroll.ViewportHeight, 4000));
             DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
             {
                 var top = QueueCard.TransformToVisual(PageContent).TransformPoint(new Windows.Foundation.Point(0, 0)).Y;

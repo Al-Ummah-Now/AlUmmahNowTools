@@ -93,6 +93,12 @@ public static class ScreenshotRunner
         var pageBottom = page.TransformToVisual(null).TransformPoint(new Windows.Foundation.Point(0, page.ActualHeight)).Y;
         var room = page.ScrollableHeight - page.VerticalOffset;
         if (missing < 1 || room < 1 || Math.Abs(pageBottom - content.ActualHeight) > 1) return 0;
+        // Only when something on the page runs past the window: room left to scroll may be bare padding
+        var leaves = new List<(double Top, double Bottom)>();
+        var edges = new List<double>();
+        Collect(page, leaves, edges);
+        var lowest = leaves.Select((l) => l.Bottom).Concat(edges).DefaultIfEmpty(0).Max();
+        if (lowest <= content.ActualHeight + 0.5) return 0;
         var from = page.VerticalOffset;
         page.ChangeView(null, from + Math.Min(missing, room), null, true);
         await Task.Delay(1000);
