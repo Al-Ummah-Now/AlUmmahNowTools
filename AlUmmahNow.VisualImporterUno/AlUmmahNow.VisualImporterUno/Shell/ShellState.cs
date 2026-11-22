@@ -68,6 +68,14 @@ public sealed class ShellState
         LanguageChanged?.Invoke(this, EventArgs.Empty);
     }
 
+    /// <summary>The whisper model chosen on the Import page (TA-13), kept for next time.</summary>
+    public void SetSpeechModel(string id)
+    {
+        if (Preferences.SpeechModel == id) return;
+        Preferences.SpeechModel = id;
+        Save();
+    }
+
     public void SetTheme(ToolsTheme theme)
     {
         Preferences.Theme = theme;

@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Text;
 using AlUmmahNow.ToolsCore;
 using AlUmmahNow.ToolsCore.Import;
+using AlUmmahNow.ToolsCore.Transcription;
 using LogLevel = AlUmmahNow.ToolsCore.Import.LogLevel;
 
 namespace AlUmmahNow.VisualImporterUno.Shell;
@@ -32,13 +33,16 @@ public sealed class ImportWorkspace : IDisposable
         Api = new ImportApiClient(Environment.AdminApi, token, adminHandler);
         Reporter = new ErrorReporter(Api.ReportErrorsAsync, Release, () => shell.Preferences.Language);
         Media = new FfmpegMediaTools(LocateFfmpegAsync);
+        Transcriber = IsDemo ? new DemoTranscriber() : new CoreTranscriber(CoreTranscriber.DefaultModelsDirectory);
         var steps = new IImportStep[]
         {
             new HashStep(),
             new EncodeStep(Api, Environment.VideosApi, Media, new CoreRenditionPackager(), EncodeStep.DefaultWorkRoot, "Al Ummah Now Tools " + Release, ReportEncodeFailure),
             new UploadStep(Api, new TusClient(), Environment.VideosApi, token),
             new AttachStep(Api),
+            new TranscribeStep(Api, Transcriber, Media, new QuranIndexSource(Api), TranscribeStep.DefaultWorkRoot, ReportTranscribeFailure),
             new CheckStep(Api),
+            new TranslateStep(Api),
         };
         var path = IsDemo
             ? Path.Combine(Path.GetTempPath(), "aun-tools-demo-" + Guid.NewGuid().ToString("N"), "queue.json")
@@ -67,6 +71,9 @@ public sealed class ImportWorkspace : IDisposable
 
     /// <summary>ffprobe and ffmpeg for encoding on this computer (TA-12)</summary>
     public IMediaTools Media { get; }
+
+    /// <summary>Speech to text on this computer (TA-13): aun-core's whisper.cpp, GPU when there is one</summary>
+    public ITranscriber Transcriber { get; }
 
     /// <summary>
     /// What stops encoding here, or null when it can: <c>ffmpeg_missing</c>, or <c>no_encoder</c> when this ffmpeg has
@@ -116,6 +123,18 @@ public sealed class ImportWorkspace : IDisposable
             ["itemId"] = item.ServerItemId,
             ["videoId"] = item.VideoId,
             ["fileSize"] = item.Video.Size,
+        });
+
+    /// <summary>A local transcription that failed goes to the Errors page; the file itself carries on without a transcript.</summary>
+    private void ReportTranscribeFailure(Exception error, QueueItem item) =>
+        Reporter.Report("caught", error, "Import Transcribe on this computer failed; the file is imported without a transcript: " + error.Message, "/import/transcribe", new Dictionary<string, object?>
+        {
+            ["step"] = nameof(ImportStepKind.Transcribe),
+            ["code"] = error switch { TranscribeException t => t.Code, LocalEncodeException l => l.Code, ImportApiException a => a.Code, _ => "disk" },
+            ["itemId"] = item.ServerItemId,
+            ["videoId"] = item.VideoId,
+            ["model"] = item.SpeechModel,
+            ["device"] = Transcriber.Device is { } d ? d.Backend : null,
         });
 
     /// <summary>The app's version, sent with each error report</summary>
@@ -246,11 +265,14 @@ internal static class DemoImport
             Video(folder, "fiqh-of-fasting-07.mp4", 1_098_765_432, "فقه الصيام، الدرس السابع: العيد", new[] { "ar" }, false, true),
             Video(folder, "fiqh-of-fasting-12.mp4", 1_152_921_504, "فقه الصيام، الدرس الثاني عشر: الفدية", new[] { "ar" }, false, true),
             Video(folder, "fiqh-of-fasting-13.mp4", 1_020_054_732, "فقه الصيام، الدرس الثالث عشر: خاتمة", Array.Empty<string>(), false, false),
+            // Transcribed on this computer (TA-13): no caption files of their own
+            Video(folder, "fiqh-of-fasting-14.mp4", 1_110_183_936, "فقه الصيام، الدرس الرابع عشر: تفسير آيات الصيام", Array.Empty<string>(), false, true),
+            Video(folder, "fiqh-of-fasting-15.mp4", 1_046_478_848, "فقه الصيام، الدرس الخامس عشر: مراجعة", Array.Empty<string>(), false, true),
         };
         for (var i = 0; i < files.Length; i++)
         {
-            // The last file's batch was added with "Let the server encode"
-            yield return QueueItem.For(files[i], "batch_demo", ChannelId, start.AddSeconds(i), serverEncodes: i == files.Length - 1);
+            // The ninth file's batch was added with "Let the server encode"; the last two were transcribed here
+            yield return QueueItem.For(files[i], "batch_demo", ChannelId, start.AddSeconds(i), serverEncodes: i == 8, transcribe: i >= 9 ? new TranscribeChoice(null, CoreTranscriber.DefaultModel) : null);
         }
     }
 
@@ -328,7 +350,51 @@ internal static class DemoImport
         At(items[7], ImportStepKind.Encode);
         items[7].Paused = true;
         At(items[8], ImportStepKind.Hash);
+        if (items.Count < 11) return;
+
+        // Transcribing on this computer, and a transcript sent whose draft the server is still writing (TA-13)
+        At(items[9], ImportStepKind.Transcribe, StepStatus.Running);
+        items[9].VideoId = "v2Wm8FsK6d";
+        S(items[9], ImportStepKind.Transcribe).Attempts = 1;
+        Progress(items[9], 0.52);
+        At(items[10], ImportStepKind.Translate);
+        items[10].VideoId = "v9Pc3ZbN5h";
+        items[10].Verdict = new RenditionVerdict(true, null, null);
+        S(items[10], ImportStepKind.Translate).WaitingOnServer = true;
+        S(items[10], ImportStepKind.Translate).NextAttemptAt = Now.AddSeconds(30);
+        items[10].Transcript = new TranscriptState { Language = "ar", Segments = 412, QuranSpans = 3, Model = CoreTranscriber.DefaultModel, Device = DemoTranscriber.DeviceName, Sent = true, SentAt = Now.AddMinutes(-4) };
+        var t = Now.AddMinutes(-31);
+        items[10].Log.AddRange(new[]
+        {
+            new LogLine(t, LogLevel.Info, "Transcribe: started", "started", new[] { "Transcribe" }),
+            new LogLine(t.AddSeconds(1), LogLevel.Info, "Downloading the speech model", "model_download", new[] { CoreTranscriber.DefaultModel }),
+            new LogLine(t.AddMinutes(27), LogLevel.Info, "Transcribed", "transcribed", new[] { "ar", "412", "3", DemoTranscriber.DeviceName, CoreTranscriber.DefaultModel }),
+            new LogLine(t.AddMinutes(27), LogLevel.Info, "The transcript is with the server", "transcript_sent", new[] { "ar" }),
+            new LogLine(t.AddMinutes(27), LogLevel.Info, "Transcribe: done", "done", new[] { "Transcribe" }),
+        });
     }
+}
+
+/// <summary>
+/// Transcription for screenshots: a fixed device so every frame (en and ar) shows the same one, nothing run.
+/// <c>TOOLS_DEMO_IMPORT_TRANSCRIBE</c>: <c>unavailable</c> (a build without it), <c>cpu</c> (no GPU), <c>installed</c> (the model is here).
+/// </summary>
+internal sealed class DemoTranscriber : ITranscriber
+{
+    public const string DeviceName = "Apple M2 Pro (Metal)";
+    private static string Mode => System.Environment.GetEnvironmentVariable("TOOLS_DEMO_IMPORT_TRANSCRIBE") ?? "";
+
+    public bool Available => Mode != "unavailable";
+    public SpeechDevice? Device => !Available ? null : Mode == "cpu" ? new SpeechDevice(false, "CPU", "Apple M2 Pro") : new SpeechDevice(true, "Metal", "Apple M2 Pro");
+    // aun-core's catalog sizes, pinned
+    public IReadOnlyList<SpeechModel> Models => !Available ? [] :
+    [
+        new("large-v3-turbo", 1_624_555_275), new("large-v3-turbo-q5_0", 574_041_195), new("medium-q5_0", 539_212_467),
+        new("small-q5_1", 190_085_487), new("base-q5_1", 59_707_625),
+    ];
+    public string? InstalledPath(string modelId) => Mode == "installed" ? "/models/" + modelId + ".bin" : null;
+    public Task<string> DownloadAsync(string modelId, IProgress<double> progress, CancellationToken ct) => Task.FromException<string>(new TranscribeException("unavailable", "Demo"));
+    public Task<string> TranscribeAsync(string modelPath, string mediaPath, string? language, IProgress<double> progress, CancellationToken ct) => Task.FromException<string>(new TranscribeException("unavailable", "Demo"));
 }
 
 /// <summary>admin-api for screenshots: the channel list and new channels and batches, nothing sent anywhere.</summary>

@@ -124,6 +124,18 @@ internal sealed class FakeMedia : IMediaTools
         foreach (var o in outputs) File.WriteAllBytes(o, new byte[64]);
         return Task.CompletedTask;
     }
+
+    /// <summary>Set to fail the sound's extraction (TA-13); otherwise writes a small stand-in WAV.</summary>
+    public Exception? AudioFail;
+    public int Extracts;
+
+    public Task ExtractAudioAsync(string source, string wavPath, CancellationToken ct)
+    {
+        Extracts++;
+        if (AudioFail is not null) throw AudioFail;
+        File.WriteAllBytes(wavPath, new byte[44]);
+        return Task.CompletedTask;
+    }
 }
 
 /// <summary>aun-core's packaging for tests: a playlist, an init and two segments per rung.</summary>

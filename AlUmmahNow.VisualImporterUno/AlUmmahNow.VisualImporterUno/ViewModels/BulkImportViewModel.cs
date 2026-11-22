@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
 using AlUmmahNow.ToolsCore.Import;
+using AlUmmahNow.ToolsCore.Transcription;
 using LogLevel = AlUmmahNow.ToolsCore.Import.LogLevel;
 using AlUmmahNow.VisualImporterUno.Shell;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -47,6 +48,7 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
             ShowScan(DemoImport.Scan());
         }
         _ = CheckEncodingAsync();
+        SetUpTranscription();
     }
 
     // ---------------------------------------------------------------- Encoding (TA-12)
@@ -89,6 +91,85 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
         if (_disposed) return;
         EncodeNote = problem is null ? "" : Loc.Get("Import_EncodeNote_" + (problem == "ffmpeg_missing" ? "ffmpeg_missing" : "no_encoder"));
     }
+
+    // ---------------------------------------------------------------- Speech to text (TA-13)
+
+    /// <summary>Transcribe the batch's videos that bring no caption files of their own, on this computer.</summary>
+    [ObservableProperty]
+    private bool _transcribeHere = true;
+
+    /// <summary>What is said in the videos: 0 detect it, 1 Arabic, 2 English.</summary>
+    [ObservableProperty]
+    private int _spokenLanguageIndex;
+
+    /// <summary>The models as the admin reads them ("Most accurate, 1.6 GB"), most accurate first.</summary>
+    public ObservableCollection<string> ModelChoices { get; } = new();
+
+    private IReadOnlyList<SpeechModel> _models = Array.Empty<SpeechModel>();
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ModelStatus))]
+    private int _modelIndex = -1;
+
+    /// <summary>False when this build cannot transcribe: the card says so and offers nothing.</summary>
+    public bool CanTranscribe => _workspace.Transcriber.Available && _models.Count > 0;
+    public bool CannotTranscribe => !CanTranscribe;
+
+    /// <summary>Where whisper runs: the graphics card (its name on its own line) or the processor.</summary>
+    public string DeviceText => _workspace.Transcriber.Device switch
+    {
+        { Gpu: true } d => Loc.WithDetail(Loc.Get("Import_TranscribeDeviceGpu"), d.Name + " (" + d.Backend + ")"),
+        { } => Loc.Get("Import_TranscribeDeviceCpu"),
+        null => "",
+    };
+
+    /// <summary>The chosen model: already here, or downloaded once (its size) the first time it is used.</summary>
+    public string ModelStatus => ModelIndex >= 0 && ModelIndex < _models.Count
+        ? _workspace.Transcriber.InstalledPath(_models[ModelIndex].Id) is not null
+            ? Loc.Get("Import_TranscribeModelHere")
+            : Loc.Format("Import_TranscribeModelDownload", Loc.Bytes(_models[ModelIndex].SizeBytes))
+        : "";
+
+    private void SetUpTranscription()
+    {
+        try
+        {
+            _models = _workspace.Transcriber.Models;
+        }
+        catch (Exception ex)
+        {
+            // An aun-core without the catalog: the card says this computer cannot transcribe
+            Serilog.Log.Warning(ex, "[Import] No speech model catalog");
+            _models = Array.Empty<SpeechModel>();
+        }
+        foreach (var m in _models) ModelChoices.Add(Loc.Format("Import_TranscribeModelItem", ModelName(m.Id), Loc.Bytes(m.SizeBytes)));
+        var saved = ShellState.Current.Preferences.SpeechModel ?? CoreTranscriber.DefaultModel;
+        var index = _models.ToList().FindIndex(m => m.Id == saved);
+        ModelIndex = _models.Count == 0 ? -1 : Math.Max(index, 0);
+        if (!CanTranscribe) TranscribeHere = false;
+    }
+
+    partial void OnModelIndexChanged(int value)
+    {
+        if (value >= 0 && value < _models.Count && !_workspace.IsDemo) ShellState.Current.SetSpeechModel(_models[value].Id);
+    }
+
+    partial void OnTranscribeHereChanged(bool value)
+    {
+        if (value && !CanTranscribe) TranscribeHere = false;
+    }
+
+    /// <summary>A model in plain words: no whisper ids in Arabic lines (Uno reverses mixed runs).</summary>
+    internal static string ModelName(string id)
+    {
+        var text = Loc.Get("ImportModel_" + id);
+        return text == "ImportModel_" + id ? id : text;
+    }
+
+    /// <summary>The batch's transcription, or null when the admin left it off.</summary>
+    private TranscribeChoice? Transcription() => TranscribeHere && CanTranscribe && ModelIndex >= 0
+        ? new TranscribeChoice(SpokenLanguageIndex switch { 1 => "ar", 2 => "en", _ => null }, _models[ModelIndex].Id)
+        : null;
 
     // ---------------------------------------------------------------- Channel
 
@@ -300,10 +381,11 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
         {
             var name = Path.GetFileName(FolderPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
             var serverEncodes = ServerEncodesShown;
+            var transcribe = Transcription();
             var batch = await _workspace.Api.CreateBatchAsync(channel.Id, string.IsNullOrWhiteSpace(name) ? null : name);
             _channelNames[channel.Id] = channel.Name;
             var now = DateTimeOffset.UtcNow;
-            _workspace.Queue.Add(chosen.Select((r, i) => QueueItem.For(r.Video, batch.Id, channel.Id, now.AddMilliseconds(i), serverEncodes)));
+            _workspace.Queue.Add(chosen.Select((r, i) => QueueItem.For(r.Video, batch.Id, channel.Id, now.AddMilliseconds(i), serverEncodes, transcribe)));
             foreach (var r in chosen) ReviewRows.Remove(r);
             ReviewCount = ReviewRows.Count;
             CountSelected();
@@ -506,8 +588,35 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
             "renditions_rejected" => Loc.WithDetail(Loc.WithDetail(Loc.Get("ImportLog_renditions_rejected"), ReasonText(Arg(0))), Arg(1)),
             "transcode_failed" => Loc.WithDetail(Loc.Get("ImportLog_transcode_failed"), Arg(0)),
             "server_working" => Loc.Format("ImportLog_server_working", StepName(Arg(0))),
+            // Speech to text here and translation on the server (TA-13); model ids, device names and raw words on their own lines
+            "transcribe_off" or "transcribe_sidecar" or "transcribe_unavailable" or "quran_index_wait" or "transcribe_no_audio" or "transcribe_silent" => Loc.Get("ImportLog_" + line.Code),
+            "model_download" => Loc.Format("ImportLog_model_download", ModelName(Arg(0))),
+            "transcribed" => Loc.WithDetail(
+                Loc.Format("ImportLog_transcribed", LanguageName(Arg(0)), Loc.Plural("ImportCount_segments", Count(Arg(1))), Loc.Plural("ImportCount_quran", Count(Arg(2)))),
+                Arg(3).Length > 0 ? Arg(3) : null),
+            "transcript_sent" or "transcript_exists" or "translation_requested" or "translation_exists" => Loc.Format("ImportLog_" + line.Code, LanguageName(Arg(0))),
+            "transcript_refused" => Loc.WithDetail(Loc.Get("ImportLog_transcript_refused"), Arg(0)),
+            "transcribe_failed" => Loc.WithDetail(Loc.WithDetail(Loc.Get("ImportLog_transcribe_failed"), TranscribeErrorText(Arg(0))), Arg(1)),
+            "translation_refused" => Loc.Format("ImportLog_translation_refused", LanguageName(Arg(0)), TranslationErrorText(Arg(1))),
+            "translate_gave_up" => Loc.Get("ImportLog_translate_gave_up"),
             _ => line.Text,
         };
+    }
+
+    private static long Count(string value) => long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var n) ? n : 0;
+
+    /// <summary>Why transcription here stopped, in the app's words (TranscribeException and ffmpeg codes).</summary>
+    private static string TranscribeErrorText(string code)
+    {
+        var text = Loc.Get("ImportTranscribeError_" + code);
+        return text == "ImportTranscribeError_" + code ? Loc.Get("ImportTranscribeError_transcribe") : text;
+    }
+
+    /// <summary>Why the server did not translate (admin-api's per-language error), in the app's words.</summary>
+    private static string TranslationErrorText(string code)
+    {
+        var text = Loc.Get("ImportTranslateError_" + code);
+        return text == "ImportTranslateError_" + code ? Loc.Get("ImportTranslateError_other") : text;
     }
 
     private static string Bytes(string value) =>
@@ -740,6 +849,9 @@ public sealed partial class QueueRow : ObservableObject
             ItemPhase.Done => item.AlreadyImported ? Loc.Get("ImportPhase_AlreadyImported") : Loc.Get("ImportPhase_Done"),
             ItemPhase.Running when step!.Kind == ImportStepKind.Upload => Loc.Format("ImportPhase_Uploading", Loc.Percent(item.Progress * 100)),
             ItemPhase.Running when step!.Kind == ImportStepKind.Encode => Loc.Format("ImportPhase_Encoding", Loc.Percent(item.Progress * 100)),
+            ItemPhase.Running when step!.Kind == ImportStepKind.Transcribe => Loc.Format("ImportPhase_Transcribing", Loc.Percent(item.Progress * 100)),
+            ItemPhase.ServerWorking when step!.Kind == ImportStepKind.Transcribe => Loc.Get("ImportPhase_WaitingQuranIndex"),
+            ItemPhase.ServerWorking when step!.Kind == ImportStepKind.Translate => Loc.Get("ImportPhase_WaitingDraft"),
             ItemPhase.ServerWorking => Loc.Get("ImportPhase_ServerWorking"),
             ItemPhase.Running => Loc.Get("ImportPhase_Running_" + step!.Kind),
             ItemPhase.RetryWaiting => Loc.Format("ImportPhase_RetryAt", Loc.TimeWithZone(step!.NextAttemptAt!.Value.LocalDateTime)),
@@ -752,7 +864,11 @@ public sealed partial class QueueRow : ObservableObject
         HasDetail = Detail.Length > 0;
         // The server's verdict once it has one; before that, a file the server encodes says so
         var verdict = BulkImportViewModel.VerdictText(item);
-        Note = verdict.Length > 0 ? Loc.KeepLastWords(verdict) : item.ServerEncodes && phase != ItemPhase.Done ? Loc.Get("ImportRow_ServerEncodes") : "";
+        // and a transcript made here says it is with the server (TA-13)
+        Note = verdict.Length > 0 ? Loc.KeepLastWords(verdict)
+            : item.ServerEncodes && phase != ItemPhase.Done ? Loc.Get("ImportRow_ServerEncodes")
+            : item.Transcript is { Sent: true } t ? Loc.Format("ImportRow_TranscriptSent", BulkImportViewModel.LanguageName(t.Language))
+            : "";
         // Encoded again, stopped or not processed: worth a second look, in the accent colour
         var problem = verdict.Length > 0 && item.Verdict is not { Used: true };
         ShowProblemNote = Note.Length > 0 && problem;
