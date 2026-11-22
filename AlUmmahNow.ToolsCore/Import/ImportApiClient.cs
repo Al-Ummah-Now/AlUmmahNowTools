@@ -214,7 +214,7 @@ public sealed class AlreadyImportedException : Exception
 }
 
 /// <summary>Everything the importer asks admin-api, with the signed-in account's token on each call.</summary>
-public class ImportApiClient
+public partial class ImportApiClient
 {
     internal static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
     {
