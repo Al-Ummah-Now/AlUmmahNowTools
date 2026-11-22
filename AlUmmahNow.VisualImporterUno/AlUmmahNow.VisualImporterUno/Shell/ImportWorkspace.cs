@@ -119,6 +119,9 @@ internal static class DemoImport
 
     public const string ChannelId = "ch_demo_fiqh";
 
+    /// <summary>The demo's "now": 2:20 PM today in the device's zone, so every frame (en and ar) shows the same times.</summary>
+    public static readonly DateTimeOffset Now = new(DateTime.Today.AddHours(14).AddMinutes(20), TimeZoneInfo.Local.GetUtcOffset(DateTime.Today.AddHours(14)));
+
     public static readonly ImportChannel[] Channels =
     {
         new(ChannelId, "Shaykh Ahmad al-Azhari", "azhari", "ahmad.azhari@alummahnow.net"),
@@ -166,13 +169,13 @@ internal static class DemoImport
         Video(Folder, "fiqh-of-fasting-08.mp4", 1_288_490_189, "فقه الصيام، الدرس الثامن: قيام الليل", new[] { "ar", "en" }, true, true),
         Video(Folder, "fiqh-of-fasting-09.mp4", 1_181_116_006, "فقه الصيام، الدرس التاسع: ليلة القدر", new[] { "ar", "en" }, true, true),
         Video(Folder, "fiqh-of-fasting-10.mp4", 1_395_864_371, "فقه الصيام، الدرس العاشر: صيام التطوع", new[] { "ar" }, true, true),
-        Video(Folder, "fiqh-of-fasting-11.mp4", 966_367_641, null, Array.Empty<string>(), false, false, new[] { new ScanNote(ScanNoteCode.CaptionLanguageUnknown, "fiqh-of-fasting-11.srt") }),
+        Video(Folder, "fiqh-of-fasting-11.mp4", 966_367_641, "فقه الصيام، الدرس الحادي عشر: أسئلة وأجوبة", Array.Empty<string>(), false, false, new[] { new ScanNote(ScanNoteCode.CaptionLanguageUnknown, "fiqh-of-fasting-11.srt") }),
     }, Array.Empty<ScanNote>());
 
     public static IEnumerable<QueueItem> QueueItems(ToolsEnvironment environment)
     {
         if (Empty) yield break;
-        var start = DateTimeOffset.UtcNow.AddMinutes(-42);
+        var start = Now.AddMinutes(-42);
         var folder = "/Volumes/Media/Lessons/Fiqh of Fasting";
         var files = new[]
         {
@@ -180,9 +183,9 @@ internal static class DemoImport
             Video(folder, "fiqh-of-fasting-02.mp4", 1_181_116_006, "فقه الصيام، الدرس الثاني: المفطرات", new[] { "ar", "en" }, true, true),
             Video(folder, "fiqh-of-fasting-03.mp4", 1_395_864_371, "فقه الصيام، الدرس الثالث: المسافر والمريض", new[] { "ar" }, true, true),
             Video(folder, "fiqh-of-fasting-04.mp4", 1_073_741_824, "فقه الصيام، الدرس الرابع: قضاء الأيام", new[] { "ar" }, false, true),
-            Video(folder, "fiqh-of-fasting-05.mp4", 966_367_641, null, Array.Empty<string>(), false, false),
-            Video(folder, "fiqh-of-fasting-06.mp4", 1_234_567_890, null, new[] { "ar" }, false, true),
-            Video(folder, "fiqh-of-fasting-07.mp4", 1_098_765_432, null, new[] { "ar" }, false, true),
+            Video(folder, "fiqh-of-fasting-05.mp4", 966_367_641, "فقه الصيام، الدرس الخامس: الاعتكاف", Array.Empty<string>(), false, false),
+            Video(folder, "fiqh-of-fasting-06.mp4", 1_234_567_890, "فقه الصيام، الدرس السادس: زكاة الفطر", new[] { "ar" }, false, true),
+            Video(folder, "fiqh-of-fasting-07.mp4", 1_098_765_432, "فقه الصيام، الدرس السابع: العيد", new[] { "ar" }, false, true),
         };
         for (var i = 0; i < files.Length; i++)
         {
@@ -195,6 +198,11 @@ internal static class DemoImport
     {
         var items = queue.Items;
         if (items.Count == 0) return;
+        // "Added to the queue" at the moment each file was added, before everything after it in its log
+        foreach (var item in items)
+        {
+            for (var i = 0; i < item.Log.Count; i++) if (item.Log[i].Code == "added") item.Log[i] = item.Log[i] with { At = item.CreatedAt };
+        }
         void Steps(QueueItem item, params StepStatus[] statuses)
         {
             for (var i = 0; i < statuses.Length; i++) item.Steps[i].Status = statuses[i];
@@ -208,10 +216,10 @@ internal static class DemoImport
         typeof(QueueItem).GetProperty(nameof(QueueItem.Progress))!.SetValue(items[2], 0.64);
         Steps(items[3], StepStatus.Done, StepStatus.Pending, StepStatus.Pending);
         items[3].Steps[1].Attempts = 2;
-        items[3].Steps[1].NextAttemptAt = DateTimeOffset.UtcNow.AddSeconds(40);
+        items[3].Steps[1].NextAttemptAt = Now.AddSeconds(40);
         items[3].Steps[1].LastError = "The videos API could not be reached";
         items[3].Steps[1].LastErrorCode = "videos_unreachable";
-        var at = DateTimeOffset.UtcNow.AddMinutes(-6);
+        var at = Now.AddMinutes(-6);
         items[3].Log.AddRange(new[]
         {
             new LogLine(at, LogLevel.Info, "Hash: started", "started", new[] { "Hash" }),

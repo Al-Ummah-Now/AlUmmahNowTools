@@ -14,7 +14,7 @@
     </Page.Resources>
 
     <ScrollViewer x:Name="PageScroll" SizeChanged="Page_SizeChanged" HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled">
-        <StackPanel Spacing="16" Padding="24,8,24,24" MaxWidth="1200">
+        <StackPanel x:Name="PageContent" Spacing="16" Padding="24,8,24,24" MaxWidth="1200">
 
             <!-- 1. The channel the videos go to -->
             <Border Style="{StaticResource ToolsCard}">
@@ -177,7 +177,7 @@
             </Border>
 
             <!-- 4. The work queue: survives restarts, retries on its own -->
-            <Border Style="{StaticResource ToolsCard}" Visibility="{x:Bind ViewModel.HasQueue, Mode=OneWay}">
+            <Border x:Name="QueueCard" Style="{StaticResource ToolsCard}" Visibility="{x:Bind ViewModel.HasQueue, Mode=OneWay}">
                 <StackPanel Spacing="12">
                     <Grid ColumnSpacing="12" RowSpacing="8">
                         <Grid.ColumnDefinitions>
@@ -217,17 +217,18 @@
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
-                                        <!-- The state at a glance: tick, warning, clock or spinner -->
+                                        <!-- The state at a glance: tick, warning, clock (waiting), arrows (trying again), pause or spinner -->
                                         <Grid Width="20" VerticalAlignment="Top" Margin="0,2,0,0">
                                             <FontIcon Glyph="&#xE73E;" FontSize="16" Foreground="{ThemeResource FanousSuccessTextBrush}" Visibility="{x:Bind IsDone, Mode=OneWay}" />
                                             <FontIcon Glyph="&#xE7BA;" FontSize="16" Foreground="{ThemeResource FanousErrorTextBrush}" Visibility="{x:Bind IsFailed, Mode=OneWay}" />
                                             <FontIcon Glyph="&#xE823;" FontSize="16" Foreground="{ThemeResource FanousTextSecondaryBrush}" Visibility="{x:Bind IsWaiting, Mode=OneWay}" />
+                                            <FontIcon Glyph="&#xE72C;" FontSize="16" Foreground="{ThemeResource FanousTextSecondaryBrush}" Visibility="{x:Bind IsRetrying, Mode=OneWay}" />
                                             <FontIcon Glyph="&#xE769;" FontSize="16" Foreground="{ThemeResource FanousTextSecondaryBrush}" Visibility="{x:Bind IsPaused, Mode=OneWay}" />
                                             <ProgressRing Width="16" Height="16" IsActive="{x:Bind ShowProgress, Mode=OneWay}" Visibility="{x:Bind ShowProgress, Mode=OneWay}" />
                                         </Grid>
                                         <StackPanel Grid.Column="1" Spacing="3">
                                             <TextBlock Text="{x:Bind TitleShown}" Style="{StaticResource ToolsBody}" Foreground="{ThemeResource FanousTextPrimaryBrush}"
-                                                       TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind FileName}" />
+                                                       TextWrapping="Wrap" ToolTipService.ToolTip="{x:Bind FileName}" />
                                             <TextBlock Text="{x:Bind Status, Mode=OneWay}" Style="{StaticResource ToolsMuted}" TextWrapping="Wrap" />
                                             <ProgressBar Value="{x:Bind Progress, Mode=OneWay}" Maximum="100" Visibility="{x:Bind ShowProgress, Mode=OneWay}" Margin="0,4" />
                                             <TextBlock Text="{x:Bind Detail, Mode=OneWay}" Style="{StaticResource ToolsMuted}" Foreground="{ThemeResource FanousErrorTextBrush}"
@@ -258,7 +259,7 @@
                                                             <DataTemplate x:DataType="vm:LogEntry">
                                                                 <Grid ColumnSpacing="12" Padding="0,4">
                                                                     <Grid.ColumnDefinitions>
-                                                                        <ColumnDefinition Width="80" />
+                                                                        <ColumnDefinition Width="150" />
                                                                         <ColumnDefinition Width="*" />
                                                                     </Grid.ColumnDefinitions>
                                                                     <TextBlock Text="{x:Bind Time}" Style="{StaticResource ToolsMuted}" />
