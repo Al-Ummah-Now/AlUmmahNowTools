@@ -3114,7 +3114,7 @@
     <value>أضِف</value>
   </data>
   <data name="Social_ConnectionAdded.Text" xml:space="preserve">
-    <value>أُضيف</value>
+    <value>مُضاف</value>
   </data>
   <data name="Social_OtherTitle.Text" xml:space="preserve">
     <value>خلاصة أو حساب آخر</value>
