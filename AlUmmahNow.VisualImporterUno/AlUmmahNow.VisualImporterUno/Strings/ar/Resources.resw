@@ -520,7 +520,7 @@
     <value>المجلد</value>
   </data>
   <data name="Import_FolderBody.Text" xml:space="preserve">
-    <value>كل مجلد بداخله يصبح قناة. تجد الأدوات المرئيات وملفات الترجمة والفصول والصور المصغّرة المجاورة لها.</value>
+    <value>تجد الأدوات المرئيات فيه، وملفات الترجمة والفصول والصور المصغّرة والبيانات التي بجانبها.</value>
   </data>
   <data name="Import_FolderBox.PlaceholderText" xml:space="preserve">
     <value>لم يُختر مجلد بعد</value>
@@ -535,25 +535,16 @@
     <value>تظهر المرئيات هنا</value>
   </data>
   <data name="Import_EmptyBody.Text" xml:space="preserve">
-    <value>اختر مجلدًا وابحث عن مرئياته، ثم اختر ما تريد رفعه؛ لا يُرفع شيء حتى تقرر ذلك.</value>
+    <value>اختر قناة ومجلدًا، ثم ابحث عن مرئياته. أنت تختار ما يُستورد منها، ولا يُرفع شيء حتى تضيفه إلى قائمة الرفع.</value>
   </data>
   <data name="Import_FoundTitle.Text" xml:space="preserve">
     <value>المرئيات التي وُجدت</value>
-  </data>
-  <data name="Import_SelectedLabel.Text" xml:space="preserve">
-    <value>محدّد</value>
   </data>
   <data name="Import_SelectAll.Text" xml:space="preserve">
     <value>تحديد الكل</value>
   </data>
   <data name="Import_SelectNone.Text" xml:space="preserve">
     <value>إلغاء التحديد</value>
-  </data>
-  <data name="Import_OnlySelected.Content" xml:space="preserve">
-    <value>عرض المحدّد فقط</value>
-  </data>
-  <data name="Import_Upload.Text" xml:space="preserve">
-    <value>ارفع المحدّد</value>
   </data>
   <data name="Import_AllChannels" xml:space="preserve">
     <value>كل القنوات</value>
@@ -1991,5 +1982,416 @@
   </data>
   <data name="Dashboard_ProblemsNone.Text" xml:space="preserve">
     <value>لا مشكلات</value>
+  </data>
+  <data name="Import_ChannelTitle.Text" xml:space="preserve">
+    <value>القناة</value>
+  </data>
+  <data name="Import_ChannelBody.Text" xml:space="preserve">
+    <value>كل مرئيات هذا الاستيراد تذهب إلى قناة واحدة. ابحث عنها بالاسم أو المعرّف، أو أنشئ قناة جديدة.</value>
+  </data>
+  <data name="Import_ChannelBox.PlaceholderText" xml:space="preserve">
+    <value>ابحث عن قناة</value>
+  </data>
+  <data name="Import_NewChannel.Text" xml:space="preserve">
+    <value>قناة جديدة</value>
+  </data>
+  <data name="Import_Subfolders.Content" xml:space="preserve">
+    <value>تضمين المجلدات التي بداخله</value>
+  </data>
+  <data name="Import_CaptionLanguageLabel.Text" xml:space="preserve">
+    <value>ملفات الترجمة التي لا يذكر اسمها لغة</value>
+  </data>
+  <data name="Import_CaptionLanguageAsk.Content" xml:space="preserve">
+    <value>لا تُرفع</value>
+  </data>
+  <data name="Import_CaptionLanguageAr.Content" xml:space="preserve">
+    <value>بالعربية</value>
+  </data>
+  <data name="Import_CaptionLanguageEn.Content" xml:space="preserve">
+    <value>بالإنجليزية</value>
+  </data>
+  <data name="Import_PickChannelFirst.Text" xml:space="preserve">
+    <value>اختر قناة في الأعلى أولًا.</value>
+  </data>
+  <data name="Import_QueueTitle.Text" xml:space="preserve">
+    <value>قائمة الرفع</value>
+  </data>
+  <data name="Import_PauseAll.Text" xml:space="preserve">
+    <value>إيقاف الكل مؤقتًا</value>
+  </data>
+  <data name="Import_ResumeAll.Text" xml:space="preserve">
+    <value>استئناف الكل</value>
+  </data>
+  <data name="Import_ClearFinished.Text" xml:space="preserve">
+    <value>إزالة ما اكتمل</value>
+  </data>
+  <data name="Import_RowPause.Text" xml:space="preserve">
+    <value>إيقاف مؤقت</value>
+  </data>
+  <data name="Import_RowResume.Text" xml:space="preserve">
+    <value>استئناف</value>
+  </data>
+  <data name="Import_RowRetry.Text" xml:space="preserve">
+    <value>أعد المحاولة الآن</value>
+  </data>
+  <data name="Import_RowLog.Text" xml:space="preserve">
+    <value>السجلّ</value>
+  </data>
+  <data name="Import_RowRemove.Text" xml:space="preserve">
+    <value>إزالة</value>
+  </data>
+  <data name="Import_ParallelTitle.Text" xml:space="preserve">
+    <value>في الوقت نفسه</value>
+  </data>
+  <data name="Import_ParallelBody.Text" xml:space="preserve">
+    <value>العدد الأكبر أسرع على اتصال سريع. الرفع حتى ٥ في آن واحد.</value>
+  </data>
+  <data name="Import_ParallelHash.Header" xml:space="preserve">
+    <value>فحص الملفات</value>
+  </data>
+  <data name="Import_ParallelUpload.Header" xml:space="preserve">
+    <value>الرفع</value>
+  </data>
+  <data name="Import_ParallelAttach.Header" xml:space="preserve">
+    <value>الترجمات والملحقات</value>
+  </data>
+  <data name="Import_ChannelNone" xml:space="preserve">
+    <value>لا توجد قناة مطابقة.</value>
+  </data>
+  <data name="Import_FolderMissing" xml:space="preserve">
+    <value>هذا المجلد غير موجود أو لا يمكن فتحه.</value>
+  </data>
+  <data name="Import_FoundSummary" xml:space="preserve">
+    <value>{0}، {1} إجمالًا</value>
+  </data>
+  <data name="Import_NoVideos" xml:space="preserve">
+    <value>لا توجد مرئيات في هذا المجلد.</value>
+  </data>
+  <data name="Import_LanguageArabic" xml:space="preserve">
+    <value>العربية</value>
+  </data>
+  <data name="Import_LanguageEnglish" xml:space="preserve">
+    <value>الإنجليزية</value>
+  </data>
+  <data name="Import_NoSidecars" xml:space="preserve">
+    <value>بلا ترجمات أو ملحقات</value>
+  </data>
+  <data name="Import_Cancel" xml:space="preserve">
+    <value>إلغاء</value>
+  </data>
+  <data name="Import_NewChannelTitle" xml:space="preserve">
+    <value>قناة جديدة</value>
+  </data>
+  <data name="Import_NewChannelBody" xml:space="preserve">
+    <value>تكون أنت مالك القناة، ويمكنك تسليمها لصاحبها لاحقًا من إدارة المرئيات.</value>
+  </data>
+  <data name="Import_NewChannelName" xml:space="preserve">
+    <value>الاسم</value>
+  </data>
+  <data name="Import_NewChannelHandle" xml:space="preserve">
+    <value>المعرّف، اختياري</value>
+  </data>
+  <data name="Import_NewChannelDescription" xml:space="preserve">
+    <value>الوصف، اختياري</value>
+  </data>
+  <data name="Import_NewChannelCreate" xml:space="preserve">
+    <value>إنشاء القناة</value>
+  </data>
+  <data name="Import_NewChannelNameNeeded" xml:space="preserve">
+    <value>أعطِ القناة اسمًا.</value>
+  </data>
+  <data name="Import_NewChannelTaken" xml:space="preserve">
+    <value>هذا المعرّف مستخدم. اختر غيره.</value>
+  </data>
+  <data name="Import_RemoveTitle" xml:space="preserve">
+    <value>إزالة من قائمة الرفع؟</value>
+  </data>
+  <data name="Import_RemoveBody" xml:space="preserve">
+    <value>يتوقف العمل عليه هنا، ويبقى على القناة ما رُفع منه.</value>
+  </data>
+  <data name="Import_RemoveConfirm" xml:space="preserve">
+    <value>إزالة</value>
+  </data>
+  <data name="ImportStep_Hash" xml:space="preserve">
+    <value>فحص الملف</value>
+  </data>
+  <data name="ImportStep_Upload" xml:space="preserve">
+    <value>الرفع</value>
+  </data>
+  <data name="ImportStep_Attach" xml:space="preserve">
+    <value>الترجمات والملحقات</value>
+  </data>
+  <data name="ImportPhase_Done" xml:space="preserve">
+    <value>رُفع</value>
+  </data>
+  <data name="ImportPhase_AlreadyImported" xml:space="preserve">
+    <value>موجود في هذه القناة أصلًا، فلم يُرفع</value>
+  </data>
+  <data name="ImportPhase_Uploading" xml:space="preserve">
+    <value>جارٍ الرفع، {0}</value>
+  </data>
+  <data name="ImportPhase_Running_Hash" xml:space="preserve">
+    <value>جارٍ فحص الملف…</value>
+  </data>
+  <data name="ImportPhase_Running_Attach" xml:space="preserve">
+    <value>جارٍ إرسال الترجمات والملحقات…</value>
+  </data>
+  <data name="ImportPhase_Running_Upload" xml:space="preserve">
+    <value>جارٍ الرفع…</value>
+  </data>
+  <data name="ImportPhase_RetryAt" xml:space="preserve">
+    <value>إعادة المحاولة عند {0}</value>
+  </data>
+  <data name="ImportPhase_Paused" xml:space="preserve">
+    <value>متوقف مؤقتًا</value>
+  </data>
+  <data name="ImportPhase_Failed" xml:space="preserve">
+    <value>توقف عند {0}</value>
+  </data>
+  <data name="ImportPhase_Waiting" xml:space="preserve">
+    <value>بانتظار {0}</value>
+  </data>
+  <data name="ImportError_admin_unreachable" xml:space="preserve">
+    <value>تعذّر الوصول إلى واجهة الإدارة. تحقّق من الاتصال.</value>
+  </data>
+  <data name="ImportError_signed_out" xml:space="preserve">
+    <value>انتهت جلستك. سجّل الدخول مجددًا ويُستأنف العمل.</value>
+  </data>
+  <data name="ImportError_server" xml:space="preserve">
+    <value>رفض الخادم الطلب.</value>
+  </data>
+  <data name="ImportError_videos_unreachable" xml:space="preserve">
+    <value>تعذّر الوصول إلى واجهة المرئيات. تحقّق من الاتصال.</value>
+  </data>
+  <data name="ImportError_upload_refused" xml:space="preserve">
+    <value>رُفض الرفع.</value>
+  </data>
+  <data name="ImportError_upload_gone" xml:space="preserve">
+    <value>انتهت جلسة الرفع، وتُفتح جلسة جديدة.</value>
+  </data>
+  <data name="ImportError_already_imported" xml:space="preserve">
+    <value>هذا الملف موجود في هذه القناة أصلًا.</value>
+  </data>
+  <data name="ImportError_file_missing" xml:space="preserve">
+    <value>الملف لم يعد موجودًا. ابحث في المجلد مجددًا.</value>
+  </data>
+  <data name="ImportError_file_link" xml:space="preserve">
+    <value>أصبح الملف اختصارًا لملف آخر، فلا يُرفع. ابحث في المجلد مجددًا.</value>
+  </data>
+  <data name="ImportError_file_changed" xml:space="preserve">
+    <value>تغيّر الملف بعد البحث. ابحث في المجلد مجددًا.</value>
+  </data>
+  <data name="ImportError_file_denied" xml:space="preserve">
+    <value>لا تملك الأدوات إذنًا بقراءة الملف.</value>
+  </data>
+  <data name="ImportError_file_read" xml:space="preserve">
+    <value>تعذّرت قراءة الملف.</value>
+  </data>
+  <data name="ImportError_not_hashed" xml:space="preserve">
+    <value>لم يُفحص الملف أولًا. أعد المحاولة.</value>
+  </data>
+  <data name="ImportError_not_uploaded" xml:space="preserve">
+    <value>لم يكتمل الرفع أولًا. أعد المحاولة.</value>
+  </data>
+  <data name="ImportError_unexpected" xml:space="preserve">
+    <value>حدث خطأ غير متوقع.</value>
+  </data>
+  <data name="ImportNote_CaptionLanguageUnknown" xml:space="preserve">
+    <value>ملف ترجمة لا يذكر اسمه لغة، فتُرك. اختر لغة لمثل هذه الملفات وابحث مجددًا:</value>
+  </data>
+  <data name="ImportNote_CaptionLanguageTwice" xml:space="preserve">
+    <value>ملفّا ترجمة باللغة نفسها، وتُرك هذا:</value>
+  </data>
+  <data name="ImportNote_MetadataUnreadable" xml:space="preserve">
+    <value>تعذّرت قراءة ملف بيانات فتُرك:</value>
+  </data>
+  <data name="ImportNote_CsvUnreadable" xml:space="preserve">
+    <value>تعذّرت قراءة جدول البيانات فتُرك:</value>
+  </data>
+  <data name="ImportNote_TooLarge" xml:space="preserve">
+    <value>أكبر من ٥ غيغابايت، فلا يمكن رفعه:</value>
+  </data>
+  <data name="ImportPart_captions" xml:space="preserve">
+    <value>ترجمات: {0}</value>
+  </data>
+  <data name="ImportPart_chapters" xml:space="preserve">
+    <value>فصول</value>
+  </data>
+  <data name="ImportPart_thumbnail" xml:space="preserve">
+    <value>صورة مصغّرة</value>
+  </data>
+  <data name="ImportPart_metadata" xml:space="preserve">
+    <value>بيانات</value>
+  </data>
+  <data name="ImportPart_playlist" xml:space="preserve">
+    <value>قائمة تشغيل</value>
+  </data>
+  <data name="ImportPart_publish_date" xml:space="preserve">
+    <value>موعد النشر</value>
+  </data>
+  <data name="ImportLog_added" xml:space="preserve">
+    <value>أُضيف إلى قائمة الرفع</value>
+  </data>
+  <data name="ImportLog_paused" xml:space="preserve">
+    <value>أُوقف مؤقتًا</value>
+  </data>
+  <data name="ImportLog_resumed" xml:space="preserve">
+    <value>استُؤنف</value>
+  </data>
+  <data name="ImportLog_finished" xml:space="preserve">
+    <value>اكتمل</value>
+  </data>
+  <data name="ImportLog_session_ended" xml:space="preserve">
+    <value>انتهت جلسة الرفع، وتُفتح من جديد</value>
+  </data>
+  <data name="ImportLog_report_failed" xml:space="preserve">
+    <value>تعذّر إرسال الخطأ إلى صفحة الأخطاء:</value>
+  </data>
+  <data name="ImportLog_retry" xml:space="preserve">
+    <value>إعادة محاولة {0}</value>
+  </data>
+  <data name="ImportLog_started" xml:space="preserve">
+    <value>بدأ {0}</value>
+  </data>
+  <data name="ImportLog_stopped" xml:space="preserve">
+    <value>توقف {0}</value>
+  </data>
+  <data name="ImportLog_done" xml:space="preserve">
+    <value>اكتمل {0}</value>
+  </data>
+  <data name="ImportLog_skipped" xml:space="preserve">
+    <value>لا شيء لـ{0}</value>
+  </data>
+  <data name="ImportLog_attempt" xml:space="preserve">
+    <value>{0}: المحاولة {1}</value>
+  </data>
+  <data name="ImportLog_attempt_failed" xml:space="preserve">
+    <value>{0}: فشلت المحاولة {1}، والتالية بعد {2} ث</value>
+  </data>
+  <data name="ImportLog_failed" xml:space="preserve">
+    <value>{0}: توقف بعد {1} محاولات</value>
+  </data>
+  <data name="ImportLog_reference" xml:space="preserve">
+    <value>المرجع {0}</value>
+  </data>
+  <data name="ImportLog_sha" xml:space="preserve">
+    <value>SHA-256:</value>
+  </data>
+  <data name="ImportLog_upload_opened" xml:space="preserve">
+    <value>فُتح الرفع للمرئي:</value>
+  </data>
+  <data name="ImportLog_upload_reopened" xml:space="preserve">
+    <value>أُعيد فتح الرفع للمرئي:</value>
+  </data>
+  <data name="ImportLog_uploaded" xml:space="preserve">
+    <value>رُفع المرئي:</value>
+  </data>
+  <data name="ImportLog_already_imported" xml:space="preserve">
+    <value>موجود في هذه القناة أصلًا، فلا شيء يُرفع. المرئي:</value>
+  </data>
+  <data name="ImportLog_sent" xml:space="preserve">
+    <value>أُرسلت: {0}، ويُلحقها الخادم</value>
+  </data>
+  <data name="ImportLog_left_out_size" xml:space="preserve">
+    <value>أكبر من {0} ميغابايت أو فارغ، فتُرك:</value>
+  </data>
+  <data name="ImportLog_left_out_unreadable" xml:space="preserve">
+    <value>تعذّرت قراءته فتُرك:</value>
+  </data>
+  <data name="Import_VideoCount_One" xml:space="preserve">
+    <value>مرئي واحد</value>
+  </data>
+  <data name="Import_VideoCount_Other" xml:space="preserve">
+    <value>{0} مرئي</value>
+  </data>
+  <data name="Import_VideoCount_Zero" xml:space="preserve">
+    <value>{0} مرئي</value>
+  </data>
+  <data name="Import_VideoCount_Two" xml:space="preserve">
+    <value>مرئيان</value>
+  </data>
+  <data name="Import_VideoCount_Few" xml:space="preserve">
+    <value>{0} مرئيات</value>
+  </data>
+  <data name="Import_VideoCount_Many" xml:space="preserve">
+    <value>{0} مرئيًا</value>
+  </data>
+  <data name="Import_AlreadyQueued_One" xml:space="preserve">
+    <value>مرئي واحد في قائمة الرفع أصلًا، فلا يُعرض مجددًا.</value>
+  </data>
+  <data name="Import_AlreadyQueued_Other" xml:space="preserve">
+    <value>{0} مرئي في قائمة الرفع أصلًا، فلا يُعرض مجددًا.</value>
+  </data>
+  <data name="Import_AlreadyQueued_Zero" xml:space="preserve">
+    <value>{0} مرئي في قائمة الرفع أصلًا، فلا يُعرض مجددًا.</value>
+  </data>
+  <data name="Import_AlreadyQueued_Two" xml:space="preserve">
+    <value>مرئيان في قائمة الرفع أصلًا، فلا يُعرض مجددًا.</value>
+  </data>
+  <data name="Import_AlreadyQueued_Few" xml:space="preserve">
+    <value>{0} مرئيات في قائمة الرفع أصلًا، فلا يُعرض مجددًا.</value>
+  </data>
+  <data name="Import_AlreadyQueued_Many" xml:space="preserve">
+    <value>{0} مرئيًا في قائمة الرفع أصلًا، فلا يُعرض مجددًا.</value>
+  </data>
+  <data name="Import_AddToQueue_One" xml:space="preserve">
+    <value>أضف مرئيًا واحدًا إلى قائمة الرفع</value>
+  </data>
+  <data name="Import_AddToQueue_Other" xml:space="preserve">
+    <value>أضف {0} مرئي إلى قائمة الرفع</value>
+  </data>
+  <data name="Import_AddToQueue_Zero" xml:space="preserve">
+    <value>أضف إلى قائمة الرفع</value>
+  </data>
+  <data name="Import_AddToQueue_Two" xml:space="preserve">
+    <value>أضف مرئيين إلى قائمة الرفع</value>
+  </data>
+  <data name="Import_AddToQueue_Few" xml:space="preserve">
+    <value>أضف {0} مرئيات إلى قائمة الرفع</value>
+  </data>
+  <data name="Import_AddToQueue_Many" xml:space="preserve">
+    <value>أضف {0} مرئيًا إلى قائمة الرفع</value>
+  </data>
+  <data name="Import_Added_One" xml:space="preserve">
+    <value>أُضيف إلى قائمة الرفع مرئي واحد لقناة:</value>
+  </data>
+  <data name="Import_Added_Other" xml:space="preserve">
+    <value>أُضيف إلى قائمة الرفع {0} مرئي لقناة:</value>
+  </data>
+  <data name="Import_Added_Zero" xml:space="preserve">
+    <value>أُضيف إلى قائمة الرفع {0} مرئي لقناة:</value>
+  </data>
+  <data name="Import_Added_Two" xml:space="preserve">
+    <value>أُضيف إلى قائمة الرفع مرئيان لقناة:</value>
+  </data>
+  <data name="Import_Added_Few" xml:space="preserve">
+    <value>أُضيف إلى قائمة الرفع {0} مرئيات لقناة:</value>
+  </data>
+  <data name="Import_Added_Many" xml:space="preserve">
+    <value>أُضيف إلى قائمة الرفع {0} مرئيًا لقناة:</value>
+  </data>
+  <data name="Import_SumDone" xml:space="preserve">
+    <value>مكتمل: {0}</value>
+  </data>
+  <data name="Import_SumRunning" xml:space="preserve">
+    <value>قيد العمل: {0}</value>
+  </data>
+  <data name="Import_SumWaiting" xml:space="preserve">
+    <value>بالانتظار: {0}</value>
+  </data>
+  <data name="Import_SumRetrying" xml:space="preserve">
+    <value>تُعاد محاولته قريبًا: {0}</value>
+  </data>
+  <data name="Import_SumPaused" xml:space="preserve">
+    <value>متوقف مؤقتًا: {0}</value>
+  </data>
+  <data name="Import_SumFailed" xml:space="preserve">
+    <value>متوقف لخطأ: {0}</value>
+  </data>
+  <data name="Import_LogCopyButton.Text" xml:space="preserve">
+    <value>نسخ السجلّ</value>
+  </data>
+  <data name="Import_LogCopiedNote.Text" xml:space="preserve">
+    <value>نُسخ</value>
   </data>
 </root>

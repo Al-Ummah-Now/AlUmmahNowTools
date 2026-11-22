@@ -68,6 +68,12 @@ public partial class App : Application
             if (exception != null)
             {
                 LogStructuredException(exception, "AppDomain unhandled exception");
+                // To the Errors page in videos admin, once the signed-in import workspace exists (TOOLS-ADMIN TA-11)
+                if (Shell.ImportWorkspace.IfStarted is { } workspace)
+                {
+                    workspace.Reporter.Report("unhandled", exception, exception.Message);
+                    if (isTerminating) workspace.Reporter.FlushAsync().Wait(TimeSpan.FromSeconds(3));
+                }
             }
         };
 
@@ -79,6 +85,8 @@ public partial class App : Application
                 args.Observed);
 
             LogStructuredException(args.Exception, "Unobserved task exception");
+            var inner = args.Exception.InnerException ?? args.Exception;
+            Shell.ImportWorkspace.IfStarted?.Reporter.Report("rejection", inner, inner.Message);
 
             // Mark as observed to prevent process termination
             args.SetObserved();
@@ -345,6 +353,7 @@ public partial class App : Application
 
                         // Register view models with safe initialization
                         services.AddTransient<MainViewModel>();
+                        services.AddTransient<BulkImportViewModel>();
                         services.AddSingleton<ServiceStatusViewModel>();
                         services.AddTransient<SettingsViewModel>();
 

@@ -532,7 +532,7 @@
     <value>Folder</value>
   </data>
   <data name="Import_FolderBody.Text" xml:space="preserve">
-    <value>Each folder inside it becomes a channel. Tools finds the videos and the caption, chapter and thumbnail files next to them.</value>
+    <value>Tools finds the videos in it and the caption, chapter, thumbnail and metadata files next to them.</value>
   </data>
   <data name="Import_FolderBox.PlaceholderText" xml:space="preserve">
     <value>No folder chosen yet</value>
@@ -547,25 +547,16 @@
     <value>Videos show here</value>
   </data>
   <data name="Import_EmptyBody.Text" xml:space="preserve">
-    <value>Choose a folder and find its videos. You then pick which ones to upload; nothing uploads until you say so.</value>
+    <value>Choose a channel and a folder, then find its videos. You pick which ones to import; nothing uploads until you add them to the queue.</value>
   </data>
   <data name="Import_FoundTitle.Text" xml:space="preserve">
     <value>Videos found</value>
-  </data>
-  <data name="Import_SelectedLabel.Text" xml:space="preserve">
-    <value>selected</value>
   </data>
   <data name="Import_SelectAll.Text" xml:space="preserve">
     <value>Select all</value>
   </data>
   <data name="Import_SelectNone.Text" xml:space="preserve">
     <value>Select none</value>
-  </data>
-  <data name="Import_OnlySelected.Content" xml:space="preserve">
-    <value>Show only selected</value>
-  </data>
-  <data name="Import_Upload.Text" xml:space="preserve">
-    <value>Upload selected</value>
   </data>
   <data name="Import_AllChannels" xml:space="preserve">
     <value>All channels</value>
@@ -1742,5 +1733,371 @@
   </data>
   <data name="Dashboard_ProblemsNone.Text" xml:space="preserve">
     <value>No problems</value>
+  </data>
+  <data name="Import_ChannelTitle.Text" xml:space="preserve">
+    <value>Channel</value>
+  </data>
+  <data name="Import_ChannelBody.Text" xml:space="preserve">
+    <value>Every video in this import goes to one channel. Find it by name or handle, or make a new one.</value>
+  </data>
+  <data name="Import_ChannelBox.PlaceholderText" xml:space="preserve">
+    <value>Search channels</value>
+  </data>
+  <data name="Import_NewChannel.Text" xml:space="preserve">
+    <value>New channel</value>
+  </data>
+  <data name="Import_Subfolders.Content" xml:space="preserve">
+    <value>Include folders inside it</value>
+  </data>
+  <data name="Import_CaptionLanguageLabel.Text" xml:space="preserve">
+    <value>Caption files with no language in their name</value>
+  </data>
+  <data name="Import_CaptionLanguageAsk.Content" xml:space="preserve">
+    <value>Leave them out</value>
+  </data>
+  <data name="Import_CaptionLanguageAr.Content" xml:space="preserve">
+    <value>Are in Arabic</value>
+  </data>
+  <data name="Import_CaptionLanguageEn.Content" xml:space="preserve">
+    <value>Are in English</value>
+  </data>
+  <data name="Import_PickChannelFirst.Text" xml:space="preserve">
+    <value>Choose a channel above first.</value>
+  </data>
+  <data name="Import_QueueTitle.Text" xml:space="preserve">
+    <value>Upload queue</value>
+  </data>
+  <data name="Import_PauseAll.Text" xml:space="preserve">
+    <value>Pause all</value>
+  </data>
+  <data name="Import_ResumeAll.Text" xml:space="preserve">
+    <value>Resume all</value>
+  </data>
+  <data name="Import_ClearFinished.Text" xml:space="preserve">
+    <value>Clear finished</value>
+  </data>
+  <data name="Import_RowPause.Text" xml:space="preserve">
+    <value>Pause</value>
+  </data>
+  <data name="Import_RowResume.Text" xml:space="preserve">
+    <value>Resume</value>
+  </data>
+  <data name="Import_RowRetry.Text" xml:space="preserve">
+    <value>Try again now</value>
+  </data>
+  <data name="Import_RowLog.Text" xml:space="preserve">
+    <value>Log</value>
+  </data>
+  <data name="Import_RowRemove.Text" xml:space="preserve">
+    <value>Remove</value>
+  </data>
+  <data name="Import_ParallelTitle.Text" xml:space="preserve">
+    <value>At the same time</value>
+  </data>
+  <data name="Import_ParallelBody.Text" xml:space="preserve">
+    <value>More at once is faster on a fast connection. Uploads go up to 5.</value>
+  </data>
+  <data name="Import_ParallelHash.Header" xml:space="preserve">
+    <value>Checking files</value>
+  </data>
+  <data name="Import_ParallelUpload.Header" xml:space="preserve">
+    <value>Uploads</value>
+  </data>
+  <data name="Import_ParallelAttach.Header" xml:space="preserve">
+    <value>Captions and extras</value>
+  </data>
+  <data name="Import_ChannelNone" xml:space="preserve">
+    <value>No channel matches.</value>
+  </data>
+  <data name="Import_FolderMissing" xml:space="preserve">
+    <value>That folder doesn't exist or can't be opened.</value>
+  </data>
+  <data name="Import_FoundSummary" xml:space="preserve">
+    <value>{0}, {1} in all</value>
+  </data>
+  <data name="Import_NoVideos" xml:space="preserve">
+    <value>No videos in this folder.</value>
+  </data>
+  <data name="Import_LanguageArabic" xml:space="preserve">
+    <value>Arabic</value>
+  </data>
+  <data name="Import_LanguageEnglish" xml:space="preserve">
+    <value>English</value>
+  </data>
+  <data name="Import_NoSidecars" xml:space="preserve">
+    <value>No captions or extras</value>
+  </data>
+  <data name="Import_Cancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="Import_NewChannelTitle" xml:space="preserve">
+    <value>New channel</value>
+  </data>
+  <data name="Import_NewChannelBody" xml:space="preserve">
+    <value>You own the channel. You can hand it to its scholar later from the videos admin.</value>
+  </data>
+  <data name="Import_NewChannelName" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="Import_NewChannelHandle" xml:space="preserve">
+    <value>Handle (optional)</value>
+  </data>
+  <data name="Import_NewChannelDescription" xml:space="preserve">
+    <value>Description (optional)</value>
+  </data>
+  <data name="Import_NewChannelCreate" xml:space="preserve">
+    <value>Create channel</value>
+  </data>
+  <data name="Import_NewChannelNameNeeded" xml:space="preserve">
+    <value>Give the channel a name.</value>
+  </data>
+  <data name="Import_NewChannelTaken" xml:space="preserve">
+    <value>That handle is taken. Choose another.</value>
+  </data>
+  <data name="Import_RemoveTitle" xml:space="preserve">
+    <value>Remove from the queue?</value>
+  </data>
+  <data name="Import_RemoveBody" xml:space="preserve">
+    <value>Its work here stops. Anything already uploaded stays on the channel.</value>
+  </data>
+  <data name="Import_RemoveConfirm" xml:space="preserve">
+    <value>Remove</value>
+  </data>
+  <data name="ImportStep_Hash" xml:space="preserve">
+    <value>checking the file</value>
+  </data>
+  <data name="ImportStep_Upload" xml:space="preserve">
+    <value>upload</value>
+  </data>
+  <data name="ImportStep_Attach" xml:space="preserve">
+    <value>captions and extras</value>
+  </data>
+  <data name="ImportPhase_Done" xml:space="preserve">
+    <value>Uploaded</value>
+  </data>
+  <data name="ImportPhase_AlreadyImported" xml:space="preserve">
+    <value>Already in this channel; nothing uploaded</value>
+  </data>
+  <data name="ImportPhase_Uploading" xml:space="preserve">
+    <value>Uploading, {0}</value>
+  </data>
+  <data name="ImportPhase_Running_Hash" xml:space="preserve">
+    <value>Checking the file…</value>
+  </data>
+  <data name="ImportPhase_Running_Attach" xml:space="preserve">
+    <value>Sending captions and extras…</value>
+  </data>
+  <data name="ImportPhase_Running_Upload" xml:space="preserve">
+    <value>Uploading…</value>
+  </data>
+  <data name="ImportPhase_RetryAt" xml:space="preserve">
+    <value>Trying again at {0}</value>
+  </data>
+  <data name="ImportPhase_Paused" xml:space="preserve">
+    <value>Paused</value>
+  </data>
+  <data name="ImportPhase_Failed" xml:space="preserve">
+    <value>Stopped at {0}</value>
+  </data>
+  <data name="ImportPhase_Waiting" xml:space="preserve">
+    <value>Waiting: {0}</value>
+  </data>
+  <data name="ImportError_admin_unreachable" xml:space="preserve">
+    <value>The admin API couldn't be reached. Check the connection.</value>
+  </data>
+  <data name="ImportError_signed_out" xml:space="preserve">
+    <value>You're signed out. Sign in again and it carries on.</value>
+  </data>
+  <data name="ImportError_server" xml:space="preserve">
+    <value>The server said no.</value>
+  </data>
+  <data name="ImportError_videos_unreachable" xml:space="preserve">
+    <value>The videos API couldn't be reached. Check the connection.</value>
+  </data>
+  <data name="ImportError_upload_refused" xml:space="preserve">
+    <value>The upload was refused.</value>
+  </data>
+  <data name="ImportError_upload_gone" xml:space="preserve">
+    <value>The upload session ended. It opens a new one.</value>
+  </data>
+  <data name="ImportError_already_imported" xml:space="preserve">
+    <value>This file is already in this channel.</value>
+  </data>
+  <data name="ImportError_file_missing" xml:space="preserve">
+    <value>The file isn't there any more. Scan the folder again.</value>
+  </data>
+  <data name="ImportError_file_link" xml:space="preserve">
+    <value>The file is now a link to another file, so it isn't uploaded. Scan the folder again.</value>
+  </data>
+  <data name="ImportError_file_changed" xml:space="preserve">
+    <value>The file changed after it was scanned. Scan the folder again.</value>
+  </data>
+  <data name="ImportError_file_denied" xml:space="preserve">
+    <value>Tools isn't allowed to read the file.</value>
+  </data>
+  <data name="ImportError_file_read" xml:space="preserve">
+    <value>The file couldn't be read.</value>
+  </data>
+  <data name="ImportError_not_hashed" xml:space="preserve">
+    <value>The file wasn't checked first. Try again.</value>
+  </data>
+  <data name="ImportError_not_uploaded" xml:space="preserve">
+    <value>The upload didn't finish first. Try again.</value>
+  </data>
+  <data name="ImportError_unexpected" xml:space="preserve">
+    <value>Something unexpected went wrong.</value>
+  </data>
+  <data name="ImportNote_CaptionLanguageUnknown" xml:space="preserve">
+    <value>A caption file has no language in its name, so it's left out. Choose a language for such files and find the videos again:</value>
+  </data>
+  <data name="ImportNote_CaptionLanguageTwice" xml:space="preserve">
+    <value>Two caption files have the same language; this one is left out:</value>
+  </data>
+  <data name="ImportNote_MetadataUnreadable" xml:space="preserve">
+    <value>A metadata file couldn't be read and is left out:</value>
+  </data>
+  <data name="ImportNote_CsvUnreadable" xml:space="preserve">
+    <value>The metadata sheet couldn't be read and is left out:</value>
+  </data>
+  <data name="ImportNote_TooLarge" xml:space="preserve">
+    <value>Larger than 5 GB, so it can't be uploaded:</value>
+  </data>
+  <data name="ImportPart_captions" xml:space="preserve">
+    <value>captions: {0}</value>
+  </data>
+  <data name="ImportPart_chapters" xml:space="preserve">
+    <value>chapters</value>
+  </data>
+  <data name="ImportPart_thumbnail" xml:space="preserve">
+    <value>thumbnail</value>
+  </data>
+  <data name="ImportPart_metadata" xml:space="preserve">
+    <value>metadata</value>
+  </data>
+  <data name="ImportPart_playlist" xml:space="preserve">
+    <value>playlist</value>
+  </data>
+  <data name="ImportPart_publish_date" xml:space="preserve">
+    <value>publish date</value>
+  </data>
+  <data name="ImportLog_added" xml:space="preserve">
+    <value>Added to the queue</value>
+  </data>
+  <data name="ImportLog_paused" xml:space="preserve">
+    <value>Paused</value>
+  </data>
+  <data name="ImportLog_resumed" xml:space="preserve">
+    <value>Resumed</value>
+  </data>
+  <data name="ImportLog_finished" xml:space="preserve">
+    <value>Finished</value>
+  </data>
+  <data name="ImportLog_session_ended" xml:space="preserve">
+    <value>The upload session ended; opening it again</value>
+  </data>
+  <data name="ImportLog_report_failed" xml:space="preserve">
+    <value>The failure couldn't be sent to the Errors page:</value>
+  </data>
+  <data name="ImportLog_retry" xml:space="preserve">
+    <value>Trying {0} again</value>
+  </data>
+  <data name="ImportLog_started" xml:space="preserve">
+    <value>Started {0}</value>
+  </data>
+  <data name="ImportLog_stopped" xml:space="preserve">
+    <value>Stopped {0}</value>
+  </data>
+  <data name="ImportLog_done" xml:space="preserve">
+    <value>Finished {0}</value>
+  </data>
+  <data name="ImportLog_skipped" xml:space="preserve">
+    <value>Nothing to do for {0}</value>
+  </data>
+  <data name="ImportLog_attempt" xml:space="preserve">
+    <value>{0}: attempt {1}</value>
+  </data>
+  <data name="ImportLog_attempt_failed" xml:space="preserve">
+    <value>{0}: attempt {1} failed; next try in {2} s</value>
+  </data>
+  <data name="ImportLog_failed" xml:space="preserve">
+    <value>{0}: stopped after {1} attempts</value>
+  </data>
+  <data name="ImportLog_reference" xml:space="preserve">
+    <value>Reference {0}</value>
+  </data>
+  <data name="ImportLog_sha" xml:space="preserve">
+    <value>SHA-256:</value>
+  </data>
+  <data name="ImportLog_upload_opened" xml:space="preserve">
+    <value>Upload opened for video:</value>
+  </data>
+  <data name="ImportLog_upload_reopened" xml:space="preserve">
+    <value>Upload opened again for video:</value>
+  </data>
+  <data name="ImportLog_uploaded" xml:space="preserve">
+    <value>Uploaded video:</value>
+  </data>
+  <data name="ImportLog_already_imported" xml:space="preserve">
+    <value>Already in this channel, nothing to upload. Video:</value>
+  </data>
+  <data name="ImportLog_sent" xml:space="preserve">
+    <value>Sent {0}; the server attaches them</value>
+  </data>
+  <data name="ImportLog_left_out_size" xml:space="preserve">
+    <value>Larger than {0} MB or empty, so left out:</value>
+  </data>
+  <data name="ImportLog_left_out_unreadable" xml:space="preserve">
+    <value>Couldn't be read, so left out:</value>
+  </data>
+  <data name="Import_VideoCount_One" xml:space="preserve">
+    <value>1 video</value>
+  </data>
+  <data name="Import_VideoCount_Other" xml:space="preserve">
+    <value>{0} videos</value>
+  </data>
+  <data name="Import_AlreadyQueued_One" xml:space="preserve">
+    <value>1 video is already in the queue, so it isn't shown again.</value>
+  </data>
+  <data name="Import_AlreadyQueued_Other" xml:space="preserve">
+    <value>{0} videos are already in the queue, so they aren't shown again.</value>
+  </data>
+  <data name="Import_AddToQueue_One" xml:space="preserve">
+    <value>Add 1 video to the queue</value>
+  </data>
+  <data name="Import_AddToQueue_Other" xml:space="preserve">
+    <value>Add {0} videos to the queue</value>
+  </data>
+  <data name="Import_AddToQueue_Zero" xml:space="preserve">
+    <value>Add to the queue</value>
+  </data>
+  <data name="Import_Added_One" xml:space="preserve">
+    <value>1 video added to the queue for:</value>
+  </data>
+  <data name="Import_Added_Other" xml:space="preserve">
+    <value>{0} videos added to the queue for:</value>
+  </data>
+  <data name="Import_SumDone" xml:space="preserve">
+    <value>{0} finished</value>
+  </data>
+  <data name="Import_SumRunning" xml:space="preserve">
+    <value>{0} in progress</value>
+  </data>
+  <data name="Import_SumWaiting" xml:space="preserve">
+    <value>{0} waiting</value>
+  </data>
+  <data name="Import_SumRetrying" xml:space="preserve">
+    <value>{0} trying again soon</value>
+  </data>
+  <data name="Import_SumPaused" xml:space="preserve">
+    <value>{0} paused</value>
+  </data>
+  <data name="Import_SumFailed" xml:space="preserve">
+    <value>{0} stopped</value>
+  </data>
+  <data name="Import_LogCopyButton.Text" xml:space="preserve">
+    <value>Copy log</value>
+  </data>
+  <data name="Import_LogCopiedNote.Text" xml:space="preserve">
+    <value>Copied</value>
   </data>
 </root>
