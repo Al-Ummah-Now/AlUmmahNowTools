@@ -47,6 +47,7 @@ public sealed class UploadStep : IImportStep
     {
         var info = new FileInfo(item.Video.Path);
         if (!info.Exists) throw new StepFailedException("The file is no longer in its folder", retryable: false);
+        if (info.LinkTarget is not null) throw new StepFailedException("The file is now a link to another file. Scan the folder again", retryable: false);
         var modified = new DateTimeOffset(info.LastWriteTimeUtc).ToUnixTimeMilliseconds();
         if (info.Length != item.Video.Size || modified != item.Video.LastModifiedMs)
         {
