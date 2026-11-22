@@ -10,28 +10,32 @@ public enum ToolsEnvironmentKind
 
 /// <summary>
 /// One environment: the Auth issuer, the Admin Tools (desktop) client registered there (wiki
-/// TOOLS-ADMIN TA-2; a public PKCE client on a loopback redirect) and the admin API.
+/// TOOLS-ADMIN TA-2; a public PKCE client on a loopback redirect), the admin API, and the videos API whose TUS
+/// endpoint (<c>/api/videos/tus</c>) takes the files of an import.
 /// </summary>
-public sealed record ToolsEnvironment(ToolsEnvironmentKind Kind, Uri Issuer, string ClientId, Uri AdminApi)
+public sealed record ToolsEnvironment(ToolsEnvironmentKind Kind, Uri Issuer, string ClientId, Uri AdminApi, Uri VideosApi)
 {
     /// <summary>Production and stage share the client row (the same Auth migration), QA has its own.</summary>
     public static readonly ToolsEnvironment Production = new(
         ToolsEnvironmentKind.Production,
         new Uri("https://auth.alummahnow.net"),
         "cf0d26c6-4cd1-4bbf-8247-c63a5d417b15",
-        new Uri("https://admin.api.alummahnow.net"));
+        new Uri("https://admin.api.alummahnow.net"),
+        new Uri("https://videos.api.alummahnow.net"));
 
     public static readonly ToolsEnvironment Stage = new(
         ToolsEnvironmentKind.Stage,
         new Uri("https://auth.stage.alummahnow.net"),
         "cf0d26c6-4cd1-4bbf-8247-c63a5d417b15",
-        new Uri("https://admin.api.stage.alummahnow.net"));
+        new Uri("https://admin.api.stage.alummahnow.net"),
+        new Uri("https://videos.api.stage.alummahnow.net"));
 
     public static readonly ToolsEnvironment Qa = new(
         ToolsEnvironmentKind.Qa,
         new Uri("https://auth.qa.alummahnow.net"),
         "75f36653-4dfd-44af-8f67-588a5b7e9613",
-        new Uri("https://admin.api.qa.alummahnow.net"));
+        new Uri("https://admin.api.qa.alummahnow.net"),
+        new Uri("https://videos.api.qa.alummahnow.net"));
 
     public static IReadOnlyList<ToolsEnvironment> All { get; } = new[] { Production, Stage, Qa };
 
