@@ -2110,10 +2110,10 @@
     <value>Let the server encode these videos</value>
   </data>
   <data name="Import_EncodeNote_ffmpeg_missing" xml:space="preserve">
-    <value>ffmpeg isn't on this computer, so the server encodes these videos. Add it on the Video tools page.</value>
+    <value>The encoding tool (ffmpeg) isn't on this computer, so the server encodes these videos. Add it on the Video tools page.</value>
   </data>
   <data name="Import_EncodeNote_no_encoder" xml:space="preserve">
-    <value>This ffmpeg can't encode H.264, so the server encodes these videos. Choose another on the Video tools page.</value>
+    <value>The encoding tool (ffmpeg) on this computer can't make the video format the server needs, so the server encodes these videos. Choose another on the Video tools page.</value>
   </data>
   <data name="Import_ParallelEncode.Header" xml:space="preserve">
     <value>Encodes</value>
@@ -2143,10 +2143,10 @@
     <value>Served as encoded on this computer</value>
   </data>
   <data name="ImportVerdict_rejected" xml:space="preserve">
-    <value>Encoded again by the server: {0}</value>
+    <value>The server re-encoded this because {0}</value>
   </data>
   <data name="ImportVerdict_rejected_rung" xml:space="preserve">
-    <value>Encoded again by the server: {0}, at {1}</value>
+    <value>The server re-encoded this at {1} because {0}</value>
   </data>
   <data name="ImportVerdict_failed" xml:space="preserve">
     <value>The server's processing stopped. The videos admin shows it with Retry.</value>
@@ -2161,7 +2161,7 @@
     <value>a file was missing</value>
   </data>
   <data name="ImportReason_playlist" xml:space="preserve">
-    <value>an HLS playlist isn't as the server writes them</value>
+    <value>a playlist file isn't as the server writes it</value>
   </data>
   <data name="ImportReason_no_video" xml:space="preserve">
     <value>there's no picture</value>
@@ -2185,10 +2185,10 @@
     <value>the length doesn't match the original</value>
   </data>
   <data name="ImportReason_keyframes" xml:space="preserve">
-    <value>keyframes aren't where the server needs them</value>
+    <value>playback couldn't start at every point the server needs</value>
   </data>
   <data name="ImportReason_bitrate" xml:space="preserve">
-    <value>the bitrate is over the limit</value>
+    <value>it uses more data per second than the limit</value>
   </data>
   <data name="ImportReason_decode" xml:space="preserve">
     <value>a file didn't play through</value>
@@ -2206,10 +2206,10 @@
     <value>the files didn't reach the encode in time</value>
   </data>
   <data name="ImportEncodeError_ffmpeg_missing" xml:space="preserve">
-    <value>ffmpeg isn't on this computer</value>
+    <value>the encoding tool (ffmpeg) isn't on this computer</value>
   </data>
   <data name="ImportEncodeError_probe_failed" xml:space="preserve">
-    <value>ffprobe couldn't read the file</value>
+    <value>the encoding tool couldn't read the file</value>
   </data>
   <data name="ImportEncodeError_no_video" xml:space="preserve">
     <value>the file has no picture</value>
@@ -2218,7 +2218,7 @@
     <value>there isn't enough free disk space</value>
   </data>
   <data name="ImportEncodeError_ffmpeg_failed" xml:space="preserve">
-    <value>ffmpeg stopped</value>
+    <value>the encoding tool stopped</value>
   </data>
   <data name="ImportEncodeError_package_failed" xml:space="preserve">
     <value>the encoded files couldn't be prepared</value>
@@ -2251,7 +2251,7 @@
     <value>The server already started encoding it; nothing to encode here</value>
   </data>
   <data name="ImportLog_encode_plan" xml:space="preserve">
-    <value>Encoding here, these sizes with this encoder:</value>
+    <value>Encoding here at {0}, with {1}</value>
   </data>
   <data name="ImportLog_encoded" xml:space="preserve">
     <value>Encoded here, {0} in all; it goes with the upload</value>
@@ -2260,7 +2260,7 @@
     <value>Couldn't encode here, so the server encodes it:</value>
   </data>
   <data name="ImportLog_renditions_staged" xml:space="preserve">
-    <value>Sending the encoded files: {0}</value>
+    <value>Sending the encoded video as {0} short pieces, the form the server plays</value>
   </data>
   <data name="ImportLog_renditions_sent" xml:space="preserve">
     <value>The server has the encoded files; it checks them when it processes the video</value>
@@ -2294,5 +2294,29 @@
   </data>
   <data name="ImportEncodeError_settings_invalid" xml:space="preserve">
     <value>the server's encoding settings can't be used here</value>
+  </data>
+  <data name="ImportLog_encoded_from" xml:space="preserve">
+    <value>Encoded here: {0}, from an original of {1}; it goes with the upload</value>
+  </data>
+  <data name="ImportLog_renditions_staged_size" xml:space="preserve">
+    <value>Sending the encoded video ({0}) as {1} short pieces, the form the server plays</value>
+  </data>
+  <data name="ImportEncoder_apple" xml:space="preserve">
+    <value>Apple's built-in encoder</value>
+  </data>
+  <data name="ImportEncoder_nvidia" xml:space="preserve">
+    <value>the NVIDIA graphics card's encoder</value>
+  </data>
+  <data name="ImportEncoder_intel" xml:space="preserve">
+    <value>Intel's built-in encoder</value>
+  </data>
+  <data name="ImportEncoder_amd" xml:space="preserve">
+    <value>the AMD graphics card's encoder</value>
+  </data>
+  <data name="ImportEncoder_software" xml:space="preserve">
+    <value>the encoding tool's own encoder</value>
+  </data>
+  <data name="ImportEncoder_other" xml:space="preserve">
+    <value>the encoding tool</value>
   </data>
 </root>
