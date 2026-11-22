@@ -2275,7 +2275,7 @@
     <value>المرجع {0}</value>
   </data>
   <data name="ImportLog_sha" xml:space="preserve">
-    <value>بصمة SHA-256 للملف:</value>
+    <value>بصمة الملف:</value>
   </data>
   <data name="ImportLog_upload_opened" xml:space="preserve">
     <value>فُتح الرفع للمرئي:</value>
