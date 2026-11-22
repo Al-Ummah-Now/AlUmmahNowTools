@@ -53,12 +53,12 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
 
     /// <summary>"Let the server encode", as the admin chose it: the batch's files are not encoded on this computer.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ServerEncodesShown))]
+    [NotifyPropertyChangedFor(nameof(ServerEncodesShown), nameof(EncodeBody))]
     private bool _serverEncodes;
 
     /// <summary>Why this computer cannot encode (no ffmpeg, no H.264 encoder), or empty.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasEncodeNote), nameof(CanChooseEncode), nameof(ServerEncodesShown))]
+    [NotifyPropertyChangedFor(nameof(HasEncodeNote), nameof(CanChooseEncode), nameof(ServerEncodesShown), nameof(EncodeBody))]
     private string _encodeNote = "";
 
     public bool HasEncodeNote => EncodeNote.Length > 0;
@@ -79,6 +79,9 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
             else OnPropertyChanged();
         }
     }
+
+    /// <summary>The text above the box: who encodes this batch, matching the box (AUDIT-2 2026-11-22).</summary>
+    public string EncodeBody => Loc.Get(ServerEncodesShown ? "Import_EncodeBodyServer" : "Import_EncodeBodyHere");
 
     private async Task CheckEncodingAsync()
     {

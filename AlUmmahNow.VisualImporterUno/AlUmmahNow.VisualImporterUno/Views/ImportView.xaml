@@ -169,7 +169,7 @@
                     <Border Style="{StaticResource ToolsInsetCard}">
                         <StackPanel Spacing="8">
                             <TextBlock x:Uid="Import_EncodeTitle" Text="Encoding" Style="{StaticResource ToolsLabel}" />
-                            <TextBlock x:Uid="Import_EncodeBody" Text="Tools encodes each video on this computer and sends the result with the upload." Style="{StaticResource ToolsMuted}" TextWrapping="Wrap" />
+                            <TextBlock Text="{x:Bind ViewModel.EncodeBody, Mode=OneWay}" Style="{StaticResource ToolsMuted}" TextWrapping="Wrap" />
                             <CheckBox x:Uid="Import_EncodeServer" Content="Let the server encode these videos" IsChecked="{x:Bind ViewModel.ServerEncodesShown, Mode=TwoWay}" IsEnabled="{x:Bind ViewModel.CanChooseEncode, Mode=OneWay}" />
                             <TextBlock Text="{x:Bind ViewModel.EncodeNote, Mode=OneWay}" Style="{StaticResource ToolsMuted}" Foreground="{ThemeResource FanousAccentBrush}"
                                        TextWrapping="Wrap" Visibility="{x:Bind ViewModel.HasEncodeNote, Mode=OneWay}" />
