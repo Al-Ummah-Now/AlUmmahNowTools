@@ -3248,4 +3248,205 @@
   <data name="When_Tomorrow" xml:space="preserve">
     <value>غدًا، {0}</value>
   </data>
+  <data name="Social_CancelSync.Text" xml:space="preserve">
+    <value>ألغِ المزامنة</value>
+  </data>
+  <data name="Social_CancelJob.Text" xml:space="preserve">
+    <value>ألغِ</value>
+  </data>
+  <data name="Social_CancelTitle" xml:space="preserve">
+    <value>إلغاء هذه المزامنة؟</value>
+  </data>
+  <data name="Social_CancelBody" xml:space="preserve">
+    <value>تتوقف قبل عنصرها التالي، ويبقى ما نشرته على القناة.</value>
+  </data>
+  <data name="Social_CancelConfirm" xml:space="preserve">
+    <value>ألغِ المزامنة</value>
+  </data>
+  <data name="Social_CancelKeep" xml:space="preserve">
+    <value>أبقِها تعمل</value>
+  </data>
+  <data name="Social_StatusCancelled" xml:space="preserve">
+    <value>أُلغيت آخر مزامنة. «زامِن الآن» تبدأ مزامنة جديدة</value>
+  </data>
+  <data name="Social_StatusCancelledNext" xml:space="preserve">
+    <value>أُلغيت آخر مزامنة. المزامنة التالية {0}</value>
+  </data>
+  <data name="SocialJob_cancelled" xml:space="preserve">
+    <value>ألغاها مشرف. «أعِد المحاولة» تبدأ مزامنة جديدة</value>
+  </data>
+  <data name="SocialJob_cancelledBy" xml:space="preserve">
+    <value>أُلغيت. «أعِد المحاولة» تبدأ مزامنة جديدة. ألغاها:</value>
+  </data>
+  <data name="SocialLog_cancelledBy" xml:space="preserve">
+    <value>ألغاها:</value>
+  </data>
+  <data name="SocialError_not_youtube" xml:space="preserve">
+    <value>ملفات التصدير لمصادر يوتيوب فقط.</value>
+  </data>
+  <data name="SocialError_not_ambiguous" xml:space="preserve">
+    <value>لم يعد هذا الملف يحتاج إلى اختيار. حدّث القائمة.</value>
+  </data>
+  <data name="SocialError_not_a_candidate" xml:space="preserve">
+    <value>هذا المرئي ليس من المرئيات المحتملة لهذا الملف.</value>
+  </data>
+  <data name="SocialError_file_taken" xml:space="preserve">
+    <value>طابق ملفٌ آخر هذا المرئي من قبل.</value>
+  </data>
+  <data name="SocialError_not_matched" xml:space="preserve">
+    <value>لا يُرفع إلا ملف مطابَق.</value>
+  </data>
+  <data name="SocialError_has_file" xml:space="preserve">
+    <value>لهذا المرئي ملفه من قبل.</value>
+  </data>
+  <data name="SocialError_not_uploading" xml:space="preserve">
+    <value>افتح الرفع أولًا.</value>
+  </data>
+  <data name="SocialError_file_not_found" xml:space="preserve">
+    <value>لم يُعثر على الملف. اختر المجلد مرة أخرى.</value>
+  </data>
+  <data name="Takeout_Link.Text" xml:space="preserve">
+    <value>ملفات التصدير</value>
+  </data>
+  <data name="Takeout_Title.Text" xml:space="preserve">
+    <value>ملفات التصدير من يوتيوب</value>
+  </data>
+  <data name="Takeout_Body.Text" xml:space="preserve">
+    <value>لا يسمح يوتيوب بتنزيل المرئيات، فيأتي كل مرئي من نسخة صاحب القناة المصدّرة من غوغل. اختر مجلد النسخة المصدّرة، ويطابق الخادم كل مرئي فيها مع مرئي ينتظر ملفه هنا: بمعرّفه، وإلا فبعنوانه ومدته.</value>
+  </data>
+  <data name="Takeout_Choose.Text" xml:space="preserve">
+    <value>اختر مجلد التصدير</value>
+  </data>
+  <data name="Takeout_Upload.Text" xml:space="preserve">
+    <value>ارفع الملفات المطابَقة</value>
+  </data>
+  <data name="Takeout_PickRecord.Text" xml:space="preserve">
+    <value>أيّ مرئي هو؟</value>
+  </data>
+  <data name="Takeout_ThisOne.Text" xml:space="preserve">
+    <value>هذا</value>
+  </data>
+  <data name="Takeout_NoVideos" xml:space="preserve">
+    <value>لا مرئيات في هذا المجلد:</value>
+  </data>
+  <data name="Takeout_FolderFailed" xml:space="preserve">
+    <value>تعذّرت قراءة المجلد:</value>
+  </data>
+  <data name="Takeout_Listing" xml:space="preserve">
+    <value>المرئيات الموجودة: {0}. يُرسل الكشف للمطابقة…</value>
+  </data>
+  <data name="Takeout_Uploading" xml:space="preserve">
+    <value>يُرفع: {0}</value>
+  </data>
+  <data name="Takeout_UploadFailed" xml:space="preserve">
+    <value>توقف الرفع:</value>
+  </data>
+  <data name="Takeout_ChooseAgainToUpload" xml:space="preserve">
+    <value>بعض الملفات المطابَقة أُرسل كشفها من مجلد آخر أو قبل إعادة تشغيل التطبيق. اختر المجلد مرة أخرى لرفعها.</value>
+  </data>
+  <data name="Takeout_CancelBody" xml:space="preserve">
+    <value>تتوقف المطابقة قبل ملفها التالي.</value>
+  </data>
+  <data name="Takeout_Record" xml:space="preserve">
+    <value>يطابق:</value>
+  </data>
+  <data name="Takeout_Count_ambiguous" xml:space="preserve">
+    <value>تحتاج إلى اختيارك: {0}</value>
+  </data>
+  <data name="Takeout_Count_matched" xml:space="preserve">
+    <value>مطابَقة: {0}</value>
+  </data>
+  <data name="Takeout_Count_uploading" xml:space="preserve">
+    <value>قيد الرفع: {0}</value>
+  </data>
+  <data name="Takeout_Count_uploaded" xml:space="preserve">
+    <value>رُفعت وتُنشر: {0}</value>
+  </data>
+  <data name="Takeout_Count_attached" xml:space="preserve">
+    <value>نُشرت: {0}</value>
+  </data>
+  <data name="Takeout_Count_unmatched" xml:space="preserve">
+    <value>غير مطابَقة: {0}</value>
+  </data>
+  <data name="Takeout_Count_failed" xml:space="preserve">
+    <value>فشلت: {0}</value>
+  </data>
+  <data name="Takeout_Count_new" xml:space="preserve">
+    <value>بانتظار المطابقة: {0}</value>
+  </data>
+  <data name="TakeoutState_new" xml:space="preserve">
+    <value>بانتظار المطابقة</value>
+  </data>
+  <data name="TakeoutState_matched" xml:space="preserve">
+    <value>مطابَق وجاهز للرفع</value>
+  </data>
+  <data name="TakeoutState_unmatched" xml:space="preserve">
+    <value>غير مطابَق</value>
+  </data>
+  <data name="TakeoutState_ambiguous" xml:space="preserve">
+    <value>يحتاج إلى اختيارك</value>
+  </data>
+  <data name="TakeoutState_uploading" xml:space="preserve">
+    <value>بدأ الرفع</value>
+  </data>
+  <data name="TakeoutState_uploaded" xml:space="preserve">
+    <value>رُفع، والخادم ينشره</value>
+  </data>
+  <data name="TakeoutState_attached" xml:space="preserve">
+    <value>نُشر على القناة</value>
+  </data>
+  <data name="TakeoutState_failed" xml:space="preserve">
+    <value>تعذّر نشره</value>
+  </data>
+  <data name="TakeoutMatchedBy_video_id" xml:space="preserve">
+    <value>بمعرّف المرئي</value>
+  </data>
+  <data name="TakeoutMatchedBy_file_name" xml:space="preserve">
+    <value>بالمعرّف في اسم الملف</value>
+  </data>
+  <data name="TakeoutMatchedBy_title" xml:space="preserve">
+    <value>بعنوانه</value>
+  </data>
+  <data name="TakeoutMatchedBy_admin" xml:space="preserve">
+    <value>باختيار مشرف</value>
+  </data>
+  <data name="TakeoutNote_no_record" xml:space="preserve">
+    <value>لا مرئي ينتظر ملفه في هذا المصدر يطابقه. ربما هو أقدم من المصدر، أو من قناة أخرى.</value>
+  </data>
+  <data name="TakeoutNote_has_file" xml:space="preserve">
+    <value>لمرئيه ملفه من قبل.</value>
+  </data>
+  <data name="TakeoutNote_several_records" xml:space="preserve">
+    <value>لأكثر من مرئي هذا العنوان. اختر الصحيح منها.</value>
+  </data>
+  <data name="TakeoutNote_file_taken" xml:space="preserve">
+    <value>طابقه ملف آخر من هذه النسخة المصدّرة.</value>
+  </data>
+  <data name="TakeoutNote_upload_incomplete" xml:space="preserve">
+    <value>لم يكتمل رفعه. ارفعه مرة أخرى.</value>
+  </data>
+  <data name="TakeoutNote_post_refused" xml:space="preserve">
+    <value>رُفض المنشور أو المرئي.</value>
+  </data>
+  <data name="TakeoutJob_matching" xml:space="preserve">
+    <value>تجري مطابقة الملفات…</value>
+  </data>
+  <data name="TakeoutJob_retrying" xml:space="preserve">
+    <value>واجهت المطابقة مشكلة وستعيد المحاولة قريبًا</value>
+  </data>
+  <data name="TakeoutJob_failed" xml:space="preserve">
+    <value>فشلت المطابقة. وهي في صفحة الأخطاء مع زر إعادة المحاولة</value>
+  </data>
+  <data name="TakeoutJob_done" xml:space="preserve">
+    <value>انتهت المطابقة</value>
+  </data>
+  <data name="Takeout_RecordLabel.Text" xml:space="preserve">
+    <value>يطابق:</value>
+  </data>
+  <data name="Social_CancelBody2" xml:space="preserve">
+    <value>يمكنك بدء مزامنة جديدة لاحقًا.</value>
+  </data>
+  <data name="Takeout_CancelBody2" xml:space="preserve">
+    <value>ويبقى ما طوبق أو نُشر على حاله.</value>
+  </data>
 </root>

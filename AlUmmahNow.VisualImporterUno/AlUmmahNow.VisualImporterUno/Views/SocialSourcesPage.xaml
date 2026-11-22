@@ -135,8 +135,14 @@
                                                 <HyperlinkButton Style="{StaticResource ToolsLinkButton}" Padding="8,4" Tag="{x:Bind}" Click="Job_Click" Visibility="{x:Bind HasJob, Mode=OneWay}">
                                                     <TextBlock x:Uid="Social_JobLink" Text="Sync job" />
                                                 </HyperlinkButton>
+                                                <HyperlinkButton Style="{StaticResource ToolsLinkButton}" Padding="8,4" Tag="{x:Bind}" Click="CancelJob_Click" Visibility="{x:Bind CanCancelJob, Mode=OneWay}" IsEnabled="{x:Bind IsIdle, Mode=OneWay}">
+                                                    <TextBlock x:Uid="Social_CancelSync" Text="Cancel sync" />
+                                                </HyperlinkButton>
                                                 <HyperlinkButton Style="{StaticResource ToolsLinkButton}" Padding="8,4" Tag="{x:Bind}" Click="Items_Click">
                                                     <TextBlock x:Uid="Social_ItemsLink" Text="Items" />
+                                                </HyperlinkButton>
+                                                <HyperlinkButton Style="{StaticResource ToolsLinkButton}" Padding="8,4" Tag="{x:Bind}" Click="Takeout_Click" Visibility="{x:Bind IsYouTube, Mode=OneWay}">
+                                                    <TextBlock x:Uid="Takeout_Link" Text="Takeout files" />
                                                 </HyperlinkButton>
                                                 <HyperlinkButton Style="{StaticResource ToolsLinkButton}" Padding="8,4" Tag="{x:Bind}" Click="TurnOff_Click" Visibility="{x:Bind CanTurnOff, Mode=OneWay}" IsEnabled="{x:Bind IsIdle, Mode=OneWay}">
                                                     <TextBlock x:Uid="Social_TurnOff" Text="Turn off" />
@@ -183,6 +189,12 @@
                                                                 <TextBlock x:Uid="Social_RetryJob" Text="Try again" />
                                                             </StackPanel>
                                                         </Button>
+                                                        <Button Style="{StaticResource ToolsSecondaryButton}" Tag="{x:Bind}" Click="CancelJob_Click" Visibility="{x:Bind CanCancelJob, Mode=OneWay}" IsEnabled="{x:Bind IsIdle, Mode=OneWay}">
+                                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                                <FontIcon Glyph="&#xE711;" FontSize="14" />
+                                                                <TextBlock x:Uid="Social_CancelJob" Text="Cancel" />
+                                                            </StackPanel>
+                                                        </Button>
                                                         <Button Style="{StaticResource ToolsSecondaryButton}" Tag="{x:Bind}" Click="CopyJob_Click">
                                                             <StackPanel Orientation="Horizontal" Spacing="8">
                                                                 <FontIcon Glyph="&#xE8C8;" FontSize="14" />
@@ -209,6 +221,90 @@
                                                                         <TextBlock Text="{x:Bind When}" Style="{StaticResource ToolsMuted}" TextWrapping="Wrap" Visibility="{x:Bind HasWhen}" />
                                                                         <TextBlock Text="{x:Bind Original}" Style="{StaticResource ToolsMuted}" FlowDirection="LeftToRight" HorizontalAlignment="Left"
                                                                                    TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" IsTextSelectionEnabled="True" Visibility="{x:Bind HasOriginal}" ToolTipService.ToolTip="{x:Bind Original}" />
+                                                                    </StackPanel>
+                                                                </Border>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </StackPanel>
+                                            </Border>
+
+                                            <!-- YouTube Takeout files: choose the export's folder, the server matches each video to a record waiting
+                                                 for its file, the admin picks the record of an ambiguous one, then the matched files are uploaded -->
+                                            <Border Style="{StaticResource ToolsInsetCard}" Visibility="{x:Bind ShowTakeout, Mode=OneWay}" Margin="0,4,0,0">
+                                                <StackPanel Spacing="10">
+                                                    <TextBlock x:Uid="Takeout_Title" Text="YouTube Takeout files" Style="{StaticResource ToolsLabel}" />
+                                                    <TextBlock x:Uid="Takeout_Body" Text="YouTube does not let us download videos, so each one comes from the owner’s Google Takeout export. Choose the export’s folder: the server matches each video to one waiting here, by its video id, else its title and length." Style="{StaticResource ToolsMuted}" TextWrapping="Wrap" />
+                                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                                        <Button Style="{StaticResource ToolsSecondaryButton}" Tag="{x:Bind}" Click="ChooseTakeout_Click" IsEnabled="{x:Bind TakeoutIdle, Mode=OneWay}">
+                                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                                <FontIcon Glyph="&#xE8B7;" FontSize="14" />
+                                                                <TextBlock x:Uid="Takeout_Choose" Text="Choose Takeout folder" />
+                                                            </StackPanel>
+                                                        </Button>
+                                                        <Button Style="{StaticResource ToolsPrimaryButton}" Tag="{x:Bind}" Click="UploadTakeout_Click" Visibility="{x:Bind CanUploadTakeout, Mode=OneWay}">
+                                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                                <FontIcon Glyph="&#xE898;" FontSize="14" />
+                                                                <TextBlock x:Uid="Takeout_Upload" Text="Upload matched files" />
+                                                            </StackPanel>
+                                                        </Button>
+                                                    </StackPanel>
+                                                    <TextBlock Text="{x:Bind UploadTakeoutHint, Mode=OneWay}" Style="{StaticResource ToolsMuted}" TextWrapping="Wrap" Visibility="{x:Bind HasUploadTakeoutHint, Mode=OneWay}" />
+                                                    <StackPanel Orientation="Horizontal" Spacing="8" Visibility="{x:Bind HasTakeoutMessage, Mode=OneWay}">
+                                                        <ProgressRing Width="16" Height="16" IsIndeterminate="{x:Bind SpinnerMoves}" Value="100" IsActive="{x:Bind HasTakeoutMessage, Mode=OneWay}" />
+                                                        <TextBlock Text="{x:Bind TakeoutMessage, Mode=OneWay}" Style="{StaticResource ToolsMuted}" TextWrapping="Wrap" />
+                                                    </StackPanel>
+                                                    <TextBlock Text="{x:Bind TakeoutError, Mode=OneWay}" Style="{StaticResource ToolsMuted}" Foreground="{ThemeResource FanousErrorTextBrush}"
+                                                               TextWrapping="Wrap" Visibility="{x:Bind HasTakeoutError, Mode=OneWay}" IsTextSelectionEnabled="True" />
+                                                    <Grid ColumnSpacing="8" Visibility="{x:Bind HasTakeoutJob, Mode=OneWay}">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Text="{x:Bind TakeoutJobStatus, Mode=OneWay}" Style="{StaticResource ToolsBody}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                                        <HyperlinkButton Grid.Column="1" Style="{StaticResource ToolsLinkButton}" Padding="8,4" Tag="{x:Bind}" Click="CancelTakeout_Click" Visibility="{x:Bind TakeoutJobActive, Mode=OneWay}">
+                                                            <TextBlock x:Uid="Social_CancelJob" Text="Cancel" />
+                                                        </HyperlinkButton>
+                                                    </Grid>
+                                                    <TextBlock Text="{x:Bind TakeoutSummary, Mode=OneWay}" Style="{StaticResource ToolsBody}" Foreground="{ThemeResource FanousTextPrimaryBrush}" TextWrapping="Wrap" Visibility="{x:Bind HasTakeoutSummary, Mode=OneWay}" />
+                                                    <ItemsControl ItemsSource="{x:Bind TakeoutFiles}">
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate x:DataType="vm:TakeoutFileRow">
+                                                                <Border BorderBrush="{ThemeResource FanousDividerBrush}" BorderThickness="0,1,0,0" Padding="0,8">
+                                                                    <StackPanel Spacing="2">
+                                                                        <shell:RightToLeftText Text="{x:Bind DisplayName}" TextStyle="{StaticResource ToolsBody}" Foreground="{ThemeResource FanousTextPrimaryBrush}" />
+                                                                        <TextBlock Text="{x:Bind StateText}" Style="{StaticResource ToolsMuted}" TextWrapping="Wrap" />
+                                                                        <StackPanel Spacing="2" Visibility="{x:Bind HasMatch}">
+                                                                            <TextBlock x:Uid="Takeout_RecordLabel" Text="Matches:" Style="{StaticResource ToolsMuted}" />
+                                                                            <shell:RightToLeftText Text="{x:Bind Match}" TextStyle="{StaticResource ToolsMuted}" />
+                                                                        </StackPanel>
+                                                                        <TextBlock Text="{x:Bind Note}" Style="{StaticResource ToolsMuted}" Foreground="{ThemeResource FanousAccentBrush}" TextWrapping="Wrap" Visibility="{x:Bind HasNote}" />
+                                                                        <TextBlock Text="{x:Bind Progress, Mode=OneWay}" Style="{StaticResource ToolsMuted}" TextWrapping="Wrap" Visibility="{x:Bind HasProgress, Mode=OneWay}" />
+                                                                        <TextBlock Text="{x:Bind Error, Mode=OneWay}" Style="{StaticResource ToolsMuted}" Foreground="{ThemeResource FanousErrorTextBrush}" TextWrapping="Wrap" Visibility="{x:Bind HasError, Mode=OneWay}" />
+                                                                        <StackPanel Spacing="6" Margin="0,6,0,0" Visibility="{x:Bind IsAmbiguous}">
+                                                                            <TextBlock x:Uid="Takeout_PickRecord" Text="Which video is it?" Style="{StaticResource ToolsLabel}" />
+                                                                            <ItemsControl ItemsSource="{x:Bind Candidates}">
+                                                                                <ItemsControl.ItemTemplate>
+                                                                                    <DataTemplate x:DataType="vm:TakeoutCandidateRow">
+                                                                                        <Grid ColumnSpacing="12" Padding="0,4">
+                                                                                            <Grid.ColumnDefinitions>
+                                                                                                <ColumnDefinition Width="*" />
+                                                                                                <ColumnDefinition Width="Auto" />
+                                                                                            </Grid.ColumnDefinitions>
+                                                                                            <StackPanel Spacing="2">
+                                                                                                <shell:RightToLeftText Text="{x:Bind Title}" TextStyle="{StaticResource ToolsBody}" Foreground="{ThemeResource FanousTextPrimaryBrush}" />
+                                                                                                <TextBlock Text="{x:Bind When}" Style="{StaticResource ToolsMuted}" TextWrapping="Wrap" Visibility="{x:Bind HasWhen}" />
+                                                                                                <TextBlock Text="{x:Bind Original}" Style="{StaticResource ToolsMuted}" FlowDirection="LeftToRight" HorizontalAlignment="Left"
+                                                                                                           TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" IsTextSelectionEnabled="True" Visibility="{x:Bind HasOriginal}" />
+                                                                                            </StackPanel>
+                                                                                            <Button Grid.Column="1" Style="{StaticResource ToolsSecondaryButton}" VerticalAlignment="Center" Tag="{x:Bind}" Click="PickCandidate_Click" IsEnabled="{x:Bind File.IsIdle, Mode=OneWay}">
+                                                                                                <TextBlock x:Uid="Takeout_ThisOne" Text="This one" />
+                                                                                            </Button>
+                                                                                        </Grid>
+                                                                                    </DataTemplate>
+                                                                                </ItemsControl.ItemTemplate>
+                                                                            </ItemsControl>
+                                                                        </StackPanel>
                                                                     </StackPanel>
                                                                 </Border>
                                                             </DataTemplate>

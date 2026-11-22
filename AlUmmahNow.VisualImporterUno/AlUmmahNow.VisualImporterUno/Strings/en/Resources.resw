@@ -2933,4 +2933,205 @@
   <data name="When_Tomorrow" xml:space="preserve">
     <value>Tomorrow, {0}</value>
   </data>
+  <data name="Social_CancelSync.Text" xml:space="preserve">
+    <value>Cancel sync</value>
+  </data>
+  <data name="Social_CancelJob.Text" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="Social_CancelTitle" xml:space="preserve">
+    <value>Cancel this sync?</value>
+  </data>
+  <data name="Social_CancelBody" xml:space="preserve">
+    <value>It stops before its next item; what it already posted stays.</value>
+  </data>
+  <data name="Social_CancelConfirm" xml:space="preserve">
+    <value>Cancel sync</value>
+  </data>
+  <data name="Social_CancelKeep" xml:space="preserve">
+    <value>Keep it running</value>
+  </data>
+  <data name="Social_StatusCancelled" xml:space="preserve">
+    <value>The last sync was cancelled. Sync now starts a new one</value>
+  </data>
+  <data name="Social_StatusCancelledNext" xml:space="preserve">
+    <value>The last sync was cancelled. Next sync {0}</value>
+  </data>
+  <data name="SocialJob_cancelled" xml:space="preserve">
+    <value>Cancelled by an admin. Try again starts a new sync</value>
+  </data>
+  <data name="SocialJob_cancelledBy" xml:space="preserve">
+    <value>Cancelled. Try again starts a new sync. Cancelled by:</value>
+  </data>
+  <data name="SocialLog_cancelledBy" xml:space="preserve">
+    <value>Cancelled by:</value>
+  </data>
+  <data name="SocialError_not_youtube" xml:space="preserve">
+    <value>Takeout files are only for a YouTube source.</value>
+  </data>
+  <data name="SocialError_not_ambiguous" xml:space="preserve">
+    <value>This file no longer needs a choice. Refresh the list.</value>
+  </data>
+  <data name="SocialError_not_a_candidate" xml:space="preserve">
+    <value>That video is not one this file could be.</value>
+  </data>
+  <data name="SocialError_file_taken" xml:space="preserve">
+    <value>Another file already matched that video.</value>
+  </data>
+  <data name="SocialError_not_matched" xml:space="preserve">
+    <value>Only a matched file can be uploaded.</value>
+  </data>
+  <data name="SocialError_has_file" xml:space="preserve">
+    <value>That video already has its file.</value>
+  </data>
+  <data name="SocialError_not_uploading" xml:space="preserve">
+    <value>Open the upload first.</value>
+  </data>
+  <data name="SocialError_file_not_found" xml:space="preserve">
+    <value>The file wasn’t found. Choose the folder again.</value>
+  </data>
+  <data name="Takeout_Link.Text" xml:space="preserve">
+    <value>Takeout files</value>
+  </data>
+  <data name="Takeout_Title.Text" xml:space="preserve">
+    <value>YouTube Takeout files</value>
+  </data>
+  <data name="Takeout_Body.Text" xml:space="preserve">
+    <value>YouTube does not let us download videos, so each one comes from the owner’s Google Takeout export. Choose the export’s folder: the server matches each video to one waiting here, by its video id, else its title and length.</value>
+  </data>
+  <data name="Takeout_Choose.Text" xml:space="preserve">
+    <value>Choose Takeout folder</value>
+  </data>
+  <data name="Takeout_Upload.Text" xml:space="preserve">
+    <value>Upload matched files</value>
+  </data>
+  <data name="Takeout_PickRecord.Text" xml:space="preserve">
+    <value>Which video is it?</value>
+  </data>
+  <data name="Takeout_ThisOne.Text" xml:space="preserve">
+    <value>This one</value>
+  </data>
+  <data name="Takeout_NoVideos" xml:space="preserve">
+    <value>No videos in this folder:</value>
+  </data>
+  <data name="Takeout_FolderFailed" xml:space="preserve">
+    <value>The folder could not be read:</value>
+  </data>
+  <data name="Takeout_Listing" xml:space="preserve">
+    <value>Videos found: {0}. Sending the list to match…</value>
+  </data>
+  <data name="Takeout_Uploading" xml:space="preserve">
+    <value>Uploading: {0}</value>
+  </data>
+  <data name="Takeout_UploadFailed" xml:space="preserve">
+    <value>The upload stopped:</value>
+  </data>
+  <data name="Takeout_ChooseAgainToUpload" xml:space="preserve">
+    <value>Some matched files were listed from another folder or before the app restarted. Choose the folder again to upload them.</value>
+  </data>
+  <data name="Takeout_CancelBody" xml:space="preserve">
+    <value>Matching stops before its next file.</value>
+  </data>
+  <data name="Takeout_Record" xml:space="preserve">
+    <value>Matches:</value>
+  </data>
+  <data name="Takeout_Count_ambiguous" xml:space="preserve">
+    <value>Need your choice: {0}</value>
+  </data>
+  <data name="Takeout_Count_matched" xml:space="preserve">
+    <value>Matched: {0}</value>
+  </data>
+  <data name="Takeout_Count_uploading" xml:space="preserve">
+    <value>Uploading: {0}</value>
+  </data>
+  <data name="Takeout_Count_uploaded" xml:space="preserve">
+    <value>Uploaded, posting: {0}</value>
+  </data>
+  <data name="Takeout_Count_attached" xml:space="preserve">
+    <value>Posted: {0}</value>
+  </data>
+  <data name="Takeout_Count_unmatched" xml:space="preserve">
+    <value>Not matched: {0}</value>
+  </data>
+  <data name="Takeout_Count_failed" xml:space="preserve">
+    <value>Failed: {0}</value>
+  </data>
+  <data name="Takeout_Count_new" xml:space="preserve">
+    <value>Waiting to match: {0}</value>
+  </data>
+  <data name="TakeoutState_new" xml:space="preserve">
+    <value>Waiting to match</value>
+  </data>
+  <data name="TakeoutState_matched" xml:space="preserve">
+    <value>Matched, ready to upload</value>
+  </data>
+  <data name="TakeoutState_unmatched" xml:space="preserve">
+    <value>Not matched</value>
+  </data>
+  <data name="TakeoutState_ambiguous" xml:space="preserve">
+    <value>Needs your choice</value>
+  </data>
+  <data name="TakeoutState_uploading" xml:space="preserve">
+    <value>Upload started</value>
+  </data>
+  <data name="TakeoutState_uploaded" xml:space="preserve">
+    <value>Uploaded; the server is posting it</value>
+  </data>
+  <data name="TakeoutState_attached" xml:space="preserve">
+    <value>Posted on the channel</value>
+  </data>
+  <data name="TakeoutState_failed" xml:space="preserve">
+    <value>Could not be posted</value>
+  </data>
+  <data name="TakeoutMatchedBy_video_id" xml:space="preserve">
+    <value>by its video id</value>
+  </data>
+  <data name="TakeoutMatchedBy_file_name" xml:space="preserve">
+    <value>by the id in its file name</value>
+  </data>
+  <data name="TakeoutMatchedBy_title" xml:space="preserve">
+    <value>by its title</value>
+  </data>
+  <data name="TakeoutMatchedBy_admin" xml:space="preserve">
+    <value>chosen by an admin</value>
+  </data>
+  <data name="TakeoutNote_no_record" xml:space="preserve">
+    <value>No video waiting on this source has it. It may be older than the source, or another channel’s.</value>
+  </data>
+  <data name="TakeoutNote_has_file" xml:space="preserve">
+    <value>Its video already has its file.</value>
+  </data>
+  <data name="TakeoutNote_several_records" xml:space="preserve">
+    <value>Several videos have this title. Pick the right one.</value>
+  </data>
+  <data name="TakeoutNote_file_taken" xml:space="preserve">
+    <value>Another file of this export already matched it.</value>
+  </data>
+  <data name="TakeoutNote_upload_incomplete" xml:space="preserve">
+    <value>Its upload hasn’t finished. Upload it again.</value>
+  </data>
+  <data name="TakeoutNote_post_refused" xml:space="preserve">
+    <value>The post or video was refused.</value>
+  </data>
+  <data name="TakeoutJob_matching" xml:space="preserve">
+    <value>Matching the files…</value>
+  </data>
+  <data name="TakeoutJob_retrying" xml:space="preserve">
+    <value>Matching hit a problem and tries again shortly</value>
+  </data>
+  <data name="TakeoutJob_failed" xml:space="preserve">
+    <value>Matching failed. It is on the Errors page, with Retry</value>
+  </data>
+  <data name="TakeoutJob_done" xml:space="preserve">
+    <value>Matching finished</value>
+  </data>
+  <data name="Takeout_RecordLabel.Text" xml:space="preserve">
+    <value>Matches:</value>
+  </data>
+  <data name="Social_CancelBody2" xml:space="preserve">
+    <value>You can start a new sync later.</value>
+  </data>
+  <data name="Takeout_CancelBody2" xml:space="preserve">
+    <value>Files already matched or posted stay as they are.</value>
+  </data>
 </root>

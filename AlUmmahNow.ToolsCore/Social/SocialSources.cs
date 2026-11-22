@@ -98,7 +98,13 @@ public sealed record SyncJobLogLine(
     [property: JsonPropertyName("attempt")] int? Attempt,
     [property: JsonPropertyName("error")] string? Error,
     [property: JsonPropertyName("delaySeconds")] int? DelaySeconds,
-    [property: JsonPropertyName("retried")] bool? Retried);
+    [property: JsonPropertyName("retried")] bool? Retried,
+    [property: JsonPropertyName("by")] JobActor? By = null);
+
+/// <summary>The admin a log line names (a Cancel): their id, and their name when admin-api knew it.</summary>
+public sealed record JobActor(
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("name")] string? Name);
 
 /// <summary>A source's sync job (admin-api <c>GET /api/content/jobs/:id</c>, shared-types <c>AdminJob</c>, TA-8).</summary>
 public sealed record SyncJob(
@@ -116,8 +122,20 @@ public sealed record SyncJob(
     /// <summary>Waiting in the queue, running, or waiting to try again after a failed attempt.</summary>
     public bool IsActive => Status is "queued" or "running" or "retrying";
 
-    /// <summary>It gave up after its last attempt (the DLQ, and a row on the Errors page): Retry runs it again.</summary>
-    public bool CanRetry => Status == "failed";
+    /// <summary>Waiting or running: Cancel stops it (it ends as cancelled, not as a failure).</summary>
+    public bool CanCancel => IsActive;
+
+    /// <summary>
+    /// It gave up after its last attempt (the DLQ, and a row on the Errors page), or an admin cancelled it: Retry runs it
+    /// again (a cancelled sync starts a new run).
+    /// </summary>
+    public bool CanRetry => Status is "failed" or "cancelled";
+
+    /// <summary>An admin cancelled it.</summary>
+    public bool IsCancelled => Status == "cancelled";
+
+    /// <summary>Who cancelled it: the name on its last <c>cancelled</c> log line, if any.</summary>
+    public string? CancelledBy => Log?.LastOrDefault(l => l.Event == "cancelled")?.By?.Name;
 }
 
 /// <summary>What <c>POST /api/admin/import/sources</c> takes.</summary>
@@ -151,6 +169,8 @@ public enum SourcePhase
     Retrying,
     /// <summary>Its last sync gave up: on the Errors page, with Retry</summary>
     Failed,
+    /// <summary>An admin cancelled its last sync (not a failure); a schedule carries on</summary>
+    Cancelled,
     /// <summary>A super admin turned it off</summary>
     Off,
     /// <summary>Turned off by the server because the owner's connection is gone; on again only once they connect</summary>
@@ -181,6 +201,7 @@ public static class SourceText
             if (job.Status is "queued" or "running") return SourcePhase.Syncing;
             if (job.Status == "retrying") return SourcePhase.Retrying;
             if (job.Status == "failed") return SourcePhase.Failed;
+            if (job.Status == "cancelled") return SourcePhase.Cancelled;
             if (job.Status == "succeeded") return source.Schedule == SourceSchedules.Manual ? SourcePhase.Manual : SourcePhase.Scheduled;
         }
         if (!string.IsNullOrEmpty(source.LastError)) return SourcePhase.Failed;
