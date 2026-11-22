@@ -240,8 +240,22 @@ public sealed partial class SocialSourcesViewModel : ObservableObject, IDisposab
 
     public Task RetryJobAsync(SourceRow row) => row.JobId is not { } jobId ? Task.CompletedTask : Act(row, "retry", async () =>
     {
-        await _workspace.Api.RetryJobAsync(jobId).ConfigureAwait(true);
+        // A cancelled sync starts a new run (Sync now); a failed one runs again
+        if (row.JobIsCancelled) await _workspace.Api.SyncSourceAsync(row.Id).ConfigureAwait(true);
+        else await _workspace.Api.RetryJobAsync(jobId).ConfigureAwait(true);
         _jobs.Remove(jobId);
+    });
+
+    /// <summary>
+    /// Cancels the source's waiting or running sync (the page asks first). The server stops it between items; it ends as
+    /// cancelled, not as a failure, with a log line naming the admin. Idempotent: a sync that finished meanwhile is shown as
+    /// it is.
+    /// </summary>
+    public Task CancelJobAsync(SourceRow row) => row.JobId is not { } jobId ? Task.CompletedTask : Act(row, "cancel", async () =>
+    {
+        var job = await _workspace.Api.CancelSourceJobAsync(row.Id, jobId).ConfigureAwait(true);
+        _jobs[job.Id] = job;
+        row.ShowJob = true;
     });
 
     /// <summary>Runs one action on a source, then reads the list again; a refusal shows under the source.</summary>
@@ -289,6 +303,173 @@ public sealed partial class SocialSourcesViewModel : ObservableObject, IDisposab
         {
             row.ItemsMessage = ErrorText(ex);
             Report(ex, "items", row.Id);
+        }
+    }
+
+    // ---------------------------------------------------------------- YouTube Takeout files
+
+    /// <summary>How often the Takeout panel reads the match again while its job waits or runs.</summary>
+    private static readonly TimeSpan TakeoutPoll = TimeSpan.FromSeconds(3);
+
+    /// <summary>Opens or closes a YouTube source's Takeout panel, reading what was listed before when it opens.</summary>
+    public async Task ToggleTakeoutAsync(SourceRow row)
+    {
+        row.ShowTakeout = !row.ShowTakeout;
+        if (!row.ShowTakeout) return;
+        row.ShowJob = false;
+        row.ShowItems = false;
+        await LoadTakeoutAsync(row).ConfigureAwait(true);
+    }
+
+    private async Task LoadTakeoutAsync(SourceRow row)
+    {
+        try
+        {
+            var report = await _workspace.Api.GetTakeoutAsync(row.Id).ConfigureAwait(true);
+            SyncJob? job = null;
+            if (report.JobId is { } jobId)
+            {
+                try
+                {
+                    job = await _workspace.Api.GetJobAsync(jobId).ConfigureAwait(true);
+                }
+                catch (ImportApiException ex) when (ex.Status == 404)
+                {
+                }
+            }
+            row.SetTakeout(report, job);
+        }
+        catch (ImportApiException ex)
+        {
+            row.TakeoutError = ErrorText(ex);
+            Report(ex, "takeout", row.Id);
+        }
+    }
+
+    /// <summary>
+    /// Reads the Takeout export in <paramref name="folder"/> (its videos and <c>videos.csv</c>), lists the files on the server
+    /// (in requests of at most 500) and follows the match job until it is done.
+    /// </summary>
+    public async Task ListTakeoutFolderAsync(SourceRow row, string folder)
+    {
+        if (row.TakeoutBusy) return;
+        row.TakeoutBusy = true;
+        row.TakeoutError = "";
+        try
+        {
+            var files = _workspace.IsDemo ? DemoSocial.TakeoutFolder() : await Task.Run(() => TakeoutExport.Read(folder)).ConfigureAwait(true);
+            row.RememberTakeoutPaths(files);
+            if (files.Count == 0)
+            {
+                row.TakeoutError = Loc.GetWithDetail("Takeout_NoVideos", folder);
+                return;
+            }
+            row.TakeoutMessage = Loc.Format("Takeout_Listing", files.Count);
+            foreach (var chunk in files.Chunk(TakeoutExport.MaxPerRequest))
+            {
+                await _workspace.Api.ListTakeoutFilesAsync(row.Id, chunk).ConfigureAwait(true);
+            }
+            await FollowTakeoutAsync(row).ConfigureAwait(true);
+        }
+        catch (ImportApiException ex)
+        {
+            row.TakeoutError = Loc.KeepLastWords(ErrorText(ex));
+            Report(ex, "takeout_list", row.Id);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            row.TakeoutError = Loc.GetWithDetail("Takeout_FolderFailed", ex.Message);
+        }
+        finally
+        {
+            row.TakeoutMessage = "";
+            row.TakeoutBusy = false;
+        }
+    }
+
+    /// <summary>Reads the match again every few seconds while its job waits or runs (at most a few minutes; Refresh reads it later).</summary>
+    private async Task FollowTakeoutAsync(SourceRow row)
+    {
+        for (var i = 0; i < 100 && !_disposed; i++)
+        {
+            await LoadTakeoutAsync(row).ConfigureAwait(true);
+            if (!row.TakeoutJobActive || _workspace.IsDemo) return;
+            await Task.Delay(TakeoutPoll).ConfigureAwait(true);
+        }
+    }
+
+    /// <summary>The admin's pick for an ambiguous file.</summary>
+    public async Task ConfirmTakeoutAsync(SourceRow row, TakeoutFileRow file, TakeoutCandidateRow candidate)
+    {
+        if (file.IsBusy) return;
+        file.IsBusy = true;
+        file.Error = "";
+        try
+        {
+            await _workspace.Api.ConfirmTakeoutFileAsync(row.Id, file.Id, candidate.ItemId).ConfigureAwait(true);
+            await LoadTakeoutAsync(row).ConfigureAwait(true);
+        }
+        catch (ImportApiException ex)
+        {
+            file.Error = Loc.KeepLastWords(ErrorText(ex));
+            Report(ex, "takeout_confirm", row.Id);
+        }
+        finally
+        {
+            file.IsBusy = false;
+        }
+    }
+
+    /// <summary>Sends every matched file the app has on this computer, one at a time; the server's job then posts each video.</summary>
+    public async Task UploadTakeoutAsync(SourceRow row)
+    {
+        if (row.TakeoutBusy) return;
+        row.TakeoutBusy = true;
+        row.TakeoutError = "";
+        try
+        {
+            foreach (var file in row.TakeoutFiles.Where(f => f.CanUpload).ToList())
+            {
+                if (row.TakeoutPathOf(file) is not { } path) continue;
+                file.Progress = Loc.Format("Takeout_Uploading", Loc.Percent(0));
+                try
+                {
+                    await _workspace.Takeout.UploadAsync(row.Id, file.File, path, new Progress<double>(p => file.Progress = Loc.Format("Takeout_Uploading", Loc.Percent(p * 100))), CancellationToken.None).ConfigureAwait(true);
+                    file.Progress = "";
+                }
+                catch (ImportApiException ex)
+                {
+                    file.Progress = "";
+                    file.Error = Loc.KeepLastWords(ErrorText(ex));
+                    Report(ex, "takeout_upload", row.Id);
+                }
+                catch (Exception ex) when (ex is TusException or IOException or InvalidOperationException or HttpRequestException)
+                {
+                    file.Progress = "";
+                    file.Error = Loc.GetWithDetail("Takeout_UploadFailed", ex.Message);
+                }
+            }
+            await FollowTakeoutAsync(row).ConfigureAwait(true);
+        }
+        finally
+        {
+            row.TakeoutBusy = false;
+        }
+    }
+
+    /// <summary>Cancels the Takeout match job (asked first, as a sync).</summary>
+    public async Task CancelTakeoutJobAsync(SourceRow row)
+    {
+        if (row.TakeoutJobId is not { } jobId || row.TakeoutBusy) return;
+        try
+        {
+            await _workspace.Api.CancelSourceJobAsync(row.Id, jobId).ConfigureAwait(true);
+            await LoadTakeoutAsync(row).ConfigureAwait(true);
+        }
+        catch (ImportApiException ex)
+        {
+            row.TakeoutError = Loc.KeepLastWords(ErrorText(ex));
+            Report(ex, "takeout_cancel", row.Id);
         }
     }
 
@@ -517,6 +698,88 @@ public sealed partial class SourceRow : ObservableObject
     [ObservableProperty] private string _jobDetail = "";
     [ObservableProperty] private bool _hasJobDetail;
     [ObservableProperty] private bool _canRetryJob;
+    [ObservableProperty] private bool _canCancelJob;
+    [ObservableProperty] private bool _isCancelled;
+    [ObservableProperty] private bool _isYouTube;
+    [ObservableProperty] private bool _showTakeout;
+    [ObservableProperty] private string _takeoutSummary = "";
+    [ObservableProperty] private bool _hasTakeoutSummary;
+    [ObservableProperty] private string _takeoutJobStatus = "";
+    [ObservableProperty] private bool _hasTakeoutJob;
+    [ObservableProperty] private bool _takeoutJobActive;
+    [ObservableProperty] private string _takeoutMessage = "";
+    [ObservableProperty] private bool _hasTakeoutMessage;
+    [ObservableProperty] private string _takeoutError = "";
+    [ObservableProperty] private bool _hasTakeoutError;
+    [ObservableProperty] private bool _canUploadTakeout;
+    [ObservableProperty] private string _uploadTakeoutHint = "";
+    [ObservableProperty] private bool _hasUploadTakeoutHint;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(TakeoutIdle))]
+    private bool _takeoutBusy;
+
+    public bool TakeoutIdle => !TakeoutBusy;
+    public string? TakeoutJobId { get; private set; }
+    public bool JobIsCancelled { get; private set; }
+    public ObservableCollection<TakeoutFileRow> TakeoutFiles { get; } = new();
+    private readonly Dictionary<(string, long), string> _takeoutPaths = new();
+
+    partial void OnTakeoutMessageChanged(string value) => HasTakeoutMessage = value.Length > 0;
+    partial void OnTakeoutErrorChanged(string value) => HasTakeoutError = value.Length > 0;
+    partial void OnTakeoutBusyChanged(bool value) => UpdateUploadable();
+
+    /// <summary>Where each listed file is on this computer (by name and size, as the server keys it).</summary>
+    internal void RememberTakeoutPaths(IEnumerable<TakeoutFileInput> files)
+    {
+        foreach (var f in files.Where(f => f.Path is not null)) _takeoutPaths[(f.Name, f.Size)] = f.Path!;
+    }
+
+    internal string? TakeoutPathOf(TakeoutFileRow file) => _takeoutPaths.GetValueOrDefault((file.File.Name, file.File.Size));
+
+    internal void SetTakeout(TakeoutReport report, SyncJob? job)
+    {
+        TakeoutError = "";
+        TakeoutJobId = report.JobId;
+        TakeoutFiles.Clear();
+        foreach (var file in report.Files.OrderBy(f => TakeoutStates.Order.ToList().IndexOf(f.State)).ThenBy(f => f.Name, StringComparer.Ordinal))
+        {
+            TakeoutFiles.Add(new TakeoutFileRow(file));
+        }
+        var parts = new List<string>();
+        foreach (var state in TakeoutStates.Order)
+        {
+            var n = report.Count(state);
+            if (n > 0) parts.Add(Loc.Format("Takeout_Count_" + state, n).Replace(' ', '\u00A0'));
+        }
+        TakeoutSummary = Loc.Groups(parts);
+        HasTakeoutSummary = parts.Count > 0;
+        HasTakeoutJob = job is not null;
+        TakeoutJobActive = job?.IsActive ?? false;
+        TakeoutJobStatus = job is null ? "" : Loc.KeepLastWords(job.Status switch
+        {
+            "queued" or "running" => Loc.Get("TakeoutJob_matching"),
+            "retrying" => Loc.Get("TakeoutJob_retrying"),
+            "failed" => Loc.WithDetail(Loc.Get("TakeoutJob_failed"), job.LastError is { } e ? ReasonText(e, labelled: false) : null),
+            "cancelled" => CancelledLine(job),
+            _ => Loc.Get("TakeoutJob_done"),
+        });
+        UpdateUploadable();
+    }
+
+    private void UpdateUploadable()
+    {
+        var sendable = TakeoutFiles.Count(f => f.CanUpload && TakeoutPathOf(f) is not null);
+        var waiting = TakeoutFiles.Count(f => f.CanUpload);
+        CanUploadTakeout = sendable > 0 && !TakeoutBusy;
+        // Matched files listed from another computer (or before the app restarted): choose the folder again to send them
+        UploadTakeoutHint = waiting > sendable ? Loc.Get("Takeout_ChooseAgainToUpload") : "";
+        HasUploadTakeoutHint = UploadTakeoutHint.Length > 0;
+    }
+
+    /// <summary>"Cancelled by {name}" with the admin's name on its own line, or "Cancelled by an admin".</summary>
+    internal static string CancelledLine(SyncJob job) =>
+        job.CancelledBy is { Length: > 0 } name ? Loc.GetWithDetail("SocialJob_cancelledBy", name) : Loc.Get("SocialJob_cancelled");
     [ObservableProperty] private bool _jobCopied;
     [ObservableProperty] private string _itemsMessage = "";
     [ObservableProperty] private bool _hasItemsMessage;
@@ -557,6 +820,9 @@ public sealed partial class SourceRow : ObservableObject
         IsFailed = phase == SourcePhase.Failed;
         IsOff = phase == SourcePhase.Off;
         IsOffNotConnected = phase == SourcePhase.OffNotConnected;
+        IsCancelled = phase == SourcePhase.Cancelled;
+        IsOk = IsOk || IsCancelled;
+        IsYouTube = source.Network == SourceNetworks.YouTube;
         CanSync = source.Enabled && !IsSyncing;
         CanTurnOff = source.Enabled;
         CanTurnOn = !source.Enabled;
@@ -571,6 +837,8 @@ public sealed partial class SourceRow : ObservableObject
             SourcePhase.Retrying when retryAt is { } r => Loc.Format("Social_StatusRetrying", SocialSourcesViewModel.When(r)),
             SourcePhase.Retrying => Loc.Get("Social_StatusRetryingSoon"),
             SourcePhase.Failed => Loc.Get("Social_StatusFailed"),
+            SourcePhase.Cancelled when source.Schedule != SourceSchedules.Manual && source.NextSyncAt is { } next2 => Loc.Format("Social_StatusCancelledNext", SocialSourcesViewModel.When(next2)),
+            SourcePhase.Cancelled => Loc.Get("Social_StatusCancelled"),
             SourcePhase.OffNotConnected => Loc.Get("Social_StatusOffNotConnected"),
             _ => Loc.Get("Social_StatusOff"),
         };
@@ -611,6 +879,8 @@ public sealed partial class SourceRow : ObservableObject
     {
         HasJob = job is not null;
         CanRetryJob = job?.CanRetry ?? false;
+        CanCancelJob = job?.CanCancel ?? false;
+        JobIsCancelled = job?.IsCancelled ?? false;
         if (job is null)
         {
             JobStatus = "";
@@ -629,6 +899,7 @@ public sealed partial class SourceRow : ObservableObject
             "retrying" => Loc.Format("SocialJob_retryingSoon", job.Attempts, max),
             "failed" => Loc.Format("SocialJob_failed", job.Attempts, max),
             "succeeded" when job.FinishedAt is { } done => Loc.Format("SocialJob_succeededAt", SocialSourcesViewModel.When(done)),
+            "cancelled" => CancelledLine(job),
             _ => Loc.Get("SocialJob_succeeded"),
         });
         JobStatusTip = job.Status == "retrying" && job.NextRunAt is { } t ? Loc.UtcText(t) : job.FinishedAt is { } f ? Loc.UtcText(f) : null;
@@ -674,6 +945,85 @@ public sealed class SourceItemRow
     public bool HasOriginal { get; }
     public string When { get; }
     public bool HasWhen { get; }
+}
+
+/// <summary>A Takeout file: its name, what became of it and why, the record it matched, or the records an admin picks from.</summary>
+public sealed partial class TakeoutFileRow : ObservableObject
+{
+    public TakeoutFileRow(TakeoutFile file)
+    {
+        File = file;
+        Id = file.Id;
+        Name = file.Name;
+        // A title that may be Arabic: the extension (Latin) would split its line, so the name is shown without it
+        DisplayName = System.IO.Path.GetFileNameWithoutExtension(file.Name);
+        var state = Loc.Get("TakeoutState_" + file.State);
+        StateText = file.MatchedBy is { } by && file.State is TakeoutStates.Matched or TakeoutStates.Uploading or TakeoutStates.Uploaded or TakeoutStates.Attached
+            ? Loc.Groups(new[] { state, Loc.Get("TakeoutMatchedBy_" + by) })
+            : state;
+        Note = file.Note is { } note ? Loc.KeepLastWords(Loc.Get("TakeoutNote_" + note)) : "";
+        HasNote = Note.Length > 0;
+        IsProblem = file.State is TakeoutStates.Unmatched or TakeoutStates.Failed;
+        IsAmbiguous = file.State == TakeoutStates.Ambiguous;
+        IsDone = file.State == TakeoutStates.Attached;
+        // The record's title is the owner's own words (often Latin in an Arabic page): on its own line
+        Match = file.Item is { } item ? item.Title ?? item.ItemId : "";
+        HasMatch = Match.Length > 0;
+        foreach (var c in file.Candidates ?? Array.Empty<TakeoutCandidate>()) Candidates.Add(new TakeoutCandidateRow(c, this));
+        CanUpload = file.CanUpload;
+    }
+
+    public TakeoutFile File { get; }
+    public string Id { get; }
+    public string Name { get; }
+    public string DisplayName { get; }
+    public string StateText { get; }
+    public string Note { get; }
+    public bool HasNote { get; }
+    public bool IsProblem { get; }
+    public bool IsAmbiguous { get; }
+    public bool IsDone { get; }
+    public string Match { get; }
+    public bool HasMatch { get; }
+    public bool CanUpload { get; }
+    public ObservableCollection<TakeoutCandidateRow> Candidates { get; } = new();
+
+    [ObservableProperty] private string _progress = "";
+    [ObservableProperty] private bool _hasProgress;
+    [ObservableProperty] private string _error = "";
+    [ObservableProperty] private bool _hasError;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsIdle))]
+    private bool _isBusy;
+
+    public bool IsIdle => !IsBusy;
+
+    partial void OnProgressChanged(string value) => HasProgress = value.Length > 0;
+    partial void OnErrorChanged(string value) => HasError = value.Length > 0;
+}
+
+/// <summary>A record an ambiguous file could be: its title, when it was first posted, and its link.</summary>
+public sealed class TakeoutCandidateRow
+{
+    public TakeoutCandidateRow(TakeoutCandidate candidate, TakeoutFileRow file)
+    {
+        ItemId = candidate.ItemId;
+        File = file;
+        Title = candidate.Title ?? candidate.ItemId;
+        When = candidate.OriginalAt is { } at ? Loc.Format("Social_ItemFirstPosted", SocialSourcesViewModel.When(at)) : "";
+        HasWhen = When.Length > 0;
+        Original = candidate.OriginalUrl ?? "";
+        HasOriginal = Original.Length > 0;
+    }
+
+    public string ItemId { get; }
+    public TakeoutFileRow File { get; }
+    public string Title { get; }
+    public string When { get; }
+    public bool HasWhen { get; }
+    public string Original { get; }
+    public bool HasOriginal { get; }
 }
 
 /// <summary>An account the owner connected, offered as a source.</summary>

@@ -9,7 +9,9 @@ namespace AlUmmahNow.VisualImporterUno.Shell;
 /// The Social sources page's demo data for screenshots (<c>TOOLS_DEMO=1</c>, <c>TOOLS_DEMO_ROLE=super_admin</c>):
 /// a channel's sources in every state (scheduled, syncing, failed with its log, off because the owner disconnected,
 /// waiting for Takeout files) and its connected accounts. <c>TOOLS_DEMO_SOCIAL=all</c> lists every channel,
-/// <c>empty</c> a channel with nothing yet, <c>add</c> a filled form with its error. Nothing is sent anywhere.
+/// <c>empty</c> a channel with nothing yet, <c>add</c> a filled form with its error, <c>cancel</c> the Cancel dialog on the
+/// running sync, <c>cancelled</c> that sync cancelled by an admin, <c>takeout</c> the YouTube source's Takeout files matched.
+/// Nothing is sent anywhere.
 /// </summary>
 internal static class DemoSocial
 {
@@ -65,7 +67,16 @@ internal static class DemoSocial
             updatedAt = Iso(Now.AddHours(-1)),
         })!.AsObject();
 
-    private static IEnumerable<JsonObject> Sources()
+    private static IEnumerable<JsonObject> Sources() =>
+        // A dialog frame lists only the source it is about, so the page ends at a card edge within the screen's height
+        Mode switch
+        {
+            "cancel" => AllSources().Where(s => (string?)s["id"] == TelegramId),
+            "remove" => AllSources().Where(s => (string?)s["id"] == FailedId),
+            _ => AllSources(),
+        };
+
+    private static IEnumerable<JsonObject> AllSources()
     {
         if (Mode == "empty") yield break;
         var channel = DemoImport.ChannelId;
@@ -113,6 +124,36 @@ internal static class DemoSocial
     {
         switch (id)
         {
+            case "job_demo_telegram" when Mode == "cancelled":
+            {
+                var at = Now.AddMinutes(-3);
+                return Job(id, "cancelled", 1, at, at.AddSeconds(40), null, null, new object[]
+                {
+                    new { at = Iso(at), @event = "queued" },
+                    new { at = Iso(at.AddSeconds(2)), @event = "started", attempt = 1 },
+                    new { at = Iso(at.AddSeconds(9)), @event = "waiting", delaySeconds = 1 },
+                    new { at = Iso(at.AddSeconds(40)), @event = "cancelled", by = new { id = "usr_demo_admin", name = "Amina Haddad" } },
+                });
+            }
+            case "job_demo_takeout":
+            {
+                var at = Now.AddMinutes(-1);
+                return JsonSerializer.SerializeToNode(new
+                {
+                    id,
+                    kind = "import.takeout-match",
+                    targetKind = "channel",
+                    targetId = DemoImport.ChannelId,
+                    status = "succeeded",
+                    attempts = 1,
+                    maxAttempts = 6,
+                    nextRunAt = (string?)null,
+                    lastError = (string?)null,
+                    createdAt = Iso(at),
+                    finishedAt = Iso(at.AddSeconds(4)),
+                    log = new object[] { new { at = Iso(at), @event = "queued" }, new { at = Iso(at.AddSeconds(1)), @event = "started", attempt = 1 }, new { at = Iso(at.AddSeconds(4)), @event = "succeeded" } },
+                })!.AsObject();
+            }
             case "job_demo_telegram":
             {
                 var at = Now.AddMinutes(-3);
@@ -198,6 +239,54 @@ internal static class DemoSocial
 
     private static string Ok(object result) => JsonSerializer.Serialize(new { success = true, result });
 
+    /// <summary>The demo Takeout export: its videos as the app would read them (never on disk).</summary>
+    public static IReadOnlyList<AlUmmahNow.ToolsCore.Social.TakeoutFileInput> TakeoutFolder() => new[]
+    {
+        new AlUmmahNow.ToolsCore.Social.TakeoutFileInput("تفسير سورة الكهف - المجلس الأول.mp4", 412_334_080, "kq3Zx9LmT4K", "تفسير سورة الكهف - المجلس الأول", 3_512_000, "video/mp4") { Path = "/Takeout/1.mp4" },
+        new AlUmmahNow.ToolsCore.Social.TakeoutFileInput("Friday khutbah [d7Vn2Wp8RbY].mp4", 268_435_456, null, "Friday khutbah", null, "video/mp4") { Path = "/Takeout/2.mp4" },
+        new AlUmmahNow.ToolsCore.Social.TakeoutFileInput("أسئلة وأجوبة.mp4", 157_286_400, null, "أسئلة وأجوبة", 1_820_000, "video/mp4") { Path = "/Takeout/3.mp4" },
+        new AlUmmahNow.ToolsCore.Social.TakeoutFileInput("Family trip 2019.mp4", 98_566_144, "Zt8Qa1Lp0Xc", "Family trip 2019", 640_000, "video/mp4") { Path = "/Takeout/4.mp4" },
+    };
+
+    private static object TakeoutFile(string id, string name, long size, string? videoId, string state, string? matchedBy, string? note, (string Id, string Title, int DaysAgo)? item, (string Id, string Title, int DaysAgo)[] candidates, string? uploadVideoId = null)
+    {
+        object Candidate((string Id, string Title, int DaysAgo) c) => new { itemId = c.Id, title = c.Title, originalUrl = "https://www.youtube.com/watch?v=" + c.Id, originalAt = Iso(Now.AddDays(-c.DaysAgo)) };
+        return new
+        {
+            id,
+            sourceId = YouTubeId,
+            name,
+            size,
+            videoId,
+            title = System.IO.Path.GetFileNameWithoutExtension(name),
+            durationMs = (long?)null,
+            state,
+            matchedBy,
+            note,
+            itemId = item?.Id,
+            item = item is { } i ? Candidate(i) : null,
+            candidates = candidates.Select(Candidate).ToArray(),
+            uploadVideoId,
+            createdAt = Iso(Now.AddMinutes(-1)),
+            updatedAt = Iso(Now.AddMinutes(-1)),
+        };
+    }
+
+    private static object TakeoutReport() => new
+    {
+        files = new[]
+        {
+            TakeoutFile("tkf_demo_1", "تفسير سورة الكهف - المجلس الأول.mp4", 412_334_080, "kq3Zx9LmT4K", "matched", "video_id", null, ("kq3Zx9LmT4K", "تفسير سورة الكهف - المجلس الأول", 40), Array.Empty<(string, string, int)>()),
+            TakeoutFile("tkf_demo_2", "Friday khutbah [d7Vn2Wp8RbY].mp4", 268_435_456, null, "matched", "file_name", null, ("d7Vn2Wp8RbY", "خطبة الجمعة: الصبر عند البلاء", 12), Array.Empty<(string, string, int)>()),
+            TakeoutFile("tkf_demo_3", "أسئلة وأجوبة.mp4", 157_286_400, null, "ambiguous", null, "several_records", null,
+                new[] { ("Hr5Nc2Vb7Qa", "أسئلة وأجوبة", 30), ("Pm9Lw4Ks1Td", "أسئلة وأجوبة", 9) }),
+            TakeoutFile("tkf_demo_4", "Family trip 2019.mp4", 98_566_144, "Zt8Qa1Lp0Xc", "unmatched", null, "no_record", null, Array.Empty<(string, string, int)>()),
+            TakeoutFile("tkf_demo_5", "مجلس الحديث - الأربعون النووية ١.mp4", 305_135_616, "Wq2Er5Ty8Ui", "attached", "video_id", null, ("Wq2Er5Ty8Ui", "مجلس الحديث - الأربعون النووية ١", 60), Array.Empty<(string, string, int)>(), "vdemo_attached"),
+        },
+        counts = new Dictionary<string, int> { ["matched"] = 2, ["ambiguous"] = 1, ["unmatched"] = 1, ["attached"] = 1 },
+        jobId = "job_demo_takeout",
+    };
+
     /// <summary>The demo admin-api's answer for a sources or jobs path, or null for any other path.</summary>
     public static string? Answer(HttpRequestMessage request)
     {
@@ -216,6 +305,10 @@ internal static class DemoSocial
             var rest = path[(sources.Length + 1)..];
             if (rest.EndsWith("/items", StringComparison.Ordinal)) return Ok(new { items = rest.StartsWith(TelegramId, StringComparison.Ordinal) ? Items().ToArray() : Array.Empty<object>() });
             if (rest.EndsWith("/sync", StringComparison.Ordinal)) return Ok(new { jobId = "job_demo_new", status = "queued" });
+            if (rest.EndsWith("/cancel", StringComparison.Ordinal)) return Ok(new { job = JobFor("job_demo_telegram") });
+            if (rest.EndsWith("/takeout/files", StringComparison.Ordinal)) return Ok(new { listed = 4, added = 4, jobId = "job_demo_takeout", status = "queued" });
+            if (rest.EndsWith("/takeout", StringComparison.Ordinal)) return Ok(TakeoutReport());
+            if (rest.Contains("/takeout/files/", StringComparison.Ordinal)) return Ok(new { file = TakeoutFile("tkf_demo_3", "أسئلة وأجوبة.mp4", 157_286_400, null, "matched", "admin", null, ("Pm9Lw4Ks1Td", "أسئلة وأجوبة", 9), Array.Empty<(string, string, int)>()) });
             if (request.Method == HttpMethod.Delete) return Ok(new { deleted = true });
             var source = Sources().FirstOrDefault(s => (string?)s["id"] == rest) ?? Sources().First();
             return Ok(new { source });

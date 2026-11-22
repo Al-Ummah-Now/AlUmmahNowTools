@@ -31,6 +31,8 @@ public sealed class ImportWorkspace : IDisposable
             _disposed || !ReferenceEquals(ShellState.Current.Session, session) ? Task.FromResult<string?>(null) : session.AccessTokenAsync();
         HttpMessageHandler? adminHandler = IsDemo ? new DemoImportServer() : null;
         Api = new ImportApiClient(Environment.AdminApi, token, adminHandler);
+        // A YouTube source's Takeout files go up through the record's own upload (wiki TOOLS-ADMIN TA-9/TA-13)
+        Takeout = new AlUmmahNow.ToolsCore.Social.TakeoutUploader(Api, new TusClient(), Environment.VideosApi, token);
         Reporter = new ErrorReporter(Api.ReportErrorsAsync, Release, () => shell.Preferences.Language);
         Media = new FfmpegMediaTools(LocateFfmpegAsync);
         Transcriber = IsDemo ? new DemoTranscriber() : new CoreTranscriber(CoreTranscriber.DefaultModelsDirectory);
@@ -66,6 +68,9 @@ public sealed class ImportWorkspace : IDisposable
     private ToolsSession Session { get; }
     public bool IsDemo { get; }
     public ImportApiClient Api { get; }
+
+    /// <summary>Sends a matched Takeout file to its record's upload.</summary>
+    public AlUmmahNow.ToolsCore.Social.TakeoutUploader Takeout { get; }
     public ImportQueue Queue { get; }
     public ErrorReporter Reporter { get; }
 

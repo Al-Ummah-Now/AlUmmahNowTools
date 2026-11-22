@@ -32,7 +32,11 @@ public static class ScreenshotRunner
         if (window.Content?.XamlRoot is { } xamlRoot)
             foreach (var popup in Microsoft.UI.Xaml.Media.VisualTreeHelper.GetOpenPopupsForXamlRoot(xamlRoot))
                 if (popup.Child is FrameworkElement child && child.ActualHeight > 0)
-                    popupBottom = Math.Max(popupBottom, child.TransformToVisual(null).TransformBounds(new Windows.Foundation.Rect(0, 0, child.ActualWidth, child.ActualHeight)).Bottom);
+                {
+                    // A dialog's popup covers the whole window (its dimmed backdrop): what has to stay whole is the dialog's box
+                    var box = Named(child, "BackgroundElement") ?? child;
+                    popupBottom = Math.Max(popupBottom, box.TransformToVisual(null).TransformBounds(new Windows.Foundation.Rect(0, 0, box.ActualWidth, box.ActualHeight)).Bottom);
+                }
         // The window never grows past the screen: a page taller than that (Arabic wraps longer) is scrolled on by the
         // missing height and the rows that come into view are added below, so it ends where its English frame does
         var shot = full;
@@ -44,7 +48,11 @@ public static class ScreenshotRunner
             var info = new SKImageInfo(full.Width, full.Height + add, SKColorType.Bgra8888, SKAlphaType.Premul);
             using var surface = SKSurface.Create(info);
             surface.Canvas.DrawImage(full, 0, 0);
-            surface.Canvas.DrawImage(below, new SKRectI(0, below.Height - add, below.Width, below.Height), new SKRectI(0, full.Height, full.Width, full.Height + add));
+            // Only the page's scroll area moved: the rows added below come from it, and everything beside it (the side
+            // menu) continues with its own last row, so nothing that stays put is drawn twice
+            var (left, right) = PageColumns((UIElement)window.Content!, scale, full.Width);
+            surface.Canvas.DrawImage(full, new SKRectI(0, full.Height - 1, full.Width, full.Height), new SKRectI(0, full.Height, full.Width, full.Height + add));
+            surface.Canvas.DrawImage(below, new SKRectI(left, below.Height - add, right, below.Height), new SKRectI(left, full.Height, right, full.Height + add));
             shot = surface.Snapshot();
         }
         var end = Environment.GetEnvironmentVariable("TOOLS_SCREENSHOT_CROP") != "0" ? EndAtEdge((UIElement)window.Content!, popupBottom) + shift : null;
@@ -71,15 +79,45 @@ public static class ScreenshotRunner
         var leaves = new List<(double Top, double Bottom)>();
         var edges = new List<double>();
         Collect(page, leaves, edges);
+        // TOOLS_SCREENSHOT_EDGE=card: only the bottom of a whole card (a direct child of the page's panel), never a row inside one
+        var cardsOnly = Environment.GetEnvironmentVariable("TOOLS_SCREENSHOT_EDGE") == "card";
+        if (cardsOnly && page.Content is Microsoft.UI.Xaml.Controls.Panel panel)
+        {
+            edges = panel.Children.OfType<FrameworkElement>()
+                .Where((c) => c.Visibility == Visibility.Visible && c.ActualHeight > 0)
+                .Select((c) => c.TransformToVisual(null).TransformBounds(new Windows.Foundation.Rect(0, 0, c.ActualWidth, c.ActualHeight)).Bottom)
+                .ToList();
+        }
         const double margin = 4;
         foreach (var edge in edges.Where((e) => e + margin <= height).OrderByDescending((e) => e))
         {
-            if (edge < height * 0.5 || edge < below) break;
+            if (edge < height * (cardsOnly ? 0.05 : 0.5) || edge < below) break;
             var cut = edge + margin;
             if (leaves.Any((l) => l.Top < cut - 0.5 && l.Bottom > edge + 0.5)) continue;
             return cut;
         }
         return null;
+    }
+
+    private static FrameworkElement? Named(DependencyObject parent, string name)
+    {
+        for (var i = 0; i < Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChildrenCount(parent); i++)
+        {
+            var child = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChild(parent, i);
+            if (child is FrameworkElement { Name: var n } fe && n == name && fe.ActualHeight > 0) return fe;
+            if (Named(child, name) is { } found) return found;
+        }
+        return null;
+    }
+
+    /// <summary>The pixel columns of the page's scroll area (the whole width when there is none).</summary>
+    private static (int Left, int Right) PageColumns(UIElement content, double scale, int width)
+    {
+        if (Largest<Microsoft.UI.Xaml.Controls.ScrollViewer>(content) is not { } page) return (0, width);
+        var bounds = page.TransformToVisual(null).TransformBounds(new Windows.Foundation.Rect(0, 0, page.ActualWidth, page.ActualHeight));
+        var left = Math.Clamp((int)Math.Floor(bounds.Left * scale), 0, width);
+        var right = Math.Clamp((int)Math.Ceiling(bounds.Right * scale), left, width);
+        return right > left ? (left, right) : (0, width);
     }
 
     /// <summary>

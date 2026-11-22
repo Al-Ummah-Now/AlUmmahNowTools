@@ -30,6 +30,7 @@ public sealed partial class RightToLeftText : Panel
 
     // Words, and the marks between them (Arabic and Latin punctuation), as separate tokens
     private static readonly Regex Tokens = new(@"[^\s:;!?.,،؛()\[\]\-–—|/]+|[:;!?.,،؛()\[\]\-–—|/]+");
+    private static readonly Regex SpacedDash = new(@"(\s[-–—]\s)");
     private static readonly Regex Mark = new(@"^[:;!?.,،؛()\[\]\-–—|/]+$");
 
     private bool _flowing;
@@ -47,6 +48,11 @@ public sealed partial class RightToLeftText : Panel
         {
             // A title keeps its last two words together, except a Latin one in the Arabic window, where a no-break space
             // moves a trailing colon to the wrong side
+            // Uno's Skia text lays an Arabic line's pieces out left to right around a spaced dash, even in the Arabic window
+            // ("A - B" reads "B - A"; a colon is placed correctly): the pieces are stored in reverse, as Loc.RightToLeftLine
+            // does in the English window. Like it, this holds on one line (titles here fit one).
+            if (Loc.IsArabic && LooksArabic(text) && SpacedDash.IsMatch(text))
+                text = string.Concat(SpacedDash.Split(text).Where(p => p.Length > 0).Reverse());
             Children.Add(Block(LooksArabic(text) || !Loc.IsArabic ? Loc.KeepLastWords(text) : text, wrap: true));
             return;
         }

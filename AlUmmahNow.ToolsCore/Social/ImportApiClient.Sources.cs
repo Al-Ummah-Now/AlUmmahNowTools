@@ -72,9 +72,59 @@ public partial class ImportApiClient
         return result?.Deserialize<SyncJob>(Json) is { Id.Length: > 0 } job ? job : throw Unreadable();
     }
 
-    /// <summary>Runs a failed sync job again (the same Retry as the Errors and Jobs pages; audited).</summary>
+    /// <summary>Runs a failed or cancelled sync job again (the same Retry as the Errors and Jobs pages; audited).</summary>
     public virtual Task RetryJobAsync(string jobId, CancellationToken ct = default) =>
         SendAsync(HttpMethod.Post, $"/api/content/jobs/{Uri.EscapeDataString(jobId)}/retry", new { }, ct);
+
+    /// <summary>
+    /// Cancels one of the source's jobs (its sync, or its Takeout match). Idempotent: a job already cancelled or finished is
+    /// answered as it is. The answer is the job with its log, whose last line names the admin who cancelled it.
+    /// </summary>
+    public virtual async Task<SyncJob> CancelSourceJobAsync(string sourceId, string jobId, CancellationToken ct = default)
+    {
+        var result = await SendAsync(HttpMethod.Post, $"/api/admin/import/sources/{Uri.EscapeDataString(sourceId)}/cancel", new { jobId }, ct).ConfigureAwait(false);
+        return result?["job"]?.Deserialize<SyncJob>(Json) is { Id.Length: > 0 } job ? job : throw Unreadable();
+    }
+
+    // ---------------------------------------------------------------- YouTube Takeout files (YouTube sources only)
+
+    /// <summary>Lists the export's video files (at most <see cref="TakeoutExport.MaxPerRequest"/>); the server's job matches them.</summary>
+    public virtual async Task<TakeoutListed> ListTakeoutFilesAsync(string sourceId, IReadOnlyList<TakeoutFileInput> files, CancellationToken ct = default)
+    {
+        var result = await SendAsync(HttpMethod.Post, $"/api/admin/import/sources/{Uri.EscapeDataString(sourceId)}/takeout/files", new { files }, ct).ConfigureAwait(false);
+        return result?.Deserialize<TakeoutListed>(Json) is { JobId.Length: > 0 } listed ? listed : throw Unreadable();
+    }
+
+    /// <summary>The listed files with what became of each, the counts per state and the latest match job.</summary>
+    public virtual async Task<TakeoutReport> GetTakeoutAsync(string sourceId, CancellationToken ct = default)
+    {
+        var result = await SendAsync(HttpMethod.Get, $"/api/admin/import/sources/{Uri.EscapeDataString(sourceId)}/takeout?limit=500", null, ct).ConfigureAwait(false);
+        return result?.Deserialize<TakeoutReport>(Json) is { Files: not null } report ? report : throw Unreadable();
+    }
+
+    /// <summary>The admin's pick for an ambiguous file: one of its candidates.</summary>
+    public virtual async Task<TakeoutFile> ConfirmTakeoutFileAsync(string sourceId, string fileId, string itemId, CancellationToken ct = default)
+    {
+        var result = await SendAsync(HttpMethod.Post, $"/api/admin/import/sources/{Uri.EscapeDataString(sourceId)}/takeout/files/{Uri.EscapeDataString(fileId)}/confirm", new { itemId }, ct).ConfigureAwait(false);
+        return result?["file"]?.Deserialize<TakeoutFile>(Json) ?? throw Unreadable();
+    }
+
+    /// <summary>Opens (or resumes) the record's upload for a matched file.</summary>
+    public virtual async Task<TakeoutUpload> OpenTakeoutUploadAsync(string sourceId, string fileId, CancellationToken ct = default)
+    {
+        var result = await SendAsync(HttpMethod.Post, $"/api/admin/import/sources/{Uri.EscapeDataString(sourceId)}/takeout/files/{Uri.EscapeDataString(fileId)}/upload", new { }, ct).ConfigureAwait(false);
+        var file = result?["file"]?.Deserialize<TakeoutFile>(Json);
+        var upload = result?["upload"]?.Deserialize<UploadSession>(Json);
+        if (file is null || upload is null || string.IsNullOrEmpty(upload.TusSessionId)) throw Unreadable();
+        return new TakeoutUpload(file, upload);
+    }
+
+    /// <summary>The whole file was sent: the server's job posts the record's video.</summary>
+    public virtual async Task<TakeoutFile> MarkTakeoutUploadedAsync(string sourceId, string fileId, CancellationToken ct = default)
+    {
+        var result = await SendAsync(HttpMethod.Post, $"/api/admin/import/sources/{Uri.EscapeDataString(sourceId)}/takeout/files/{Uri.EscapeDataString(fileId)}/uploaded", new { }, ct).ConfigureAwait(false);
+        return result?["file"]?.Deserialize<TakeoutFile>(Json) ?? throw Unreadable();
+    }
 
     /// <summary>A channel's name, for sources listed across channels; null when admin-api has none.</summary>
     public virtual async Task<string?> GetChannelNameAsync(string channelId, CancellationToken ct = default)

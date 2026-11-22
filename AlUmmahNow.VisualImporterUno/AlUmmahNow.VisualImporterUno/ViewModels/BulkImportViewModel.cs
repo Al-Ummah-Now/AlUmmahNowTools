@@ -643,6 +643,7 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
             "failed_attempt" => Loc.Format("SocialLog_failed_attempt", attempt, delay),
             "failed" => Loc.Get("SocialLog_failed"),
             "succeeded" => Loc.Get("SocialLog_succeeded"),
+            "cancelled" when line.By?.Name is { Length: > 0 } name => Loc.GetWithDetail("SocialLog_cancelledBy", name),
             "cancelled" => Loc.Get("SocialLog_cancelled"),
             _ => line.Event,
         };

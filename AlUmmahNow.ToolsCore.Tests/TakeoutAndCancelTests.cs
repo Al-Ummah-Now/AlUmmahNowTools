@@ -1,0 +1,252 @@
+using System.Net;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using AlUmmahNow.ToolsCore.Import;
+using AlUmmahNow.ToolsCore.Social;
+using Xunit;
+
+namespace AlUmmahNow.ToolsCore.Tests;
+
+/// <summary>Cancel on a source's sync, and the YouTube Takeout match (wiki TOOLS-ADMIN TA-9/TA-13).</summary>
+public class SyncCancelTests
+{
+    private const string SourceId = "isrc_0123456789abcdef0123456789abcdef";
+    private const string JobId = "0b6f7c1e-5d2a-4a8e-9f3c-1d2e3f4a5b6c";
+
+    private static (ImportApiClient Api, FakeHandler Handler) Client(Func<HttpRequestMessage, HttpResponseMessage> answer)
+    {
+        var handler = new FakeHandler { Answer = answer };
+        return (new ImportApiClient(new Uri("https://admin.example"), _ => Task.FromResult<string?>("tok"), handler), handler);
+    }
+
+    private static HttpResponseMessage Ok(string result) => FakeHandler.Json(HttpStatusCode.OK, "{\"success\":true,\"result\":" + result + "}");
+
+    private const string CancelledJob = "{\"job\":{\"id\":\"" + JobId + "\",\"kind\":\"import.source-sync\",\"status\":\"cancelled\",\"attempts\":1,\"maxAttempts\":6,\"nextRunAt\":null," +
+        "\"lastError\":null,\"createdAt\":\"2026-11-22T10:00:00.000Z\",\"finishedAt\":\"2026-11-22T10:01:00.000Z\",\"log\":[{\"at\":\"2026-11-22T10:00:00.000Z\",\"event\":\"queued\"}," +
+        "{\"at\":\"2026-11-22T10:01:00.000Z\",\"event\":\"cancelled\",\"by\":{\"id\":\"usr_1\",\"name\":\"Amina Haddad\"}}]}}";
+
+    [Fact]
+    public async Task Cancel_posts_the_job_id_and_reads_back_the_cancelled_job_with_who_cancelled_it()
+    {
+        string? sent = null;
+        var (api, handler) = Client(r =>
+        {
+            sent = r.Content!.ReadAsStringAsync().Result;
+            return Ok(CancelledJob);
+        });
+        var job = await api.CancelSourceJobAsync(SourceId, JobId);
+        Assert.Equal(HttpMethod.Post, handler.Requests[0].Method);
+        Assert.Equal($"/api/admin/import/sources/{SourceId}/cancel", handler.Requests[0].RequestUri!.AbsolutePath);
+        Assert.Equal(JobId, JsonNode.Parse(sent!)!["jobId"]!.GetValue<string>());
+        Assert.True(job.IsCancelled);
+        Assert.False(job.CanCancel);
+        Assert.True(job.CanRetry, "a cancelled sync can start again");
+        Assert.Equal("Amina Haddad", job.CancelledBy);
+    }
+
+    [Theory]
+    [InlineData("queued", true, false)]
+    [InlineData("running", true, false)]
+    [InlineData("retrying", true, false)]
+    [InlineData("failed", false, true)]
+    [InlineData("cancelled", false, true)]
+    [InlineData("succeeded", false, false)]
+    public void Cancel_applies_to_a_waiting_or_running_job_and_Retry_to_a_failed_or_cancelled_one(string status, bool cancel, bool retry)
+    {
+        var job = new SyncJob(JobId, "import.source-sync", status, 1, 6, null, null, null, null, null);
+        Assert.Equal(cancel, job.CanCancel);
+        Assert.Equal(retry, job.CanRetry);
+    }
+
+    [Fact]
+    public void A_cancelled_sync_is_its_own_phase_not_a_failure()
+    {
+        var source = JsonSerializer.Deserialize<ImportSource>("{\"id\":\"" + SourceId + "\",\"channelId\":\"ch_1\",\"network\":\"rss\",\"address\":\"https://example.org/feed\",\"label\":\"L\",\"auth\":\"recorded\"," +
+            "\"schedule\":\"daily\",\"enabled\":true,\"lastJobId\":\"" + JobId + "\",\"lastError\":null,\"counts\":{}}", ImportApiClient.Json)!;
+        var job = new SyncJob(JobId, "import.source-sync", "cancelled", 1, 6, null, null, null, null, null);
+        Assert.Equal(SourcePhase.Cancelled, SourceText.PhaseOf(source, job));
+    }
+
+    [Fact]
+    public async Task Cancelling_another_sources_job_is_refused_with_its_code()
+    {
+        var (api, _) = Client(_ => FakeHandler.Json(HttpStatusCode.NotFound, "{\"success\":false,\"code\":\"job_not_found\",\"error\":\"No such job for this source\"}"));
+        var error = await Assert.ThrowsAsync<ImportApiException>(() => api.CancelSourceJobAsync(SourceId, JobId));
+        Assert.Equal(404, error.Status);
+        Assert.Equal("job_not_found", error.Code);
+    }
+}
+
+public class TakeoutTests
+{
+    private const string SourceId = "isrc_0123456789abcdef0123456789abcdef";
+    private const string FileId = "tkf_0123456789abcdef0123456789abcdef";
+
+    private static (ImportApiClient Api, FakeHandler Handler) Client(Func<HttpRequestMessage, HttpResponseMessage> answer)
+    {
+        var handler = new FakeHandler { Answer = answer };
+        return (new ImportApiClient(new Uri("https://admin.example"), _ => Task.FromResult<string?>("tok"), handler), handler);
+    }
+
+    private static HttpResponseMessage Ok(string result, HttpStatusCode status = HttpStatusCode.OK) => FakeHandler.Json(status, "{\"success\":true,\"result\":" + result + "}");
+
+    private const string FileJson = "{\"id\":\"" + FileId + "\",\"sourceId\":\"" + SourceId + "\",\"name\":\"Q&A.mp4\",\"size\":4000,\"videoId\":null,\"title\":\"Q&A\",\"durationMs\":null," +
+        "\"state\":\"ambiguous\",\"matchedBy\":null,\"note\":\"several_records\",\"itemId\":null,\"item\":null,\"candidates\":[{\"itemId\":\"CCCCCCCCCCC\",\"title\":\"Q&A\",\"originalUrl\":\"https://www.youtube.com/watch?v=CCCCCCCCCCC\",\"originalAt\":\"2026-11-01T10:00:00.000Z\"}," +
+        "{\"itemId\":\"DDDDDDDDDDD\",\"title\":\"Q&A\",\"originalUrl\":null,\"originalAt\":null}],\"uploadVideoId\":null,\"createdAt\":\"2026-11-22T10:00:00.000Z\",\"updatedAt\":\"2026-11-22T10:00:00.000Z\"}";
+
+    [Fact]
+    public void Reads_the_exports_videos_csv_with_quoted_titles_and_durations()
+    {
+        var csv = "﻿Video ID,Approx Duration (ms),Video Audio Language,Video Title (Original),Privacy\n" +
+                  "AAAAAAAAAAA,3512000,ar,\"تفسير سورة الكهف, المجلس الأول\",Public\r\n" +
+                  "BBBBBBBBBBB,,en,\"Q&A \"\"live\"\"\",Unlisted\n" +
+                  ",100,en,No id,Public\n";
+        var rows = TakeoutExport.ParseCsv(csv);
+        Assert.Equal(2, rows.Count);
+        Assert.Equal(new TakeoutExport.Row("AAAAAAAAAAA", "تفسير سورة الكهف, المجلس الأول", 3512000), rows[0]);
+        Assert.Equal(new TakeoutExport.Row("BBBBBBBBBBB", "Q&A \"live\"", null), rows[1]);
+        Assert.Empty(TakeoutExport.ParseCsv("Title,Comment\nx,y\n"));
+    }
+
+    [Fact]
+    public void Gives_a_file_its_rows_id_only_when_one_row_has_its_title()
+    {
+        var rows = new[]
+        {
+            new TakeoutExport.Row("AAAAAAAAAAA", "تفسير سورة الكهف: المجلس الأول", 3_512_000),
+            new TakeoutExport.Row("CCCCCCCCCCC", "Q&A", 600_000),
+            new TakeoutExport.Row("DDDDDDDDDDD", "Q&A", 900_000),
+        };
+        var files = TakeoutExport.Build(new[]
+        {
+            ("/t/a/تفسير سورة الكهف المجلس الأول.mp4", "تفسير سورة الكهف المجلس الأول.mp4", 10L),
+            ("/t/b/Q&A.mp4", "Q&A.mp4", 20L),
+            ("/t/c/Holiday.MOV", "Holiday.MOV", 30L),
+            ("/t/copy/Holiday.MOV", "Holiday.MOV", 30L),
+        }, rows);
+        Assert.Equal(3, files.Count);
+        var tafsir = files.Single(f => f.Size == 10);
+        Assert.Equal("AAAAAAAAAAA", tafsir.VideoId);
+        Assert.Equal(3_512_000, tafsir.DurationMs);
+        Assert.Equal("/t/a/تفسير سورة الكهف المجلس الأول.mp4", tafsir.Path);
+        var qa = files.Single(f => f.Size == 20);
+        Assert.Null(qa.VideoId);
+        Assert.Equal("Q&A", qa.Title);
+        var holiday = files.Single(f => f.Size == 30);
+        Assert.Equal("video/quicktime", holiday.MimeType);
+        Assert.Equal("Holiday", holiday.Title);
+    }
+
+    [Fact]
+    public void The_path_is_never_sent()
+    {
+        var file = new TakeoutFileInput("a.mp4", 1, null, "a", null, "video/mp4") { Path = "/Users/someone/Takeout/a.mp4" };
+        var json = JsonSerializer.Serialize(file, ImportApiClient.Json);
+        Assert.DoesNotContain("Users", json);
+        Assert.DoesNotContain("videoId", json);
+    }
+
+    [Fact]
+    public async Task Lists_files_reads_the_report_and_confirms_a_choice()
+    {
+        var bodies = new List<string?>();
+        var (api, handler) = Client(r =>
+        {
+            bodies.Add(r.Content?.ReadAsStringAsync().Result);
+            var path = r.RequestUri!.AbsolutePath;
+            if (path.EndsWith("/takeout/files")) return Ok("{\"listed\":1,\"added\":1,\"jobId\":\"job_t\",\"status\":\"queued\"}", HttpStatusCode.Accepted);
+            if (path.EndsWith("/takeout")) return Ok("{\"files\":[" + FileJson + "],\"counts\":{\"ambiguous\":1},\"jobId\":\"job_t\"}");
+            return Ok("{\"file\":" + FileJson.Replace("\"state\":\"ambiguous\"", "\"state\":\"matched\"") + "}");
+        });
+        var listed = await api.ListTakeoutFilesAsync(SourceId, new[] { new TakeoutFileInput("Q&A.mp4", 4000, null, "Q&A", null, "video/mp4") });
+        Assert.Equal("job_t", listed.JobId);
+        Assert.Equal("Q&A.mp4", JsonNode.Parse(bodies[0]!)!["files"]![0]!["name"]!.GetValue<string>());
+
+        var report = await api.GetTakeoutAsync(SourceId);
+        Assert.Equal(1, report.Count("ambiguous"));
+        var file = Assert.Single(report.Files);
+        Assert.Equal(2, file.Candidates!.Count);
+        Assert.False(file.CanUpload);
+
+        var confirmed = await api.ConfirmTakeoutFileAsync(SourceId, FileId, "DDDDDDDDDDD");
+        Assert.True(confirmed.CanUpload);
+        Assert.Equal("DDDDDDDDDDD", JsonNode.Parse(bodies[2]!)!["itemId"]!.GetValue<string>());
+        Assert.Equal(new[]
+        {
+            $"POST /api/admin/import/sources/{SourceId}/takeout/files",
+            $"GET /api/admin/import/sources/{SourceId}/takeout?limit=500",
+            $"POST /api/admin/import/sources/{SourceId}/takeout/files/{FileId}/confirm",
+        }, handler.Requests.Select(r => $"{r.Method} {r.RequestUri!.PathAndQuery}"));
+    }
+
+    [Fact]
+    public async Task Uploads_a_matched_file_through_its_records_upload_then_says_it_is_uploaded()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "takeout-" + Guid.NewGuid().ToString("N") + ".mp4");
+        await File.WriteAllBytesAsync(path, new byte[4000]);
+        try
+        {
+            var matched = FileJson.Replace("\"state\":\"ambiguous\"", "\"state\":\"matched\"");
+            var (api, handler) = Client(r =>
+            {
+                var p = r.RequestUri!.AbsolutePath;
+                if (p.EndsWith("/upload")) return Ok("{\"file\":" + matched + ",\"upload\":{\"videoId\":\"vid_1\",\"tusSessionId\":\"tus_1\",\"tusUploadId\":null,\"chunkSize\":1500,\"resumable\":true,\"reused\":false}}");
+                return Ok("{\"file\":" + matched.Replace("\"state\":\"matched\"", "\"state\":\"uploaded\"") + "}", HttpStatusCode.Accepted);
+            });
+            var tus = new FakeTus();
+            var uploader = new TakeoutUploader(api, tus, new Uri("https://videos.example"), _ => Task.FromResult<string?>("tok"));
+            var file = JsonSerializer.Deserialize<TakeoutFile>(matched, ImportApiClient.Json)!;
+            var done = await uploader.UploadAsync(SourceId, file, path, null, CancellationToken.None);
+            Assert.Equal("uploaded", done.State);
+            Assert.Equal(new long[] { 1500, 3000, 4000 }, tus.Offsets);
+            Assert.Equal("tus_1", tus.Metadata!["tusSessionId"]);
+            Assert.Equal("vid_1", tus.Metadata["videoId"]);
+            Assert.EndsWith("/uploaded", handler.Requests[^1].RequestUri!.AbsolutePath);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task A_file_that_changed_since_it_was_listed_is_not_sent()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "takeout-" + Guid.NewGuid().ToString("N") + ".mp4");
+        await File.WriteAllBytesAsync(path, new byte[10]);
+        try
+        {
+            var (api, handler) = Client(_ => throw new InvalidOperationException("no call expected"));
+            var uploader = new TakeoutUploader(api, new FakeTus(), new Uri("https://videos.example"), _ => Task.FromResult<string?>("tok"));
+            var file = JsonSerializer.Deserialize<TakeoutFile>(FileJson.Replace("\"state\":\"ambiguous\"", "\"state\":\"matched\""), ImportApiClient.Json)!;
+            await Assert.ThrowsAsync<InvalidOperationException>(() => uploader.UploadAsync(SourceId, file, path, null, CancellationToken.None));
+            Assert.Empty(handler.Requests);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    private sealed class FakeTus : TusClient
+    {
+        public readonly List<long> Offsets = new();
+        public IReadOnlyDictionary<string, string>? Metadata;
+        private long _offset;
+
+        public override Task<Uri> CreateAsync(Uri endpoint, string token, long length, IReadOnlyDictionary<string, string> metadata, CancellationToken ct)
+        {
+            Metadata = metadata;
+            return Task.FromResult(new Uri(endpoint, "/api/videos/tus/up_1"));
+        }
+
+        public override Task<long> OffsetAsync(Uri upload, string token, CancellationToken ct) => Task.FromResult(_offset);
+
+        public override Task<long> PatchAsync(Uri upload, string token, Stream file, long offset, int count, CancellationToken ct)
+        {
+            _offset = offset + count;
+            Offsets.Add(_offset);
+            return Task.FromResult(_offset);
+        }
+    }
+}
