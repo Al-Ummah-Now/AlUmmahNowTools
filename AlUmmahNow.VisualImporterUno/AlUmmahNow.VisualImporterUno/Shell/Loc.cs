@@ -123,6 +123,23 @@ public static class Loc
         return IsArabic ? ToArabicDigits(text) : text;
     }
 
+    /// <summary>
+    /// The device's zone at that moment as an offset, as the admin pages label times: "UTC−5" / «غرينتش−٥»
+    /// (all Arabic, so the line keeps its order in the Arabic layout).
+    /// </summary>
+    public static string ZoneLabel(DateTime local)
+    {
+        var offset = TimeZoneInfo.Local.GetUtcOffset(local);
+        var name = IsArabic ? "غرينتش" : "UTC";
+        if (offset == TimeSpan.Zero) return name;
+        var hours = Math.Abs(offset.Hours).ToString(CultureInfo.InvariantCulture);
+        var number = offset.Minutes == 0 ? hours : hours + ":" + Math.Abs(offset.Minutes).ToString("00", CultureInfo.InvariantCulture);
+        return name + (offset < TimeSpan.Zero ? "−" : "+") + (IsArabic ? ToArabicDigits(number) : number);
+    }
+
+    /// <summary>A time of day with the device's zone: "2:05 PM UTC−5" / «٢:٠٥ م غرينتش−٥».</summary>
+    public static string TimeWithZone(DateTime local) => Time(local) + " " + ZoneLabel(local);
+
     /// <summary>A date and time in the device's zone, digits per language.</summary>
     public static string When(DateTime local)
     {

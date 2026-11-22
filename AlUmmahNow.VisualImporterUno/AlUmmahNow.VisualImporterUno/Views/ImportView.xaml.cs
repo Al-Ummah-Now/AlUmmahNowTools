@@ -35,13 +35,23 @@ public sealed partial class ImportView : Page
         Unloaded += (_, _) => ViewModel.Detach();
     }
 
-    /// <summary>Screenshots of the dialogs (<c>TOOLS_DEMO_IMPORT_DIALOG=log|remove|channel</c>) and the page's end (<c>TOOLS_DEMO_IMPORT_SCROLL=end</c>), demo only.</summary>
+    /// <summary>
+    /// Screenshots of the dialogs and the channel suggestions (<c>TOOLS_DEMO_IMPORT_DIALOG=log|remove|channel|suggest</c>)
+    /// and of the queue (<c>TOOLS_DEMO_IMPORT_SCROLL=end</c>: the queue card at the top, so no line is cut under the
+    /// header), demo only.
+    /// </summary>
     private async void OpenDemoDialog()
     {
         if (!ImportWorkspace.Current.IsDemo) return;
         if (Environment.GetEnvironmentVariable("TOOLS_DEMO_IMPORT_SCROLL") == "end")
         {
-            DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => PageScroll.ChangeView(null, PageScroll.ScrollableHeight, null, true));
+            // Room below the queue, so its card can sit at the top however short it is
+            PageContent.Padding = new Thickness(PageContent.Padding.Left, PageContent.Padding.Top, PageContent.Padding.Right, PageScroll.ViewportHeight);
+            DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+            {
+                var top = QueueCard.TransformToVisual(PageContent).TransformPoint(new Windows.Foundation.Point(0, 0)).Y;
+                PageScroll.ChangeView(null, Math.Max(0, top - 8), null, true);
+            });
         }
         var dialog = Environment.GetEnvironmentVariable("TOOLS_DEMO_IMPORT_DIALOG");
         if (dialog is null) return;
@@ -54,6 +64,10 @@ public sealed partial class ImportView : Page
             case "log" when row is not null: ViewModel.ToggleLog(row); break;
             case "remove" when row is not null: Remove_Click(tag, new RoutedEventArgs()); break;
             case "channel": NewChannel_Click(this, new RoutedEventArgs()); break;
+            case "suggest":
+                ChannelBox.Focus(FocusState.Keyboard);
+                ChannelBox.IsSuggestionListOpen = true;
+                break;
         }
     }
 
@@ -67,6 +81,8 @@ public sealed partial class ImportView : Page
     private void Page_SizeChanged(object sender, SizeChangedEventArgs e)
     {
         var narrow = e.NewSize.Width < NarrowWidth;
+        // The suggestions are placed where the box was when they opened: closed when the page lays out again
+        ChannelBox.IsSuggestionListOpen = false;
         foreach (var (row, button) in new (Grid, FrameworkElement)[] { (ChannelRow, NewChannelButton), (FolderRow, BrowseButton) })
         {
             Grid.SetRow(button, narrow ? 1 : 0);
@@ -105,8 +121,10 @@ public sealed partial class ImportView : Page
         sender.IsSuggestionListOpen = true;
     }
 
+    /// <summary>Suggestions when the admin moves to the box, never when the page puts focus there itself.</summary>
     private void ChannelBox_GotFocus(object sender, RoutedEventArgs e)
     {
+        if (ChannelBox.FocusState == FocusState.Programmatic) return;
         if (ViewModel.Channels.Count == 0) _ = ViewModel.SearchChannelsAsync(ChannelBox.Text);
     }
 
@@ -144,6 +162,7 @@ public sealed partial class ImportView : Page
             FlowDirection = FlowDirection,
             XamlRoot = XamlRoot,
         };
+        DialogLook.Apply(dialog);
         dialog.PrimaryButtonClick += async (d, args) =>
         {
             // Keep the dialog open until admin-api has answered, and show its reason when it says no
@@ -225,6 +244,7 @@ public sealed partial class ImportView : Page
             FlowDirection = FlowDirection,
             XamlRoot = XamlRoot,
         };
+        DialogLook.Apply(dialog);
         if (await dialog.ShowAsync() == ContentDialogResult.Primary) ViewModel.Remove(row);
     }
 

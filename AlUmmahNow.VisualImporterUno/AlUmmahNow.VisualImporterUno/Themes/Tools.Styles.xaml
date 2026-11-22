@@ -94,6 +94,17 @@
         <Setter Property="FontSize" Value="14" />
     </Style>
 
+    <!-- Dialog buttons (Shell/DialogLook): one height, filling their column, the default one filled -->
+    <Style x:Key="ToolsDialogButton" TargetType="Button" BasedOn="{StaticResource ToolsSecondaryButton}">
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="Height" Value="40" />
+    </Style>
+
+    <Style x:Key="ToolsDialogDefaultButton" TargetType="Button" BasedOn="{StaticResource ToolsPrimaryButton}">
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="Height" Value="40" />
+    </Style>
+
     <Style x:Key="ToolsLinkButton" TargetType="HyperlinkButton">
         <Setter Property="Foreground" Value="{ThemeResource FanousLinkBrush}" />
         <Setter Property="Padding" Value="0" />

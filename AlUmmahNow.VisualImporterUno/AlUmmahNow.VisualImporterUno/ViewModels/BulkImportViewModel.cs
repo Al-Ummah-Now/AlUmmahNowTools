@@ -339,7 +339,7 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
 
     /// <summary>The file's log as plain text for a bug report: the file, then one line per entry.</summary>
     public string LogTextFor(QueueRow row) =>
-        row.FileName + "\n" + string.Join("\n", _workspace.Queue.LogLines(row.Id).Select(l => $"{Loc.Time(l.At.LocalDateTime)}  {LogText(l).Replace("\n", " — ")}"));
+        row.FileName + "\n" + string.Join("\n", _workspace.Queue.LogLines(row.Id).Select(l => $"{Loc.TimeWithZone(l.At.LocalDateTime)}  {LogText(l).Replace("\n", " — ")}"));
 
     private void OnQueueChanged(string? id)
     {
@@ -545,6 +545,7 @@ public sealed partial class QueueRow : ObservableObject
     [ObservableProperty] private bool _isDone;
     [ObservableProperty] private bool _isFailed;
     [ObservableProperty] private bool _isWaiting;
+    [ObservableProperty] private bool _isRetrying;
     [ObservableProperty] private bool _isPaused;
     [ObservableProperty] private bool _canPause;
     [ObservableProperty] private bool _canResume;
@@ -561,7 +562,7 @@ public sealed partial class QueueRow : ObservableObject
         for (var i = LogEntries.Count; i < lines.Count; i++)
         {
             var line = lines[i];
-            LogEntries.Add(new LogEntry(Loc.Time(line.At.LocalDateTime), BulkImportViewModel.LogText(line).Split('\n'), line.Level != LogLevel.Info));
+            LogEntries.Add(new LogEntry(Loc.TimeWithZone(line.At.LocalDateTime), BulkImportViewModel.LogText(line).Split('\n'), line.Level != LogLevel.Info));
         }
     }
 
@@ -572,7 +573,8 @@ public sealed partial class QueueRow : ObservableObject
         var phase = item.Phase;
         IsDone = phase == ItemPhase.Done;
         IsFailed = phase == ItemPhase.Failed;
-        IsWaiting = phase is ItemPhase.RetryWaiting or ItemPhase.Waiting;
+        IsWaiting = phase == ItemPhase.Waiting;
+        IsRetrying = phase == ItemPhase.RetryWaiting;
         IsPaused = phase == ItemPhase.Paused;
         ShowProgress = phase == ItemPhase.Running;
         Progress = Math.Round(item.Progress * 100, 1);
@@ -584,7 +586,7 @@ public sealed partial class QueueRow : ObservableObject
             ItemPhase.Done => item.AlreadyImported ? Loc.Get("ImportPhase_AlreadyImported") : Loc.Get("ImportPhase_Done"),
             ItemPhase.Running when step!.Kind == ImportStepKind.Upload => Loc.Format("ImportPhase_Uploading", Loc.Percent(item.Progress * 100)),
             ItemPhase.Running => Loc.Get("ImportPhase_Running_" + step!.Kind),
-            ItemPhase.RetryWaiting => Loc.Format("ImportPhase_RetryAt", Loc.Time(step!.NextAttemptAt!.Value.LocalDateTime)),
+            ItemPhase.RetryWaiting => Loc.Format("ImportPhase_RetryAt", Loc.TimeWithZone(step!.NextAttemptAt!.Value.LocalDateTime)),
             ItemPhase.Paused => Loc.Get("ImportPhase_Paused"),
             ItemPhase.Failed => Loc.Format("ImportPhase_Failed", BulkImportViewModel.StepName(step!.Kind.ToString())),
             _ => Loc.Format("ImportPhase_Waiting", BulkImportViewModel.StepName(step!.Kind.ToString())),

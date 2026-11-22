@@ -73,6 +73,7 @@ public sealed partial class ApprovalWorkflowPage : Page
             FlowDirection = FlowDirection,
             XamlRoot = XamlRoot,
         };
+        DialogLook.Apply(dialog);
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
         ViewModel.NewPresetName = nameBox.Text;
         ViewModel.NewPresetDescription = descriptionBox.Text;

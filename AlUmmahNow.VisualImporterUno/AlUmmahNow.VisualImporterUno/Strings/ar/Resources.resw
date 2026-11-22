@@ -199,7 +199,7 @@
     <value>لم يكتمل تسجيل الدخول. حاول مجددًا.</value>
   </data>
   <data name="Gate_CheckingTitle" xml:space="preserve">
-    <value>جارٍ التحقق من صلاحياتك</value>
+    <value>جار التحقق من صلاحياتك</value>
   </data>
   <data name="Gate_CheckingBody" xml:space="preserve">
     <value>لحظة من فضلك حتى تتأكد الأمة الآن من حساب فريق العمل.</value>
@@ -379,7 +379,7 @@
     <value>لا شيء بعد. تشغيل الفاحص وعمليات الفحص والمشكلات تظهر هنا.</value>
   </data>
   <data name="Scanner_CheckingTitle" xml:space="preserve">
-    <value>جارٍ التحقق من الفاحص</value>
+    <value>جار التحقق من الفاحص</value>
   </data>
   <data name="Scanner_CheckingDetail" xml:space="preserve">
     <value>نبحث عن فاحص المجلدات على هذا الجهاز.</value>
@@ -400,13 +400,13 @@
     <value>شغّله ليبحث في المجلدات المراقبة عن مرئيات جديدة. الاستيراد الذي تبدؤه بنفسك يعمل على أي حال.</value>
   </data>
   <data name="Scanner_StartingTitle" xml:space="preserve">
-    <value>جارٍ تشغيل الفاحص</value>
+    <value>جار تشغيل الفاحص</value>
   </data>
   <data name="Scanner_StartingDetail" xml:space="preserve">
     <value>يستغرق ذلك بضع ثوانٍ.</value>
   </data>
   <data name="Scanner_StoppingTitle" xml:space="preserve">
-    <value>جارٍ إيقاف الفاحص</value>
+    <value>جار إيقاف الفاحص</value>
   </data>
   <data name="Scanner_StoppingDetail" xml:space="preserve">
     <value>تنتهي عمليات الفحص الجارية أولًا.</value>
@@ -439,7 +439,7 @@
     <value>متصل</value>
   </data>
   <data name="Scanner_ConnectionReconnecting" xml:space="preserve">
-    <value>جارٍ إعادة الاتصال</value>
+    <value>جار إعادة الاتصال</value>
   </data>
   <data name="Activity_ScannerFound" xml:space="preserve">
     <value>وُجد الفاحص يعمل مسبقًا</value>
@@ -499,13 +499,13 @@
     <value>بدأ {0}</value>
   </data>
   <data name="Progress_Scanning" xml:space="preserve">
-    <value>جارٍ الفحص: الملف {0} من {1}. المرئيات التي وُجدت: {2}.</value>
+    <value>جار الفحص: الملف {0} من {1}. المرئيات التي وُجدت: {2}.</value>
   </data>
   <data name="Progress_Importing" xml:space="preserve">
-    <value>جارٍ استيراد {0} من {1}</value>
+    <value>جار استيراد {0} من {1}</value>
   </data>
   <data name="Progress_ImportingItem" xml:space="preserve">
-    <value>جارٍ استيراد {0} من {1}: {2}</value>
+    <value>جار استيراد {0} من {1}: {2}</value>
   </data>
   <data name="Duration_HoursMinutes" xml:space="preserve">
     <value>{0} س {1} د</value>
@@ -562,7 +562,7 @@
     <value>تعذّر فتح المجلد</value>
   </data>
   <data name="Import_Scanning" xml:space="preserve">
-    <value>جارٍ البحث عن المرئيات…</value>
+    <value>جار البحث عن المرئيات…</value>
   </data>
   <data name="Import_ScanCancelled" xml:space="preserve">
     <value>أُلغي البحث.</value>
@@ -571,7 +571,7 @@
     <value>تعذّر البحث في المجلد</value>
   </data>
   <data name="Import_Starting" xml:space="preserve">
-    <value>جارٍ بدء الرفع…</value>
+    <value>جار بدء الرفع…</value>
   </data>
   <data name="Import_NoneSelected" xml:space="preserve">
     <value>حدّد مرئيًا واحدًا على الأقل لرفعه.</value>
@@ -586,7 +586,7 @@
     <value>تعذّر بدء الرفع</value>
   </data>
   <data name="Import_SessionLoading" xml:space="preserve">
-    <value>جارٍ تحميل الاستيراد…</value>
+    <value>جار تحميل الاستيراد…</value>
   </data>
   <data name="Import_SessionLoaded" xml:space="preserve">
     <value>حُمّل الاستيراد.</value>
@@ -595,7 +595,7 @@
     <value>تعذّر تحميل الاستيراد</value>
   </data>
   <data name="Import_Resuming" xml:space="preserve">
-    <value>جارٍ استئناف الرفع…</value>
+    <value>جار استئناف الرفع…</value>
   </data>
   <data name="Import_Resumed" xml:space="preserve">
     <value>استؤنف الرفع.</value>
@@ -682,7 +682,7 @@
     <value>تعذّر فتح منتقي الملفات</value>
   </data>
   <data name="Settings_Testing" xml:space="preserve">
-    <value>جارٍ الاختبار…</value>
+    <value>جار الاختبار…</value>
   </data>
   <data name="Settings_TestOk" xml:space="preserve">
     <value>تم الاتصال. استجاب الفاحص.</value>
@@ -754,10 +754,10 @@
     <value>طرق أخرى للتثبيت</value>
   </data>
   <data name="Video_Checking" xml:space="preserve">
-    <value>جارٍ التحقق من برامج المرئيات…</value>
+    <value>جار التحقق من برامج المرئيات…</value>
   </data>
   <data name="Video_Detecting" xml:space="preserve">
-    <value>جارٍ البحث عن برامج المرئيات…</value>
+    <value>جار البحث عن برامج المرئيات…</value>
   </data>
   <data name="Video_ReadyTitle" xml:space="preserve">
     <value>برامج المرئيات جاهزة</value>
@@ -949,7 +949,7 @@
     <value>تغيّرت حالة موافقة</value>
   </data>
   <data name="Watch_Creating" xml:space="preserve">
-    <value>جارٍ بدء المراقبة…</value>
+    <value>جار بدء المراقبة…</value>
   </data>
   <data name="Watch_Created" xml:space="preserve">
     <value>المراقبة جارية</value>
@@ -958,19 +958,19 @@
     <value>تعذّر بدء المراقبة</value>
   </data>
   <data name="Watch_Stopping" xml:space="preserve">
-    <value>جارٍ الإيقاف…</value>
+    <value>جار الإيقاف…</value>
   </data>
   <data name="Watch_StopFailed" xml:space="preserve">
     <value>تعذّر إيقاف المراقبة</value>
   </data>
   <data name="Watch_Deleting" xml:space="preserve">
-    <value>جارٍ الإزالة…</value>
+    <value>جار الإزالة…</value>
   </data>
   <data name="Watch_DeleteFailed" xml:space="preserve">
     <value>تعذّرت إزالة المجلد المراقب</value>
   </data>
   <data name="Watch_Refreshing" xml:space="preserve">
-    <value>جارٍ التحديث…</value>
+    <value>جار التحديث…</value>
   </data>
   <data name="Watch_Loaded" xml:space="preserve">
     <value>قائمة المجلدات محدّثة.</value>
@@ -988,7 +988,7 @@
     <value>اعرض المجلدات أولًا ثم ابدأ مراقبتها.</value>
   </data>
   <data name="Watch_CreatingMany" xml:space="preserve">
-    <value>جارٍ بدء {0} من {1}…</value>
+    <value>جار بدء {0} من {1}…</value>
   </data>
   <data name="Watch_ManyDone" xml:space="preserve">
     <value>بدأت مراقبته: {0}. تعذّر بدؤه: {1}.</value>
@@ -1261,7 +1261,7 @@
     <value>تعذّر تحميل الموافقات</value>
   </data>
   <data name="Approve_Connecting" xml:space="preserve">
-    <value>جارٍ الاتصال بفاحص المجلدات…</value>
+    <value>جار الاتصال بفاحص المجلدات…</value>
   </data>
   <data name="Approve_Started" xml:space="preserve">
     <value>الموافقات محدّثة.</value>
@@ -1273,16 +1273,16 @@
     <value>تغيّرت حالة موافقة.</value>
   </data>
   <data name="Approve_Loading" xml:space="preserve">
-    <value>جارٍ تحميل الموافقات…</value>
+    <value>جار تحميل الموافقات…</value>
   </data>
   <data name="Approve_LoadFailed" xml:space="preserve">
     <value>تعذّر تحميل الموافقات</value>
   </data>
   <data name="Approve_Approving" xml:space="preserve">
-    <value>جارٍ الموافقة…</value>
+    <value>جار الموافقة…</value>
   </data>
   <data name="Approve_Rejecting" xml:space="preserve">
-    <value>جارٍ الرفض…</value>
+    <value>جار الرفض…</value>
   </data>
   <data name="Approve_ApprovedOne" xml:space="preserve">
     <value>تمت الموافقة</value>
@@ -1342,7 +1342,7 @@
     <value>تعذّر إنشاء الصورة</value>
   </data>
   <data name="Approve_ThumbMaking" xml:space="preserve">
-    <value>جارٍ إنشاء الصورة…</value>
+    <value>جار إنشاء الصورة…</value>
   </data>
   <data name="Approve_Showing" xml:space="preserve">
     <value>عرض {0} من {1}.</value>
@@ -1405,7 +1405,7 @@
     <value>لم يصل شيء بعد في هذه الفترة.</value>
   </data>
   <data name="Stats_Loading" xml:space="preserve">
-    <value>جارٍ التحميل…</value>
+    <value>جار التحميل…</value>
   </data>
   <data name="Stats_LoadFailed" xml:space="preserve">
     <value>تعذّر تحميل الإحصاءات</value>
@@ -1414,7 +1414,7 @@
     <value>حُدّثت {0}</value>
   </data>
   <data name="Stats_Exporting" xml:space="preserve">
-    <value>جارٍ الحفظ…</value>
+    <value>جار الحفظ…</value>
   </data>
   <data name="Stats_Exported" xml:space="preserve">
     <value>حُفظ في</value>
@@ -1714,40 +1714,40 @@
     <value>{0} مرئيًا بانتظار القرار.</value>
   </data>
   <data name="Approve_ApprovingMany_One" xml:space="preserve">
-    <value>جارٍ الموافقة على مرئي واحد…</value>
+    <value>جار الموافقة على مرئي واحد…</value>
   </data>
   <data name="Approve_ApprovingMany_Other" xml:space="preserve">
-    <value>جارٍ الموافقة على {0} مرئي…</value>
+    <value>جار الموافقة على {0} مرئي…</value>
   </data>
   <data name="Approve_ApprovingMany_Zero" xml:space="preserve">
-    <value>جارٍ الموافقة على {0} مرئي…</value>
+    <value>جار الموافقة على {0} مرئي…</value>
   </data>
   <data name="Approve_ApprovingMany_Two" xml:space="preserve">
-    <value>جارٍ الموافقة على مرئيين…</value>
+    <value>جار الموافقة على مرئيين…</value>
   </data>
   <data name="Approve_ApprovingMany_Few" xml:space="preserve">
-    <value>جارٍ الموافقة على {0} مرئيات…</value>
+    <value>جار الموافقة على {0} مرئيات…</value>
   </data>
   <data name="Approve_ApprovingMany_Many" xml:space="preserve">
-    <value>جارٍ الموافقة على {0} مرئيًا…</value>
+    <value>جار الموافقة على {0} مرئيًا…</value>
   </data>
   <data name="Approve_RejectingMany_One" xml:space="preserve">
-    <value>جارٍ رفض مرئي واحد…</value>
+    <value>جار رفض مرئي واحد…</value>
   </data>
   <data name="Approve_RejectingMany_Other" xml:space="preserve">
-    <value>جارٍ رفض {0} مرئي…</value>
+    <value>جار رفض {0} مرئي…</value>
   </data>
   <data name="Approve_RejectingMany_Zero" xml:space="preserve">
-    <value>جارٍ رفض {0} مرئي…</value>
+    <value>جار رفض {0} مرئي…</value>
   </data>
   <data name="Approve_RejectingMany_Two" xml:space="preserve">
-    <value>جارٍ رفض مرئيين…</value>
+    <value>جار رفض مرئيين…</value>
   </data>
   <data name="Approve_RejectingMany_Few" xml:space="preserve">
-    <value>جارٍ رفض {0} مرئيات…</value>
+    <value>جار رفض {0} مرئيات…</value>
   </data>
   <data name="Approve_RejectingMany_Many" xml:space="preserve">
-    <value>جارٍ رفض {0} مرئيًا…</value>
+    <value>جار رفض {0} مرئيًا…</value>
   </data>
   <data name="Approve_ApprovedMany_One" xml:space="preserve">
     <value>تمت الموافقة على مرئي واحد.</value>
@@ -1918,7 +1918,7 @@
     <value>راقبه مجددًا</value>
   </data>
   <data name="Watch_Resuming" xml:space="preserve">
-    <value>جارٍ استئناف المراقبة…</value>
+    <value>جار استئناف المراقبة…</value>
   </data>
   <data name="Watch_Resumed" xml:space="preserve">
     <value>استؤنفت المراقبة</value>
@@ -2128,16 +2128,16 @@
     <value>موجود في هذه القناة أصلًا، فلم يُرفع</value>
   </data>
   <data name="ImportPhase_Uploading" xml:space="preserve">
-    <value>جارٍ الرفع، {0}</value>
+    <value>جار الرفع، {0}</value>
   </data>
   <data name="ImportPhase_Running_Hash" xml:space="preserve">
-    <value>جارٍ فحص الملف…</value>
+    <value>جار فحص الملف…</value>
   </data>
   <data name="ImportPhase_Running_Attach" xml:space="preserve">
-    <value>جارٍ إرسال الترجمات والملحقات…</value>
+    <value>جار إرسال الترجمات والملحقات…</value>
   </data>
   <data name="ImportPhase_Running_Upload" xml:space="preserve">
-    <value>جارٍ الرفع…</value>
+    <value>جار الرفع…</value>
   </data>
   <data name="ImportPhase_RetryAt" xml:space="preserve">
     <value>إعادة المحاولة عند {0}</value>
