@@ -22,6 +22,16 @@ public sealed partial class SocialSourcesPage : Page
         DataContext = ViewModel;
         if (ViewModel.SelectedChannel is { } channel) ChannelBox.Text = channel.Name;
         SuggestionsUnderBox.Attach(ChannelBox);
+        // The name and the permission are typed in the interface's language: an Arabic field starts on the right (Uno places
+        // an empty field's caret by its alignment, not its direction). Addresses stay left to right in both languages.
+        if (Loc.IsArabic)
+        {
+            foreach (var box in new[] { LabelBox, ByBox, NoteBox })
+            {
+                box.FlowDirection = FlowDirection.RightToLeft;
+                box.TextAlignment = TextAlignment.Right;
+            }
+        }
         Loaded += async (_, _) =>
         {
             KeepLastWords(PageContent);
