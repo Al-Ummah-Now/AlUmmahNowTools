@@ -864,15 +864,15 @@ public sealed partial class SourceRow : ObservableObject
     /// <summary>The server's reason in the app's words when its code is known; the raw text on its own line otherwise.</summary>
     internal static string ReasonText(string error, bool labelled = true)
     {
-        var code = SourceText.ErrorCode(error);
-        if (code is not null)
+        var reason = SourceText.Explain(error);
+        if (reason.Code is { } code)
         {
-            var key = "SocialReason_" + code;
-            var known = Loc.Get(key);
-            if (known != key) return known;
+            var text = Loc.Get("SocialReason_" + code);
+            // The server's status, as a number in the admin's digits on its own line; its own words only for an unexpected failure
+            if (reason.HttpStatus is { } status) text = Loc.WithDetail(text, Loc.Format("SocialReason_HttpStatus", status));
+            return reason.Detail is { } d ? Loc.WithDetail(text, d) : text;
         }
-        var detail = SourceText.ErrorDetail(error) ?? error;
-        return labelled ? Loc.GetWithDetail("Social_Reason", detail) : detail;
+        return labelled ? Loc.GetWithDetail("Social_Reason", reason.Detail) : reason.Detail ?? error;
     }
 
     private void UpdateJob(SyncJob? job)

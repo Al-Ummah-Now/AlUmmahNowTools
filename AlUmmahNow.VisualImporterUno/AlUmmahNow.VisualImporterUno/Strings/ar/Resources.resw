@@ -3449,4 +3449,34 @@
   <data name="Takeout_CancelBody2" xml:space="preserve">
     <value>ويبقى ما طوبق أو نُشر على حاله.</value>
   </data>
+  <data name="SocialReason_source_unreachable" xml:space="preserve">
+    <value>لم يُجب المصدر، أو أجاب بخطأ من جهته. وستحاول المزامنة التالية مرة أخرى.</value>
+  </data>
+  <data name="SocialReason_source_not_found" xml:space="preserve">
+    <value>لم يعد عنوان المصدر موجودًا. تحقّق منه مع صاحب القناة.</value>
+  </data>
+  <data name="SocialReason_source_forbidden" xml:space="preserve">
+    <value>رفض المصدر أن نقرأه، وربما صار خاصًّا.</value>
+  </data>
+  <data name="SocialReason_source_bad_response" xml:space="preserve">
+    <value>أجاب المصدر بما لا تستطيع المزامنة استعماله.</value>
+  </data>
+  <data name="SocialReason_source_not_a_feed" xml:space="preserve">
+    <value>العنوان ليس خلاصة ولا بودكاست.</value>
+  </data>
+  <data name="SocialReason_sync_failed" xml:space="preserve">
+    <value>توقفت المزامنة بسبب خطأ غير متوقع. تفاصيله:</value>
+  </data>
+  <data name="SocialReason_post_refused" xml:space="preserve">
+    <value>رُفض المنشور أو المرئي.</value>
+  </data>
+  <data name="SocialReason_takeout_failed" xml:space="preserve">
+    <value>توقفت المطابقة بسبب خطأ غير متوقع. تفاصيله:</value>
+  </data>
+  <data name="SocialReason_upload_incomplete" xml:space="preserve">
+    <value>لم يكتمل رفع أحد الملفات. ارفعه مرة أخرى، ثم أعِد المحاولة.</value>
+  </data>
+  <data name="SocialReason_HttpStatus" xml:space="preserve">
+    <value>رمز الخادم: {0}</value>
+  </data>
 </root>

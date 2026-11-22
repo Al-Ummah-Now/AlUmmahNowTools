@@ -177,6 +177,9 @@ public enum SourcePhase
     OffNotConnected,
 }
 
+/// <summary>A stored reason, explained (<see cref="SourceText.Explain"/>).</summary>
+public sealed record Reason(string? Code, int? HttpStatus, string? Detail);
+
 public static class SourceText
 {
     private static readonly Regex Code = new("^([a-z][a-z0-9_]{1,40}):", RegexOptions.CultureInvariant);
@@ -184,6 +187,35 @@ public static class SourceText
     /// <summary>The <c>code</c> of a server message written as <c>code: text</c>, else null.</summary>
     public static string? ErrorCode(string? message) =>
         message is not null && Code.Match(message) is { Success: true } m ? m.Groups[1].Value : null;
+
+    /// <summary>
+    /// The codes api-videos stores as a source's or a job's reason (<c>"&lt;code&gt;: &lt;detail&gt;"</c>, lib/importSources/errors.ts),
+    /// each worded by the app (<c>SocialReason_&lt;code&gt;</c>).
+    /// </summary>
+    public static readonly IReadOnlyList<string> ReasonCodes = new[]
+    {
+        "not_connected", "channel_unavailable", "source_unreachable", "source_not_found", "source_forbidden", "source_bad_response",
+        "source_not_a_feed", "sync_failed", "post_refused", "takeout_failed", "upload_incomplete",
+    };
+
+    /// <summary>Codes whose detail is the server's own words about an unexpected failure: shown on their own line for troubleshooting.</summary>
+    private static readonly HashSet<string> DetailShown = new() { "sync_failed", "takeout_failed" };
+
+    private static readonly Regex HttpStatus = new(@"\(http_(\d{3})\)\s*$", RegexOptions.CultureInvariant);
+
+    /// <summary>
+    /// What the app shows for a stored reason: its <see cref="ReasonCodes"/> code (worded by the app), the HTTP status a
+    /// fetch answered (a number the app writes in the admin's digits), and the detail to show on its own line. An unknown
+    /// code, or none, gives no code and the whole text as the detail.
+    /// </summary>
+    public static Reason Explain(string error)
+    {
+        var code = ErrorCode(error);
+        if (code is null || !ReasonCodes.Contains(code)) return new Reason(null, null, ErrorDetail(error) ?? error);
+        var detail = ErrorDetail(error);
+        int? status = detail is not null && HttpStatus.Match(detail) is { Success: true } m ? int.Parse(m.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture) : null;
+        return new Reason(code, status, DetailShown.Contains(code) && !string.IsNullOrWhiteSpace(detail) ? detail : null);
+    }
 
     /// <summary>The text of a <c>code: text</c> message without its code.</summary>
     public static string? ErrorDetail(string? message) =>
