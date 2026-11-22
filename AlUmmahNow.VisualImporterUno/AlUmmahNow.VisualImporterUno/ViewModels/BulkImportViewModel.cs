@@ -386,7 +386,8 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
         void Add(ItemPhase phase, string key)
         {
             var n = items.Count(i => i.Phase == phase);
-            if (n > 0) parts.Add(Loc.Plural(key, n));
+            // Each count stays whole on a narrow window ("1 processing on the server"): lines break between counts only
+            if (n > 0) parts.Add(Loc.Plural(key, n).Replace(' ', '\u00A0'));
         }
         Add(ItemPhase.Done, "Import_SumDone");
         Add(ItemPhase.Running, "Import_SumRunning");
@@ -436,7 +437,7 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
             "attempt" => Loc.Format("ImportLog_attempt", StepName(Arg(0)), Num(1)),
             "attempt_failed" => Loc.WithDetail(Loc.Format("ImportLog_attempt_failed", StepName(Arg(0)), Num(1), Num(3)), ErrorText(Arg(2), Arg(4))),
             "failed" => Loc.WithDetail(Loc.WithDetail(Loc.Format("ImportLog_failed", StepName(Arg(0)), Num(1)), ErrorText(Arg(2), Arg(4))), Loc.Format("ImportLog_reference", Arg(3))),
-            "sent" => Loc.Format("ImportLog_sent", string.Join(Loc.IsArabic ? "، " : ", ", a.Skip(1).Select(Part))),
+            "sent" => Loc.Format("ImportLog_sent", Loc.Groups(a.Skip(1).Select(Part))),
             "left_out_size" => Loc.WithDetail(Loc.Format("ImportLog_left_out_size", Num(1)), Arg(0)),
             "left_out_unreadable" => Loc.WithDetail(Loc.WithDetail(Loc.Get("ImportLog_left_out_unreadable"), Arg(0)), Arg(1)),
             _ => line.Text,
@@ -444,7 +445,7 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
     }
 
     private static string Part(string part) => part.StartsWith("captions=", StringComparison.Ordinal)
-        ? Loc.Format("ImportPart_captions", string.Join(Loc.IsArabic ? "، " : ", ", part["captions=".Length..].Split(',').Select(LanguageName)))
+        ? Loc.Format("ImportPart_captions", Loc.Languages(part["captions=".Length..].Split(',').Select(LanguageName)))
         : Loc.Get("ImportPart_" + part);
 
     internal static string TitleFor(ImportMetadata metadata) =>
@@ -492,12 +493,12 @@ public sealed partial class ReviewRow : ObservableObject
         var parts = new List<string>();
         if (video.Captions.Count > 0)
         {
-            parts.Add(Loc.Format("ImportPart_captions", string.Join(Loc.IsArabic ? "، " : ", ", video.Captions.Select(c => BulkImportViewModel.LanguageName(c.Language)))));
+            parts.Add(Loc.Format("ImportPart_captions", Loc.Languages(video.Captions.Select(c => BulkImportViewModel.LanguageName(c.Language)))));
         }
         if (video.ChaptersPath is not null) parts.Add(Loc.Get("ImportPart_chapters"));
         if (video.ThumbnailPath is not null) parts.Add(Loc.Get("ImportPart_thumbnail"));
         if (video.MetadataPath is not null) parts.Add(Loc.Get("ImportPart_metadata"));
-        Sidecars = Loc.KeepLastWords(parts.Count == 0 ? Loc.Get("Import_NoSidecars") : string.Join(Loc.IsArabic ? "، " : "\u00A0· ", parts));
+        Sidecars = Loc.KeepLastWords(parts.Count == 0 ? Loc.Get("Import_NoSidecars") : Loc.Groups(parts));
         Notes = Loc.KeepLastWords(string.Join("\n", video.Notes.Select(BulkImportViewModel.NoteText)));
     }
 
@@ -525,7 +526,7 @@ public sealed partial class ReviewRow : ObservableObject
 }
 
 /// <summary>One event in a file's log: its time and its text, a line each (a file name, hash or reference has its own).</summary>
-public sealed record LogEntry(string Time, IReadOnlyList<string> Lines, bool IsProblem)
+public sealed record LogEntry(string Time, string Utc, IReadOnlyList<string> Lines, bool IsProblem)
 {
     public string Text => string.Join("\n", Lines);
 }
@@ -550,6 +551,8 @@ public sealed partial class QueueRow : ObservableObject
 
     [ObservableProperty] private string _channel = "";
     [ObservableProperty] private string _status = "";
+    /// <summary>The retry time in UTC, as the status's tooltip (null when the status names no time)</summary>
+    [ObservableProperty] private string? _statusTip;
     [ObservableProperty] private string _detail = "";
     [ObservableProperty] private bool _hasDetail;
     [ObservableProperty] private double _progress;
@@ -574,7 +577,7 @@ public sealed partial class QueueRow : ObservableObject
         for (var i = LogEntries.Count; i < lines.Count; i++)
         {
             var line = lines[i];
-            LogEntries.Add(new LogEntry(Loc.TimeWithZone(line.At.LocalDateTime), BulkImportViewModel.LogText(line).Split('\n'), line.Level != LogLevel.Info));
+            LogEntries.Add(new LogEntry(Loc.TimeWithZone(line.At.LocalDateTime), Loc.UtcText(line.At), BulkImportViewModel.LogText(line).Split('\n'), line.Level != LogLevel.Info));
         }
     }
 
@@ -603,6 +606,7 @@ public sealed partial class QueueRow : ObservableObject
             ItemPhase.Failed => Loc.Format("ImportPhase_Failed", BulkImportViewModel.StepName(step!.Kind.ToString())),
             _ => Loc.Format("ImportPhase_Waiting", BulkImportViewModel.StepName(step!.Kind.ToString())),
         };
+        StatusTip = phase == ItemPhase.RetryWaiting ? Loc.UtcText(step!.NextAttemptAt!.Value) : null;
         Detail = phase is ItemPhase.Failed or ItemPhase.RetryWaiting ? Loc.KeepLastWords(BulkImportViewModel.ErrorText(step!.LastErrorCode, step.LastError)) : "";
         HasDetail = Detail.Length > 0;
     }

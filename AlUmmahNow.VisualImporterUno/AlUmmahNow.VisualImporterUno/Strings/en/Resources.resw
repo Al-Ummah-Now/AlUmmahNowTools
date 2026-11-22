@@ -199,16 +199,16 @@
     <value>Sign-in opens in your browser. Your password never enters this app.</value>
   </data>
   <data name="SignIn_FailureCancelled" xml:space="preserve">
-    <value>Sign-in was cancelled. Sign in again whenever you're ready.</value>
+    <value>Sign-in was cancelled. Sign in again whenever you’re ready.</value>
   </data>
   <data name="SignIn_FailureTimedOut" xml:space="preserve">
     <value>Sign-in took too long. Try again, and finish it in the browser window that opens.</value>
   </data>
   <data name="SignIn_FailureOffline" xml:space="preserve">
-    <value>Can't reach the sign-in service. Check your connection and try again.</value>
+    <value>Can’t reach the sign-in service. Check your connection and try again.</value>
   </data>
   <data name="SignIn_FailureFailed" xml:space="preserve">
-    <value>Sign-in didn't finish. Try again.</value>
+    <value>Sign-in didn’t finish. Try again.</value>
   </data>
   <data name="Gate_CheckingTitle" xml:space="preserve">
     <value>Checking your access</value>
@@ -220,16 +220,16 @@
     <value>This app is for Al Ummah Now staff</value>
   </data>
   <data name="Gate_NotStaffBody" xml:space="preserve">
-    <value>This account can't import. Sign in with your staff account, or ask a super admin to give this account import access.</value>
+    <value>This account can’t import. Sign in with your staff account, or ask a super admin to give this account import access.</value>
   </data>
   <data name="Gate_NotStaffPrimary" xml:space="preserve">
     <value>Sign in with another account</value>
   </data>
   <data name="Gate_UnreachableTitle" xml:space="preserve">
-    <value>Can't reach Al Ummah Now</value>
+    <value>Can’t reach Al Ummah Now</value>
   </data>
   <data name="Gate_UnreachableBody" xml:space="preserve">
-    <value>You're still signed in. Check your connection, then try again.</value>
+    <value>You’re still signed in. Check your connection, then try again.</value>
   </data>
   <data name="Gate_UnreachablePrimary" xml:space="preserve">
     <value>Try again</value>
@@ -424,10 +424,10 @@
     <value>Scans that are running finish first.</value>
   </data>
   <data name="Scanner_MissingTitle" xml:space="preserve">
-    <value>Scanner isn't installed</value>
+    <value>Scanner isn’t installed</value>
   </data>
   <data name="Scanner_MissingDetail" xml:space="preserve">
-    <value>Tools couldn't find the folder scanner next to the app. Reinstalling Tools puts it back.</value>
+    <value>Tools couldn’t find the folder scanner next to the app. Reinstalling Tools puts it back.</value>
   </data>
   <data name="Scanner_FailedTitle" xml:space="preserve">
     <value>Scanner stopped unexpectedly</value>
@@ -478,28 +478,28 @@
     <value>Scan cancelled</value>
   </data>
   <data name="Problem_ScannerCheck" xml:space="preserve">
-    <value>Couldn't check the scanner</value>
+    <value>Couldn’t check the scanner</value>
   </data>
   <data name="Problem_ScannerStart" xml:space="preserve">
-    <value>Couldn't turn the scanner on</value>
+    <value>Couldn’t turn the scanner on</value>
   </data>
   <data name="Problem_ScannerStop" xml:space="preserve">
-    <value>Couldn't turn the scanner off</value>
+    <value>Couldn’t turn the scanner off</value>
   </data>
   <data name="Problem_ScannerStopped" xml:space="preserve">
     <value>The scanner stopped unexpectedly</value>
   </data>
   <data name="Problem_Connect" xml:space="preserve">
-    <value>Couldn't connect to the scanner</value>
+    <value>Couldn’t connect to the scanner</value>
   </data>
   <data name="Problem_Connection" xml:space="preserve">
     <value>The connection to the scanner dropped</value>
   </data>
   <data name="Problem_Disconnect" xml:space="preserve">
-    <value>Couldn't disconnect from the scanner</value>
+    <value>Couldn’t disconnect from the scanner</value>
   </data>
   <data name="Problem_Refresh" xml:space="preserve">
-    <value>Couldn't refresh the scanner's state</value>
+    <value>Couldn’t refresh the scanner’s state</value>
   </data>
   <data name="Problem_ScanFailed" xml:space="preserve">
     <value>A scan failed</value>
@@ -571,7 +571,7 @@
     <value>Folder chosen. Find its videos next.</value>
   </data>
   <data name="Import_FolderFailed" xml:space="preserve">
-    <value>Couldn't open the folder</value>
+    <value>Couldn’t open the folder</value>
   </data>
   <data name="Import_Scanning" xml:space="preserve">
     <value>Looking for videos…</value>
@@ -580,7 +580,7 @@
     <value>The search was cancelled.</value>
   </data>
   <data name="Import_ScanFailed" xml:space="preserve">
-    <value>Couldn't search the folder</value>
+    <value>Couldn’t search the folder</value>
   </data>
   <data name="Import_Starting" xml:space="preserve">
     <value>Starting the upload…</value>
@@ -595,7 +595,7 @@
     <value>Upload started.</value>
   </data>
   <data name="Import_StartFailed" xml:space="preserve">
-    <value>Couldn't start the upload</value>
+    <value>Couldn’t start the upload</value>
   </data>
   <data name="Import_SessionLoading" xml:space="preserve">
     <value>Loading the import…</value>
@@ -604,7 +604,7 @@
     <value>Import loaded.</value>
   </data>
   <data name="Import_SessionFailed" xml:space="preserve">
-    <value>Couldn't load the import</value>
+    <value>Couldn’t load the import</value>
   </data>
   <data name="Import_Resuming" xml:space="preserve">
     <value>Resuming the upload…</value>
@@ -613,16 +613,16 @@
     <value>Upload resumed.</value>
   </data>
   <data name="Import_ResumeFailed" xml:space="preserve">
-    <value>Couldn't resume the upload</value>
+    <value>Couldn’t resume the upload</value>
   </data>
   <data name="Import_Cancelled" xml:space="preserve">
     <value>Upload cancelled.</value>
   </data>
   <data name="Import_CancelFailed" xml:space="preserve">
-    <value>Couldn't cancel the upload</value>
+    <value>Couldn’t cancel the upload</value>
   </data>
   <data name="Import_SessionsFailed" xml:space="preserve">
-    <value>Couldn't load past imports</value>
+    <value>Couldn’t load past imports</value>
   </data>
   <data name="Import_Completed" xml:space="preserve">
     <value>Upload finished. Uploaded: {0}. Failed: {1}.</value>
@@ -685,13 +685,13 @@
     <value>Saved. Tools uses these settings from now on.</value>
   </data>
   <data name="Settings_SaveFailed" xml:space="preserve">
-    <value>Couldn't save the settings</value>
+    <value>Couldn’t save the settings</value>
   </data>
   <data name="Settings_ResetDone" xml:space="preserve">
     <value>Defaults restored. Save to keep them.</value>
   </data>
   <data name="Settings_BrowseFailed" xml:space="preserve">
-    <value>Couldn't open the file picker</value>
+    <value>Couldn’t open the file picker</value>
   </data>
   <data name="Settings_Testing" xml:space="preserve">
     <value>Testing…</value>
@@ -703,13 +703,13 @@
     <value>The scanner answered with an error</value>
   </data>
   <data name="Settings_TestBadAddress" xml:space="preserve">
-    <value>That address isn't valid. It should look like http://localhost:5000.</value>
+    <value>That address isn’t valid. It should look like http://localhost:5000.</value>
   </data>
   <data name="Settings_TestFailed" xml:space="preserve">
-    <value>Couldn't reach the scanner</value>
+    <value>Couldn’t reach the scanner</value>
   </data>
   <data name="Settings_TestTimeout" xml:space="preserve">
-    <value>The scanner didn't answer within 10 seconds. Check it's on.</value>
+    <value>The scanner didn’t answer within 10 seconds. Check it’s on.</value>
   </data>
   <data name="Video_Detect.Text" xml:space="preserve">
     <value>Find automatically</value>
@@ -778,34 +778,34 @@
     <value>Thumbnails, video details and file checks all work.</value>
   </data>
   <data name="Video_MissingTitle" xml:space="preserve">
-    <value>Video programs aren't set up</value>
+    <value>Video programs aren’t set up</value>
   </data>
   <data name="Video_ConverterMissing" xml:space="preserve">
-    <value>The video converter wasn't found.</value>
+    <value>The video converter wasn’t found.</value>
   </data>
   <data name="Video_ConverterBroken" xml:space="preserve">
-    <value>The video converter was found but doesn't run.</value>
+    <value>The video converter was found but doesn’t run.</value>
   </data>
   <data name="Video_ReaderMissing" xml:space="preserve">
-    <value>The video reader wasn't found.</value>
+    <value>The video reader wasn’t found.</value>
   </data>
   <data name="Video_ReaderBroken" xml:space="preserve">
-    <value>The video reader was found but doesn't run.</value>
+    <value>The video reader was found but doesn’t run.</value>
   </data>
   <data name="Video_NotDetected" xml:space="preserve">
-    <value>They aren't installed on this computer. Install them below, then try again.</value>
+    <value>They aren’t installed on this computer. Install them below, then try again.</value>
   </data>
   <data name="Video_CheckFailed" xml:space="preserve">
-    <value>Couldn't check the video programs</value>
+    <value>Couldn’t check the video programs</value>
   </data>
   <data name="Video_NeedBoth" xml:space="preserve">
     <value>Choose both programs before saving.</value>
   </data>
   <data name="Video_PathsInvalid" xml:space="preserve">
-    <value>Those files don't run as the video programs. Check the locations.</value>
+    <value>Those files don’t run as the video programs. Check the locations.</value>
   </data>
   <data name="Video_SaveFailed" xml:space="preserve">
-    <value>Couldn't save the locations</value>
+    <value>Couldn’t save the locations</value>
   </data>
   <data name="Video_Saved" xml:space="preserve">
     <value>Saved. Both programs work.</value>
@@ -925,7 +925,7 @@
     <value>Folders are checked while the folder scanner is on.</value>
   </data>
   <data name="Watch_StartFailed" xml:space="preserve">
-    <value>Couldn't load watched folders</value>
+    <value>Couldn’t load watched folders</value>
   </data>
   <data name="Watch_NotConnected" xml:space="preserve">
     <value>The folder scanner is off. Turn it on from the Folder scanner page.</value>
@@ -967,19 +967,19 @@
     <value>Now watching</value>
   </data>
   <data name="Watch_CreateFailed" xml:space="preserve">
-    <value>Couldn't start watching</value>
+    <value>Couldn’t start watching</value>
   </data>
   <data name="Watch_Stopping" xml:space="preserve">
     <value>Stopping…</value>
   </data>
   <data name="Watch_StopFailed" xml:space="preserve">
-    <value>Couldn't stop watching</value>
+    <value>Couldn’t stop watching</value>
   </data>
   <data name="Watch_Deleting" xml:space="preserve">
     <value>Removing…</value>
   </data>
   <data name="Watch_DeleteFailed" xml:space="preserve">
-    <value>Couldn't remove the watched folder</value>
+    <value>Couldn’t remove the watched folder</value>
   </data>
   <data name="Watch_Refreshing" xml:space="preserve">
     <value>Refreshing…</value>
@@ -988,13 +988,13 @@
     <value>Folder list is up to date.</value>
   </data>
   <data name="Watch_RefreshFailed" xml:space="preserve">
-    <value>Couldn't refresh watched folders</value>
+    <value>Couldn’t refresh watched folders</value>
   </data>
   <data name="Watch_Viewing" xml:space="preserve">
     <value>Showing</value>
   </data>
   <data name="Watch_PreviewFailed" xml:space="preserve">
-    <value>Couldn't work out the folders</value>
+    <value>Couldn’t work out the folders</value>
   </data>
   <data name="Watch_PreviewFirst" xml:space="preserve">
     <value>Show the folders first, then start watching them.</value>
@@ -1003,7 +1003,7 @@
     <value>Starting {0} of {1}…</value>
   </data>
   <data name="Watch_ManyDone" xml:space="preserve">
-    <value>Now watched: {0}. Couldn't start: {1}.</value>
+    <value>Now watched: {0}. Couldn’t start: {1}.</value>
   </data>
   <data name="Watch_ManyDoneTitle" xml:space="preserve">
     <value>Folders watched</value>
@@ -1015,7 +1015,7 @@
     <value>Choose a file first.</value>
   </data>
   <data name="Watch_FileMissing" xml:space="preserve">
-    <value>That file doesn't exist.</value>
+    <value>That file doesn’t exist.</value>
   </data>
   <data name="Watch_FileFormat" xml:space="preserve">
     <value>Use a CSV or JSON file.</value>
@@ -1024,13 +1024,13 @@
     <value>Valid rows: {0}. Rows with problems: {1}.</value>
   </data>
   <data name="Watch_FileFailed" xml:space="preserve">
-    <value>Couldn't read the file</value>
+    <value>Couldn’t read the file</value>
   </data>
   <data name="Watch_FileNoneValid" xml:space="preserve">
     <value>No row in the file is valid.</value>
   </data>
   <data name="Watch_TemplatesFailed" xml:space="preserve">
-    <value>Couldn't load templates</value>
+    <value>Couldn’t load templates</value>
   </data>
   <data name="Watch_NameRequired" xml:space="preserve">
     <value>Type a channel name.</value>
@@ -1048,7 +1048,7 @@
     <value>Choose a folder.</value>
   </data>
   <data name="Watch_PathMissing" xml:space="preserve">
-    <value>That folder doesn't exist.</value>
+    <value>That folder doesn’t exist.</value>
   </data>
   <data name="Watch_PathTaken" xml:space="preserve">
     <value>This folder is already watched.</value>
@@ -1270,7 +1270,7 @@
     <value>Choose videos, then approve or reject them.</value>
   </data>
   <data name="Approve_StartFailed" xml:space="preserve">
-    <value>Couldn't load approvals</value>
+    <value>Couldn’t load approvals</value>
   </data>
   <data name="Approve_Connecting" xml:space="preserve">
     <value>Connecting to the folder scanner…</value>
@@ -1288,7 +1288,7 @@
     <value>Loading approvals…</value>
   </data>
   <data name="Approve_LoadFailed" xml:space="preserve">
-    <value>Couldn't load approvals</value>
+    <value>Couldn’t load approvals</value>
   </data>
   <data name="Approve_Approving" xml:space="preserve">
     <value>Approving…</value>
@@ -1303,10 +1303,10 @@
     <value>Rejected</value>
   </data>
   <data name="Approve_ApproveFailed" xml:space="preserve">
-    <value>Couldn't approve</value>
+    <value>Couldn’t approve</value>
   </data>
   <data name="Approve_RejectFailed" xml:space="preserve">
-    <value>Couldn't reject</value>
+    <value>Couldn’t reject</value>
   </data>
   <data name="Approve_Previewing" xml:space="preserve">
     <value>Previewing</value>
@@ -1318,7 +1318,7 @@
     <value>Filters cleared.</value>
   </data>
   <data name="Approve_PresetsFailed" xml:space="preserve">
-    <value>Couldn't load presets</value>
+    <value>Couldn’t load presets</value>
   </data>
   <data name="Approve_PresetApplied" xml:space="preserve">
     <value>Preset in use</value>
@@ -1330,7 +1330,7 @@
     <value>Preset saved</value>
   </data>
   <data name="Approve_PresetSaveFailed" xml:space="preserve">
-    <value>Couldn't change the preset</value>
+    <value>Couldn’t change the preset</value>
   </data>
   <data name="Approve_PresetDeleted" xml:space="preserve">
     <value>Preset deleted</value>
@@ -1342,16 +1342,16 @@
     <value>No default preset now.</value>
   </data>
   <data name="Approve_FilterFailed" xml:space="preserve">
-    <value>Couldn't apply the filters</value>
+    <value>Couldn’t apply the filters</value>
   </data>
   <data name="Approve_VideoMissing" xml:space="preserve">
-    <value>The video file isn't there any more</value>
+    <value>The video file isn’t there any more</value>
   </data>
   <data name="Approve_ThumbMade" xml:space="preserve">
     <value>Picture made.</value>
   </data>
   <data name="Approve_ThumbFailed" xml:space="preserve">
-    <value>Couldn't make the picture</value>
+    <value>Couldn’t make the picture</value>
   </data>
   <data name="Approve_ThumbMaking" xml:space="preserve">
     <value>Making the picture…</value>
@@ -1420,7 +1420,7 @@
     <value>Loading…</value>
   </data>
   <data name="Stats_LoadFailed" xml:space="preserve">
-    <value>Couldn't load analytics</value>
+    <value>Couldn’t load analytics</value>
   </data>
   <data name="Stats_UpdatedAt" xml:space="preserve">
     <value>Updated {0}</value>
@@ -1432,7 +1432,7 @@
     <value>Saved to</value>
   </data>
   <data name="Stats_ExportFailed" xml:space="preserve">
-    <value>Couldn't save the file</value>
+    <value>Couldn’t save the file</value>
   </data>
   <data name="Stats_TrendUp" xml:space="preserve">
     <value>{0} more than the period before</value>
@@ -1468,7 +1468,7 @@
     <value>This page needs it running. Turn it on from the Folder scanner page, and this page fills in by itself.</value>
   </data>
   <data name="Approve_NotAccepted" xml:space="preserve">
-    <value>The scanner didn't accept the decision. Try again.</value>
+    <value>The scanner didn’t accept the decision. Try again.</value>
   </data>
   <data name="Stats_LegendWaiting.Text" xml:space="preserve">
     <value>Waiting</value>
@@ -1483,7 +1483,7 @@
     <value>{0}, {1}</value>
   </data>
   <data name="SignIn_WaitingBody.Text" xml:space="preserve">
-    <value>A sign-in page opened in your browser. Tools carries on by itself once you've signed in there.</value>
+    <value>A sign-in page opened in your browser. Tools carries on by itself once you’ve signed in there.</value>
   </data>
   <data name="SignIn_Reopen.Text" xml:space="preserve">
     <value>Open the sign-in page again</value>
@@ -1501,7 +1501,7 @@
     <value>OK</value>
   </data>
   <data name="Import_StorageNotSet" xml:space="preserve">
-    <value>Uploading isn't set up on this computer yet. Finding and checking videos still works.</value>
+    <value>Uploading isn’t set up on this computer yet. Finding and checking videos still works.</value>
   </data>
   <data name="Stats_ChannelApproved" xml:space="preserve">
     <value>{0} approved</value>
@@ -1630,16 +1630,16 @@
     <value>{0} videos rejected.</value>
   </data>
   <data name="Approve_ApproveManyFailed_One" xml:space="preserve">
-    <value>Couldn't approve 1 video.</value>
+    <value>Couldn’t approve 1 video.</value>
   </data>
   <data name="Approve_ApproveManyFailed_Other" xml:space="preserve">
-    <value>Couldn't approve {0} videos.</value>
+    <value>Couldn’t approve {0} videos.</value>
   </data>
   <data name="Approve_RejectManyFailed_One" xml:space="preserve">
-    <value>Couldn't reject 1 video.</value>
+    <value>Couldn’t reject 1 video.</value>
   </data>
   <data name="Approve_RejectManyFailed_Other" xml:space="preserve">
-    <value>Couldn't reject {0} videos.</value>
+    <value>Couldn’t reject {0} videos.</value>
   </data>
   <data name="Approve_SelectedAll_One" xml:space="preserve">
     <value>1 video selected.</value>
@@ -1684,7 +1684,7 @@
     <value>Watching again</value>
   </data>
   <data name="Watch_ResumeFailed" xml:space="preserve">
-    <value>Couldn't watch this folder again. Another watch may already cover it.</value>
+    <value>Couldn’t watch this folder again. Another watch may already cover it.</value>
   </data>
   <data name="Settings_LocationLabel.Text" xml:space="preserve">
     <value>Runs on</value>
@@ -1810,7 +1810,7 @@
     <value>No channel matches.</value>
   </data>
   <data name="Import_FolderMissing" xml:space="preserve">
-    <value>That folder doesn't exist or can't be opened.</value>
+    <value>That folder doesn’t exist or can’t be opened.</value>
   </data>
   <data name="Import_FoundSummary" xml:space="preserve">
     <value>{0}, {1} in all</value>
@@ -1903,16 +1903,16 @@
     <value>Waiting: {0}</value>
   </data>
   <data name="ImportError_admin_unreachable" xml:space="preserve">
-    <value>The admin API couldn't be reached. Check the connection.</value>
+    <value>Couldn’t reach the Al Ummah Now admin service. Check the connection.</value>
   </data>
   <data name="ImportError_signed_out" xml:space="preserve">
-    <value>You're signed out. Sign in again and it carries on.</value>
+    <value>You’re signed out. Sign in again and it carries on.</value>
   </data>
   <data name="ImportError_server" xml:space="preserve">
     <value>The server said no.</value>
   </data>
   <data name="ImportError_videos_unreachable" xml:space="preserve">
-    <value>The videos API couldn't be reached. Check the connection.</value>
+    <value>Couldn’t reach the Al Ummah Now videos service. Check the connection.</value>
   </data>
   <data name="ImportError_upload_refused" xml:space="preserve">
     <value>The upload was refused.</value>
@@ -1924,43 +1924,43 @@
     <value>This file is already in this channel.</value>
   </data>
   <data name="ImportError_file_missing" xml:space="preserve">
-    <value>The file isn't there any more. Scan the folder again.</value>
+    <value>The file isn’t there any more. Scan the folder again.</value>
   </data>
   <data name="ImportError_file_link" xml:space="preserve">
-    <value>The file is now a link to another file, so it isn't uploaded. Scan the folder again.</value>
+    <value>The file is now a link to another file, so it isn’t uploaded. Scan the folder again.</value>
   </data>
   <data name="ImportError_file_changed" xml:space="preserve">
     <value>The file changed after it was scanned. Scan the folder again.</value>
   </data>
   <data name="ImportError_file_denied" xml:space="preserve">
-    <value>Tools isn't allowed to read the file.</value>
+    <value>Tools isn’t allowed to read the file.</value>
   </data>
   <data name="ImportError_file_read" xml:space="preserve">
-    <value>The file couldn't be read.</value>
+    <value>The file couldn’t be read.</value>
   </data>
   <data name="ImportError_not_hashed" xml:space="preserve">
-    <value>The file wasn't checked first. Try again.</value>
+    <value>The file wasn’t checked first. Try again.</value>
   </data>
   <data name="ImportError_not_uploaded" xml:space="preserve">
-    <value>The upload didn't finish first. Try again.</value>
+    <value>The upload didn’t finish first. Try again.</value>
   </data>
   <data name="ImportError_unexpected" xml:space="preserve">
     <value>Something unexpected went wrong.</value>
   </data>
   <data name="ImportNote_CaptionLanguageUnknown" xml:space="preserve">
-    <value>{0} has no language in its name, so it's left out. Choose a language for such caption files and find the videos again.</value>
+    <value>{0} has no language in its name, so it’s left out. Choose a language for such caption files and find the videos again.</value>
   </data>
   <data name="ImportNote_CaptionLanguageTwice" xml:space="preserve">
     <value>Two caption files have the same language; this one is left out:</value>
   </data>
   <data name="ImportNote_MetadataUnreadable" xml:space="preserve">
-    <value>A metadata file couldn't be read and is left out:</value>
+    <value>A metadata file couldn’t be read and is left out:</value>
   </data>
   <data name="ImportNote_CsvUnreadable" xml:space="preserve">
-    <value>The metadata sheet couldn't be read and is left out:</value>
+    <value>The metadata sheet couldn’t be read and is left out:</value>
   </data>
   <data name="ImportNote_TooLarge" xml:space="preserve">
-    <value>Larger than 5 GB, so it can't be uploaded:</value>
+    <value>Larger than 5 GB, so it can’t be uploaded:</value>
   </data>
   <data name="ImportPart_captions" xml:space="preserve">
     <value>captions: {0}</value>
@@ -1996,7 +1996,7 @@
     <value>The upload session ended; opening it again</value>
   </data>
   <data name="ImportLog_report_failed" xml:space="preserve">
-    <value>The failure couldn't be sent to the Errors page:</value>
+    <value>The failure couldn’t be sent to the Errors page:</value>
   </data>
   <data name="ImportLog_retry" xml:space="preserve">
     <value>Trying {0} again</value>
@@ -2017,7 +2017,7 @@
     <value>Trying {0} again, attempt {1}</value>
   </data>
   <data name="ImportLog_attempt_failed" xml:space="preserve">
-    <value>Couldn't finish {0} on attempt {1}; trying again in {2} s</value>
+    <value>Couldn’t finish {0} on attempt {1}; trying again in {2} s</value>
   </data>
   <data name="ImportLog_failed" xml:space="preserve">
     <value>Stopped {0} after {1} attempts</value>
@@ -2026,7 +2026,7 @@
     <value>Reference {0}</value>
   </data>
   <data name="ImportLog_sha" xml:space="preserve">
-    <value>SHA-256:</value>
+    <value>File fingerprint:</value>
   </data>
   <data name="ImportLog_upload_opened" xml:space="preserve">
     <value>Upload opened for video:</value>
@@ -2047,7 +2047,7 @@
     <value>Larger than {0} MB or empty, so left out:</value>
   </data>
   <data name="ImportLog_left_out_unreadable" xml:space="preserve">
-    <value>Couldn't be read, so left out:</value>
+    <value>Couldn’t be read, so left out:</value>
   </data>
   <data name="Import_VideoCount_One" xml:space="preserve">
     <value>1 video</value>
@@ -2056,10 +2056,10 @@
     <value>{0} videos</value>
   </data>
   <data name="Import_AlreadyQueued_One" xml:space="preserve">
-    <value>1 video is already in the queue, so it isn't shown again.</value>
+    <value>1 video is already in the queue, so it isn’t shown again.</value>
   </data>
   <data name="Import_AlreadyQueued_Other" xml:space="preserve">
-    <value>{0} videos are already in the queue, so they aren't shown again.</value>
+    <value>{0} videos are already in the queue, so they aren’t shown again.</value>
   </data>
   <data name="Import_AddToQueue_One" xml:space="preserve">
     <value>Add 1 video to the queue</value>
