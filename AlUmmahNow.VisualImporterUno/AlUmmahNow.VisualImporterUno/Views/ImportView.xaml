@@ -181,6 +181,8 @@
                             <TextBlock x:Uid="Import_TranscribeTitle" Text="Speech to text and translation" Style="{StaticResource ToolsLabel}" />
                             <TextBlock x:Uid="Import_TranscribeBody" Text="Tools writes down what is said in each video." Style="{StaticResource ToolsMuted}" TextWrapping="Wrap" />
                             <CheckBox x:Uid="Import_TranscribeHere" Content="Transcribe the videos that have no captions" IsChecked="{x:Bind ViewModel.TranscribeHere, Mode=TwoWay}" IsEnabled="{x:Bind ViewModel.CanTranscribe, Mode=OneWay}" />
+                            <TextBlock x:Uid="Import_TranscribeUnavailable" Text="This copy of Tools can't transcribe." Style="{StaticResource ToolsMuted}" Foreground="{ThemeResource FanousAccentBrush}"
+                                       TextWrapping="Wrap" Visibility="{x:Bind ViewModel.CannotTranscribe, Mode=OneWay}" />
                             <StackPanel Spacing="12" Visibility="{x:Bind ViewModel.TranscribeHere, Mode=OneWay}">
                                 <StackPanel Spacing="6">
                                     <TextBlock x:Name="SpokenLanguageLabel" x:Uid="Import_SpokenLanguageLabel" Text="What they speak" Style="{StaticResource ToolsLabel}" />
@@ -201,8 +203,6 @@
                             </StackPanel>
                             <CheckBox x:Uid="Import_TranslateCaptions" Content="Ask the server to translate the captions into the site’s other language" IsChecked="{x:Bind ViewModel.TranslateCaptions, Mode=TwoWay}" />
                             <TextBlock x:Uid="Import_TranslateNote" Text="Each translation is a machine-made draft." Style="{StaticResource ToolsMuted}" TextWrapping="Wrap" Visibility="{x:Bind ViewModel.TranslateCaptions, Mode=OneWay}" />
-                            <TextBlock x:Uid="Import_TranscribeUnavailable" Text="This copy of Tools can't transcribe." Style="{StaticResource ToolsMuted}" Foreground="{ThemeResource FanousAccentBrush}"
-                                       TextWrapping="Wrap" Visibility="{x:Bind ViewModel.CannotTranscribe, Mode=OneWay}" />
                         </StackPanel>
                     </Border>
                     <Button Style="{StaticResource ToolsPrimaryButton}" Command="{x:Bind ViewModel.AddToQueueCommand}">
