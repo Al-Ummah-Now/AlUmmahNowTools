@@ -159,6 +159,37 @@ public static class Loc
 
     private static readonly System.Text.RegularExpressions.Regex DigitRun = new("[0-9][0-9٫:]*[0-9]");
 
+    private static readonly System.Text.RegularExpressions.Regex NeutralBreak = new(@"(\s*[:;!?.()\[\]\-–—|/]+\s*)");
+
+    /// <summary>
+    /// An Arabic line (a title) shown in the English interface. Uno's Skia text lays the line out in the window's direction,
+    /// whatever the element's own FlowDirection, and breaks an Arabic line into pieces at punctuation such as ": ", so in an
+    /// English window «فقه الصيام: النية» shows with its halves swapped. The pieces are stored in reverse order so they land
+    /// the right way round. Arabic windows and Windows draw text natively and need nothing.
+    /// </summary>
+    public static string RightToLeftLine(string text) => IsArabic ? text : Reordered(text);
+
+    /// <summary>
+    /// A line of a dialog. Uno draws popups outside the window's right-to-left layout, so an Arabic line in a dialog
+    /// breaks into swapped pieces even in the Arabic interface; its pieces are stored in reverse order as for
+    /// <see cref="RightToLeftLine"/>.
+    /// </summary>
+    public static string PopupLine(string text) => Reordered(text);
+
+    private static string Reordered(string text)
+    {
+#if HAS_UNO
+        if (text.FirstOrDefault(char.IsLetter) is >= '\u0600' and <= '\u06FF')
+        {
+            // The punctuation between pieces is mirrored too, so ": " sits after the first half as it does natively
+            var pieces = NeutralBreak.Split(text).Where(p => p.Length > 0).Reverse()
+                .Select(p => NeutralBreak.IsMatch(p) && p.Trim().Length > 0 && NeutralBreak.Match(p).Length == p.Length ? new string(p.Reverse().ToArray()) : p);
+            return string.Concat(pieces);
+        }
+#endif
+        return text;
+    }
+
     /// <summary>Western digits to Arabic-Indic; digits already Arabic-Indic are left as they are.</summary>
     public static string ToArabicDigits(string text)
     {
