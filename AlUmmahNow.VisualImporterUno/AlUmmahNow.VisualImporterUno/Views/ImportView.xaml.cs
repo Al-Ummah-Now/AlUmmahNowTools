@@ -63,7 +63,8 @@ public sealed partial class ImportView : Page
         if (dialog is null) return;
         // A dialog needs the window's XamlRoot, which is ready a moment after the page loads
         await System.Threading.Tasks.Task.Delay(1000);
-        var row = ViewModel.QueueRows.Skip(3).FirstOrDefault();
+        // TOOLS_DEMO_IMPORT_ROW picks the row (the transcribed one is 10); the upload retry otherwise
+        var row = ViewModel.QueueRows.Skip(int.TryParse(Environment.GetEnvironmentVariable("TOOLS_DEMO_IMPORT_ROW"), out var at) ? at : 3).FirstOrDefault();
         var tag = new Border { Tag = row };
         switch (dialog)
         {

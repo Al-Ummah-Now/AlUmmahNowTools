@@ -2356,7 +2356,7 @@
     <value>Already on this computer.</value>
   </data>
   <data name="Import_TranscribeModelDownload" xml:space="preserve">
-    <value>Downloaded once, {0}, the first time it’s used.</value>
+    <value>Not on this computer yet. It’s downloaded once, the first time it’s used.</value>
   </data>
   <data name="Import_TranscribeDeviceGpu" xml:space="preserve">
     <value>Runs on this computer’s graphics card:</value>
