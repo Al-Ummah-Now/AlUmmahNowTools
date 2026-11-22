@@ -45,9 +45,9 @@ public sealed partial class RightToLeftText : Panel
 #endif
         if (!_flowing)
         {
-            // An Arabic title keeps its last two words together; a Latin one in the Arabic window is left as it is, as a
-            // no-break space there moves a trailing colon to the wrong side
-            Children.Add(Block(LooksArabic(text) ? Loc.KeepLastWords(text) : text, wrap: true));
+            // A title keeps its last two words together, except a Latin one in the Arabic window, where a no-break space
+            // moves a trailing colon to the wrong side
+            Children.Add(Block(LooksArabic(text) || !Loc.IsArabic ? Loc.KeepLastWords(text) : text, wrap: true));
             return;
         }
         foreach (Match m in Tokens.Matches(text))

@@ -603,7 +603,7 @@ public sealed partial class QueueRow : ObservableObject
             ItemPhase.Failed => Loc.Format("ImportPhase_Failed", BulkImportViewModel.StepName(step!.Kind.ToString())),
             _ => Loc.Format("ImportPhase_Waiting", BulkImportViewModel.StepName(step!.Kind.ToString())),
         };
-        Detail = phase is ItemPhase.Failed or ItemPhase.RetryWaiting ? BulkImportViewModel.ErrorText(step!.LastErrorCode, step.LastError) : "";
+        Detail = phase is ItemPhase.Failed or ItemPhase.RetryWaiting ? Loc.KeepLastWords(BulkImportViewModel.ErrorText(step!.LastErrorCode, step.LastError)) : "";
         HasDetail = Detail.Length > 0;
     }
 }
