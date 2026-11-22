@@ -443,7 +443,8 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
         Add(ItemPhase.RetryWaiting, "Import_SumRetrying");
         Add(ItemPhase.Paused, "Import_SumPaused");
         Add(ItemPhase.Failed, "Import_SumFailed");
-        return string.Join(Loc.IsArabic ? "، " : " · ", parts);
+        // A separator stays with the count before it, so no line starts with «·»
+        return Loc.KeepLastWords(string.Join(Loc.IsArabic ? "، " : "\u00A0· ", parts));
     }
 
     // ---------------------------------------------------------------- Words
@@ -748,7 +749,7 @@ public sealed partial class QueueRow : ObservableObject
         HasDetail = Detail.Length > 0;
         // The server's verdict once it has one; before that, a file the server encodes says so
         var verdict = BulkImportViewModel.VerdictText(item);
-        Note = verdict.Length > 0 ? verdict : item.ServerEncodes && phase != ItemPhase.Done ? Loc.Get("ImportRow_ServerEncodes") : "";
+        Note = verdict.Length > 0 ? Loc.KeepLastWords(verdict) : item.ServerEncodes && phase != ItemPhase.Done ? Loc.Get("ImportRow_ServerEncodes") : "";
         // Encoded again, stopped or not processed: worth a second look, in the accent colour
         var problem = verdict.Length > 0 && item.Verdict is not { Used: true };
         ShowProblemNote = Note.Length > 0 && problem;
