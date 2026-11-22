@@ -2816,5 +2816,436 @@
   </data>
   <data name="Import_TranslateNote.Text" xml:space="preserve">
     <value>كل ترجمة آلية مسودةٌ يراجعها شخص وينشرها. والمرئي الذي له ملفات ترجمة خاصة به يُترجم منها، وتبقى كما هي.</value>
+  <data name="Nav_SocialSources.Content" xml:space="preserve">
+    <value>المصادر الاجتماعية</value>
+  </data>
+  <data name="Page_SocialSources_Title" xml:space="preserve">
+    <value>المصادر الاجتماعية</value>
+  </data>
+  <data name="Page_SocialSources_Subtitle" xml:space="preserve">
+    <value>انشر منشورات صاحب القناة من خلاصاته وحساباته على القناة، عند الطلب أو وفق جدول.</value>
+  </data>
+  <data name="Social_SuperAdminTitle.Text" xml:space="preserve">
+    <value>المصادر الاجتماعية للمشرفين العامين فقط</value>
+  </data>
+  <data name="Social_SuperAdminBody.Text" xml:space="preserve">
+    <value>اطلب من مشرف عام إضافة مصادر القناة الاجتماعية أو تشغيلها أو تغييرها.</value>
+  </data>
+  <data name="Social_ChannelTitle.Text" xml:space="preserve">
+    <value>القناة</value>
+  </data>
+  <data name="Social_ChannelBody.Text" xml:space="preserve">
+    <value>اختر قناة لترى مصادرها وتضيف إليها، أو اتركها فارغة لترى مصادر كل القنوات.</value>
+  </data>
+  <data name="Social_ChannelBox.PlaceholderText" xml:space="preserve">
+    <value>ابحث في القنوات</value>
+  </data>
+  <data name="Social_ShowAllChannels.Text" xml:space="preserve">
+    <value>كل القنوات</value>
+  </data>
+  <data name="Social_NoChannelFound" xml:space="preserve">
+    <value>لا توجد قناة بهذا الاسم أو المعرّف.</value>
+  </data>
+  <data name="Social_SourcesTitle.Text" xml:space="preserve">
+    <value>المصادر</value>
+  </data>
+  <data name="Social_Refresh.Text" xml:space="preserve">
+    <value>تحديث</value>
+  </data>
+  <data name="Social_NoSourcesTitle.Text" xml:space="preserve">
+    <value>لا مصادر بعد</value>
+  </data>
+  <data name="Social_NoSourcesBody" xml:space="preserve">
+    <value>أضف مصدرًا أدناه: خلاصة أو حسابًا لصاحب القناة.</value>
+  </data>
+  <data name="Social_NoSourcesAnyBody" xml:space="preserve">
+    <value>لا توجد قناة لها مصدر اجتماعي بعد. اختر قناة لتضيف إليها مصدرًا.</value>
+  </data>
+  <data name="Social_SourceCount_Zero" xml:space="preserve">
+    <value>لا مصادر</value>
+  </data>
+  <data name="Social_SourceCount_One" xml:space="preserve">
+    <value>مصدر واحد</value>
+  </data>
+  <data name="Social_SourceCount_Two" xml:space="preserve">
+    <value>مصدران</value>
+  </data>
+  <data name="Social_SourceCount_Few" xml:space="preserve">
+    <value>{0} مصادر</value>
+  </data>
+  <data name="Social_SourceCount_Many" xml:space="preserve">
+    <value>{0} مصدرًا</value>
+  </data>
+  <data name="Social_SourceCount_Other" xml:space="preserve">
+    <value>{0} مصدر</value>
+  </data>
+  <data name="Social_AttentionCount_One" xml:space="preserve">
+    <value>بحاجة إلى نظر: {0}</value>
+  </data>
+  <data name="Social_AttentionCount_Other" xml:space="preserve">
+    <value>بحاجة إلى نظر: {0}</value>
+  </data>
+  <data name="Social_Channel" xml:space="preserve">
+    <value>القناة</value>
+  </data>
+  <data name="Social_AuthConnected" xml:space="preserve">
+    <value>وصله صاحب القناة بنفسه في الاستوديو</value>
+  </data>
+  <data name="Social_AuthRecorded" xml:space="preserve">
+    <value>إذن صاحب القناة المكتوب، مسجَّل</value>
+  </data>
+  <data name="Social_AuthRecordedAt" xml:space="preserve">
+    <value>إذن صاحب القناة المكتوب، سُجّل {0}</value>
+  </data>
+  <data name="Social_StatusManual" xml:space="preserve">
+    <value>لا يُزامَن إلا حين تضغط «زامِن الآن»</value>
+  </data>
+  <data name="Social_StatusScheduled" xml:space="preserve">
+    <value>{0}. المزامنة التالية: {1}</value>
+  </data>
+  <data name="Social_StatusSyncing" xml:space="preserve">
+    <value>تجري المزامنة الآن</value>
+  </data>
+  <data name="Social_StatusRetrying" xml:space="preserve">
+    <value>فشلت محاولة مزامنة، وستُعاد في {0}</value>
+  </data>
+  <data name="Social_StatusRetryingSoon" xml:space="preserve">
+    <value>فشلت محاولة مزامنة، وستُعاد بعد قليل</value>
+  </data>
+  <data name="Social_StatusFailed" xml:space="preserve">
+    <value>فشلت آخر مزامنة. وهي في صفحة الأخطاء أيضًا مع زر إعادة المحاولة</value>
+  </data>
+  <data name="Social_StatusOff" xml:space="preserve">
+    <value>متوقف: لا يُستورد شيء حتى يُشغَّل</value>
+  </data>
+  <data name="Social_StatusOffNotConnected" xml:space="preserve">
+    <value>متوقف: فصل صاحب القناة هذا الحساب. يمكن تشغيله مجددًا حين يصله من جديد</value>
+  </data>
+  <data name="Social_LastSync" xml:space="preserve">
+    <value>آخر مزامنة: {0}</value>
+  </data>
+  <data name="Social_NeverSynced" xml:space="preserve">
+    <value>لم يُزامَن بعد</value>
+  </data>
+  <data name="Social_Count_posted" xml:space="preserve">
+    <value>نُشر: {0}</value>
+  </data>
+  <data name="Social_Count_pending" xml:space="preserve">
+    <value>للنشر: {0}</value>
+  </data>
+  <data name="Social_Count_awaiting_file" xml:space="preserve">
+    <value>بانتظار ملفاتها: {0}</value>
+  </data>
+  <data name="Social_Count_skipped" xml:space="preserve">
+    <value>تُرك: {0}</value>
+  </data>
+  <data name="Social_Reason" xml:space="preserve">
+    <value>السبب</value>
+  </data>
+  <data name="SocialReason_not_connected" xml:space="preserve">
+    <value>أُزيل وصل صاحب القناة بهذا الحساب.</value>
+  </data>
+  <data name="SocialReason_channel_unavailable" xml:space="preserve">
+    <value>القناة محذوفة أو موقوفة.</value>
+  </data>
+  <data name="Social_ScheduleLabel.Text" xml:space="preserve">
+    <value>الجدول</value>
+  </data>
+  <data name="Social_SyncNow.Text" xml:space="preserve">
+    <value>زامِن الآن</value>
+  </data>
+  <data name="Social_JobLink.Text" xml:space="preserve">
+    <value>مهمة المزامنة</value>
+  </data>
+  <data name="Social_ItemsLink.Text" xml:space="preserve">
+    <value>العناصر</value>
+  </data>
+  <data name="Social_TurnOff.Text" xml:space="preserve">
+    <value>أوقِف</value>
+  </data>
+  <data name="Social_TurnOn.Text" xml:space="preserve">
+    <value>شغِّل</value>
+  </data>
+  <data name="Social_Remove.Text" xml:space="preserve">
+    <value>أزِل</value>
+  </data>
+  <data name="Social_RetryJob.Text" xml:space="preserve">
+    <value>أعِد المحاولة</value>
+  </data>
+  <data name="Social_CopyLog.Text" xml:space="preserve">
+    <value>انسخ السجل</value>
+  </data>
+  <data name="Social_Copied.Text" xml:space="preserve">
+    <value>نُسخ</value>
+  </data>
+  <data name="Social_ItemsTitle.Text" xml:space="preserve">
+    <value>أحدث العناصر</value>
+  </data>
+  <data name="Social_ItemsLoading" xml:space="preserve">
+    <value>جارٍ تحميل العناصر…</value>
+  </data>
+  <data name="Social_ItemsEmpty" xml:space="preserve">
+    <value>لم يصل شيء من هذا المصدر بعد.</value>
+  </data>
+  <data name="Social_ItemFirstPosted" xml:space="preserve">
+    <value>نُشر أول مرة {0}</value>
+  </data>
+  <data name="SocialJob_queued" xml:space="preserve">
+    <value>بانتظار دوره في الطابور</value>
+  </data>
+  <data name="SocialJob_running" xml:space="preserve">
+    <value>تجري المزامنة، المحاولة {0} من {1}</value>
+  </data>
+  <data name="SocialJob_retrying" xml:space="preserve">
+    <value>فشلت المحاولة {0} من {1}، وستُعاد في {2}</value>
+  </data>
+  <data name="SocialJob_retryingSoon" xml:space="preserve">
+    <value>فشلت المحاولة {0} من {1}، وستُعاد بعد قليل</value>
+  </data>
+  <data name="SocialJob_failed" xml:space="preserve">
+    <value>توقفت بعد {0} من {1} محاولات. «أعِد المحاولة» يشغّلها مرة أخرى</value>
+  </data>
+  <data name="SocialJob_succeededAt" xml:space="preserve">
+    <value>انتهت {0}</value>
+  </data>
+  <data name="SocialJob_succeeded" xml:space="preserve">
+    <value>انتهت</value>
+  </data>
+  <data name="SocialLog_queued" xml:space="preserve">
+    <value>أُضيفت إلى الطابور</value>
+  </data>
+  <data name="SocialLog_queued_retried" xml:space="preserve">
+    <value>أُعيدت إلى الطابور بزر إعادة المحاولة</value>
+  </data>
+  <data name="SocialLog_started" xml:space="preserve">
+    <value>بدأت المحاولة {0}</value>
+  </data>
+  <data name="SocialLog_waiting" xml:space="preserve">
+    <value>انتهت خطوة، وتبدأ التالية بعد {0}</value>
+  </data>
+  <data name="SocialLog_waiting_now" xml:space="preserve">
+    <value>انتهت خطوة، وتبدأ التالية الآن</value>
+  </data>
+  <data name="SocialLog_failed_attempt" xml:space="preserve">
+    <value>فشلت المحاولة {0}، والتالية بعد {1}</value>
+  </data>
+  <data name="SocialLog_failed" xml:space="preserve">
+    <value>توقفت: لم تبقَ محاولات</value>
+  </data>
+  <data name="SocialLog_succeeded" xml:space="preserve">
+    <value>انتهت</value>
+  </data>
+  <data name="SocialLog_cancelled" xml:space="preserve">
+    <value>أوقفها مشرف</value>
+  </data>
+  <data name="SocialKind_text" xml:space="preserve">
+    <value>منشور نصي</value>
+  </data>
+  <data name="SocialKind_image" xml:space="preserve">
+    <value>صور</value>
+  </data>
+  <data name="SocialKind_link" xml:space="preserve">
+    <value>رابط</value>
+  </data>
+  <data name="SocialKind_video" xml:space="preserve">
+    <value>مرئي</value>
+  </data>
+  <data name="SocialKind_unknown" xml:space="preserve">
+    <value>عنصر</value>
+  </data>
+  <data name="SocialItemState_pending" xml:space="preserve">
+    <value>للنشر</value>
+  </data>
+  <data name="SocialItemState_posted" xml:space="preserve">
+    <value>نُشر</value>
+  </data>
+  <data name="SocialItemState_skipped" xml:space="preserve">
+    <value>تُرك</value>
+  </data>
+  <data name="SocialItemState_awaiting_file" xml:space="preserve">
+    <value>بانتظار ملفه</value>
+  </data>
+  <data name="SocialItemNote_too_large_for_bot_api" xml:space="preserve">
+    <value>أكبر من أن يُنزّله بوت تيليجرام. يجب أن يأتي الملف من صاحب القناة.</value>
+  </data>
+  <data name="SocialItemNote_takeout_file" xml:space="preserve">
+    <value>يأتي الملف من نسخة صاحب القناة المصدّرة من غوغل.</value>
+  </data>
+  <data name="SocialItemNote_too_large" xml:space="preserve">
+    <value>أكبر مما يُسمح باستيراده من مصدر.</value>
+  </data>
+  <data name="SocialItemNote_unsupported_media" xml:space="preserve">
+    <value>نوع وسائط لا يقبله الموقع.</value>
+  </data>
+  <data name="SocialItemNote_empty" xml:space="preserve">
+    <value>لا شيء فيه يُنشر.</value>
+  </data>
+  <data name="SocialItemNote_reply_or_repost" xml:space="preserve">
+    <value>رد أو إعادة نشر.</value>
+  </data>
+  <data name="SocialItemNote_posted_by_us" xml:space="preserve">
+    <value>منشورنا نحن على هذا الحساب، فلا يُستورد مرة أخرى.</value>
+  </data>
+  <data name="SocialItemNote_media_unavailable" xml:space="preserve">
+    <value>تعذّر تنزيل وسائطه.</value>
+  </data>
+  <data name="SocialItemNote_post_refused" xml:space="preserve">
+    <value>رفض الموقع المنشور.</value>
+  </data>
+  <data name="Social_AddTitle.Text" xml:space="preserve">
+    <value>أضف مصدرًا</value>
+  </data>
+  <data name="Social_AddBody.Text" xml:space="preserve">
+    <value>لا يُستورد إلا إلى قناة أذن صاحبها: حساب وصله بنفسه في الاستوديو، أو إذنه المكتوب مسجَّلًا هنا. كل منشور جديد في المصدر يصير منشورًا على القناة.</value>
+  </data>
+  <data name="Social_PickChannelFirst.Text" xml:space="preserve">
+    <value>اختر قناة في الأعلى أولًا.</value>
+  </data>
+  <data name="Social_ScheduleNewLabel.Text" xml:space="preserve">
+    <value>كم مرة يُزامَن</value>
+  </data>
+  <data name="Social_ConnectionsTitle.Text" xml:space="preserve">
+    <value>حسابات وصلها صاحب القناة</value>
+  </data>
+  <data name="Social_NoConnections.Text" xml:space="preserve">
+    <value>لم يصل صاحب القناة أي حساب في الاستوديو. أضف مصدرًا بإذنه المكتوب أدناه.</value>
+  </data>
+  <data name="Social_AddConnection.Text" xml:space="preserve">
+    <value>أضِف</value>
+  </data>
+  <data name="Social_ConnectionAdded.Text" xml:space="preserve">
+    <value>أُضيف</value>
+  </data>
+  <data name="Social_OtherTitle.Text" xml:space="preserve">
+    <value>خلاصة أو حساب آخر</value>
+  </data>
+  <data name="Social_NetworkLabel.Text" xml:space="preserve">
+    <value>المكان</value>
+  </data>
+  <data name="Social_TelegramNote.Text" xml:space="preserve">
+    <value>تُضاف قناة تيليجرام من وصل صاحبها أعلاه، بعد أن يصلها في الاستوديو: فبوتنا هو من يقرأ منشوراتها.</value>
+  </data>
+  <data name="Social_AddressLabel.Text" xml:space="preserve">
+    <value>العنوان</value>
+  </data>
+  <data name="Social_LabelLabel.Text" xml:space="preserve">
+    <value>الاسم في القائمة (اختياري)</value>
+  </data>
+  <data name="Social_PermissionTitle.Text" xml:space="preserve">
+    <value>إذن صاحب القناة</value>
+  </data>
+  <data name="Social_PermissionBody.Text" xml:space="preserve">
+    <value>ما لم يصل صاحب القناة هذا الحساب، سجّل ممن لديك الإذن المكتوب وعلى ماذا وافق. يُحفظ مع المصدر وفي سجل التدقيق.</value>
+  </data>
+  <data name="Social_PermissionByLabel.Text" xml:space="preserve">
+    <value>من أعطى الإذن</value>
+  </data>
+  <data name="Social_PermissionNoteLabel.Text" xml:space="preserve">
+    <value>كيف أعطاه، وعلى ماذا وافق</value>
+  </data>
+  <data name="Social_AddButton.Text" xml:space="preserve">
+    <value>أضف المصدر</value>
+  </data>
+  <data name="Social_Added" xml:space="preserve">
+    <value>أُضيف المصدر. زامِنه الآن، أو يُزامَن وفق جدوله.</value>
+  </data>
+  <data name="Social_Hint_rss" xml:space="preserve">
+    <value>عنوان الخلاصة أو البودكاست، ويبدأ بـ</value>
+  </data>
+  <data name="Social_Hint_bluesky" xml:space="preserve">
+    <value>معرّف الحساب، مثل</value>
+  </data>
+  <data name="Social_Hint_mastodon" xml:space="preserve">
+    <value>الحساب مع خادمه، مثل</value>
+  </data>
+  <data name="Social_Hint_youtube" xml:space="preserve">
+    <value>معرّف قناة يوتيوب، ويبدأ بـ</value>
+  </data>
+  <data name="SocialNetwork_rss" xml:space="preserve">
+    <value>خلاصة أو بودكاست</value>
+  </data>
+  <data name="SocialNetwork_bluesky" xml:space="preserve">
+    <value>بلوسكاي</value>
+  </data>
+  <data name="SocialNetwork_mastodon" xml:space="preserve">
+    <value>ماستودون</value>
+  </data>
+  <data name="SocialNetwork_telegram" xml:space="preserve">
+    <value>قناة تيليجرام</value>
+  </data>
+  <data name="SocialNetwork_youtube" xml:space="preserve">
+    <value>قناة يوتيوب</value>
+  </data>
+  <data name="SocialSchedule_manual" xml:space="preserve">
+    <value>عند الطلب فقط</value>
+  </data>
+  <data name="SocialSchedule_hourly" xml:space="preserve">
+    <value>كل ساعة</value>
+  </data>
+  <data name="SocialSchedule_daily" xml:space="preserve">
+    <value>كل يوم</value>
+  </data>
+  <data name="SocialSchedule_weekly" xml:space="preserve">
+    <value>كل أسبوع</value>
+  </data>
+  <data name="Social_RemoveTitle" xml:space="preserve">
+    <value>إزالة هذا المصدر؟</value>
+  </data>
+  <data name="Social_RemoveBody" xml:space="preserve">
+    <value>لن يُستورد منه شيء بعد الآن. وتبقى المنشورات والمرئيات التي جاءت منه على القناة.</value>
+  </data>
+  <data name="Social_RemoveConfirm" xml:space="preserve">
+    <value>أزِل</value>
+  </data>
+  <data name="SocialError_channel_missing" xml:space="preserve">
+    <value>اختر قناة أولًا.</value>
+  </data>
+  <data name="SocialError_address_missing" xml:space="preserve">
+    <value>أدخل عنوان الخلاصة أو الحساب.</value>
+  </data>
+  <data name="SocialError_invalid_address" xml:space="preserve">
+    <value>لا يبدو هذا العنوان صحيحًا لهذا النوع من المصادر. راجع المثال تحت الحقل.</value>
+  </data>
+  <data name="SocialError_invalid_network" xml:space="preserve">
+    <value>اختر مكان المصدر.</value>
+  </data>
+  <data name="SocialError_invalid_schedule" xml:space="preserve">
+    <value>اختر كم مرة يُزامَن.</value>
+  </data>
+  <data name="SocialError_not_connected" xml:space="preserve">
+    <value>وصل صاحب القناة بهذا الحساب غير موجود، أو لم يصله أصلًا. عليه أن يصله في الاستوديو أولًا.</value>
+  </data>
+  <data name="SocialError_permission_required" xml:space="preserve">
+    <value>لم يصل صاحب القناة هذا الحساب: سجّل من أعطى الإذن المكتوب وعلى ماذا وافق.</value>
+  </data>
+  <data name="SocialError_forbidden" xml:space="preserve">
+    <value>إدارة المصادر الاجتماعية للمشرفين العامين فقط.</value>
+  </data>
+  <data name="SocialError_source_not_found" xml:space="preserve">
+    <value>لم يُعثر على المصدر، فلعله أُزيل. حدّث القائمة.</value>
+  </data>
+  <data name="SocialError_channel_not_found" xml:space="preserve">
+    <value>لم يُعثر على القناة.</value>
+  </data>
+  <data name="SocialError_job_not_found" xml:space="preserve">
+    <value>لم يُعثر على مهمة المزامنة. حدّث القائمة.</value>
+  </data>
+  <data name="SocialError_signed_out" xml:space="preserve">
+    <value>سجّل الدخول من جديد للمتابعة.</value>
+  </data>
+  <data name="SocialError_unreachable" xml:space="preserve">
+    <value>تعذّر الوصول إلى واجهة الإدارة. تحقّق من الاتصال وأعِد المحاولة.</value>
+  </data>
+  <data name="SocialError_server" xml:space="preserve">
+    <value>واجه الخادم مشكلة. أعِد المحاولة بعد لحظة، وهي مسجّلة في صفحة الأخطاء.</value>
+  </data>
+  <data name="SocialError_refused" xml:space="preserve">
+    <value>رفض الخادم هذا الطلب</value>
+  </data>
+  <data name="SocialError_unreadable" xml:space="preserve">
+    <value>أجاب الخادم بما لا تفهمه الأدوات. أعِد المحاولة.</value>
+  </data>
+  <data name="When_Tomorrow" xml:space="preserve">
+    <value>غدًا، {0}</value>
   </data>
 </root>

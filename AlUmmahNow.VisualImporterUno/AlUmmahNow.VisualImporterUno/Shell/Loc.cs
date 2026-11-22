@@ -200,6 +200,7 @@ public static class Loc
         var time = local.ToString("t", CultureInfo.CurrentUICulture);
         var text = local.Date == today ? Format("When_Today", time)
             : local.Date == today.AddDays(-1) ? Format("When_Yesterday", time)
+            : local.Date == today.AddDays(1) ? Format("When_Tomorrow", time)
             : Format("When_Date", local.ToString(local.Year == today.Year ? "d MMM" : "d MMM yyyy", CultureInfo.CurrentUICulture), time);
         return IsArabic ? ToArabicDigits(text) : text;
     }

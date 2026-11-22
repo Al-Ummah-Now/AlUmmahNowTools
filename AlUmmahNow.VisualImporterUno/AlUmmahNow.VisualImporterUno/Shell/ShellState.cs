@@ -128,7 +128,8 @@ public sealed class ShellState
 /// <summary>
 /// Screenshots and UI tests: a fake sign-in, nothing sent anywhere (<c>TOOLS_DEMO=1</c>).
 /// <c>TOOLS_DEMO_STATE</c> picks the screen: <c>signed-out</c>, <c>signing-in</c>, <c>failed</c>,
-/// <c>checking</c>, <c>not-staff</c>, <c>unreachable</c> or <c>staff</c> (the default).
+/// <c>checking</c>, <c>not-staff</c>, <c>unreachable</c> or <c>staff</c> (the default). <c>TOOLS_DEMO_ROLE=super_admin</c>
+/// signs in a super admin (social sources), else an admin.
 /// </summary>
 public sealed class ShellDemo
 {
@@ -231,7 +232,10 @@ public sealed class ShellDemo
             if (_state == "checking") await Task.Delay(Timeout.Infinite, cancellationToken);
             if (_state == "unreachable") throw new HttpRequestException("demo: admin API down");
             if (_state == "not-staff") return new HttpResponseMessage(HttpStatusCode.Forbidden);
-            const string me = "{\"success\":true,\"result\":{\"userId\":\"usr_demo\",\"email\":\"mariam.haddad@alummahnow.net\",\"roles\":[\"admin\"],\"permissions\":[\"imports:manage\"]}}";
+            // TOOLS_DEMO_ROLE=super_admin: the account also manages social sources (TA-13)
+            var superAdmin = Environment.GetEnvironmentVariable("TOOLS_DEMO_ROLE") == "super_admin";
+            var me = "{\"success\":true,\"result\":{\"userId\":\"usr_demo\",\"email\":\"mariam.haddad@alummahnow.net\",\"roles\":[\"" + (superAdmin ? "super_admin" : "admin") +
+                "\"],\"permissions\":[\"imports:manage\"" + (superAdmin ? ",\"import_sources:manage\"" : "") + "]}}";
             return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(me, Encoding.UTF8, "application/json") };
         }
     }

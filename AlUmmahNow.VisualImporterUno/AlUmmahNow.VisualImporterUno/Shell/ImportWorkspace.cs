@@ -399,12 +399,15 @@ internal sealed class DemoTranscriber : ITranscriber
     public Task<string> TranscribeAsync(string modelPath, string mediaPath, string? language, IProgress<double> progress, CancellationToken ct) => Task.FromException<string>(new TranscribeException("unavailable", "Demo"));
 }
 
-/// <summary>admin-api for screenshots: the channel list and new channels and batches, nothing sent anywhere.</summary>
+/// <summary>admin-api for screenshots: the channel list, new channels and batches, and social sources; nothing sent anywhere.</summary>
 internal sealed class DemoImportServer : HttpMessageHandler
 {
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         var path = request.RequestUri!.AbsolutePath;
+        // Social sources and their sync jobs (TA-13)
+        if (DemoSocial.Answer(request) is { } social)
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(social, Encoding.UTF8, "application/json") });
         string body = path switch
         {
             "/api/content/channels" => "{\"success\":true,\"result\":{\"items\":[" + string.Join(",", DemoImport.Channels.Select(c =>
