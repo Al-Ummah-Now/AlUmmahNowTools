@@ -1,7 +1,7 @@
 # AlUmmahNow Tools - Testing Guide
 
 ## Table of Contents
-1. [Current Test Coverage](#current-test-coverage)
+1. [Current Test Suites (2026-11)](#current-test-suites-2026-11)
 2. [Test Infrastructure](#test-infrastructure)
 3. [Testing SignalR Communication](#testing-signalr-communication)
 4. [Testing Core Functions](#testing-core-functions)
@@ -12,27 +12,32 @@
 
 ---
 
-## Current Test Coverage
+## Current Test Suites (2026-11)
 
-**Overall Coverage**: ~11.9% (709/5957 lines covered)
+The repository has three active xUnit test projects plus a headless desktop UI smoke mode:
 
-### Current Test Status
-- ✅ **78 tests passing**
-- ✅ Test frameworks: xUnit, Moq, FluentAssertions
-- ✅ Code coverage collection enabled (Coverlet)
-- ⚠️ **Missing coverage areas**:
-  - SignalR Hub methods (FileScanHub.cs)
-  - SignalR Client (FileScanSignalRClient.cs)
-  - FileScanEngine core logic
-  - MetadataExtractor
-  - FileScanWorker background service
+1. **`AlUmmahNow.Tests` (`net8.0`)** — `AlUmmahNow.Data`, `AlUmmahNow.Importer`, `AlUmmahNow.FileScanService` (including live in-process Kestrel SignalR hub tests via `FileScanSignalRIntegrationTests`), `AlUmmahNow.DataImporter`, and `AlUmmahNow.BunnyBulkUploader`.
+   ```bash
+   dotnet test AlUmmahNow.Tests/AlUmmahNow.Tests.csproj
+   ```
+2. **`AlUmmahNow.ToolsCore.Tests` (`net9.0`)** — Auth/session, `FolderScanner`, `ImportQueue`, `EncodeStep` / `H264Encoders`, `RenditionSender`, `CheckStep`, `Transcriber`, `QuranMatcher`, `TranscriptUpload`.
+   ```bash
+   scripts/fetch-core.sh
+   dotnet test AlUmmahNow.ToolsCore.Tests/AlUmmahNow.ToolsCore.Tests.csproj
+   ```
+3. **`AlUmmahNow.VisualImporterUno.Tests` (`net9.0-desktop`)** — Headless cross-platform xUnit tests for desktop ViewModels (`FFmpegSettingsViewModel`, `SettingsViewModel`), Models (`VideoFileInfo`, `FileStatistics`), Converters, and `Loc` (English/Arabic formatting and CLDR plurals).
+   ```bash
+   dotnet test AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno.Tests/AlUmmahNow.VisualImporterUno.Tests.csproj
+   ```
+4. **Headless Desktop UI Smoke (`TOOLS_DEMO=1` + `TOOLS_SCREENSHOT`)** — Verifies real `net9.0-desktop` launch and frame rendering across `signed-out`, `not-staff`, and `staff` states in `en` and `ar` (runs under `xvfb-run` on Ubuntu Linux CI).
 
-### Existing Test Coverage
-- ✅ HashCalculator: `AlUmmahNow.Tests/FileScanService/Services/HashCalculatorBasicTests.cs`
-- ✅ Repository: `AlUmmahNow.Tests/Repository/RepositoryTests.cs`
-- ✅ Data Models: `AlUmmahNow.Tests/Data/Models/BasicModelTests.cs`
-- ✅ Storage Clients: BunnyStorageClient, R2Client tests
-- ✅ Video Client: BunnyStreamClient tests
+> **Note:** `AlUmmahNow.VisualImporterUno.UITests` is a legacy WinAppDriver stub and is not part of the cross-platform test workflow.
+
+### Existing Test Coverage (AlUmmahNow.Tests)
+- ✅ SignalR Hub & Client: `AlUmmahNow.Tests/FileScanService/Hubs/FileScanHubTests.cs`, `FileScanHubWatchApprovalTests.cs`, `FileScanSignalRIntegrationTests.cs`, `AlUmmahNow.Tests/DataImporter/Services/FileScanSignalRClientTests.cs`
+- ✅ FileScan Engine & Services: `FileScanEngineTests.cs`, `HashCalculatorBasicTests.cs`, `HashCalculatorAdvancedTests.cs`, `MetadataExtractorTests.cs`, `ThumbnailServiceTests.cs`, `ImportWorkerClaimTests.cs`
+- ✅ Repository & Data Models: `AlUmmahNow.Tests/Repository/RepositoryTests.cs`, `AlUmmahNow.Tests/Data/Models/`
+- ✅ Importer & Storage Clients: `ImporterTests.cs`, `IdempotentImportTests.cs`, `SessionScopedImportTests.cs`, `BunnyStorageClientTests.cs`, `BunnyStreamClientTests.cs`, `R2ClientTests.cs`
 
 ---
 

@@ -1,16 +1,27 @@
 # Testing Implementation Plan
-## AlUmmahNow.VisualImporterUno - 7-Week Rollout
+## AlUmmahNow.VisualImporterUno - Cross-Platform Test Strategy (Updated 2026-11-23)
+
+> **Status Update (2026-11-23, epic `TOOLS-PLANS`):** The original 7-week WinAppDriver rollout below predates the cross-platform Uno Skia Desktop port (`net9.0-desktop`) and `AlUmmahNow.ToolsCore`. WinAppDriver is archived (Windows-only); UI smoke testing now uses the built-in `TOOLS_DEMO=1` + `TOOLS_SCREENSHOT` runner (Windows, macOS, and Ubuntu under `xvfb-run`).
+
+### Current Test Projects
+- `AlUmmahNow.Tests` (`net8.0`): Data models, `ImportDbContext` / `SqliteImportDb`, `FileScanService` (unit + live in-process SignalR integration tests), `Importer`, `DataImporter`, `BunnyBulkUploader`, `R2Client`.
+- `AlUmmahNow.ToolsCore.Tests` (`net9.0`): Auth/session, `FolderScanner`, `ImportQueue` / `ImportSteps`, `Renditions` (`EncodeLadder`, `H264Encoders`, `EncodeStep`, `RenditionSender`, `CheckStep`), `Transcriber`, `QuranMatcher`, `TranscriptUpload`.
+- `AlUmmahNow.VisualImporterUno.Tests` (`net9.0-desktop`): Headless cross-platform xUnit tests for desktop ViewModels, Models, Converters, and `Loc` (English/Arabic digits, CLDR plurals, zones, formatting).
+- Desktop UI smoke (`TOOLS_DEMO=1` + `TOOLS_SCREENSHOT`): Launches the `net9.0-desktop` binary headlessly in CI (`xvfb-run` on Ubuntu) to verify `signed-out`, `not-staff`, and `staff` Import screens in `en` and `ar`.
+- `AlUmmahNow.VisualImporterUno.UITests`: Legacy WinAppDriver stub (unbuilt in CI; scheduled for removal pending owner decision `TP-D1`).
 
 ---
 
-## Quick Reference
+## Original 7-Week Rollout Archive
+
+### Quick Reference
 
 **Main Guide:** [XAML_UI_TEST_AUTOMATION_GUIDE.md](./XAML_UI_TEST_AUTOMATION_GUIDE.md)
 
-**Current Status:**
+**Current Status (historical baseline before 2026-11 updates):**
 - ✅ Service layer tests: **Good coverage**
-- ⚠️ ViewModel tests: **Not implemented**
-- ❌ E2E UI tests: **Not implemented**
+- ✅ ToolsCore & Desktop ViewModel tests: **Implemented** (`AlUmmahNow.ToolsCore.Tests`, `AlUmmahNow.VisualImporterUno.Tests`)
+- ✅ Headless desktop UI smoke: **Implemented via `TOOLS_DEMO` / `TOOLS_SCREENSHOT`**
 
 **Target Metrics:**
 - Unit Test Coverage: 80% (ViewModels + Models)
