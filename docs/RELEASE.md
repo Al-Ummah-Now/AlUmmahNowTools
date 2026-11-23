@@ -43,7 +43,7 @@ Tag `vYYYY.MM.DD[.N]` (N is 1 when absent) becomes:
 | File names, About, `InformationalVersion`, `.deb` | tag without `v` | `2026.11.22.2` |
 | Assembly and file version | `YYYY.M.D.N` | `2026.11.22.2` |
 | MSI `ProductVersion` (major ≤ 255, only 3 fields compare) | `YY.M.(D×100+N)` | `26.11.2202` |
-| macOS `CFBundleVersion` | `YYYYMMDDNN` | `2026112202` |
+| Uno `ApplicationDisplayVersion` / `ApplicationVersion` (macOS `CFBundleShortVersionString` / `CFBundleVersion`) | `YYYY.M.D` / `N` | `2026.11.22` / `2` |
 
 ## Signing
 
