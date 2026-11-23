@@ -11,7 +11,7 @@ public class SourceFormTests
     private static readonly SourceConnection[] None = Array.Empty<SourceConnection>();
 
     [Theory]
-    [InlineData("rss", " https://example.org/feed.xml ", "https://example.org/feed.xml")]
+    [InlineData("rss", " https://alummahnow.com/feed.xml ", "https://alummahnow.com/feed.xml")]
     [InlineData("bluesky", "@Scholar.bsky.social", "scholar.bsky.social")]
     [InlineData("bluesky", "did:plc:abcdefghijklmnopqrstuvwx", "did:plc:abcdefghijklmnopqrstuvwx")]
     [InlineData("mastodon", "@shaykh@Mastodon.Social", "shaykh@mastodon.social")]
@@ -25,9 +25,9 @@ public class SourceFormTests
     }
 
     [Theory]
-    [InlineData("rss", "ftp://example.org/feed")]
-    [InlineData("rss", "example.org/feed")]
-    [InlineData("rss", "https://user:pw@example.org/feed")]
+    [InlineData("rss", "ftp://alummahnow.com/feed")]
+    [InlineData("rss", "alummahnow.com/feed")]
+    [InlineData("rss", "https://user:pw@alummahnow.com/feed")]
     [InlineData("bluesky", "not a handle")]
     [InlineData("mastodon", "shaykh")]
     [InlineData("telegram", "@channel")]
@@ -47,11 +47,11 @@ public class SourceFormTests
     [Fact]
     public void A_source_the_owner_did_not_connect_needs_a_recorded_permission()
     {
-        var (request, problem) = SourceForm.Build("ch_1", "rss", "https://example.org/feed", null, "daily", "", "", None);
+        var (request, problem) = SourceForm.Build("ch_1", "rss", "https://alummahnow.com/feed", null, "daily", "", "", None);
         Assert.Null(request);
         Assert.Equal("permission_required", problem);
 
-        (request, problem) = SourceForm.Build("ch_1", "rss", "https://example.org/feed", "  Lessons feed ", "daily", " Shaykh Ahmad ", " Email of 12 Nov 2026 ", None);
+        (request, problem) = SourceForm.Build("ch_1", "rss", "https://alummahnow.com/feed", "  Lessons feed ", "daily", " Shaykh Ahmad ", " Email of 12 Nov 2026 ", None);
         Assert.Null(problem);
         Assert.NotNull(request);
         Assert.Equal("Lessons feed", request!.Label);
@@ -94,9 +94,9 @@ public class SourceFormTests
     [Fact]
     public void A_channel_and_a_known_schedule_are_required_and_long_values_are_cut()
     {
-        Assert.Equal("channel_missing", SourceForm.Build(" ", "rss", "https://example.org/feed", null, "daily", "a", "b", None).Problem);
-        Assert.Equal("invalid_schedule", SourceForm.Build("ch_1", "rss", "https://example.org/feed", null, "monthly", "a", "b", None).Problem);
-        var (request, _) = SourceForm.Build("ch_1", "rss", "https://example.org/feed", new string('l', 300), "daily", new string('b', 300), new string('n', 2000), None);
+        Assert.Equal("channel_missing", SourceForm.Build(" ", "rss", "https://alummahnow.com/feed", null, "daily", "a", "b", None).Problem);
+        Assert.Equal("invalid_schedule", SourceForm.Build("ch_1", "rss", "https://alummahnow.com/feed", null, "monthly", "a", "b", None).Problem);
+        var (request, _) = SourceForm.Build("ch_1", "rss", "https://alummahnow.com/feed", new string('l', 300), "daily", new string('b', 300), new string('n', 2000), None);
         Assert.Equal(SourceForm.MaxLabel, request!.Label!.Length);
         Assert.Equal(SourceForm.MaxPermissionBy, request.Permission!.By.Length);
         Assert.Equal(SourceForm.MaxPermissionNote, request.Permission.Note.Length);
@@ -106,7 +106,7 @@ public class SourceFormTests
 public class SourcePhaseTests
 {
     private static ImportSource Source(bool enabled = true, string schedule = "daily", string? lastError = null, string? lastJobId = "job_1") =>
-        new("isrc_1", "ch_1", "rss", "https://example.org/feed", "Feed", "recorded", null, schedule, enabled, null, null, lastJobId, lastError, null, null);
+        new("isrc_1", "ch_1", "rss", "https://alummahnow.com/feed", "Feed", "recorded", null, schedule, enabled, null, null, lastJobId, lastError, null, null);
 
     private static SyncJob Job(string status, string id = "job_1") => new(id, "import.source-sync", status, 1, 6, null, null, null, null, null);
 
@@ -164,7 +164,7 @@ public class SourcePhaseTests
 
 public class SourcesApiTests
 {
-    private const string SourceJson = "{\"id\":\"isrc_0123456789abcdef0123456789abcdef\",\"channelId\":\"ch_1\",\"network\":\"rss\",\"address\":\"https://example.org/feed\"," +
+    private const string SourceJson = "{\"id\":\"isrc_0123456789abcdef0123456789abcdef\",\"channelId\":\"ch_1\",\"network\":\"rss\",\"address\":\"https://alummahnow.com/feed\"," +
         "\"label\":\"Lessons\",\"auth\":\"recorded\",\"socialAccountId\":null,\"ytImportId\":null,\"permission\":{\"by\":\"Shaykh Ahmad\",\"note\":\"Letter\",\"at\":\"2026-11-20T10:00:00.000Z\"}," +
         "\"schedule\":\"daily\",\"enabled\":true,\"nextSyncAt\":\"2026-11-23T10:00:00.000Z\",\"lastSyncAt\":\"2026-11-22T10:00:00.000Z\",\"lastJobId\":\"job_1\",\"lastError\":null," +
         "\"counts\":{\"posted\":12,\"skipped\":2,\"awaiting_file\":1},\"createdBy\":\"usr_admin\",\"createdAt\":\"2026-11-20T10:00:00.000Z\",\"updatedAt\":\"2026-11-22T10:00:00.000Z\"}";
@@ -202,7 +202,7 @@ public class SourcesApiTests
             sent = r.Content!.ReadAsStringAsync().Result;
             return Ok("{\"source\":" + SourceJson + "}", HttpStatusCode.Created);
         });
-        var source = await api.AddSourceAsync(new NewSource("ch_1", "rss", "https://example.org/feed", null, "daily", new NewSourcePermission("Shaykh Ahmad", "Letter")));
+        var source = await api.AddSourceAsync(new NewSource("ch_1", "rss", "https://alummahnow.com/feed", null, "daily", new NewSourcePermission("Shaykh Ahmad", "Letter")));
         Assert.Equal(HttpMethod.Post, handler.Requests[0].Method);
         Assert.Equal("/api/admin/import/sources", handler.Requests[0].RequestUri!.AbsolutePath);
         var body = JsonNode.Parse(sent!)!;
