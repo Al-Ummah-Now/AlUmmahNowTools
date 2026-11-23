@@ -750,10 +750,12 @@ public sealed partial class SourceRow : ObservableObject
     private bool _syncable;
     private bool _retryable;
 
+    private (ImportSource Source, SyncJob? Job, string? Channel)? _shown;
+
     partial void OnUploadsOnChanged(bool value)
     {
-        CanSync = _syncable && value;
-        CanRetryJob = _retryable && (value || !JobIsCancelled);
+        // The status line names "Sync now" for a manual source: shown again without it
+        if (_shown is { } shown) Update(shown.Source, shown.Job, shown.Channel);
         UpdateUploadable();
     }
 
@@ -872,6 +874,7 @@ public sealed partial class SourceRow : ObservableObject
 
     internal void Update(ImportSource source, SyncJob? job, string? channelName)
     {
+        _shown = (source, job, channelName);
         Network = source.Network;
         Address = source.Address;
         JobId = source.LastJobId;
@@ -903,7 +906,8 @@ public sealed partial class SourceRow : ObservableObject
         var retryAt = job?.NextRunAt;
         Status = phase switch
         {
-            SourcePhase.Manual => Loc.Get("Social_StatusManual"),
+            // "Syncs only when you press Sync now", while Sync now is offered; else the schedule's name alone
+            SourcePhase.Manual => UploadsOn ? Loc.Get("Social_StatusManual") : SocialSourcesViewModel.ScheduleName(source.Schedule),
             SourcePhase.Scheduled when source.NextSyncAt is { } next => Loc.Format("Social_StatusScheduled", SocialSourcesViewModel.ScheduleName(source.Schedule), SocialSourcesViewModel.When(next)),
             SourcePhase.Scheduled => SocialSourcesViewModel.ScheduleName(source.Schedule),
             SourcePhase.Syncing => Loc.Get("Social_StatusSyncing"),
@@ -911,7 +915,7 @@ public sealed partial class SourceRow : ObservableObject
             SourcePhase.Retrying => Loc.Get("Social_StatusRetryingSoon"),
             SourcePhase.Failed => Loc.Get("Social_StatusFailed"),
             SourcePhase.Cancelled when source.Schedule != SourceSchedules.Manual && source.NextSyncAt is { } next2 => Loc.Format("Social_StatusCancelledNext", SocialSourcesViewModel.When(next2)),
-            SourcePhase.Cancelled => Loc.Get("Social_StatusCancelled"),
+            SourcePhase.Cancelled => Loc.Get(UploadsOn ? "Social_StatusCancelled" : "Social_StatusCancelledQuiet"),
             SourcePhase.OffNotConnected => Loc.Get("Social_StatusOffNotConnected"),
             _ => Loc.Get("Social_StatusOff"),
         };
@@ -974,7 +978,8 @@ public sealed partial class SourceRow : ObservableObject
             "retrying" => Loc.Format("SocialJob_retryingSoon", job.Attempts, max),
             "failed" => Loc.Format("SocialJob_failed", job.Attempts, max),
             "succeeded" when job.FinishedAt is { } done => Loc.Format("SocialJob_succeededAt", SocialSourcesViewModel.When(done)),
-            "cancelled" => CancelledLine(job),
+            // Without its "Retry starts a new sync" while that Retry isn't offered (uploads off)
+            "cancelled" => UploadsOn ? CancelledLine(job) : job.CancelledBy is { Length: > 0 } by ? Loc.GetWithDetail("SocialJob_cancelledByQuiet", by) : Loc.Get("SocialJob_cancelledQuiet"),
             _ => Loc.Get("SocialJob_succeeded"),
         });
         JobStatusTip = job.Status == "retrying" && job.NextRunAt is { } t ? Loc.UtcText(t) : job.FinishedAt is { } f ? Loc.UtcText(f) : null;

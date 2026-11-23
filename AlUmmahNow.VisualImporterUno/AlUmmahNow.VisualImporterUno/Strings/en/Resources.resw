@@ -2955,6 +2955,15 @@
   <data name="Social_StatusCancelled" xml:space="preserve">
     <value>The last sync was cancelled. “Sync now” starts a new one</value>
   </data>
+  <data name="Social_StatusCancelledQuiet" xml:space="preserve">
+    <value>The last sync was cancelled</value>
+  </data>
+  <data name="SocialJob_cancelledQuiet" xml:space="preserve">
+    <value>Cancelled by an admin</value>
+  </data>
+  <data name="SocialJob_cancelledByQuiet" xml:space="preserve">
+    <value>Cancelled. Cancelled by:</value>
+  </data>
   <data name="Social_StatusCancelledNext" xml:space="preserve">
     <value>The last sync was cancelled. Next sync: {0}</value>
   </data>

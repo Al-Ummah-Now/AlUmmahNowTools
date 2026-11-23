@@ -3270,6 +3270,15 @@
   <data name="Social_StatusCancelled" xml:space="preserve">
     <value>أُلغيت آخر مزامنة. «زامِن الآن» تبدأ مزامنة جديدة</value>
   </data>
+  <data name="Social_StatusCancelledQuiet" xml:space="preserve">
+    <value>أُلغيت آخر مزامنة</value>
+  </data>
+  <data name="SocialJob_cancelledQuiet" xml:space="preserve">
+    <value>ألغاها مشرف</value>
+  </data>
+  <data name="SocialJob_cancelledByQuiet" xml:space="preserve">
+    <value>أُلغيت. ألغاها:</value>
+  </data>
   <data name="Social_StatusCancelledNext" xml:space="preserve">
     <value>أُلغيت آخر مزامنة. المزامنة التالية: {0}</value>
   </data>
