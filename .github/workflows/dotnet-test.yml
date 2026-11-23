@@ -161,6 +161,9 @@ jobs:
     - name: Test ToolsCore
       run: dotnet test AlUmmahNow.ToolsCore.Tests/AlUmmahNow.ToolsCore.Tests.csproj --configuration Release --logger "console;verbosity=normal"
 
+    - name: Test VisualImporterUno ViewModels and Helpers
+      run: dotnet test AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno.Tests/AlUmmahNow.VisualImporterUno.Tests.csproj --configuration Release --logger "console;verbosity=normal"
+
     - name: Build the desktop app
       run: dotnet build AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno.csproj -f net9.0-desktop --configuration Release
 
