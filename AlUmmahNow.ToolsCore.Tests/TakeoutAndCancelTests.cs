@@ -61,7 +61,7 @@ public class SyncCancelTests
     [Fact]
     public void A_cancelled_sync_is_its_own_phase_not_a_failure()
     {
-        var source = JsonSerializer.Deserialize<ImportSource>("{\"id\":\"" + SourceId + "\",\"channelId\":\"ch_1\",\"network\":\"rss\",\"address\":\"https://example.org/feed\",\"label\":\"L\",\"auth\":\"recorded\"," +
+        var source = JsonSerializer.Deserialize<ImportSource>("{\"id\":\"" + SourceId + "\",\"channelId\":\"ch_1\",\"network\":\"rss\",\"address\":\"https://alummahnow.com/feed\",\"label\":\"L\",\"auth\":\"recorded\"," +
             "\"schedule\":\"daily\",\"enabled\":true,\"lastJobId\":\"" + JobId + "\",\"lastError\":null,\"counts\":{}}", ImportApiClient.Json)!;
         var job = new SyncJob(JobId, "import.source-sync", "cancelled", 1, 6, null, null, null, null, null);
         Assert.Equal(SourcePhase.Cancelled, SourceText.PhaseOf(source, job));

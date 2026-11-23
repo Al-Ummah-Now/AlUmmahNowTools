@@ -551,7 +551,7 @@ public sealed partial class SocialSourcesViewModel : ObservableObject, IDisposab
             SourceNetworks.Bluesky => Loc.GetWithDetail("Social_Hint_bluesky", "name.bsky.social"),
             SourceNetworks.Mastodon => Loc.GetWithDetail("Social_Hint_mastodon", "@name@mastodon.social"),
             SourceNetworks.YouTube => Loc.GetWithDetail("Social_Hint_youtube", "UCq3Zx9LmT4Kd7Vn2Wp8RbYs"),
-            SourceNetworks.Rss => Loc.GetWithDetail("Social_Hint_rss", "https://example.org/feed.xml"),
+            SourceNetworks.Rss => Loc.GetWithDetail("Social_Hint_rss", "https://alummahnow.com/feed.xml"),
             _ => "",
         };
         // Telegram is added only from the owner's connection (our bot reads the posts)
