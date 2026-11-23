@@ -2501,6 +2501,7 @@
   </data>
   <data name="Import_TranslateNote.Text" xml:space="preserve">
     <value>Each translation is a machine-made draft that a person checks and publishes. A video with its own caption files is translated from them, and they stay as they are.</value>
+  </data>
   <data name="Nav_SocialSources.Content" xml:space="preserve">
     <value>Social sources</value>
   </data>
