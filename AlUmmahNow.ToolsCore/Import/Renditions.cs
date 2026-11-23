@@ -91,18 +91,20 @@ public static class EncodeLadder
 /// <summary>
 /// H.264 encoder detection, OS-scoped hardware-first ordering, probing, and fallback rules.
 /// <para>
-/// Ported from Maktaba (github.com/Hamza-Labs-Core/Maktaba; same owner):
+/// Ported from Maktaba (<c>github.com/Hamza-Labs-Core/Maktaba</c>, <c>origin/main</c>; same owner):
 /// header-safe <c>ffmpeg -encoders</c> legend skipping (<c>cmd/maktaba-server/internal/ffmpeg/check.go:parseCodecs</c>),
-/// OS-scoped hardware-first priority for macOS VideoToolbox and Linux/Windows NVENC → QSV with 0.2 s black-frame null probing
-/// (<c>streaming/internal/ffmpeg/hwaccel.go</c>), VideoToolbox <c>-allow_sw 0 -realtime 1</c> probe flags
-/// (<c>streaming/internal/channel/config.go</c> and <c>cluster/capability.go</c>),
+/// OS-scoped hardware-first priority for macOS VideoToolbox, Linux NVENC → QSV → VA-API, and Windows NVENC → QSV
+/// (<c>streaming/internal/ffmpeg/hwaccel.go</c>), 0.2 s black-frame null probing (<c>hwaccel.go:encodes</c>),
+/// Linux <c>/dev/dri/renderD*</c> render-node discovery for <c>h264_vaapi</c> (<c>streaming/internal/ffmpeg/vaapi.go</c>;
+/// Tools relies directly on the ffmpeg test encode as Maktaba does when <c>vainfo</c> is absent),
+/// VideoToolbox <c>-allow_sw 0 -realtime 1</c> probe flags (<c>streaming/internal/channel/config.go</c> and <c>cluster/capability.go</c>),
 /// and transient session-limit refusal detection + 30 s fallback window (<c>streaming/internal/ffmpeg/transcode.go</c>).
 /// </para>
 /// <para>
 /// Extended in Tools for desktop/LGPL (TA-19) and TA-12 prebuilt parity:
-/// Linux <c>h264_vaapi</c> with <c>/dev/dri/renderD*</c> node probing, Windows <c>h264_amf</c> and <c>h264_mf</c>,
-/// <c>libopenh264</c> LGPL software fallback, per-file candidate-chain retry, and local output/segment verification aligned
-/// with <c>apps/media/container/prebuilt.mjs</c>.
+/// Windows <c>h264_amf</c> and <c>h264_mf</c>, <c>libopenh264</c> LGPL software fallback,
+/// per-file candidate-chain retry (committing permanent blacklisting only after a fallback succeeds),
+/// and local output/segment verification aligned with <c>apps/media/container/prebuilt.mjs</c>.
 /// </para>
 /// </summary>
 public static class H264Encoders
@@ -126,7 +128,7 @@ public static class H264Encoders
     /// <summary>
     /// OS-scoped encoder priority order:
     /// macOS tries VideoToolbox then software (Maktaba <c>hwaccel.go</c>);
-    /// Linux tries NVENC, QSV (Maktaba), then VAAPI (Tools extension), then software;
+    /// Linux tries NVENC, QSV, VA-API then software (Maktaba <c>hwaccel.go</c> + <c>vaapi.go</c>);
     /// Windows tries NVENC, QSV (Maktaba), then AMF, Media Foundation (Tools extensions), then software.
     /// </summary>
     public static IReadOnlyList<string> PreferredForPlatform(string? os = null)
