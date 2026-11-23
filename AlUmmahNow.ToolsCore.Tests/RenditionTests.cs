@@ -175,17 +175,66 @@ public class EncodeLadderTests
         Assert.False(H264Encoders.IsRefusedSession("OpenEncodeSessionEx failed: unsupported device (2)"));
         Assert.False(H264Encoders.IsRefusedSession("Cannot load libcuda.so.1"));
 
-        // Local output verification catches bad pix_fmt, codec, size, or missing audio before staging
-        var rung = rungs[0]; // 360p: 640x360
+        // Source/disk errors are separated from encoder failures
+        Assert.True(H264Encoders.IsSourceOrDiskError("av_interleaved_write_frame(): No space left on device"));
+        Assert.True(H264Encoders.IsSourceOrDiskError("in.mp4: Invalid data found when processing input"));
+        Assert.True(H264Encoders.IsSourceOrDiskError("[mov,mp4] moov atom not found"));
+        Assert.False(H264Encoders.IsSourceOrDiskError("Cannot load libcuda.so.1"));
+
+        // Local output verification catches bad pix_fmt, codec, size, audio channels, unexpected silent audio, duration slack, keyframes, and peak bitrate
+        var rung = rungs[0]; // 360p: 640x360, maxrate 800000, audio 96000
         FfmpegMediaTools.VerifyEncodedRungJson("""
-            {"streams":[{"codec_type":"video","codec_name":"h264","pix_fmt":"yuv420p","width":640,"height":360},{"codec_type":"audio","codec_name":"aac"}],"format":{"duration":"10.0"}}
-            """, rung, expectAudio: true);
+            {"streams":[{"codec_type":"video","codec_name":"h264","pix_fmt":"yuv420p","width":640,"height":360},{"codec_type":"audio","codec_name":"aac","channels":2}],"format":{"duration":"10.0"}}
+            """, rung, expectAudio: true, sourceDurationSeconds: 10.0);
+        // Silent source succeeds without audio, rejects unexpected audio stream
+        FfmpegMediaTools.VerifyEncodedRungJson("""
+            {"streams":[{"codec_type":"video","codec_name":"h264","pix_fmt":"yuv420p","width":640,"height":360}],"format":{"duration":"10.0"}}
+            """, rung, expectAudio: false, sourceDurationSeconds: 10.0);
         Assert.Equal("output_invalid", Assert.Throws<LocalEncodeException>(() => FfmpegMediaTools.VerifyEncodedRungJson("""
-            {"streams":[{"codec_type":"video","codec_name":"h264","pix_fmt":"yuv420p10le","width":640,"height":360},{"codec_type":"audio","codec_name":"aac"}],"format":{"duration":"10.0"}}
-            """, rung, expectAudio: true)).Code);
+            {"streams":[{"codec_type":"video","codec_name":"h264","pix_fmt":"yuv420p","width":640,"height":360},{"codec_type":"audio","codec_name":"aac","channels":2}],"format":{"duration":"10.0"}}
+            """, rung, expectAudio: false, sourceDurationSeconds: 10.0)).Code);
+        // Bad pix_fmt
+        Assert.Equal("output_invalid", Assert.Throws<LocalEncodeException>(() => FfmpegMediaTools.VerifyEncodedRungJson("""
+            {"streams":[{"codec_type":"video","codec_name":"h264","pix_fmt":"yuv420p10le","width":640,"height":360},{"codec_type":"audio","codec_name":"aac","channels":2}],"format":{"duration":"10.0"}}
+            """, rung, expectAudio: true, sourceDurationSeconds: 10.0)).Code);
+        // Missing audio or non-stereo audio
         Assert.Equal("output_invalid", Assert.Throws<LocalEncodeException>(() => FfmpegMediaTools.VerifyEncodedRungJson("""
             {"streams":[{"codec_type":"video","codec_name":"h264","pix_fmt":"yuv420p","width":640,"height":360}],"format":{"duration":"10.0"}}
-            """, rung, expectAudio: true)).Code);
+            """, rung, expectAudio: true, sourceDurationSeconds: 10.0)).Code);
+        Assert.Equal("output_invalid", Assert.Throws<LocalEncodeException>(() => FfmpegMediaTools.VerifyEncodedRungJson("""
+            {"streams":[{"codec_type":"video","codec_name":"h264","pix_fmt":"yuv420p","width":640,"height":360},{"codec_type":"audio","codec_name":"aac","channels":1}],"format":{"duration":"10.0"}}
+            """, rung, expectAudio: true, sourceDurationSeconds: 10.0)).Code);
+        // Duration outside slack (> max(1s, 1%))
+        Assert.Equal("output_invalid", Assert.Throws<LocalEncodeException>(() => FfmpegMediaTools.VerifyEncodedRungJson("""
+            {"streams":[{"codec_type":"video","codec_name":"h264","pix_fmt":"yuv420p","width":640,"height":360},{"codec_type":"audio","codec_name":"aac","channels":2}],"format":{"duration":"8.5"}}
+            """, rung, expectAudio: true, sourceDurationSeconds: 10.0)).Code);
+
+        // Keyframe-gap verification (GOP=2s => max gap 4.05s)
+        FfmpegMediaTools.VerifyKeyframesJson("""
+            {"frames":[{"pts_time":"0.000"},{"pts_time":"2.000"},{"pts_time":"4.000"},{"pts_time":"6.000"},{"pts_time":"8.000"}]}
+            """, rung, gopSeconds: 2, sourceDurationSeconds: 10.0);
+        Assert.Equal("output_invalid", Assert.Throws<LocalEncodeException>(() => FfmpegMediaTools.VerifyKeyframesJson("""
+            {"frames":[{"pts_time":"0.000"},{"pts_time":"4.500"},{"pts_time":"6.500"}]}
+            """, rung, gopSeconds: 2, sourceDurationSeconds: 10.0)).Code);
+        Assert.Equal("output_invalid", Assert.Throws<LocalEncodeException>(() => FfmpegMediaTools.VerifyKeyframesJson("""
+            {"frames":[{"pts_time":"0.000"}]}
+            """, rung, gopSeconds: 2, sourceDurationSeconds: 10.0)).Code);
+
+        // Packaged HLS verification: segment length <= SegmentSeconds+1, peak bitrate <= (maxrate+audio)*1.5, duration within slack
+        var pkgDir = Temp.Folder();
+        File.WriteAllText(Path.Combine(pkgDir, "index.m3u8"), "#EXTM3U\n#EXT-X-VERSION:7\n#EXT-X-TARGETDURATION:6\n#EXT-X-MAP:URI=\"init.mp4\"\n#EXTINF:5.000000,\nseg_00001.m4s\n#EXTINF:5.000000,\nseg_00002.m4s\n#EXT-X-ENDLIST\n");
+        File.WriteAllBytes(Path.Combine(pkgDir, "seg_00001.m4s"), new byte[100_000]);
+        File.WriteAllBytes(Path.Combine(pkgDir, "seg_00002.m4s"), new byte[100_000]);
+        FfmpegMediaTools.VerifyPackagedRung(pkgDir, rung, info, settings);
+
+        // Segment bitrate spike > (800000 + 96000) * 1.5 = 1,344,000 bps -> 5s * 1,344,000 / 8 = 840,000 bytes
+        File.WriteAllBytes(Path.Combine(pkgDir, "seg_00002.m4s"), new byte[900_000]);
+        Assert.Equal("output_invalid", Assert.Throws<LocalEncodeException>(() => FfmpegMediaTools.VerifyPackagedRung(pkgDir, rung, info, settings)).Code);
+
+        // Oversized segment duration (> 6 + 1 = 7s)
+        File.WriteAllBytes(Path.Combine(pkgDir, "seg_00002.m4s"), new byte[100_000]);
+        File.WriteAllText(Path.Combine(pkgDir, "index.m3u8"), "#EXTM3U\n#EXTINF:7.500000,\nseg_00001.m4s\n#EXTINF:2.500000,\nseg_00002.m4s\n#EXT-X-ENDLIST\n");
+        Assert.Equal("output_invalid", Assert.Throws<LocalEncodeException>(() => FfmpegMediaTools.VerifyPackagedRung(pkgDir, rung, info, settings)).Code);
     }
 
     [Fact]
@@ -223,6 +272,13 @@ public class EncodeLadderTests
     }
 }
 
+internal sealed class FakeTimeProvider : TimeProvider
+{
+    private DateTimeOffset _now = new(2026, 11, 23, 12, 0, 0, TimeSpan.Zero);
+    public override DateTimeOffset GetUtcNow() => _now;
+    public void Advance(TimeSpan delta) => _now += delta;
+}
+
 /// <summary>ffmpeg for tests: writes a file per rung, or fails as told.</summary>
 internal sealed class FakeMedia : IMediaTools
 {
@@ -231,6 +287,7 @@ internal sealed class FakeMedia : IMediaTools
     public HashSet<string> FailEncoders = new(StringComparer.Ordinal);
     public HashSet<string> BusyEncoders = new(StringComparer.Ordinal);
     public HashSet<string> InvalidOutputEncoders = new(StringComparer.Ordinal);
+    public Action<string>? OnBeforeEncode;
     public List<string> EncoderOrder = new();
     public List<string> MarkedFailed = new();
     public List<string> TransientBusy = new();
@@ -240,13 +297,18 @@ internal sealed class FakeMedia : IMediaTools
 
     public Task<SourceInfo> ProbeAsync(string path, CancellationToken ct) => Fail is LocalEncodeException { Code: "probe_failed" } ? throw Fail : Task.FromResult(Info);
 
-    public Task<string?> PickEncoderAsync(CancellationToken ct)
+    public Task<string?> PickEncoderAsync(CancellationToken ct) => PickEncoderAsync(null, ct);
+
+    public Task<string?> PickEncoderAsync(IReadOnlySet<string>? skipEncoders, CancellationToken ct)
     {
         if (EncoderOrder.Count > 0)
         {
-            return Task.FromResult(EncoderOrder.FirstOrDefault(e => !MarkedFailed.Contains(e) && !TransientBusy.Contains(e)));
+            return Task.FromResult(EncoderOrder.FirstOrDefault(e =>
+                !MarkedFailed.Contains(e)
+                && !TransientBusy.Contains(e)
+                && (skipEncoders is null || !skipEncoders.Contains(e))));
         }
-        return Task.FromResult(Encoder);
+        return Task.FromResult(skipEncoders is not null && Encoder is not null && skipEncoders.Contains(Encoder) ? null : Encoder);
     }
 
     public void MarkEncoderFailed(string encoder, bool transientBusy = false)
@@ -259,6 +321,7 @@ internal sealed class FakeMedia : IMediaTools
     {
         Encodes++;
         _lastEncodedWith = encoder;
+        OnBeforeEncode?.Invoke(encoder);
         if (BusyEncoders.Contains(encoder)) throw new LocalEncodeException("gpu_busy", $"ffmpeg stopped ({encoder}): OpenEncodeSessionEx failed: out of memory (10)");
         if (FailEncoders.Contains(encoder)) throw new LocalEncodeException("ffmpeg_failed", $"ffmpeg stopped ({encoder}): driver error");
         if (Fail is not null) throw Fail;
@@ -291,13 +354,16 @@ internal sealed class FakeMedia : IMediaTools
 /// <summary>aun-core's packaging for tests: a playlist, an init and two segments per rung.</summary>
 internal sealed class FakePackager : IRenditionPackager
 {
+    public int SegmentBytes = 100;
+
     public Task PackageAsync(string mp4, string outputDirectory, int segmentSeconds, CancellationToken ct)
     {
         Directory.CreateDirectory(outputDirectory);
-        File.WriteAllText(Path.Combine(outputDirectory, "index.m3u8"), "#EXTM3U\n");
+        File.WriteAllText(Path.Combine(outputDirectory, "index.m3u8"),
+            "#EXTM3U\n#EXT-X-VERSION:7\n#EXT-X-TARGETDURATION:6\n#EXT-X-MEDIA-SEQUENCE:0\n#EXT-X-PLAYLIST-TYPE:VOD\n#EXT-X-INDEPENDENT-SEGMENTS\n#EXT-X-MAP:URI=\"init.mp4\"\n#EXTINF:6.000000,\nseg_00001.m4s\n#EXTINF:6.000000,\nseg_00002.m4s\n#EXT-X-ENDLIST\n");
         File.WriteAllBytes(Path.Combine(outputDirectory, "init.mp4"), new byte[10]);
-        File.WriteAllBytes(Path.Combine(outputDirectory, "seg_00001.m4s"), new byte[100]);
-        File.WriteAllBytes(Path.Combine(outputDirectory, "seg_00002.m4s"), new byte[90]);
+        File.WriteAllBytes(Path.Combine(outputDirectory, "seg_00001.m4s"), new byte[SegmentBytes]);
+        File.WriteAllBytes(Path.Combine(outputDirectory, "seg_00002.m4s"), new byte[Math.Max(1, SegmentBytes - 10)]);
         return Task.CompletedTask;
     }
 }
@@ -373,8 +439,8 @@ public class EncodeStepTests
         return (item, server, api, Temp.Folder());
     }
 
-    private static EncodeStep Step(ImportApiClient api, string work, FakeMedia media, List<Exception>? reported = null) =>
-        new(api, new Uri("https://videos.api.example"), media, new FakePackager(), work, "Tools test", (ex, _) => reported?.Add(ex), _ => long.MaxValue);
+    private static EncodeStep Step(ImportApiClient api, string work, IMediaTools media, List<Exception>? reported = null, IRenditionPackager? packager = null, TimeProvider? time = null) =>
+        new(api, new Uri("https://videos.api.example"), media, packager ?? new FakePackager(), work, "Tools test", (ex, _) => reported?.Add(ex), _ => long.MaxValue, time);
 
     [Fact]
     public async Task Encodes_the_servers_rungs_after_opening_the_file_and_keeps_them_for_the_upload()
@@ -478,6 +544,157 @@ public class EncodeStepTests
         Assert.Equal(StepResult.Done, await Step(api2, work2, badOutMedia).RunAsync(badOutItem, new RecordingContext(), default));
         Assert.Equal(new[] { "h264_vaapi" }, badOutMedia.MarkedFailed);
         Assert.Equal("Tools test, ffmpeg libx264", badOutItem.Renditions!.Encoder);
+    }
+
+    [Fact]
+    public async Task Source_disk_late_and_both_failed_errors_do_not_permanently_blacklist_the_gpu()
+    {
+        // 1. Source/disk error does not blacklist GPU and does not waste a software retry
+        var (diskItem, _, api1, work1) = Setup();
+        var diskMedia = new FakeMedia
+        {
+            EncoderOrder = new List<string> { "h264_nvenc", "libx264" },
+            Fail = new LocalEncodeException("source_error", "ffmpeg stopped (h264_nvenc): No space left on device"),
+        };
+        Assert.Equal(StepResult.Skipped, await Step(api1, work1, diskMedia).RunAsync(diskItem, new RecordingContext(), default));
+        Assert.Equal(1, diskMedia.Encodes);
+        Assert.Empty(diskMedia.MarkedFailed);
+        Assert.Equal("h264_nvenc", await diskMedia.PickEncoderAsync(default));
+
+        // 2. Corrupt input where BOTH GPU and software fail does NOT blacklist the GPU for later good files
+        var (badInputItem, _, api2, work2) = Setup();
+        var badInputMedia = new FakeMedia
+        {
+            EncoderOrder = new List<string> { "h264_nvenc", "libx264" },
+            FailEncoders = new HashSet<string> { "h264_nvenc", "libx264" },
+        };
+        Assert.Equal(StepResult.Skipped, await Step(api2, work2, badInputMedia).RunAsync(badInputItem, new RecordingContext(), default));
+        Assert.Equal(2, badInputMedia.Encodes);
+        Assert.Empty(badInputMedia.MarkedFailed);
+        Assert.Equal("h264_nvenc", await badInputMedia.PickEncoderAsync(default));
+
+        // 3. Late failure (> 30s Maktaba fallbackWindow) cools down briefly without permanently blacklisting GPU
+        var clock = new FakeTimeProvider();
+        var (lateItem, _, api3, work3) = Setup();
+        var lateMedia = new FakeMedia
+        {
+            EncoderOrder = new List<string> { "h264_nvenc", "libx264" },
+            FailEncoders = new HashSet<string> { "h264_nvenc" },
+            OnBeforeEncode = _ => clock.Advance(TimeSpan.FromSeconds(35)),
+        };
+        Assert.Equal(StepResult.Skipped, await Step(api3, work3, lateMedia, time: clock).RunAsync(lateItem, new RecordingContext(), default));
+        Assert.Equal(1, lateMedia.Encodes);
+        Assert.Empty(lateMedia.MarkedFailed);
+        Assert.Equal(new[] { "h264_nvenc" }, lateMedia.TransientBusy);
+    }
+
+    [Fact]
+    public async Task Real_FfmpegMediaTools_transient_busy_falls_back_locally_and_recovers_after_cooldown()
+    {
+        if (OperatingSystem.IsWindows()) return;
+
+        var binDir = Temp.Folder();
+        var ffmpegPath = Path.Combine(binDir, "fake-ffmpeg.sh");
+        var ffprobePath = Path.Combine(binDir, "fake-ffprobe.sh");
+        var probeBusyFlag = Path.Combine(binDir, "probe-busy");
+
+        // Fake ffmpeg: lists h264_nvenc + libx264; probes succeed unless probe-busy flag exists;
+        // real encode with h264_nvenc refuses session (Maktaba refusedSession), libx264 writes valid dummy outputs.
+        File.WriteAllText(ffmpegPath, """
+            #!/bin/sh
+            for a in "$@"; do
+              if [ "$a" = "-encoders" ]; then
+                printf 'Encoders:\n V..... = Video\n ------\n V....D h264_nvenc NVIDIA NVENC\n V....D libx264 libx264 H.264\n'
+                exit 0
+              fi
+            done
+            # Probe run writes to "-f null -"
+            is_probe=0
+            encoder=""
+            prev=""
+            for a in "$@"; do
+              if [ "$prev" = "-c:v" ] || [ "$prev" = "-c:v:0" ]; then encoder="$a"; fi
+              if [ "$a" = "null" ] && [ "$prev" = "-f" ]; then is_probe=1; fi
+              prev="$a"
+            done
+            if [ "$is_probe" = "1" ]; then
+              if [ "$encoder" = "h264_nvenc" ] && [ -f "__PROBE_BUSY__" ]; then
+                echo "OpenEncodeSessionEx failed: out of memory (10)" >&2
+                exit 1
+              fi
+              exit 0
+            fi
+            if [ "$encoder" = "h264_nvenc" ]; then
+              echo "[h264_nvenc] OpenEncodeSessionEx failed: out of memory (10): (no details)" >&2
+              exit 1
+            fi
+            # Write each *.mp4 output argument
+            for a in "$@"; do
+              case "$a" in
+                *.mp4) printf 'mp4data' > "$a" ;;
+              esac
+            done
+            exit 0
+            """.Replace("__PROBE_BUSY__", probeBusyFlag));
+
+        File.WriteAllText(ffprobePath, """
+            #!/bin/sh
+            for a in "$@"; do
+              if [ "$a" = "nokey" ]; then
+                printf '{"frames":[{"pts_time":"0.0"},{"pts_time":"2.0"},{"pts_time":"4.0"},{"pts_time":"6.0"},{"pts_time":"8.0"},{"pts_time":"10.0"}]}\n'
+                exit 0
+              fi
+            done
+            # Return matching width/height based on filename
+            w=1280; h=720
+            for a in "$@"; do
+              case "$a" in
+                *360p.mp4) w=640; h=360 ;;
+                *480p.mp4) w=854; h=480 ;;
+                *720p.mp4) w=1280; h=720 ;;
+              esac
+            done
+            printf '{"streams":[{"codec_type":"video","codec_name":"h264","pix_fmt":"yuv420p","width":%s,"height":%s,"avg_frame_rate":"30/1"},{"codec_type":"audio","codec_name":"aac","channels":2}],"format":{"duration":"12.0"}}\n' "$w" "$h"
+            exit 0
+            """);
+
+        File.SetUnixFileMode(ffmpegPath, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        File.SetUnixFileMode(ffprobePath, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+
+        var clock = new FakeTimeProvider();
+        var realMedia = new FfmpegMediaTools(
+            _ => Task.FromResult<(string, string)?>((ffmpegPath, ffprobePath)),
+            time: clock,
+            osOverride: "linux",
+            preferOverride: () => "auto",
+            findVaapiDevices: () => Array.Empty<string>());
+
+        // 1. Probe succeeds -> h264_nvenc; real encode hits OpenEncodeSessionEx -> falls back locally to libx264
+        var (item, _, api, work) = Setup();
+        var context = new RecordingContext();
+        Assert.Equal(StepResult.Done, await Step(api, work, realMedia, time: clock).RunAsync(item, context, default));
+        Assert.Equal("Tools test, ffmpeg libx264", item.Renditions!.Encoder);
+        Assert.Contains(context.Lines, l => l.Code == "encoder_fallback");
+
+        // 2. Within 30s cooldown, NVENC is skipped without re-probing (returns libx264)
+        Assert.Equal("libx264", await realMedia.PickEncoderAsync(default));
+
+        // 3. After 31s cooldown expires, NVENC is NOT permanently blacklisted and is selected again
+        clock.Advance(TimeSpan.FromSeconds(31));
+        Assert.Equal("h264_nvenc", await realMedia.PickEncoderAsync(default));
+
+        // 4. Probe-time refusal also does not permanently cache libx264
+        var realMedia2 = new FfmpegMediaTools(
+            _ => Task.FromResult<(string, string)?>((ffmpegPath, ffprobePath)),
+            time: clock,
+            osOverride: "linux",
+            preferOverride: () => "auto",
+            findVaapiDevices: () => Array.Empty<string>());
+        File.WriteAllText(probeBusyFlag, "1");
+        Assert.Equal("libx264", await realMedia2.PickEncoderAsync(default));
+        File.Delete(probeBusyFlag);
+        clock.Advance(TimeSpan.FromSeconds(31));
+        Assert.Equal("h264_nvenc", await realMedia2.PickEncoderAsync(default));
     }
 
     [Fact]

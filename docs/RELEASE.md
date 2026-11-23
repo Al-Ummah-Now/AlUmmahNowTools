@@ -31,6 +31,10 @@ The launch check starts the installed app in demo mode (`TOOLS_DEMO=1`, no netwo
 `TOOLS_SCREENSHOT`, which renders the window to a PNG and exits; no PNG within 120 s fails the run. The PNGs are
 the `smoke-*` artifacts.
 
+Local pre-encoding selects the first working OS hardware encoder before software fallback; set `TOOLS_ENCODER`
+(`auto`, `software`/`off`/`none`/`cpu`/`libx264`, or an explicit encoder such as `vt`, `nvenc`, `qsv`, `amf`,
+`vaapi`, `mf`, or `openh264`) to override automatic encoder selection for debugging or support.
+
 A pull request that changes `release.yml`, `packaging/**` or the release scripts runs the same jobs as a dry
 run (version `vYYYY.MM.DD.0`, no release); so does **Run workflow** on the Actions page.
 

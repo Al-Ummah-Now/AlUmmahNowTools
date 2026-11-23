@@ -88,20 +88,35 @@ public static class EncodeLadder
     private static int EvenDown(int n) => Math.Max(2, n / 2 * 2);
 }
 
-/// <summary>The H.264 encoders the app can use, best first: libx264 is what the server uses; hardware encoders and OpenH264 follow.</summary>
 /// <summary>
 /// H.264 encoder detection, OS-scoped hardware-first ordering, probing, and fallback rules.
-/// Ported from Maktaba (github.com/Hamza-Labs-Core/Maktaba:
-/// <c>cmd/maktaba-server/internal/ffmpeg/check.go</c>,
-/// <c>streaming/internal/ffmpeg/hwaccel.go</c>,
-/// <c>streaming/internal/ffmpeg/transcode.go</c>, and
-/// <c>streaming/internal/channel/config.go</c>; same owner):
-/// hardware encoders are preferred per OS and accepted only after a short test encode succeeds
-/// (never trusting <c>ffmpeg -encoders</c> alone), falling back to software <c>libx264</c>, then <c>libopenh264</c> on LGPL builds.
+/// <para>
+/// Ported from Maktaba (github.com/Hamza-Labs-Core/Maktaba; same owner):
+/// header-safe <c>ffmpeg -encoders</c> legend skipping (<c>cmd/maktaba-server/internal/ffmpeg/check.go:parseCodecs</c>),
+/// OS-scoped hardware-first priority for macOS VideoToolbox and Linux/Windows NVENC → QSV with 0.2 s black-frame null probing
+/// (<c>streaming/internal/ffmpeg/hwaccel.go</c>), VideoToolbox <c>-allow_sw 0 -realtime 1</c> probe flags
+/// (<c>streaming/internal/channel/config.go</c> and <c>cluster/capability.go</c>),
+/// and transient session-limit refusal detection + 30 s fallback window (<c>streaming/internal/ffmpeg/transcode.go</c>).
+/// </para>
+/// <para>
+/// Extended in Tools for desktop/LGPL (TA-19) and TA-12 prebuilt parity:
+/// Linux <c>h264_vaapi</c> with <c>/dev/dri/renderD*</c> node probing, Windows <c>h264_amf</c> and <c>h264_mf</c>,
+/// <c>libopenh264</c> LGPL software fallback, per-file candidate-chain retry, and local output/segment verification aligned
+/// with <c>apps/media/container/prebuilt.mjs</c>.
+/// </para>
 /// </summary>
 public static class H264Encoders
 {
     public const string VaapiDevice = "/dev/dri/renderD128";
+
+    /// <summary>
+    /// Maktaba <c>transcode.go</c> fallback window: only a hardware failure that dies within 30 s is treated as an
+    /// encoder-startup/compatibility failure eligible for local fallback; late failures avoid permanently blacklisting the GPU.
+    /// </summary>
+    public static readonly TimeSpan FallbackWindow = TimeSpan.FromSeconds(30);
+
+    /// <summary>How long a transiently busy GPU encoder (e.g. NVENC session limit) is skipped before re-probing.</summary>
+    public static readonly TimeSpan BusyCooldown = TimeSpan.FromSeconds(30);
 
     /// <summary>Canonical hardware-first encoder order across all platforms, ending in software encoders.</summary>
     public static readonly string[] Preferred = { "h264_videotoolbox", "h264_nvenc", "h264_qsv", "h264_amf", "h264_vaapi", "h264_mf", "libx264", "libopenh264" };
@@ -109,9 +124,10 @@ public static class H264Encoders
     public static bool IsHardware(string encoder) => encoder is not ("libx264" or "libopenh264");
 
     /// <summary>
-    /// OS-scoped encoder priority order (Maktaba <c>hwaccel.go</c> + <c>check.go</c>):
-    /// macOS tries VideoToolbox then software; Linux tries NVENC, QSV, VAAPI then software;
-    /// Windows tries NVENC, QSV, AMF, Media Foundation then software.
+    /// OS-scoped encoder priority order:
+    /// macOS tries VideoToolbox then software (Maktaba <c>hwaccel.go</c>);
+    /// Linux tries NVENC, QSV (Maktaba), then VAAPI (Tools extension), then software;
+    /// Windows tries NVENC, QSV (Maktaba), then AMF, Media Foundation (Tools extensions), then software.
     /// </summary>
     public static IReadOnlyList<string> PreferredForPlatform(string? os = null)
     {
@@ -248,6 +264,22 @@ public static class H264Encoders
             && !lower.Contains("unsupported device", StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// True when ffmpeg's stderr clearly points to a corrupt/missing source or full disk rather than an encoder failure,
+    /// so hardware encoders are not permanently blacklisted for the rest of the session.
+    /// </summary>
+    public static bool IsSourceOrDiskError(string stderr)
+    {
+        var lower = stderr.ToLowerInvariant();
+        return lower.Contains("no space left on device", StringComparison.Ordinal)
+            || lower.Contains("disk full", StringComparison.Ordinal)
+            || lower.Contains("invalid data found when processing input", StringComparison.Ordinal)
+            || lower.Contains("no such file or directory", StringComparison.Ordinal)
+            || lower.Contains("permission denied", StringComparison.Ordinal)
+            || lower.Contains("moov atom not found", StringComparison.Ordinal)
+            || lower.Contains("input/output error", StringComparison.Ordinal);
+    }
+
     /// <summary>The encoder's rate and keyframe options for one output: a keyframe every GOP and never one from a scene cut.</summary>
     public static IEnumerable<string> Options(string encoder, PlannedRung rung, int crf, int keyint, int index)
     {
@@ -260,6 +292,8 @@ public static class H264Encoders
         var rate = encoder switch
         {
             "libx264" => new[] { S("crf"), crf.ToString(CultureInfo.InvariantCulture), S("maxrate"), max, S("bufsize"), buf, S("preset"), "veryfast", S("sc_threshold"), "0" },
+            // The probe uses -allow_sw 0 (hardware-only) so Apple's software VideoToolbox never masks libx264;
+            // once hardware VideoToolbox is confirmed, real encodes keep allow_sw 1 to survive transient VT contention.
             "h264_videotoolbox" => new[] { S("b"), average, S("maxrate"), max, S("bufsize"), buf, S("allow_sw"), "1" },
             "h264_nvenc" => new[] { S("rc"), "vbr", S("cq"), crf.ToString(CultureInfo.InvariantCulture), S("b"), average, S("maxrate"), max, S("bufsize"), buf, S("no-scenecut"), "1", S("forced-idr"), "1" },
             "h264_qsv" => new[] { S("b"), average, S("maxrate"), max, S("bufsize"), buf, S("forced_idr"), "1", S("idr_interval"), "0" },
@@ -283,20 +317,25 @@ public interface IMediaTools
     Task<SourceInfo> ProbeAsync(string path, CancellationToken ct);
     /// <summary>The H.264 encoder to use, or null when this ffmpeg has none of the preferred ones.</summary>
     Task<string?> PickEncoderAsync(CancellationToken ct);
+    /// <summary>Picks the best working H.264 encoder, skipping any encoders already attempted for the current file.</summary>
+    Task<string?> PickEncoderAsync(IReadOnlySet<string>? skipEncoders, CancellationToken ct) => PickEncoderAsync(ct);
     /// <summary>
     /// Marks a hardware encoder unusable for the rest of this session so the next pick falls back.
     /// When <paramref name="transientBusy"/> is true (e.g. NVENC session limit reached, Maktaba <c>refusedSession</c>),
-    /// the encoder is skipped for the current file without being permanently blacklisted for later files.
+    /// the encoder enters a temporary cooldown without being permanently blacklisted for later files.
     /// </summary>
     void MarkEncoderFailed(string encoder, bool transientBusy = false) { }
     /// <summary>One decode, one progressive MP4 per rung (<paramref name="outputs"/>, in rung order). Progress 0–1.</summary>
     Task EncodeAsync(string source, SourceInfo info, IReadOnlyList<PlannedRung> rungs, IReadOnlyList<string> outputs, string encoder, EncodeLadderSettings settings, IProgress<double> progress, CancellationToken ct);
     /// <summary>
-    /// Verifies each encoded rung MP4 matches the server's prebuilt requirements (H.264, yuv420p, rung dimensions,
-    /// non-zero duration, AAC audio when expected) before packaging and uploading. Throws
-    /// <see cref="LocalEncodeException"/> with code <c>output_invalid</c> on mismatch so hardware encoders fall back locally.
+    /// Verifies each encoded rung MP4 matches the server's structural prebuilt checks (H.264, yuv420p, rung dimensions,
+    /// stereo AAC or absent audio on silent sources, duration within slack, keyframe gaps ≤ GOP×2+0.05) before packaging and uploading.
+    /// Throws <see cref="LocalEncodeException"/> with code <c>output_invalid</c> on mismatch so hardware encoders fall back locally.
     /// </summary>
     Task VerifyOutputsAsync(IReadOnlyList<PlannedRung> rungs, IReadOnlyList<string> outputs, bool expectAudio, CancellationToken ct) => Task.CompletedTask;
+    /// <summary>Full local output verification including source duration slack and keyframe-gap checks matching <c>prebuilt.mjs:verifyRenditions</c>.</summary>
+    Task VerifyOutputsAsync(IReadOnlyList<PlannedRung> rungs, IReadOnlyList<string> outputs, SourceInfo source, EncodeLadderSettings settings, CancellationToken ct) =>
+        VerifyOutputsAsync(rungs, outputs, source.HasAudio, ct);
     /// <summary>
     /// The first audio track as 16 kHz mono 16-bit WAV, what whisper reads (TA-13): any container and codec ffmpeg
     /// reads, where aun-core's own decoder takes only WAV, MP3, AAC/M4A, FLAC and Vorbis.
@@ -335,11 +374,34 @@ public sealed class CoreRenditionPackager : IRenditionPackager
 public sealed class FfmpegMediaTools : IMediaTools
 {
     private readonly Func<CancellationToken, Task<(string Ffmpeg, string Ffprobe)?>> _locate;
+    private readonly TimeProvider _time;
+    private readonly string? _osOverride;
+    private readonly Func<string?> _preferOverride;
+    private readonly Func<IReadOnlyList<string>> _findVaapiDevices;
     private readonly HashSet<string> _failedEncoders = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _failedVaapiDevices = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, DateTimeOffset> _busyUntil = new(StringComparer.Ordinal);
     private string? _encoder;
     private string? _vaapiDevice;
 
-    public FfmpegMediaTools(Func<CancellationToken, Task<(string Ffmpeg, string Ffprobe)?>> locate) => _locate = locate;
+    public FfmpegMediaTools(Func<CancellationToken, Task<(string Ffmpeg, string Ffprobe)?>> locate, TimeProvider? time = null)
+        : this(locate, time, osOverride: null, preferOverride: null, findVaapiDevices: null)
+    {
+    }
+
+    internal FfmpegMediaTools(
+        Func<CancellationToken, Task<(string Ffmpeg, string Ffprobe)?>> locate,
+        TimeProvider? time,
+        string? osOverride,
+        Func<string?>? preferOverride,
+        Func<IReadOnlyList<string>>? findVaapiDevices)
+    {
+        _locate = locate;
+        _time = time ?? TimeProvider.System;
+        _osOverride = osOverride;
+        _preferOverride = preferOverride ?? (() => Environment.GetEnvironmentVariable("TOOLS_ENCODER"));
+        _findVaapiDevices = findVaapiDevices ?? (() => H264Encoders.FindVaapiDevices());
+    }
 
     private async Task<(string Ffmpeg, string Ffprobe)> Paths(CancellationToken ct) =>
         await _locate(ct).ConfigureAwait(false) ?? throw new LocalEncodeException("ffmpeg_missing", "ffmpeg was not found on this computer");
@@ -385,17 +447,39 @@ public sealed class FfmpegMediaTools : IMediaTools
             duration);
     }
 
-    public async Task<string?> PickEncoderAsync(CancellationToken ct)
+    public Task<string?> PickEncoderAsync(CancellationToken ct) => PickEncoderAsync(null, ct);
+
+    public async Task<string?> PickEncoderAsync(IReadOnlySet<string>? skipEncoders, CancellationToken ct)
     {
-        if (_encoder is not null && !_failedEncoders.Contains(_encoder)) return _encoder;
+        var now = _time.GetUtcNow();
+        foreach (var expired in _busyUntil.Where(kv => kv.Value <= now).Select(kv => kv.Key).ToList())
+        {
+            _busyUntil.Remove(expired);
+        }
+
+        if (_encoder is not null
+            && !_failedEncoders.Contains(_encoder)
+            && !_busyUntil.ContainsKey(_encoder)
+            && (skipEncoders is null || !skipEncoders.Contains(_encoder)))
+        {
+            return _encoder;
+        }
+
         var (ffmpeg, _) = await Paths(ct).ConfigureAwait(false);
         var (_, output, _) = await RunAsync(ffmpeg, new[] { "-hide_banner", "-encoders" }, null, ct).ConfigureAwait(false);
-        var os = H264Encoders.CurrentOs();
-        var prefer = Environment.GetEnvironmentVariable("TOOLS_ENCODER");
-        var vaapiDevices = os == "linux" ? H264Encoders.FindVaapiDevices() : Array.Empty<string>();
+        var os = _osOverride ?? H264Encoders.CurrentOs();
+        var prefer = _preferOverride();
+        var vaapiDevices = os == "linux"
+            ? _findVaapiDevices().Where(d => !_failedVaapiDevices.Contains(d)).ToList()
+            : (IReadOnlyList<string>)Array.Empty<string>();
+        var transientSkip = new HashSet<string>(_busyUntil.Keys, StringComparer.Ordinal);
+        if (skipEncoders is not null) transientSkip.UnionWith(skipEncoders);
+
+        var sawBusyOrSkipped = false;
         var (encoder, device) = await SelectWorkingEncoderAsync(
             H264Encoders.Candidates(output, os, prefer),
             _failedEncoders,
+            transientSkip,
             vaapiDevices,
             async (candidate, vaapiDevice, token) =>
             {
@@ -403,25 +487,48 @@ public sealed class FfmpegMediaTools : IMediaTools
                 probeCts.CancelAfter(TimeSpan.FromSeconds(15));
                 try
                 {
-                    var (code, _, _) = await RunAsync(ffmpeg, H264Encoders.ProbeArguments(candidate, vaapiDevice), null, probeCts.Token).ConfigureAwait(false);
-                    return code == 0;
+                    var (code, _, err) = await RunAsync(ffmpeg, H264Encoders.ProbeArguments(candidate, vaapiDevice), null, probeCts.Token).ConfigureAwait(false);
+                    if (code == 0) return (true, false);
+                    if (H264Encoders.IsRefusedSession(err))
+                    {
+                        _busyUntil[candidate] = _time.GetUtcNow() + H264Encoders.BusyCooldown;
+                        sawBusyOrSkipped = true;
+                        return (false, true);
+                    }
+                    return (false, false);
                 }
                 catch (OperationCanceledException) when (!token.IsCancellationRequested)
                 {
-                    return false;
+                    return (false, false);
                 }
             },
+            onTransientSkip: () => sawBusyOrSkipped = true,
             ct).ConfigureAwait(false);
+
         _vaapiDevice = device;
-        return _encoder = encoder;
+        // Never permanently cache a lower-priority/software fallback while a higher-priority GPU was only skipped
+        // for this file or transiently busy (mirrors Maktaba's non-sticky busy fallback).
+        _encoder = sawBusyOrSkipped ? null : encoder;
+        return encoder;
     }
 
     public void MarkEncoderFailed(string encoder, bool transientBusy = false)
     {
-        if (!transientBusy)
+        if (transientBusy)
+        {
+            _busyUntil[encoder] = _time.GetUtcNow() + H264Encoders.BusyCooldown;
+        }
+        else if (encoder == "h264_vaapi" && _vaapiDevice is not null)
+        {
+            _failedVaapiDevices.Add(_vaapiDevice);
+            var remaining = _findVaapiDevices().Any(d => !_failedVaapiDevices.Contains(d));
+            if (!remaining) _failedEncoders.Add(encoder);
+        }
+        else
         {
             _failedEncoders.Add(encoder);
         }
+
         if (string.Equals(_encoder, encoder, StringComparison.Ordinal))
         {
             _encoder = null;
@@ -429,22 +536,44 @@ public sealed class FfmpegMediaTools : IMediaTools
         }
     }
 
-    public async Task VerifyOutputsAsync(IReadOnlyList<PlannedRung> rungs, IReadOnlyList<string> outputs, bool expectAudio, CancellationToken ct)
+    public Task VerifyOutputsAsync(IReadOnlyList<PlannedRung> rungs, IReadOnlyList<string> outputs, bool expectAudio, CancellationToken ct) =>
+        VerifyOutputsCoreAsync(rungs, outputs, new SourceInfo(0, 0, 0, 0, expectAudio, 0), settings: null, ct);
+
+    public Task VerifyOutputsAsync(IReadOnlyList<PlannedRung> rungs, IReadOnlyList<string> outputs, SourceInfo source, EncodeLadderSettings settings, CancellationToken ct) =>
+        VerifyOutputsCoreAsync(rungs, outputs, source, settings, ct);
+
+    private async Task VerifyOutputsCoreAsync(IReadOnlyList<PlannedRung> rungs, IReadOnlyList<string> outputs, SourceInfo source, EncodeLadderSettings? settings, CancellationToken ct)
     {
         var (_, ffprobe) = await Paths(ct).ConfigureAwait(false);
         for (var i = 0; i < rungs.Count; i++)
         {
             var (code, output, error) = await RunAsync(ffprobe, new[] { "-v", "error", "-print_format", "json", "-show_streams", "-show_format", outputs[i] }, null, ct).ConfigureAwait(false);
             if (code != 0) throw new LocalEncodeException("output_invalid", $"ffprobe could not verify {rungs[i].Name}: " + LastLine(error));
-            VerifyEncodedRungJson(output, rungs[i], expectAudio);
+            VerifyEncodedRungJson(output, rungs[i], source.HasAudio, source.DurationSeconds);
+
+            if (settings is not null)
+            {
+                var (kfCode, kfOutput, kfError) = await RunAsync(ffprobe, new[]
+                {
+                    "-v", "error",
+                    "-select_streams", "v:0",
+                    "-skip_frame", "nokey",
+                    "-show_entries", "frame=pts_time,best_effort_timestamp_time",
+                    "-print_format", "json",
+                    outputs[i]
+                }, null, ct).ConfigureAwait(false);
+                if (kfCode != 0) throw new LocalEncodeException("output_invalid", $"ffprobe could not read keyframes for {rungs[i].Name}: " + LastLine(kfError));
+                VerifyKeyframesJson(kfOutput, rungs[i], settings.GopSeconds, source.DurationSeconds);
+            }
         }
     }
 
     /// <summary>
-    /// Verifies an encoded rung's <c>ffprobe</c> JSON matches what <c>apps/media/container/prebuilt.mjs</c> requires
-    /// (H.264 video, <c>yuv420p</c> 4:2:0 pixel format, matching dimensions, positive duration, and AAC audio when expected).
+    /// Verifies an encoded rung's <c>ffprobe</c> JSON against <c>apps/media/container/prebuilt.mjs:verifyRenditions</c>
+    /// (H.264 video, <c>yuv420p</c> 4:2:0 pixel format, matching dimensions, positive duration within source slack,
+    /// stereo AAC when expected, and no audio stream on silent sources).
     /// </summary>
-    public static void VerifyEncodedRungJson(string json, PlannedRung rung, bool expectAudio)
+    public static void VerifyEncodedRungJson(string json, PlannedRung rung, bool expectAudio, double sourceDurationSeconds = 0)
     {
         JsonNode? root;
         try
@@ -471,45 +600,181 @@ public sealed class FfmpegMediaTools : IMediaTools
         var duration = root?["format"]?["duration"] is JsonNode d ? Number(d) : video["duration"] is JsonNode vd ? Number(vd) : 0;
         if (duration <= 0)
             throw new LocalEncodeException("output_invalid", $"Encoded {rung.Name} has zero duration");
+        if (sourceDurationSeconds > 0)
+        {
+            var slack = Math.Max(1.0, sourceDurationSeconds * 0.01);
+            if (Math.Abs(duration - sourceDurationSeconds) > slack)
+                throw new LocalEncodeException("output_invalid", $"Encoded {rung.Name} duration {duration:0.##}s differs from source {sourceDurationSeconds:0.##}s beyond {slack:0.##}s slack");
+        }
+        var audio = streams.FirstOrDefault(s => s?["codec_type"]?.GetValue<string>() == "audio");
         if (expectAudio)
         {
-            var audio = streams.FirstOrDefault(s => s?["codec_type"]?.GetValue<string>() == "audio");
             var audioCodec = audio?["codec_name"]?.GetValue<string>();
-            if (!string.Equals(audioCodec, "aac", StringComparison.OrdinalIgnoreCase))
-                throw new LocalEncodeException("output_invalid", $"Encoded {rung.Name} has audio codec '{audioCodec ?? "none"}', expected aac");
+            var channels = (int)Number(audio?["channels"]);
+            if (!string.Equals(audioCodec, "aac", StringComparison.OrdinalIgnoreCase) || channels != 2)
+                throw new LocalEncodeException("output_invalid", $"Encoded {rung.Name} has audio '{audioCodec ?? "none"}' ({channels}ch), expected stereo aac");
+        }
+        else if (audio is not null)
+        {
+            throw new LocalEncodeException("output_invalid", $"Encoded {rung.Name} has an unexpected audio stream for a silent source");
         }
     }
 
     /// <summary>
-    /// Walks preferred encoder candidates in priority order, probing hardware encoders with a 1-frame test encode
+    /// Verifies keyframe intervals from <c>ffprobe -skip_frame nokey</c> JSON stay within
+    /// <c>GOP_SECONDS * 2 + 0.05</c>, matching <c>apps/media/container/prebuilt.mjs:verifyRenditions</c>.
+    /// </summary>
+    public static void VerifyKeyframesJson(string json, PlannedRung rung, int gopSeconds, double sourceDurationSeconds = 0)
+    {
+        JsonNode? root;
+        try
+        {
+            root = JsonNode.Parse(json);
+        }
+        catch (JsonException ex)
+        {
+            throw new LocalEncodeException("output_invalid", $"ffprobe returned unreadable keyframe JSON for {rung.Name}", ex);
+        }
+        var frames = root?["frames"]?.AsArray() ?? new JsonArray();
+        var times = new List<double>(frames.Count);
+        foreach (var frame in frames)
+        {
+            if (frame is null) continue;
+            var node = frame["pts_time"] ?? frame["best_effort_timestamp_time"];
+            if (node is not null) times.Add(Number(node));
+        }
+        times.Sort();
+        var maxGapAllowed = gopSeconds * 2 + 0.05;
+        if (sourceDurationSeconds > maxGapAllowed && times.Count <= 1)
+        {
+            throw new LocalEncodeException("output_invalid", $"Encoded {rung.Name} has too few keyframes ({times.Count}) for {sourceDurationSeconds:0.##}s duration");
+        }
+        for (var i = 1; i < times.Count; i++)
+        {
+            var gap = times[i] - times[i - 1];
+            if (gap > maxGapAllowed)
+            {
+                throw new LocalEncodeException("output_invalid", $"Encoded {rung.Name} keyframe gap {gap:0.##}s exceeds {maxGapAllowed:0.##}s");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Verifies packaged HLS segment lengths, total duration slack, and peak segment bitrate against
+    /// <c>apps/media/container/prebuilt.mjs:verifyRenditions</c> (<c>SEGMENT_SLACK_SECONDS = 1</c>, <c>PEAK_FACTOR = 1.5</c>).
+    /// </summary>
+    public static void VerifyPackagedRung(string rungDirectory, PlannedRung rung, SourceInfo source, EncodeLadderSettings settings)
+    {
+        var playlistPath = Path.Combine(rungDirectory, "index.m3u8");
+        if (!File.Exists(playlistPath))
+            throw new LocalEncodeException("output_invalid", $"Packaged {rung.Name} is missing index.m3u8");
+
+        var lines = File.ReadAllLines(playlistPath);
+        double? pendingSeconds = null;
+        var segments = new List<(string File, double Seconds)>();
+        foreach (var raw in lines)
+        {
+            var line = raw.Trim();
+            if (line.Length == 0) continue;
+            if (line.StartsWith("#EXTINF:", StringComparison.Ordinal))
+            {
+                var value = line[8..].TrimEnd(',');
+                if (!double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var secs) || secs <= 0)
+                    throw new LocalEncodeException("output_invalid", $"Packaged {rung.Name} has invalid EXTINF '{line}'");
+                pendingSeconds = secs;
+                continue;
+            }
+            if (line.StartsWith('#')) continue;
+            if (pendingSeconds is { } s)
+            {
+                segments.Add((line, s));
+                pendingSeconds = null;
+            }
+        }
+
+        if (segments.Count == 0)
+            throw new LocalEncodeException("output_invalid", $"Packaged {rung.Name} playlist has no segments");
+
+        const double segmentSlackSeconds = 1.0;
+        const double peakFactor = 1.5;
+        var maxSegSeconds = settings.SegmentSeconds + segmentSlackSeconds;
+        var maxPeakBitrate = (rung.Maxrate + (source.HasAudio ? rung.Audio : 0)) * peakFactor;
+        var totalSeconds = 0.0;
+
+        foreach (var (file, seconds) in segments)
+        {
+            if (seconds > maxSegSeconds)
+                throw new LocalEncodeException("output_invalid", $"Packaged {rung.Name} segment {file} is {seconds:0.##}s, exceeding {maxSegSeconds:0.##}s");
+            var fullPath = Path.Combine(rungDirectory, file);
+            if (!File.Exists(fullPath))
+                throw new LocalEncodeException("output_invalid", $"Packaged {rung.Name} segment {file} is missing");
+            var bytes = new FileInfo(fullPath).Length;
+            if (bytes <= 0)
+                throw new LocalEncodeException("output_invalid", $"Packaged {rung.Name} segment {file} is empty");
+            var bitrate = (bytes * 8.0) / seconds;
+            if (bitrate > maxPeakBitrate)
+                throw new LocalEncodeException("output_invalid", $"Packaged {rung.Name} peak segment bitrate {bitrate:0} bps exceeds {maxPeakBitrate:0} bps");
+            totalSeconds += seconds;
+        }
+
+        if (source.DurationSeconds > 0)
+        {
+            var slack = Math.Max(1.0, source.DurationSeconds * 0.01);
+            if (Math.Abs(totalSeconds - source.DurationSeconds) > slack)
+                throw new LocalEncodeException("output_invalid", $"Packaged {rung.Name} duration {totalSeconds:0.##}s differs from source {source.DurationSeconds:0.##}s beyond {slack:0.##}s slack");
+        }
+    }
+
+    /// <summary>
+    /// Walks preferred encoder candidates in priority order, probing hardware encoders with a 0.2 s test encode
     /// (trying each Linux DRM render node for VAAPI) so missing drivers/GPUs fall cleanly down to the next working encoder.
     /// </summary>
-    internal static async Task<(string? Encoder, string? VaapiDevice)> SelectWorkingEncoderAsync(
+    internal static Task<(string? Encoder, string? VaapiDevice)> SelectWorkingEncoderAsync(
         IReadOnlyList<string> candidates,
         IReadOnlySet<string> failedEncoders,
         IReadOnlyList<string> vaapiDevices,
         Func<string, string?, CancellationToken, Task<bool>> probeAsync,
+        CancellationToken ct) =>
+        SelectWorkingEncoderAsync(
+            candidates,
+            failedEncoders,
+            transientSkippedEncoders: new HashSet<string>(StringComparer.Ordinal),
+            vaapiDevices,
+            async (enc, dev, token) => (await probeAsync(enc, dev, token).ConfigureAwait(false), false),
+            onTransientSkip: null,
+            ct);
+
+    internal static async Task<(string? Encoder, string? VaapiDevice)> SelectWorkingEncoderAsync(
+        IReadOnlyList<string> candidates,
+        IReadOnlySet<string> failedEncoders,
+        IReadOnlySet<string> transientSkippedEncoders,
+        IReadOnlyList<string> vaapiDevices,
+        Func<string, string?, CancellationToken, Task<(bool Ok, bool Busy)>> probeAsync,
+        Action? onTransientSkip,
         CancellationToken ct)
     {
         foreach (var candidate in candidates)
         {
             if (failedEncoders.Contains(candidate)) continue;
+            if (transientSkippedEncoders.Contains(candidate))
+            {
+                onTransientSkip?.Invoke();
+                continue;
+            }
             if (!H264Encoders.IsHardware(candidate)) return (candidate, null);
             if (candidate == "h264_vaapi")
             {
                 foreach (var device in vaapiDevices)
                 {
-                    if (await probeAsync(candidate, device, ct).ConfigureAwait(false))
-                    {
-                        return (candidate, device);
-                    }
+                    var (ok, busy) = await probeAsync(candidate, device, ct).ConfigureAwait(false);
+                    if (ok) return (candidate, device);
+                    if (busy) onTransientSkip?.Invoke();
                 }
                 continue;
             }
-            if (await probeAsync(candidate, null, ct).ConfigureAwait(false))
-            {
-                return (candidate, null);
-            }
+            var (probeOk, probeBusy) = await probeAsync(candidate, null, ct).ConfigureAwait(false);
+            if (probeOk) return (candidate, null);
+            if (probeBusy) onTransientSkip?.Invoke();
         }
         return (null, null);
     }
@@ -530,7 +795,11 @@ public sealed class FfmpegMediaTools : IMediaTools
         var (code, _, error) = await RunAsync(ffmpeg, args, OnLine, ct).ConfigureAwait(false);
         if (code != 0)
         {
-            var errCode = H264Encoders.IsRefusedSession(error) ? "gpu_busy" : "ffmpeg_failed";
+            var errCode = H264Encoders.IsRefusedSession(error)
+                ? "gpu_busy"
+                : H264Encoders.IsSourceOrDiskError(error)
+                    ? "source_error"
+                    : "ffmpeg_failed";
             throw new LocalEncodeException(errCode, $"ffmpeg stopped ({encoder}): " + LastLine(error));
         }
     }
@@ -658,9 +927,10 @@ public sealed class EncodeStep : IImportStep
     private readonly string _encoderName;
     private readonly Action<Exception, QueueItem>? _report;
     private readonly Func<string, long?> _freeSpace;
+    private readonly TimeProvider _time;
     private EncodingSettings? _settings;
 
-    public EncodeStep(ImportApiClient api, Uri videosApi, IMediaTools media, IRenditionPackager packager, string workRoot, string encoderName, Action<Exception, QueueItem>? report = null, Func<string, long?>? freeSpace = null)
+    public EncodeStep(ImportApiClient api, Uri videosApi, IMediaTools media, IRenditionPackager packager, string workRoot, string encoderName, Action<Exception, QueueItem>? report = null, Func<string, long?>? freeSpace = null, TimeProvider? time = null)
     {
         _api = api;
         _tusEndpoint = new Uri(videosApi, "/api/videos/tus");
@@ -670,6 +940,7 @@ public sealed class EncodeStep : IImportStep
         _encoderName = encoderName;
         _report = report;
         _freeSpace = freeSpace ?? FreeSpace;
+        _time = time ?? TimeProvider.System;
     }
 
     public ImportStepKind Kind => ImportStepKind.Encode;
@@ -715,42 +986,68 @@ public sealed class EncodeStep : IImportStep
             CheckSpace(directory, info, rungs);
             System.IO.Directory.CreateDirectory(directory);
 
-            // 90% for the encode, 10% for packaging. If a hardware encoder fails at runtime or produces
-            // non-conforming output, mark it failed (permanently unless GPU session limit was hit) and
-            // fall back locally down the candidate list before giving up to the server (Maktaba policy).
+            // 90% for the encode, 10% for packaging. If a hardware encoder fails within Maktaba's 30 s fallback
+            // window, hits a transient GPU session limit, or produces output/segments failing local verification,
+            // fall back locally down the candidate list before giving up to the server. Permanent blacklisting is
+            // committed only after a subsequent encoder succeeds on the same input so corrupt sources or disk-full
+            // errors never disable the GPU for later files.
             var outputs = rungs.Select(r => Path.Combine(directory, r.Name + ".mp4")).ToList();
             var tried = new HashSet<string>(StringComparer.Ordinal);
+            var pendingBlacklist = new List<string>();
             string encoder;
             while (true)
             {
-                encoder = await _media.PickEncoderAsync(ct).ConfigureAwait(false)
+                encoder = await _media.PickEncoderAsync(tried, ct).ConfigureAwait(false)
                     ?? throw new LocalEncodeException("ffmpeg_failed", "This ffmpeg has no H.264 encoder");
                 if (!tried.Add(encoder))
                 {
                     throw new LocalEncodeException("ffmpeg_failed", $"No working H.264 encoder left after {encoder} failed");
                 }
                 context.Log(LogLevel.Info, "encode_plan", $"Encoding {string.Join(", ", rungs.Select(r => r.Name))} with {encoder}", encoder, string.Join(", ", rungs.Select(r => r.Name)));
+                var startedAt = _time.GetUtcNow();
                 try
                 {
                     await _media.EncodeAsync(item.Video.Path, info, rungs, outputs, encoder, settings.Ladder, new Progress<double>(p => context.Progress(p * 0.9)), ct).ConfigureAwait(false);
-                    await _media.VerifyOutputsAsync(rungs, outputs, info.HasAudio, ct).ConfigureAwait(false);
+                    await _media.VerifyOutputsAsync(rungs, outputs, info, settings.Ladder, ct).ConfigureAwait(false);
+                    for (var i = 0; i < rungs.Count; i++)
+                    {
+                        var rungDir = Path.Combine(directory, rungs[i].Name);
+                        await _packager.PackageAsync(outputs[i], rungDir, settings.Ladder.SegmentSeconds, ct).ConfigureAwait(false);
+                        File.Delete(outputs[i]);
+                        FfmpegMediaTools.VerifyPackagedRung(rungDir, rungs[i], info, settings.Ladder);
+                        context.Progress(0.9 + (0.1 * (i + 1) / rungs.Count));
+                    }
+                    foreach (var failedHw in pendingBlacklist)
+                    {
+                        _media.MarkEncoderFailed(failedHw, transientBusy: false);
+                    }
                     break;
                 }
                 catch (LocalEncodeException ex) when (ex.Code is "ffmpeg_failed" or "gpu_busy" or "output_invalid" && H264Encoders.IsHardware(encoder))
                 {
-                    var transientBusy = ex.Code == "gpu_busy";
-                    _media.MarkEncoderFailed(encoder, transientBusy);
                     foreach (var o in outputs) { try { if (File.Exists(o)) File.Delete(o); } catch (IOException) { } catch (UnauthorizedAccessException) { } }
-                    var next = await _media.PickEncoderAsync(ct).ConfigureAwait(false);
+                    foreach (var r in rungs) DeleteFolder(Path.Combine(directory, r.Name));
+
+                    var elapsed = _time.GetUtcNow() - startedAt;
+                    if (ex.Code == "gpu_busy")
+                    {
+                        _media.MarkEncoderFailed(encoder, transientBusy: true);
+                    }
+                    else if (ex.Code == "ffmpeg_failed" && elapsed > H264Encoders.FallbackWindow)
+                    {
+                        // Past Maktaba's 30 s fallbackWindow: cool down briefly without permanently blacklisting the GPU.
+                        _media.MarkEncoderFailed(encoder, transientBusy: true);
+                        throw;
+                    }
+                    else
+                    {
+                        pendingBlacklist.Add(encoder);
+                    }
+
+                    var next = await _media.PickEncoderAsync(tried, ct).ConfigureAwait(false);
                     if (next is null || tried.Contains(next)) throw;
                     context.Log(LogLevel.Warning, "encoder_fallback", $"Hardware encoder {encoder} failed ({ex.Message}); retrying with {next}", encoder, next);
                 }
-            }
-            for (var i = 0; i < rungs.Count; i++)
-            {
-                await _packager.PackageAsync(outputs[i], Path.Combine(directory, rungs[i].Name), settings.Ladder.SegmentSeconds, ct).ConfigureAwait(false);
-                File.Delete(outputs[i]);
-                context.Progress(0.9 + (0.1 * (i + 1) / rungs.Count));
             }
 
             var files = ListFiles(directory, rungs.Select(r => r.Name).ToList());
