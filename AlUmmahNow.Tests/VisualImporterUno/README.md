@@ -203,7 +203,7 @@ dotnet test --filter "FullyQualifiedName~AlUmmahNow.Tests.VisualImporterUno" --l
 
 1. **Interface Extraction**: Create `IWatchViewModel` and `IApprovalViewModel` interfaces
 2. **Service Layer**: Extract business logic into testable service classes
-3. **UI Testing**: Add Uno.UITest for actual UI interaction tests
+3. **UI Smoke Testing**: Expand `TOOLS_DEMO=1` / `TOOLS_SCREENSHOT` headless smoke coverage and cross-platform ViewModel tests in `AlUmmahNow.VisualImporterUno.Tests` (WinAppDriver / `Uno.UITest` were retired under `TP-D1`)
 4. **Test Helpers**: Create shared test fixtures and builders for common scenarios
 5. **Performance Tests**: Add tests for large data sets and stress scenarios
 
