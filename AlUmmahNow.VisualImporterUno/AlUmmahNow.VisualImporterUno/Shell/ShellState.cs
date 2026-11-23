@@ -201,7 +201,7 @@ public sealed class ShellDemo
             _account = signedIn ? _person : null;
         }
 
-        private static readonly ToolsAccount Staff = new("usr_demo", "mariam.haddad@alummahnow.net", "Mariam Haddad");
+        private static readonly ToolsAccount Staff = new("usr_demo", "mariam.haddad@mail.alummahnow.net", "Mariam Haddad");
         private static readonly ToolsAccount Visitor = new("usr_visitor", "yusuf.rahman@mail.alummahnow.net", "Yusuf Rahman");
 
         public string BeginLogin(string redirectUri) => "https://auth.example/authorize?redirect_uri=" + Uri.EscapeDataString(redirectUri);
@@ -234,7 +234,7 @@ public sealed class ShellDemo
             if (_state == "not-staff") return new HttpResponseMessage(HttpStatusCode.Forbidden);
             // TOOLS_DEMO_ROLE=super_admin: the account also manages social sources (TA-13)
             var superAdmin = Environment.GetEnvironmentVariable("TOOLS_DEMO_ROLE") == "super_admin";
-            var me = "{\"success\":true,\"result\":{\"userId\":\"usr_demo\",\"email\":\"mariam.haddad@alummahnow.net\",\"roles\":[\"" + (superAdmin ? "super_admin" : "admin") +
+            var me = "{\"success\":true,\"result\":{\"userId\":\"usr_demo\",\"email\":\"mariam.haddad@mail.alummahnow.net\",\"roles\":[\"" + (superAdmin ? "super_admin" : "admin") +
                 "\"],\"permissions\":[\"imports:manage\"" + (superAdmin ? ",\"import_sources:manage\"" : "") + "]}}";
             return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(me, Encoding.UTF8, "application/json") };
         }

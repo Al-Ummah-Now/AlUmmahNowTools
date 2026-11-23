@@ -71,7 +71,8 @@ internal static class DemoSocial
         // A dialog frame lists only the source it is about, so the page ends at a card edge within the screen's height
         Mode switch
         {
-            "cancel" => AllSources().Where(s => (string?)s["id"] == TelegramId),
+            // The cancel dialog and the cancelled sync are one story: the same single source, cancelled by the signed-in admin
+            "cancel" or "cancelled" => AllSources().Where(s => (string?)s["id"] == TelegramId),
             "remove" => AllSources().Where(s => (string?)s["id"] == FailedId),
             _ => AllSources(),
         };
@@ -132,7 +133,7 @@ internal static class DemoSocial
                     new { at = Iso(at), @event = "queued" },
                     new { at = Iso(at.AddSeconds(2)), @event = "started", attempt = 1 },
                     new { at = Iso(at.AddSeconds(9)), @event = "waiting", delaySeconds = 1 },
-                    new { at = Iso(at.AddSeconds(40)), @event = "cancelled", by = new { id = "usr_demo_admin", name = "Amina Haddad" } },
+                    new { at = Iso(at.AddSeconds(40)), @event = "cancelled", by = new { id = "usr_demo", name = "Mariam Haddad" } },
                 });
             }
             case "job_demo_takeout":

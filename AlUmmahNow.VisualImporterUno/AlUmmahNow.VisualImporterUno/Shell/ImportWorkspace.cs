@@ -204,9 +204,9 @@ internal static class DemoImport
 
     public static readonly ImportChannel[] Channels =
     {
-        new(ChannelId, "Shaykh Ahmad al-Azhari", "azhari", "ahmad.azhari@alummahnow.net"),
-        new("ch_demo_seerah", "Seerah Circle", "seerahcircle", "seerah.circle@alummahnow.net"),
-        new("ch_demo_quran", "Quran Recitations Archive", "recitations", "archive@alummahnow.net"),
+        new(ChannelId, "Shaykh Ahmad al-Azhari", "azhari", "ahmad.azhari@mail.alummahnow.net"),
+        new("ch_demo_seerah", "Seerah Circle", "seerahcircle", "seerah.circle@mail.alummahnow.net"),
+        new("ch_demo_quran", "Quran Recitations Archive", "recitations", "archive@mail.alummahnow.net"),
     };
 
     private static ScannedVideo Video(string folder, string name, long size, string? titleAr, string[] captions, bool chapters, bool thumbnail, ScanNote[]? notes = null) =>

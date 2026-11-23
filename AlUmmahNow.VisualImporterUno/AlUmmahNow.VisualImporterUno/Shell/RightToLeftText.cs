@@ -40,19 +40,21 @@ public sealed partial class RightToLeftText : Panel
     {
         Children.Clear();
         var text = Text ?? "";
-        _flowing = !Loc.IsArabic && LooksArabic(text);
+        // Uno's Skia text also lays an Arabic line out in swapped pieces around a spaced dash in the Arabic window ("A - B"
+        // reads "B - A", and the spaces move): such a title is laid out word by word here too, left to right inside the
+        // block, so it fills from the right edge exactly as in the English window
+        var arabicDash = Loc.IsArabic && LooksArabic(text) && SpacedDash.IsMatch(text);
+        _flowing = (!Loc.IsArabic && LooksArabic(text)) || arabicDash;
 #if !HAS_UNO
         _flowing = false;
+        arabicDash = false;
 #endif
+        if (arabicDash) FlowDirection = FlowDirection.LeftToRight;
+        else ClearValue(FlowDirectionProperty);
         if (!_flowing)
         {
             // A title keeps its last two words together, except a Latin one in the Arabic window, where a no-break space
             // moves a trailing colon to the wrong side
-            // Uno's Skia text lays an Arabic line's pieces out left to right around a spaced dash, even in the Arabic window
-            // ("A - B" reads "B - A"; a colon is placed correctly): the pieces are stored in reverse, as Loc.RightToLeftLine
-            // does in the English window. Like it, this holds on one line (titles here fit one).
-            if (Loc.IsArabic && LooksArabic(text) && SpacedDash.IsMatch(text))
-                text = string.Concat(SpacedDash.Split(text).Where(p => p.Length > 0).Reverse());
             Children.Add(Block(LooksArabic(text) || !Loc.IsArabic ? Loc.KeepLastWords(text) : text, wrap: true));
             return;
         }
@@ -60,7 +62,8 @@ public sealed partial class RightToLeftText : Panel
         {
             var token = m.Value;
             var block = Block(IsArabicDigits(token) ? new string(token.Reverse().ToArray()) : token, wrap: false);
-            block.Tag = Mark.IsMatch(token) ? "mark" : "word";
+            // A mark with spaces around it (" - ") keeps them; others (": " , ".") sit against the word before
+            block.Tag = !Mark.IsMatch(token) ? "word" : m.Index > 0 && char.IsWhiteSpace(text[m.Index - 1]) ? "spaced" : "mark";
             Children.Add(block);
         }
     }
@@ -79,10 +82,12 @@ public sealed partial class RightToLeftText : Panel
 
     private double Gap => (Children.FirstOrDefault() as TextBlock)?.FontSize * 0.28 ?? 4;
 
-    private bool IsMark(int i) => (Children[i] as FrameworkElement)?.Tag as string == "mark";
+    private bool IsMark(int i) => (Children[i] as FrameworkElement)?.Tag as string is "mark" or "spaced";
+
+    private bool IsSpacedMark(int i) => (Children[i] as FrameworkElement)?.Tag as string == "spaced";
 
     // A word is followed by a space, except before a mark, which sits against the word it follows (on its left)
-    private double GapBefore(int i) => i == 0 || IsMark(i) ? 0 : Gap;
+    private double GapBefore(int i) => i == 0 || (IsMark(i) && !IsSpacedMark(i)) ? 0 : Gap;
 
     private double Width(int from, int to)
     {
@@ -143,7 +148,8 @@ public sealed partial class RightToLeftText : Panel
         if (Children.Count == 0) return finalSize;
         // Lines fill from the right edge of the block, as Arabic text does; the block keeps the row's start, so a short
         // title sits where an English one would
-        var right = Math.Min(_widest, finalSize.Width);
+        // In the Arabic window the block's start is its right edge
+        var right = Loc.IsArabic ? finalSize.Width : Math.Min(_widest, finalSize.Width);
         var starts = LineStarts(finalSize.Width);
         double y = 0;
         for (var l = 0; l < starts.Count; l++)

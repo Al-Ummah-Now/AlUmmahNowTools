@@ -208,7 +208,7 @@ public sealed partial class SocialSourcesViewModel : ObservableObject, IDisposab
         var attention = Sources.Count(r => r.IsFailed || r.IsOffNotConnected);
         var parts = new List<string> { Loc.Plural("Social_SourceCount", Sources.Count) };
         if (attention > 0) parts.Add(Loc.Format("Social_AttentionCount", attention));
-        SourcesSummary = HasSources ? Loc.Groups(parts) : "";
+        SourcesSummary = HasSources ? Loc.Commas(parts) : "";
     }
 
     /// <summary>While a sync waits or runs, the page reads the sources again every few seconds; never in demo frames.</summary>
@@ -550,8 +550,8 @@ public sealed partial class SocialSourcesViewModel : ObservableObject, IDisposab
         {
             SourceNetworks.Bluesky => Loc.GetWithDetail("Social_Hint_bluesky", "name.bsky.social"),
             SourceNetworks.Mastodon => Loc.GetWithDetail("Social_Hint_mastodon", "@name@mastodon.social"),
-            SourceNetworks.YouTube => Loc.GetWithDetail("Social_Hint_youtube", "UC…"),
-            SourceNetworks.Rss => Loc.GetWithDetail("Social_Hint_rss", "https://"),
+            SourceNetworks.YouTube => Loc.GetWithDetail("Social_Hint_youtube", "UCq3Zx9LmT4Kd7Vn2Wp8RbYs"),
+            SourceNetworks.Rss => Loc.GetWithDetail("Social_Hint_rss", "https://example.org/feed.xml"),
             _ => "",
         };
         // Telegram is added only from the owner's connection (our bot reads the posts)
@@ -752,7 +752,7 @@ public sealed partial class SourceRow : ObservableObject
             var n = report.Count(state);
             if (n > 0) parts.Add(Loc.Format("Takeout_Count_" + state, n).Replace(' ', '\u00A0'));
         }
-        TakeoutSummary = Loc.Groups(parts);
+        TakeoutSummary = Loc.Commas(parts);
         HasTakeoutSummary = parts.Count > 0;
         HasTakeoutJob = job is not null;
         TakeoutJobActive = job?.IsActive ?? false;
@@ -856,7 +856,7 @@ public sealed partial class SourceRow : ObservableObject
             var n = source.Count(state);
             if (n > 0) parts.Add(Loc.Format("Social_Count_" + state, n).Replace(' ', ' '));
         }
-        Counts = Loc.Groups(parts);
+        Counts = Loc.Commas(parts);
         HasCounts = parts.Count > 0;
         UpdateJob(job);
     }
@@ -927,7 +927,7 @@ public sealed class SourceItemRow
     {
         var kind = item.Kind is { } k ? Loc.Get("SocialKind_" + k) : Loc.Get("SocialKind_unknown");
         var state = Loc.Get("SocialItemState_" + item.State);
-        Text = Loc.Groups(new[] { kind, state });
+        Text = Loc.Commas(new[] { kind, state });
         Note = item.Note is { } note ? Loc.KeepLastWords(Loc.Get("SocialItemNote_" + note)) : "";
         HasNote = Note.Length > 0;
         IsProblem = item.State is "skipped" or "awaiting_file";
@@ -959,7 +959,7 @@ public sealed partial class TakeoutFileRow : ObservableObject
         DisplayName = System.IO.Path.GetFileNameWithoutExtension(file.Name);
         var state = Loc.Get("TakeoutState_" + file.State);
         StateText = file.MatchedBy is { } by && file.State is TakeoutStates.Matched or TakeoutStates.Uploading or TakeoutStates.Uploaded or TakeoutStates.Attached
-            ? Loc.Groups(new[] { state, Loc.Get("TakeoutMatchedBy_" + by) })
+            ? Loc.Commas(new[] { state, Loc.Get("TakeoutMatchedBy_" + by) })
             : state;
         Note = file.Note is { } note ? Loc.KeepLastWords(Loc.Get("TakeoutNote_" + note)) : "";
         HasNote = Note.Length > 0;

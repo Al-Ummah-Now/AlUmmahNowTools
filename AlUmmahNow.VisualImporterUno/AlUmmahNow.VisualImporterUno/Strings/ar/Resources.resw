@@ -2913,7 +2913,7 @@
     <value>فشلت محاولة مزامنة، وستُعاد بعد قليل</value>
   </data>
   <data name="Social_StatusFailed" xml:space="preserve">
-    <value>فشلت آخر مزامنة. وهي في صفحة الأخطاء أيضًا مع زر إعادة المحاولة</value>
+    <value>فشلت آخر مزامنة. وهي في صفحة الأخطاء أيضًا مع زر «أعِد المحاولة»</value>
   </data>
   <data name="Social_StatusOff" xml:space="preserve">
     <value>متوقف: لا يُستورد شيء حتى يُشغَّل</value>
@@ -3015,7 +3015,7 @@
     <value>أُضيفت إلى الطابور</value>
   </data>
   <data name="SocialLog_queued_retried" xml:space="preserve">
-    <value>أُعيدت إلى الطابور بزر إعادة المحاولة</value>
+    <value>أُعيدت إلى الطابور بزر «أعِد المحاولة»</value>
   </data>
   <data name="SocialLog_started" xml:space="preserve">
     <value>بدأت المحاولة {0}</value>
@@ -3150,16 +3150,16 @@
     <value>أُضيف المصدر. زامِنه الآن، أو يُزامَن وفق جدوله.</value>
   </data>
   <data name="Social_Hint_rss" xml:space="preserve">
-    <value>عنوان الخلاصة أو البودكاست، ويبدأ بـ</value>
+    <value>عنوان الخلاصة أو البودكاست، مثل:</value>
   </data>
   <data name="Social_Hint_bluesky" xml:space="preserve">
-    <value>معرّف الحساب، مثل</value>
+    <value>معرّف الحساب، مثل:</value>
   </data>
   <data name="Social_Hint_mastodon" xml:space="preserve">
-    <value>الحساب مع خادمه، مثل</value>
+    <value>الحساب مع خادمه، مثل:</value>
   </data>
   <data name="Social_Hint_youtube" xml:space="preserve">
-    <value>معرّف قناة يوتيوب، ويبدأ بـ</value>
+    <value>معرّف قناة يوتيوب، مثل:</value>
   </data>
   <data name="SocialNetwork_rss" xml:space="preserve">
     <value>خلاصة أو بودكاست</value>
@@ -3252,7 +3252,7 @@
     <value>ألغِ المزامنة</value>
   </data>
   <data name="Social_CancelJob.Text" xml:space="preserve">
-    <value>ألغِ</value>
+    <value>ألغِ المزامنة</value>
   </data>
   <data name="Social_CancelTitle" xml:space="preserve">
     <value>إلغاء هذه المزامنة؟</value>
@@ -3270,7 +3270,7 @@
     <value>أُلغيت آخر مزامنة. «زامِن الآن» تبدأ مزامنة جديدة</value>
   </data>
   <data name="Social_StatusCancelledNext" xml:space="preserve">
-    <value>أُلغيت آخر مزامنة. المزامنة التالية {0}</value>
+    <value>أُلغيت آخر مزامنة. المزامنة التالية: {0}</value>
   </data>
   <data name="SocialJob_cancelled" xml:space="preserve">
     <value>ألغاها مشرف. «أعِد المحاولة» تبدأ مزامنة جديدة</value>
@@ -3435,7 +3435,7 @@
     <value>واجهت المطابقة مشكلة وستعيد المحاولة قريبًا</value>
   </data>
   <data name="TakeoutJob_failed" xml:space="preserve">
-    <value>فشلت المطابقة. وهي في صفحة الأخطاء مع زر إعادة المحاولة</value>
+    <value>فشلت المطابقة. وهي في صفحة الأخطاء مع زر «أعِد المحاولة»</value>
   </data>
   <data name="TakeoutJob_done" xml:space="preserve">
     <value>انتهت المطابقة</value>
@@ -3474,9 +3474,12 @@
     <value>توقفت المطابقة بسبب خطأ غير متوقع. تفاصيله:</value>
   </data>
   <data name="SocialReason_upload_incomplete" xml:space="preserve">
-    <value>لم يكتمل رفع أحد الملفات. ارفعه مرة أخرى، ثم أعِد المحاولة.</value>
+    <value>لم يكتمل رفع أحد الملفات. ارفعه مرة أخرى، ثم اضغط «أعِد المحاولة».</value>
   </data>
   <data name="SocialReason_HttpStatus" xml:space="preserve">
     <value>رمز الخادم: {0}</value>
+  </data>
+  <data name="Takeout_CancelJob.Text" xml:space="preserve">
+    <value>ألغِ المطابقة</value>
   </data>
 </root>

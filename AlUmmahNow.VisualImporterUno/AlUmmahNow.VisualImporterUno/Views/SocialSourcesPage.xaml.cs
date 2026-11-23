@@ -22,18 +22,14 @@ public sealed partial class SocialSourcesPage : Page
         DataContext = ViewModel;
         if (ViewModel.SelectedChannel is { } channel) ChannelBox.Text = channel.Name;
         SuggestionsUnderBox.Attach(ChannelBox);
-        // The name and the permission are typed in the interface's language: an Arabic field starts on the right (Uno places
-        // an empty field's caret by its alignment, not its direction). Addresses stay left to right in both languages.
-        if (Loc.IsArabic)
-        {
-            foreach (var box in new[] { LabelBox, ByBox, NoteBox })
-            {
-                box.FlowDirection = FlowDirection.RightToLeft;
-                box.TextAlignment = TextAlignment.Right;
-            }
-        }
+        // Typed values start at the start edge in Arabic (the Import page's rule, TA-13): Arabic text runs right to left, a
+        // Latin value (an address, a Latin name) keeps its order but starts at the right edge. An empty field starts on the
+        // right (Uno places its caret by its alignment). Two Latin lines under a channel's name end at the right edge too.
+        foreach (var box in new[] { AddressBox, LabelBox, ByBox, NoteBox }) SetValueDirection(box, latinOnly: ReferenceEquals(box, AddressBox));
+        if (Loc.IsArabic) ChannelSummaryText.TextAlignment = TextAlignment.Right;
         Loaded += async (_, _) =>
         {
+            SetChannelValueDirection();
             KeepLastWords(PageContent);
             await ViewModel.RefreshAsync();
             await OpenDemoAsync();
@@ -140,10 +136,48 @@ public sealed partial class SocialSourcesPage : Page
         }
     }
 
+    private void ValueBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (sender is TextBox box) SetValueDirection(box, latinOnly: ReferenceEquals(box, AddressBox));
+    }
+
+    /// <summary>
+    /// A typed value in a field of an Arabic page: Arabic text runs right to left; a Latin value keeps its left-to-right
+    /// order but starts at the right edge. English pages: left. (The Import page's SetValueDirection, TA-13.)
+    /// </summary>
+    private static void SetValueDirection(TextBox box, bool latinOnly = false)
+    {
+        var text = box.Text ?? "";
+        var arabicText = !latinOnly && text.Any(c => c is >= '\u0600' and <= '\u06FF');
+        var direction = Loc.IsArabic && (text.Length == 0 && !latinOnly || arabicText) ? FlowDirection.RightToLeft : FlowDirection.LeftToRight;
+        // In a left-to-right box, Right is the visual right edge
+        var align = Loc.IsArabic ? TextAlignment.Right : TextAlignment.Left;
+        if (box.FlowDirection != direction) box.FlowDirection = direction;
+        if (box.TextAlignment != align) box.TextAlignment = align;
+    }
+
+    /// <summary>The channel box's own text box: in Arabic its value starts at the right edge; the box keeps its mirrored search icon.</summary>
+    private void SetChannelValueDirection()
+    {
+        if (Loc.IsArabic && FindChild<TextBox>(ChannelBox) is { } typed && typed.TextAlignment != TextAlignment.Right) typed.TextAlignment = TextAlignment.Right;
+    }
+
+    private static T? FindChild<T>(DependencyObject parent) where T : class
+    {
+        for (var i = 0; i < Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChildrenCount(parent); i++)
+        {
+            var child = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChild(parent, i);
+            if (child is T match) return match;
+            if (FindChild<T>(child) is { } deeper) return deeper;
+        }
+        return null;
+    }
+
     // ------------------------------------------------------------ Channel
 
     private void ChannelBox_TextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)
     {
+        SetChannelValueDirection();
         if (args.Reason != AutoSuggestionBoxTextChangeReason.UserInput) return;
         _ = ViewModel.SearchChannelsAsync(sender.Text);
         sender.IsSuggestionListOpen = true;

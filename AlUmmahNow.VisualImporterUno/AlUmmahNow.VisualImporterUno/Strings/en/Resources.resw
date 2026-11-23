@@ -2583,7 +2583,7 @@
     <value>Owner’s written permission, recorded {0}</value>
   </data>
   <data name="Social_StatusManual" xml:space="preserve">
-    <value>Syncs only when you press Sync now</value>
+    <value>Syncs only when you press “Sync now”</value>
   </data>
   <data name="Social_StatusScheduled" xml:space="preserve">
     <value>{0}. Next sync: {1}</value>
@@ -2598,7 +2598,7 @@
     <value>A sync attempt failed. It tries again shortly</value>
   </data>
   <data name="Social_StatusFailed" xml:space="preserve">
-    <value>The last sync failed. It is on the Errors page too, with Retry</value>
+    <value>The last sync failed. It is on the Errors page too, with “Retry”</value>
   </data>
   <data name="Social_StatusOff" xml:space="preserve">
     <value>Off: nothing is imported until it is turned on</value>
@@ -2655,7 +2655,7 @@
     <value>Remove</value>
   </data>
   <data name="Social_RetryJob.Text" xml:space="preserve">
-    <value>Try again</value>
+    <value>Retry</value>
   </data>
   <data name="Social_CopyLog.Text" xml:space="preserve">
     <value>Copy log</value>
@@ -2688,7 +2688,7 @@
     <value>Attempt {0} of {1} failed. It tries again shortly</value>
   </data>
   <data name="SocialJob_failed" xml:space="preserve">
-    <value>Stopped after {0} of {1} attempts. Try again runs it once more</value>
+    <value>Stopped after {0} of {1} attempts. “Retry” runs it once more</value>
   </data>
   <data name="SocialJob_succeededAt" xml:space="preserve">
     <value>Finished {0}</value>
@@ -2700,7 +2700,7 @@
     <value>Queued</value>
   </data>
   <data name="SocialLog_queued_retried" xml:space="preserve">
-    <value>Queued again by Try again</value>
+    <value>Queued again by “Retry”</value>
   </data>
   <data name="SocialLog_started" xml:space="preserve">
     <value>Attempt {0} started</value>
@@ -2835,16 +2835,16 @@
     <value>Source added. Sync it now, or it syncs on its schedule.</value>
   </data>
   <data name="Social_Hint_rss" xml:space="preserve">
-    <value>The address of the feed (RSS, Atom or a podcast), starting with</value>
+    <value>The address of the feed (RSS, Atom or a podcast), for example:</value>
   </data>
   <data name="Social_Hint_bluesky" xml:space="preserve">
-    <value>The account’s handle, such as</value>
+    <value>The account’s handle, for example:</value>
   </data>
   <data name="Social_Hint_mastodon" xml:space="preserve">
-    <value>The account with its server, such as</value>
+    <value>The account with its server, for example:</value>
   </data>
   <data name="Social_Hint_youtube" xml:space="preserve">
-    <value>The YouTube channel’s id, which starts with</value>
+    <value>The YouTube channel’s id, for example:</value>
   </data>
   <data name="SocialNetwork_rss" xml:space="preserve">
     <value>Feed or podcast</value>
@@ -2937,7 +2937,7 @@
     <value>Cancel sync</value>
   </data>
   <data name="Social_CancelJob.Text" xml:space="preserve">
-    <value>Cancel</value>
+    <value>Cancel sync</value>
   </data>
   <data name="Social_CancelTitle" xml:space="preserve">
     <value>Cancel this sync?</value>
@@ -2952,16 +2952,16 @@
     <value>Keep it running</value>
   </data>
   <data name="Social_StatusCancelled" xml:space="preserve">
-    <value>The last sync was cancelled. Sync now starts a new one</value>
+    <value>The last sync was cancelled. “Sync now” starts a new one</value>
   </data>
   <data name="Social_StatusCancelledNext" xml:space="preserve">
-    <value>The last sync was cancelled. Next sync {0}</value>
+    <value>The last sync was cancelled. Next sync: {0}</value>
   </data>
   <data name="SocialJob_cancelled" xml:space="preserve">
-    <value>Cancelled by an admin. Try again starts a new sync</value>
+    <value>Cancelled by an admin. “Retry” starts a new sync</value>
   </data>
   <data name="SocialJob_cancelledBy" xml:space="preserve">
-    <value>Cancelled. Try again starts a new sync. Cancelled by:</value>
+    <value>Cancelled. “Retry” starts a new sync. Cancelled by:</value>
   </data>
   <data name="SocialLog_cancelledBy" xml:space="preserve">
     <value>Cancelled by:</value>
@@ -3120,7 +3120,7 @@
     <value>Matching hit a problem and tries again shortly</value>
   </data>
   <data name="TakeoutJob_failed" xml:space="preserve">
-    <value>Matching failed. It is on the Errors page, with Retry</value>
+    <value>Matching failed. It is on the Errors page, with “Retry”</value>
   </data>
   <data name="TakeoutJob_done" xml:space="preserve">
     <value>Matching finished</value>
@@ -3159,9 +3159,12 @@
     <value>Matching stopped on an unexpected error. Its details:</value>
   </data>
   <data name="SocialReason_upload_incomplete" xml:space="preserve">
-    <value>A file’s upload hadn’t finished. Upload it again, then try again.</value>
+    <value>A file’s upload hadn’t finished. Upload it again, then press “Retry”.</value>
   </data>
   <data name="SocialReason_HttpStatus" xml:space="preserve">
     <value>Server code {0}</value>
+  </data>
+  <data name="Takeout_CancelJob.Text" xml:space="preserve">
+    <value>Cancel matching</value>
   </data>
 </root>
