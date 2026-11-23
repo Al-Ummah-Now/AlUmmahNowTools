@@ -219,12 +219,101 @@ public class TakeoutTests
             var (api, handler) = Client(_ => throw new InvalidOperationException("no call expected"));
             var uploader = new TakeoutUploader(api, new FakeTus(), new Uri("https://videos.example"), _ => Task.FromResult<string?>("tok"));
             var file = JsonSerializer.Deserialize<TakeoutFile>(FileJson.Replace("\"state\":\"ambiguous\"", "\"state\":\"matched\""), ImportApiClient.Json)!;
-            await Assert.ThrowsAsync<InvalidOperationException>(() => uploader.UploadAsync(SourceId, file, path, null, CancellationToken.None));
+            var error = await Assert.ThrowsAsync<TakeoutUploadException>(() => uploader.UploadAsync(SourceId, file, path, null, CancellationToken.None));
+            Assert.Equal("file_changed", error.Code);
             Assert.Empty(handler.Requests);
         }
         finally
         {
             File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task An_expired_upload_is_opened_again_once_then_named_upload_gone()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "takeout-" + Guid.NewGuid().ToString("N") + ".mp4");
+        await File.WriteAllBytesAsync(path, new byte[4000]);
+        try
+        {
+            var matched = FileJson.Replace("\"state\":\"ambiguous\"", "\"state\":\"matched\"");
+            var opens = 0;
+            var (api, _) = Client(r =>
+            {
+                if (r.RequestUri!.AbsolutePath.EndsWith("/upload"))
+                {
+                    opens++;
+                    return Ok("{\"file\":" + matched + ",\"upload\":{\"videoId\":\"vid_1\",\"tusSessionId\":\"tus_" + opens + "\",\"tusUploadId\":\"up_old\",\"chunkSize\":4000,\"resumable\":true,\"reused\":true}}");
+                }
+                return Ok("{\"file\":" + matched.Replace("\"state\":\"matched\"", "\"state\":\"uploaded\"") + "}", HttpStatusCode.Accepted);
+            });
+            // The stored upload is gone: the app opens the record's upload again and starts a new one
+            var tus = new GoneTus(goneTimes: 1);
+            var uploader = new TakeoutUploader(api, tus, new Uri("https://videos.example"), _ => Task.FromResult<string?>("tok"));
+            var file = JsonSerializer.Deserialize<TakeoutFile>(matched, ImportApiClient.Json)!;
+            var done = await uploader.UploadAsync(SourceId, file, path, null, CancellationToken.None);
+            Assert.Equal("uploaded", done.State);
+            Assert.Equal(2, opens);
+            Assert.Equal("tus_2", tus.Metadata!["tusSessionId"]);
+
+            // Gone again after the new upload: a code the app says in the admin's language, never a crash
+            opens = 0;
+            var again = new TakeoutUploader(api, new GoneTus(goneTimes: 5), new Uri("https://videos.example"), _ => Task.FromResult<string?>("tok"));
+            var error = await Assert.ThrowsAsync<TakeoutUploadException>(() => again.UploadAsync(SourceId, file, path, null, CancellationToken.None));
+            Assert.Equal("upload_gone", error.Code);
+            Assert.Equal(2, opens);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task Sends_the_apps_language_and_reads_the_servers_sentence_and_feature_off()
+    {
+        var (api, handler) = Client(r => r.RequestUri!.AbsolutePath == "/api/features"
+            ? Ok("{\"items\":[{\"key\":\"live\",\"effective\":true},{\"key\":\"upload\",\"enabled\":true,\"effective\":false}]}")
+            : FakeHandler.Json(HttpStatusCode.NotFound, "{\"success\":false,\"code\":\"feature_off\",\"feature\":\"upload\",\"error\":\"Not Found\",\"message\":\"هذه الميزة غير متاحة الآن.\",\"lang\":\"ar\",\"action\":\"none\"}"));
+        api.AppLocale = () => "ar";
+        var error = await Assert.ThrowsAsync<ImportApiException>(() => api.SyncSourceAsync(SourceId));
+        Assert.True(error.IsFeatureOff);
+        Assert.Equal("هذه الميزة غير متاحة الآن.", error.ServerMessage);
+        Assert.Equal("ar", handler.Requests[^1].Headers.GetValues("X-App-Locale").Single());
+        Assert.False(await api.IsFeatureOnAsync("upload"));
+        Assert.True(await api.IsFeatureOnAsync("live"));
+        Assert.Null(await api.IsFeatureOnAsync("unknown"));
+
+        // Without the Features page's permission the app doesn't know, and the server's 404 feature_off decides
+        var (refused, _) = Client(_ => FakeHandler.Json(HttpStatusCode.Forbidden, "{\"success\":false,\"code\":\"forbidden\",\"error\":\"Missing permission features:read\"}"));
+        Assert.Null(await refused.IsFeatureOnAsync("upload"));
+    }
+
+    /// <summary>A TUS server whose stored upload is gone (404) for the first <c>goneTimes</c> offset reads.</summary>
+    private sealed class GoneTus : TusClient
+    {
+        public IReadOnlyDictionary<string, string>? Metadata;
+        private int _gone;
+        private long _offset;
+
+        public GoneTus(int goneTimes) => _gone = goneTimes;
+
+        public override Task<Uri> CreateAsync(Uri endpoint, string token, long length, IReadOnlyDictionary<string, string> metadata, CancellationToken ct)
+        {
+            Metadata = metadata;
+            return Task.FromResult(new Uri(endpoint, "/api/videos/tus/up_new"));
+        }
+
+        public override Task<long> OffsetAsync(Uri upload, string token, CancellationToken ct)
+        {
+            if (_gone-- > 0) throw new TusGoneException("The upload is gone (HEAD 404)");
+            return Task.FromResult(_offset);
+        }
+
+        public override Task<long> PatchAsync(Uri upload, string token, Stream file, long offset, int count, CancellationToken ct)
+        {
+            _offset = offset + count;
+            return Task.FromResult(_offset);
         }
     }
 

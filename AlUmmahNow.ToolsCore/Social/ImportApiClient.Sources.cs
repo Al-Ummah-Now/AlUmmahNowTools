@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using AlUmmahNow.ToolsCore.Social;
 
 namespace AlUmmahNow.ToolsCore.Import;
@@ -11,6 +12,29 @@ namespace AlUmmahNow.ToolsCore.Import;
 /// </summary>
 public partial class ImportApiClient
 {
+    /// <summary>
+    /// Whether a feature is on (the Features page, <c>GET /api/features</c>, <c>features:read</c>): its effective state,
+    /// or null when the app can't read it (then the server's <c>404 feature_off</c> answers for it).
+    /// </summary>
+    public virtual async Task<bool?> IsFeatureOnAsync(string key, CancellationToken ct = default)
+    {
+        try
+        {
+            var result = await SendAsync(HttpMethod.Get, "/api/features", null, ct).ConfigureAwait(false);
+            var item = result?["items"]?.AsArray().FirstOrDefault(i => (string?)i?["key"] == key);
+            return item?["effective"] is JsonValue v && v.TryGetValue<bool>(out var on) ? on : null;
+        }
+        catch (ImportApiException)
+        {
+            return null;
+        }
+        catch (InvalidOperationException)
+        {
+            // Not the shape the app knows
+            return null;
+        }
+    }
+
     /// <summary>The sources of one channel, or of every channel.</summary>
     public virtual async Task<IReadOnlyList<ImportSource>> ListSourcesAsync(string? channelId, CancellationToken ct = default)
     {

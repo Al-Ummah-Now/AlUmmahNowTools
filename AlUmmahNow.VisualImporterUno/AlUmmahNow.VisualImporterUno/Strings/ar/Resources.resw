@@ -3438,6 +3438,21 @@
   <data name="TakeoutJob_failed" xml:space="preserve">
     <value>فشلت المطابقة. وهي في صفحة الأخطاء مع زر «أعِد المحاولة»</value>
   </data>
+  <data name="TakeoutJob_cancelled" xml:space="preserve">
+    <value>ألغى مشرف المطابقة</value>
+  </data>
+  <data name="TakeoutJob_cancelledBy" xml:space="preserve">
+    <value>أُلغيت المطابقة. ألغاها:</value>
+  </data>
+  <data name="Takeout_Error_file_changed" xml:space="preserve">
+    <value>تغيّر هذا الملف بعد إدراجه. اختر المجلد مرة أخرى.</value>
+  </data>
+  <data name="Takeout_Error_signed_out" xml:space="preserve">
+    <value>سجّل الدخول من جديد للمتابعة.</value>
+  </data>
+  <data name="Takeout_Error_upload_gone" xml:space="preserve">
+    <value>انتهى الرفع على الخادم مرتين. حاول مرة أخرى بعد قليل.</value>
+  </data>
   <data name="TakeoutJob_done" xml:space="preserve">
     <value>انتهت المطابقة</value>
   </data>

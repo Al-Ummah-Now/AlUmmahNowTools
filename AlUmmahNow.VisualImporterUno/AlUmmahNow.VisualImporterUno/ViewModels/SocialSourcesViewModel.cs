@@ -118,6 +118,35 @@ public sealed partial class SocialSourcesViewModel : ObservableObject, IDisposab
     [ObservableProperty] private bool _hasSources;
     [ObservableProperty] private bool _showNoSources;
     [ObservableProperty] private string _noSourcesBody = "";
+
+    /// <summary>
+    /// The upload switch (Features page): a sync and a Takeout file's upload make new posts and videos, so while it is off
+    /// Sync now, a cancelled sync's Retry and Upload matched files are not offered (no text says why; admins see it on
+    /// the Features page). Read with the list, and set off by a <c>404 feature_off</c> answer.
+    /// </summary>
+    [ObservableProperty] private bool _uploadsOn = true;
+
+    private DateTimeOffset _featuresReadAt = DateTimeOffset.MinValue;
+
+    partial void OnUploadsOnChanged(bool value)
+    {
+        foreach (var row in Sources) row.UploadsOn = value;
+    }
+
+    private async Task ReadUploadsSwitchAsync()
+    {
+        if (DateTimeOffset.UtcNow - _featuresReadAt < TimeSpan.FromSeconds(60)) return;
+        _featuresReadAt = DateTimeOffset.UtcNow;
+        if (await _workspace.Api.IsFeatureOnAsync("upload").ConfigureAwait(true) is bool on) UploadsOn = on;
+    }
+
+    /// <summary>A refusal because the upload switch is off: the actions go, and nothing is shown.</summary>
+    private bool UploadsWentOff(ImportApiException ex)
+    {
+        if (!ex.IsFeatureOff) return false;
+        UploadsOn = false;
+        return true;
+    }
     [ObservableProperty] private string _listError = "";
     [ObservableProperty] private bool _isLoading;
 
@@ -136,6 +165,7 @@ public sealed partial class SocialSourcesViewModel : ObservableObject, IDisposab
         {
             var sources = await _workspace.Api.ListSourcesAsync(channel?.Id).ConfigureAwait(true);
             if (!ReferenceEquals(channel, SelectedChannel)) return;
+            await ReadUploadsSwitchAsync().ConfigureAwait(true);
             await LoadJobsAsync(sources).ConfigureAwait(true);
             await LoadChannelNamesAsync(sources).ConfigureAwait(true);
             ShowSources(sources);
@@ -199,6 +229,7 @@ public sealed partial class SocialSourcesViewModel : ObservableObject, IDisposab
         {
             var row = keep.TryGetValue(source.Id, out var existing) ? existing : new SourceRow(source.Id);
             var job = source.LastJobId is { } id && _jobs.TryGetValue(id, out var j) ? j : null;
+            row.UploadsOn = UploadsOn;
             row.Update(source, job, showChannel ? _channelNames.GetValueOrDefault(source.ChannelId, source.ChannelId) : null);
             Sources.Add(row);
         }
@@ -269,6 +300,10 @@ public sealed partial class SocialSourcesViewModel : ObservableObject, IDisposab
             await call().ConfigureAwait(true);
             await RefreshAsync().ConfigureAwait(true);
         }
+        catch (ImportApiException ex) when (UploadsWentOff(ex))
+        {
+            // Uploads were switched off meanwhile: Sync now (and a cancelled sync's Retry) are no longer offered
+        }
         catch (ImportApiException ex)
         {
             row.ActionError = Loc.KeepLastWords(ErrorText(ex));
@@ -327,7 +362,9 @@ public sealed partial class SocialSourcesViewModel : ObservableObject, IDisposab
         {
             var report = await _workspace.Api.GetTakeoutAsync(row.Id).ConfigureAwait(true);
             SyncJob? job = null;
-            if (report.JobId is { } jobId)
+            // A finished match job is no longer the source's (the server releases it): the last one this page saw says how it ended
+            if (report.JobId is { } current) row.LastTakeoutJobId = current;
+            if ((report.JobId ?? row.LastTakeoutJobId) is { } jobId)
             {
                 try
                 {
@@ -367,7 +404,8 @@ public sealed partial class SocialSourcesViewModel : ObservableObject, IDisposab
             row.TakeoutMessage = Loc.Format("Takeout_Listing", files.Count);
             foreach (var chunk in files.Chunk(TakeoutExport.MaxPerRequest))
             {
-                await _workspace.Api.ListTakeoutFilesAsync(row.Id, chunk).ConfigureAwait(true);
+                var listed = await _workspace.Api.ListTakeoutFilesAsync(row.Id, chunk).ConfigureAwait(true);
+                row.LastTakeoutJobId = listed.JobId;
             }
             await FollowTakeoutAsync(row).ConfigureAwait(true);
         }
@@ -437,11 +475,27 @@ public sealed partial class SocialSourcesViewModel : ObservableObject, IDisposab
                     await _workspace.Takeout.UploadAsync(row.Id, file.File, path, new Progress<double>(p => file.Progress = Loc.Format("Takeout_Uploading", Loc.Percent(p * 100))), CancellationToken.None).ConfigureAwait(true);
                     file.Progress = "";
                 }
+                catch (ImportApiException ex) when (UploadsWentOff(ex))
+                {
+                    // Uploads were switched off: the rest wait, and Upload matched files is no longer offered
+                    file.Progress = "";
+                    break;
+                }
                 catch (ImportApiException ex)
                 {
                     file.Progress = "";
                     file.Error = Loc.KeepLastWords(ErrorText(ex));
                     Report(ex, "takeout_upload", row.Id);
+                }
+                catch (TakeoutUploadException ex)
+                {
+                    file.Progress = "";
+                    file.Error = Loc.KeepLastWords(Loc.Get("Takeout_Error_" + ex.Code));
+                }
+                catch (TusGoneException)
+                {
+                    file.Progress = "";
+                    file.Error = Loc.KeepLastWords(Loc.Get("Takeout_Error_upload_gone"));
                 }
                 catch (Exception ex) when (ex is TusException or IOException or InvalidOperationException or HttpRequestException)
                 {
@@ -624,6 +678,8 @@ public sealed partial class SocialSourcesViewModel : ObservableObject, IDisposab
         var key = ex.Status == 0 ? "SocialError_unreachable" : "SocialError_" + ex.Code;
         var known = Loc.Get(key);
         if (known != key) return known;
+        // A code the app doesn't know: the server's own sentence, already in the admin's language (X-App-Locale)
+        if (ex.ServerMessage is { } said) return said;
         return ex.Status >= 500 ? Loc.Get("SocialError_server") : Loc.GetWithDetail("SocialError_refused", ex.Message);
     }
 
@@ -687,6 +743,22 @@ public sealed partial class SourceRow : ObservableObject
     [ObservableProperty] private bool _isOff;
     [ObservableProperty] private bool _isOffNotConnected;
     [ObservableProperty] private bool _canSync;
+
+    /// <summary>The upload switch (see <see cref="SocialSourcesViewModel.UploadsOn"/>): Sync now, a cancelled sync's Retry and Takeout uploads need it.</summary>
+    [ObservableProperty] private bool _uploadsOn = true;
+
+    private bool _syncable;
+    private bool _retryable;
+
+    partial void OnUploadsOnChanged(bool value)
+    {
+        CanSync = _syncable && value;
+        CanRetryJob = _retryable && (value || !JobIsCancelled);
+        UpdateUploadable();
+    }
+
+    /// <summary>The last Takeout match job this page saw (the server releases a finished one; its end is still shown).</summary>
+    public string? LastTakeoutJobId { get; set; }
     [ObservableProperty] private bool _canTurnOff;
     [ObservableProperty] private bool _canTurnOn;
     [ObservableProperty] private bool _canChangeSchedule;
@@ -761,7 +833,7 @@ public sealed partial class SourceRow : ObservableObject
             "queued" or "running" => Loc.Get("TakeoutJob_matching"),
             "retrying" => Loc.Get("TakeoutJob_retrying"),
             "failed" => Loc.WithDetail(Loc.Get("TakeoutJob_failed"), job.LastError is { } e ? ReasonText(e, labelled: false) : null),
-            "cancelled" => CancelledLine(job),
+            "cancelled" => job.CancelledBy is { Length: > 0 } by ? Loc.GetWithDetail("TakeoutJob_cancelledBy", by) : Loc.Get("TakeoutJob_cancelled"),
             _ => Loc.Get("TakeoutJob_done"),
         });
         UpdateUploadable();
@@ -771,7 +843,7 @@ public sealed partial class SourceRow : ObservableObject
     {
         var sendable = TakeoutFiles.Count(f => f.CanUpload && TakeoutPathOf(f) is not null);
         var waiting = TakeoutFiles.Count(f => f.CanUpload);
-        CanUploadTakeout = sendable > 0 && !TakeoutBusy;
+        CanUploadTakeout = sendable > 0 && !TakeoutBusy && UploadsOn;
         // Matched files listed from another computer (or before the app restarted): choose the folder again to send them
         UploadTakeoutHint = waiting > sendable ? Loc.Get("Takeout_ChooseAgainToUpload") : "";
         HasUploadTakeoutHint = UploadTakeoutHint.Length > 0;
@@ -823,7 +895,8 @@ public sealed partial class SourceRow : ObservableObject
         IsCancelled = phase == SourcePhase.Cancelled;
         IsOk = IsOk || IsCancelled;
         IsYouTube = source.Network == SourceNetworks.YouTube;
-        CanSync = source.Enabled && !IsSyncing;
+        _syncable = source.Enabled && !IsSyncing;
+        CanSync = _syncable && UploadsOn;
         CanTurnOff = source.Enabled;
         CanTurnOn = !source.Enabled;
         CanChangeSchedule = source.Enabled;
@@ -878,9 +951,11 @@ public sealed partial class SourceRow : ObservableObject
     private void UpdateJob(SyncJob? job)
     {
         HasJob = job is not null;
-        CanRetryJob = job?.CanRetry ?? false;
         CanCancelJob = job?.CanCancel ?? false;
         JobIsCancelled = job?.IsCancelled ?? false;
+        // A cancelled sync's Retry is a new sync (Sync now): not while uploads are off
+        _retryable = job?.CanRetry ?? false;
+        CanRetryJob = _retryable && (UploadsOn || !JobIsCancelled);
         if (job is null)
         {
             JobStatus = "";

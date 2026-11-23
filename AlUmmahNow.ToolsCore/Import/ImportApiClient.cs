@@ -202,6 +202,15 @@ public sealed class ImportApiException : Exception
     public string Code { get; }
     public TimeSpan? RetryAfter { get; }
 
+    /// <summary>
+    /// The server's sentence for a person, in the language the app asked for (<c>X-App-Locale</c>; admin-api's error
+    /// envelope), or null when it sent none. <see cref="Exception.Message"/> keeps the old English <c>error</c>.
+    /// </summary>
+    public string? ServerMessage => Body?["message"] is JsonValue v && v.TryGetValue<string>(out var text) && !string.IsNullOrWhiteSpace(text) ? text : null;
+
+    /// <summary>A feature switched off on the Features page (<c>404 feature_off</c>): the action is not offered, nothing to show.</summary>
+    public bool IsFeatureOff => Status == 404 && Code == "feature_off";
+
     /// <summary>Worth trying again later: not answered, timed out, rate limited, busy or a server error.</summary>
     public bool IsRetryable => Status is 0 or 408 or 429 or >= 500 || Code == "busy";
 }
@@ -224,6 +233,9 @@ public partial class ImportApiClient
     private readonly HttpClient _http;
     private readonly Uri _base;
     private readonly Func<CancellationToken, Task<string?>> _token;
+
+    /// <summary>The app's language (<c>en</c> or <c>ar</c>), sent as <c>X-App-Locale</c> so the server's error messages come in it.</summary>
+    public Func<string?>? AppLocale { get; set; }
 
     public ImportApiClient(Uri adminApi, Func<CancellationToken, Task<string?>> token, HttpMessageHandler? handler = null)
     {
@@ -373,6 +385,7 @@ public partial class ImportApiClient
         if (string.IsNullOrEmpty(token)) throw new ImportApiException(401, "signed_out", "Sign in again");
         using var request = new HttpRequestMessage(method, new Uri(_base, path));
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        if (AppLocale?.Invoke() is { Length: > 0 } locale) request.Headers.TryAddWithoutValidation("X-App-Locale", locale);
         if (body is HttpContent raw) request.Content = raw;
         else if (body is not null) request.Content = JsonContent.Create(body, body.GetType(), options: Json);
         HttpResponseMessage response;

@@ -30,7 +30,8 @@ public sealed class ImportWorkspace : IDisposable
         Func<CancellationToken, Task<string?>> token = _ =>
             _disposed || !ReferenceEquals(ShellState.Current.Session, session) ? Task.FromResult<string?>(null) : session.AccessTokenAsync();
         HttpMessageHandler? adminHandler = IsDemo ? new DemoImportServer() : null;
-        Api = new ImportApiClient(Environment.AdminApi, token, adminHandler);
+        // The server's error messages come in the app's language (admin-api's error envelope reads X-App-Locale)
+        Api = new ImportApiClient(Environment.AdminApi, token, adminHandler) { AppLocale = () => Loc.IsArabic ? "ar" : "en" };
         // A YouTube source's Takeout files go up through the record's own upload (wiki TOOLS-ADMIN TA-9/TA-13)
         Takeout = new AlUmmahNow.ToolsCore.Social.TakeoutUploader(Api, new TusClient(), Environment.VideosApi, token);
         Reporter = new ErrorReporter(Api.ReportErrorsAsync, Release, () => shell.Preferences.Language);

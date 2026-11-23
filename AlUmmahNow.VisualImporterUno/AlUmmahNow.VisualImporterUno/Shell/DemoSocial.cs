@@ -10,7 +10,8 @@ namespace AlUmmahNow.VisualImporterUno.Shell;
 /// a channel's sources in every state (scheduled, syncing, failed with its log, off because the owner disconnected,
 /// waiting for Takeout files) and its connected accounts. <c>TOOLS_DEMO_SOCIAL=all</c> lists every channel,
 /// <c>empty</c> a channel with nothing yet, <c>add</c> a filled form with its error, <c>cancel</c> the Cancel dialog on the
-/// running sync, <c>cancelled</c> that sync cancelled by an admin, <c>takeout</c> the YouTube source's Takeout files matched.
+/// running sync, <c>cancelled</c> that sync cancelled by an admin, <c>takeout</c> the YouTube source's Takeout files matched,
+/// <c>uploads_off</c> the same with uploads switched off on the Features page (no Sync now, no Upload matched files).
 /// Nothing is sent anywhere.
 /// </summary>
 internal static class DemoSocial
@@ -294,6 +295,8 @@ internal static class DemoSocial
         var path = request.RequestUri!.AbsolutePath;
         var query = System.Web.HttpUtility.ParseQueryString(request.RequestUri.Query);
         const string sources = "/api/admin/import/sources";
+        // The Features page's switches: uploads off for the uploads_off frame (Sync now and Takeout uploads not offered)
+        if (path == "/api/features") return Ok(new { items = new[] { new { key = "upload", enabled = Mode != "uploads_off", effective = Mode != "uploads_off" } } });
         if (path == sources && request.Method == HttpMethod.Get)
         {
             var channel = query["channelId"];
