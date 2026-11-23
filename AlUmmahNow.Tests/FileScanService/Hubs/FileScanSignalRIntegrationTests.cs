@@ -284,6 +284,22 @@ public sealed class FileScanServiceStartupTests : IDisposable
             var wsResp = await http.SendAsync(wsReq);
             wsResp.StatusCode.Should().Be(HttpStatusCode.Forbidden);
 
+            // Loopback IPv6 Host header ([::1]) is allowed
+            using var ipv6HostReq = new HttpRequestMessage(HttpMethod.Get, $"http://127.0.0.1:{fallbackLoopbackPort}/health");
+            ipv6HostReq.Headers.Host = $"[::1]:{fallbackLoopbackPort}";
+            var ipv6HostResp = await http.SendAsync(ipv6HostReq);
+            ipv6HostResp.StatusCode.Should().Be(HttpStatusCode.OK);
+
+            // Opaque / sandboxed Origin: null header is rejected with 403
+            using var nullOriginReq = new HttpRequestMessage(HttpMethod.Get, $"http://127.0.0.1:{fallbackLoopbackPort}/scanHub");
+            nullOriginReq.Headers.TryAddWithoutValidation("Origin", "null");
+            nullOriginReq.Headers.TryAddWithoutValidation("Upgrade", "websocket");
+            nullOriginReq.Headers.TryAddWithoutValidation("Connection", "Upgrade");
+            nullOriginReq.Headers.TryAddWithoutValidation("Sec-WebSocket-Version", "13");
+            nullOriginReq.Headers.TryAddWithoutValidation("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==");
+            var nullOriginResp = await http.SendAsync(nullOriginReq);
+            nullOriginResp.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
             // Loopback Origin header is allowed
             using var localOriginReq = new HttpRequestMessage(HttpMethod.Get, $"http://127.0.0.1:{fallbackLoopbackPort}/health");
             localOriginReq.Headers.TryAddWithoutValidation("Origin", $"http://localhost:{fallbackLoopbackPort}");
