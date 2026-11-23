@@ -80,7 +80,7 @@ jobs:
     # final update got a 404, left it in_progress on the PR for good (Tools #53, 2026-11-22).
     # The tests themselves gate through this job's own result.
     - name: Test Report
-      uses: dorny/test-reporter@df6247429542221bc30d46a036ee47af1102c451 # v2.7.0
+      uses: dorny/test-reporter@d1b5dff021aa968b288b02285a8bf47471c5928a # v3.2.0
       if: always()
       continue-on-error: true
       with:
