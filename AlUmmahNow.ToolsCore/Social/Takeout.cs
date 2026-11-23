@@ -250,12 +250,36 @@ public sealed class TakeoutUploader
     public async Task<TakeoutFile> UploadAsync(string sourceId, TakeoutFile file, string path, IProgress<double>? progress, CancellationToken ct)
     {
         var info = new FileInfo(path);
-        if (!info.Exists || info.Length != file.Size) throw new InvalidOperationException("The file is no longer the one that was listed");
+        if (!info.Exists || info.Length != file.Size) throw new TakeoutUploadException("file_changed", "The file is no longer the one that was listed");
+        var reopened = false;
+        while (true)
+        {
+            try
+            {
+                await SendAsync(sourceId, file, path, progress, fresh: reopened, ct).ConfigureAwait(false);
+                break;
+            }
+            catch (TusGoneException) when (!reopened)
+            {
+                // The upload expired on the server (404/410): open the record's upload again and start a new TUS upload
+                reopened = true;
+            }
+            catch (TusGoneException gone)
+            {
+                throw new TakeoutUploadException("upload_gone", gone.Message, gone);
+            }
+        }
+        return await _api.MarkTakeoutUploadedAsync(sourceId, file.Id, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>Opens the record's upload and sends the file from where the server has it; <paramref name="fresh"/> starts a new TUS upload.</summary>
+    private async Task SendAsync(string sourceId, TakeoutFile file, string path, IProgress<double>? progress, bool fresh, CancellationToken ct)
+    {
         var opened = await _api.OpenTakeoutUploadAsync(sourceId, file.Id, ct).ConfigureAwait(false);
         var upload = opened.Upload;
-        var token = await _token(ct).ConfigureAwait(false) ?? throw new InvalidOperationException("Not signed in");
+        var token = await _token(ct).ConfigureAwait(false) ?? throw new TakeoutUploadException("signed_out", "Not signed in");
         Uri url;
-        if (!string.IsNullOrEmpty(upload.TusUploadId))
+        if (!fresh && !string.IsNullOrEmpty(upload.TusUploadId))
         {
             url = new Uri(_tusEndpoint, _tusEndpoint.AbsolutePath.TrimEnd('/') + "/" + upload.TusUploadId);
         }
@@ -273,23 +297,31 @@ public sealed class TakeoutUploader
         }
         var chunk = upload.ChunkSize > 0 ? upload.ChunkSize : DefaultChunk;
         var offset = await _tus.OffsetAsync(url, token, ct).ConfigureAwait(false);
-        await using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 20, FileOptions.Asynchronous))
+        await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 20, FileOptions.Asynchronous);
+        while (offset < file.Size)
         {
-            while (offset < file.Size)
+            ct.ThrowIfCancellationRequested();
+            token = await _token(ct).ConfigureAwait(false) ?? token;
+            try
             {
-                ct.ThrowIfCancellationRequested();
-                token = await _token(ct).ConfigureAwait(false) ?? token;
-                try
-                {
-                    offset = await _tus.PatchAsync(url, token, stream, offset, (int)Math.Min(chunk, file.Size - offset), ct).ConfigureAwait(false);
-                }
-                catch (TusException conflict) when (conflict.Status == 409)
-                {
-                    offset = await _tus.OffsetAsync(url, token, ct).ConfigureAwait(false);
-                }
-                progress?.Report(file.Size == 0 ? 1 : (double)offset / file.Size);
+                offset = await _tus.PatchAsync(url, token, stream, offset, (int)Math.Min(chunk, file.Size - offset), ct).ConfigureAwait(false);
             }
+            catch (TusException conflict) when (conflict.Status == 409)
+            {
+                offset = await _tus.OffsetAsync(url, token, ct).ConfigureAwait(false);
+            }
+            progress?.Report(file.Size == 0 ? 1 : (double)offset / file.Size);
         }
-        return await _api.MarkTakeoutUploadedAsync(sourceId, file.Id, ct).ConfigureAwait(false);
     }
+}
+
+/// <summary>
+/// A Takeout file the app could not send, with a code the app says in the admin's words: <c>file_changed</c> (not the
+/// file that was listed), <c>signed_out</c>, <c>upload_gone</c> (the upload expired twice).
+/// </summary>
+public sealed class TakeoutUploadException : InvalidOperationException
+{
+    public TakeoutUploadException(string code, string message, Exception? inner = null) : base(message, inner) => Code = code;
+
+    public string Code { get; }
 }

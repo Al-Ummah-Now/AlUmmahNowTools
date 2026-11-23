@@ -44,7 +44,7 @@ public sealed partial class SocialSourcesPage : Page
     }
 
     /// <summary>
-    /// Demo frames (<c>TOOLS_DEMO_SOCIAL=job|items|remove|add|cancel|cancelled|takeout</c>): the failed source's job log open,
+    /// Demo frames (<c>TOOLS_DEMO_SOCIAL=job|items|remove|add|cancel|cancelled|takeout|uploads_off</c>): the failed source's job log open,
     /// the Telegram source's items open, the Remove dialog, the Add card at the top, the Cancel dialog on the Telegram
     /// source's running sync, that sync cancelled with its log, or the YouTube source's Takeout match.
     /// </summary>
@@ -81,7 +81,7 @@ public sealed partial class SocialSourcesPage : Page
                 ViewModel.ToggleJob(stopped);
                 ScrollTo(SourcesCard);
                 break;
-            case "takeout" when Row(DemoSocial.YouTubeId) is { } youtube:
+            case "takeout" or "uploads_off" when Row(DemoSocial.YouTubeId) is { } youtube:
                 await ViewModel.ToggleTakeoutAsync(youtube);
                 await ViewModel.ListTakeoutFolderAsync(youtube, "/Takeout");
                 // From the top of the Sources card, so the frame shows the card whole (TOOLS_SCREENSHOT_SIZE tall enough)
@@ -225,7 +225,11 @@ public sealed partial class SocialSourcesPage : Page
     {
         // Only the admin's own choice: the row setting its schedule from the server changes nothing
         if (sender is ComboBox box && RowOf(box) is { } row && box.SelectedIndex >= 0 && box.SelectedIndex != row.ScheduleIndex)
+        {
             await ViewModel.SetScheduleAsync(row, box.SelectedIndex);
+            // Not saved (the reason shows under the source): the box goes back to the schedule the source has
+            if (box.SelectedIndex != row.ScheduleIndex) box.SelectedIndex = row.ScheduleIndex;
+        }
     }
 
     private void Job_Click(object sender, RoutedEventArgs e)
