@@ -31,7 +31,7 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
     {
         _workspace = ImportWorkspace.Current;
         _dispatcher = App.Current?.MainWindow?.DispatcherQueue ?? DispatcherQueue.GetForCurrentThread();
-        foreach (var c in DemoImport.Channels.Where(_ => _workspace.IsDemo)) _channelNames[c.Id] = c.Name;
+        foreach (var c in DemoImport.Channels.Where(_ => _workspace.IsDemo)) _channelNames[c.Id] = c.LocalizedName;
         Attach();
         var settings = _workspace.Queue.Settings;
         _hashParallel = settings.ParallelFor(ImportStepKind.Hash) - 1;
@@ -214,7 +214,7 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
             foreach (var c in found)
             {
                 Channels.Add(c);
-                _channelNames[c.Id] = c.Name;
+                _channelNames[c.Id] = c.LocalizedName;
             }
             ChannelError = found.Count == 0 && !string.IsNullOrWhiteSpace(query) ? Loc.Get("Import_ChannelNone") : "";
         }
@@ -231,26 +231,42 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
         }
     }
 
-    /// <summary>Makes a channel owned by the signed-in admin and picks it; answers the error to show, or null.</summary>
-    public async Task<string?> CreateChannelAsync(string name, string? handle, string? description)
+    /// <summary>Translates a channel form field via admin-api <c>POST /api/translate/fields</c>.</summary>
+    public Task<FieldTranslateItem> TranslateFieldAsync(string from, string to, string text, string field, CancellationToken ct = default) =>
+        _workspace.Api.TranslateFieldAsync(from, to, text, field, ct);
+
+    /// <summary>Result of attempting to create a bilingual channel from the Import dialog.</summary>
+    public sealed record CreateChannelOutcome(ChannelFormErrors? FieldErrors = null, string? Error = null)
     {
-        if (string.IsNullOrWhiteSpace(name)) return Loc.Get("Import_NewChannelNameNeeded");
+        public bool Succeeded => FieldErrors is null && Error is null;
+    }
+
+    /// <summary>Makes a bilingual channel owned by the signed-in admin and picks it; answers field or form errors, or success.</summary>
+    public async Task<CreateChannelOutcome> CreateChannelAsync(string nameEn, string nameAr, string? handle, string? descriptionEn, string? descriptionAr)
+    {
+        var validation = ChannelValidation.Validate(nameEn, nameAr, descriptionEn, descriptionAr);
+        if (validation.HasErrors) return new CreateChannelOutcome(FieldErrors: validation);
         try
         {
-            var channel = await _workspace.Api.CreateChannelAsync(name.Trim(), string.IsNullOrWhiteSpace(handle) ? null : handle.Trim().TrimStart('@'), string.IsNullOrWhiteSpace(description) ? null : description.Trim());
-            _channelNames[channel.Id] = channel.Name;
+            var channel = await _workspace.Api.CreateChannelAsync(
+                nameEn.Trim(),
+                nameAr.Trim(),
+                string.IsNullOrWhiteSpace(handle) ? null : handle.Trim().TrimStart('@'),
+                string.IsNullOrWhiteSpace(descriptionEn) ? null : descriptionEn.Trim(),
+                string.IsNullOrWhiteSpace(descriptionAr) ? null : descriptionAr.Trim());
+            _channelNames[channel.Id] = channel.LocalizedName;
             Channels.Insert(0, channel);
             SelectedChannel = channel;
             ChannelError = "";
-            return null;
+            return new CreateChannelOutcome();
         }
         catch (ImportApiException ex) when (ex.Status == 409)
         {
-            return Loc.Get("Import_NewChannelTaken");
+            return new CreateChannelOutcome(Error: Loc.Get("Import_NewChannelTaken"));
         }
         catch (Exception ex)
         {
-            return ErrorText(ex);
+            return new CreateChannelOutcome(Error: ErrorText(ex));
         }
     }
 
@@ -391,13 +407,13 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
             var transcribe = Transcription();
             var translate = TranslateCaptions;
             var batch = await _workspace.Api.CreateBatchAsync(channel.Id, string.IsNullOrWhiteSpace(name) ? null : name);
-            _channelNames[channel.Id] = channel.Name;
+            _channelNames[channel.Id] = channel.LocalizedName;
             var now = DateTimeOffset.UtcNow;
             _workspace.Queue.Add(chosen.Select((r, i) => QueueItem.For(r.Video, batch.Id, channel.Id, now.AddMilliseconds(i), serverEncodes, transcribe, translate)));
             foreach (var r in chosen) ReviewRows.Remove(r);
             ReviewCount = ReviewRows.Count;
             CountSelected();
-            ScanMessage = Loc.WithDetail(Loc.Plural("Import_Added", chosen.Count), channel.Name);
+            ScanMessage = Loc.WithDetail(Loc.Plural("Import_Added", chosen.Count), channel.LocalizedName);
         }
         catch (Exception ex)
         {

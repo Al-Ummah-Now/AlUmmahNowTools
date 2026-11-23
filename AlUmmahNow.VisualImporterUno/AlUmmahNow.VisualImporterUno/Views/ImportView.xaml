@@ -37,7 +37,7 @@
                             <AutoSuggestBox.ItemTemplate>
                                 <DataTemplate x:DataType="core:ImportChannel">
                                     <StackPanel Padding="0,6" Spacing="2">
-                                        <TextBlock Text="{x:Bind Name}" Style="{StaticResource ToolsBody}" Foreground="{ThemeResource FanousTextPrimaryBrush}" />
+                                        <TextBlock Text="{x:Bind LocalizedName}" Style="{StaticResource ToolsBody}" Foreground="{ThemeResource FanousTextPrimaryBrush}" />
                                         <TextBlock Text="{x:Bind OwnerEmail}" Style="{StaticResource ToolsMuted}" FlowDirection="LeftToRight" HorizontalAlignment="Left" />
                                     </StackPanel>
                                 </DataTemplate>
@@ -62,7 +62,7 @@
                             </Grid.ColumnDefinitions>
                             <FontIcon Glyph="&#xE73E;" FontSize="16" Foreground="{ThemeResource FanousAccentBrush}" VerticalAlignment="Center" />
                             <StackPanel Grid.Column="1" Spacing="2">
-                                <TextBlock Text="{x:Bind ViewModel.SelectedChannel.Name, Mode=OneWay}" Style="{StaticResource ToolsBody}" Foreground="{ThemeResource FanousTextPrimaryBrush}" />
+                                <TextBlock Text="{x:Bind ViewModel.SelectedChannel.LocalizedName, Mode=OneWay}" Style="{StaticResource ToolsBody}" Foreground="{ThemeResource FanousTextPrimaryBrush}" />
                                 <TextBlock Text="{x:Bind ViewModel.ChannelSummary, Mode=OneWay}" Style="{StaticResource ToolsMuted}"
                                            Visibility="{x:Bind ViewModel.ChannelSummary, Mode=OneWay, Converter={StaticResource StringToVisibility}}" />
                             </StackPanel>
