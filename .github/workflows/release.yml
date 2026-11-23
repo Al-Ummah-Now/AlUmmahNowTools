@@ -157,6 +157,7 @@ jobs:
           $msi = "dist/AlUmmahNow-Tools-Windows-$env:NAME-x64${{ steps.sign.outputs.suffix }}.msi"
           wix build packaging/windows/tools.wxs -arch x64 -d Version=${{ needs.verify.outputs.msi }} -d "PublishDir=$((Resolve-Path out/publish).Path)" -o $msi
           if ($LASTEXITCODE -ne 0) { throw "wix build failed" }
+          Remove-Item dist/*.wixpdb -ErrorAction SilentlyContinue  # WiX's debug file is not a download
           if ("${{ steps.sign.outputs.signed }}" -eq "true") {
             try {
               & $env:SIGNTOOL sign /fd SHA256 /f $env:PFX_PATH /p $env:PFX_PASSWORD /tr http://timestamp.digicert.com /td SHA256 $msi
