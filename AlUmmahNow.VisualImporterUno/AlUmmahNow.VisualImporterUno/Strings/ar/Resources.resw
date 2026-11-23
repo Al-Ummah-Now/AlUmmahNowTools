@@ -2107,10 +2107,10 @@
     <value>أدخل الاسم بالعربية.</value>
   </data>
   <data name="Import_NewChannelError_NameEn_TooLong" xml:space="preserve">
-    <value>استخدم ١٠٠ حرف على الأكثر.</value>
+    <value>استخدم {0} حرف على الأكثر.</value>
   </data>
   <data name="Import_NewChannelError_NameAr_TooLong" xml:space="preserve">
-    <value>استخدم ١٠٠ حرف على الأكثر.</value>
+    <value>استخدم {0} حرف على الأكثر.</value>
   </data>
   <data name="Import_NewChannelError_DescEn_Pair" xml:space="preserve">
     <value>أضف الوصف بالإنجليزية أو اتركهما فارغين.</value>
@@ -2119,10 +2119,10 @@
     <value>أضف الوصف بالعربية أو اتركهما فارغين.</value>
   </data>
   <data name="Import_NewChannelError_DescEn_TooLong" xml:space="preserve">
-    <value>استخدم ٥٠٠٠ حرف على الأكثر.</value>
+    <value>استخدم {0} حرف على الأكثر.</value>
   </data>
   <data name="Import_NewChannelError_DescAr_TooLong" xml:space="preserve">
-    <value>استخدم ٥٠٠٠ حرف على الأكثر.</value>
+    <value>استخدم {0} حرف على الأكثر.</value>
   </data>
   <data name="Localized_English" xml:space="preserve">
     <value>English</value>
@@ -2154,6 +2154,9 @@
   <data name="Localized_Replaced" xml:space="preserve">
     <value>استُبدل نص {0} بترجمة آلية، راجعه قبل الحفظ.</value>
   </data>
+  <data name="Localized_Truncated" xml:space="preserve">
+    <value>{0} اختُصر إلى {1} حرفًا.</value>
+  </data>
   <data name="Localized_Undo" xml:space="preserve">
     <value>تراجع</value>
   </data>
@@ -2167,7 +2170,7 @@
     <value>لا يُترجم النص القرآني آليًا، الصق النص المعتمد بدلًا من ذلك.</value>
   </data>
   <data name="Localized_QuranRefs" xml:space="preserve">
-    <value>المواضع: {0}</value>
+    <value>المواضع:</value>
   </data>
   <data name="Localized_ErrorLimit" xml:space="preserve">
     <value>بلغت حد الترجمة اليومي، حاول مجددًا غدًا.</value>

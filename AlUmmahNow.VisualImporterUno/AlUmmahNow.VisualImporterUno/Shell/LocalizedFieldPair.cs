@@ -26,10 +26,13 @@ internal sealed class LocalizedFieldPair
     private readonly Button _enTranslateBtn;
     private readonly Button _arTranslateBtn;
     private readonly TextBlock _statusText;
+    private readonly StackPanel _statusDetailRow;
+    private readonly TextBlock _statusDetailLabel;
+    private readonly TextBlock _statusDetailValue;
     private readonly Button _undoBtn;
 
     private bool _busy;
-    private (string Lang, string Previous)? _undo;
+    private (string Lang, string Previous, string Applied)? _undo;
 
     public LocalizedFieldPair(
         string label,
@@ -50,6 +53,8 @@ internal sealed class LocalizedFieldPair
         var mutedBrush = (Brush)res["FanousTextMutedBrush"];
         var secondaryBtnStyle = (Style)res["ToolsSecondaryButton"];
         var arabicFont = ShellState.TextFontFor("ar");
+        var uiFlow = Loc.IsArabic ? FlowDirection.RightToLeft : FlowDirection.LeftToRight;
+        var uiFont = Loc.IsArabic ? arabicFont : null;
 
         _enBox = new TextBox
         {
@@ -76,16 +81,28 @@ internal sealed class LocalizedFieldPair
         if (multiline) _arBox.MinHeight = 76;
         AutomationProperties.SetName(_arBox, Loc.Format("Localized_FieldIn", label, Loc.Get("Localized_LangArabic")));
 
-        var uiFlow = Loc.IsArabic ? FlowDirection.RightToLeft : FlowDirection.LeftToRight;
-        _enError = new TextBlock { Style = mutedStyle, Foreground = errorBrush, FlowDirection = uiFlow, Visibility = Visibility.Collapsed };
-        _arError = new TextBlock { Style = mutedStyle, Foreground = errorBrush, FlowDirection = uiFlow, Visibility = Visibility.Collapsed };
-        if (Loc.IsArabic && arabicFont is not null)
+        _enError = new TextBlock
         {
-            _enError.FontFamily = arabicFont;
-            _arError.FontFamily = arabicFont;
+            Style = mutedStyle,
+            Foreground = errorBrush,
+            FlowDirection = uiFlow,
+            TextWrapping = TextWrapping.Wrap,
+            Visibility = Visibility.Collapsed,
+        };
+        _arError = new TextBlock
+        {
+            Style = mutedStyle,
+            Foreground = errorBrush,
+            FlowDirection = uiFlow,
+            TextWrapping = TextWrapping.Wrap,
+            Visibility = Visibility.Collapsed,
+        };
+        if (uiFont is not null)
+        {
+            _enError.FontFamily = uiFont;
+            _arError.FontFamily = uiFont;
         }
 
-        var uiFont = Loc.IsArabic ? arabicFont : null;
         _enTranslateBtn = MakeTranslateButton(secondaryBtnStyle, Loc.PopupLine(Loc.Get("Localized_TranslateToAr")), uiFont, HorizontalAlignment.Left);
         _arTranslateBtn = MakeTranslateButton(secondaryBtnStyle, Loc.PopupLine(Loc.Get("Localized_TranslateToEn")), uiFont, HorizontalAlignment.Right);
         _enTranslateBtn.Click += async (_, _) => await TranslateAsync("en", "ar");
@@ -93,23 +110,64 @@ internal sealed class LocalizedFieldPair
 
         _enBox.TextChanged += (_, _) =>
         {
-            if (_undo?.Lang == "en") ClearUndo();
+            // Only clear Undo on user edits; Uno Skia can dispatch TextChanged asynchronously after programmatic sets
+            if (_undo is { Lang: "en" } u && !string.Equals(_enBox.Text ?? "", u.Applied, StringComparison.Ordinal)) ClearUndo();
             UpdateButtons();
         };
         _arBox.TextChanged += (_, _) =>
         {
-            if (_undo?.Lang == "ar") ClearUndo();
+            if (_undo is { Lang: "ar" } u && !string.Equals(_arBox.Text ?? "", u.Applied, StringComparison.Ordinal)) ClearUndo();
             UpdateButtons();
         };
 
-        _statusText = new TextBlock { Style = mutedStyle, Foreground = mutedBrush, Visibility = Visibility.Collapsed };
+        _statusText = new TextBlock
+        {
+            Style = mutedStyle,
+            Foreground = mutedBrush,
+            FlowDirection = uiFlow,
+            TextWrapping = TextWrapping.Wrap,
+            Visibility = Visibility.Collapsed,
+        };
+        _statusDetailLabel = new TextBlock
+        {
+            Style = mutedStyle,
+            Foreground = errorBrush,
+            FlowDirection = uiFlow,
+            TextWrapping = TextWrapping.NoWrap,
+        };
+        _statusDetailValue = new TextBlock
+        {
+            Style = mutedStyle,
+            Foreground = errorBrush,
+            FlowDirection = FlowDirection.LeftToRight,
+            TextWrapping = TextWrapping.Wrap,
+        };
+        if (uiFont is not null)
+        {
+            _statusText.FontFamily = uiFont;
+            _statusDetailLabel.FontFamily = uiFont;
+        }
+        _statusDetailRow = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 6,
+            FlowDirection = uiFlow,
+            Visibility = Visibility.Collapsed,
+        };
+        _statusDetailRow.Children.Add(_statusDetailLabel);
+        _statusDetailRow.Children.Add(_statusDetailValue);
+
+        var undoLabel = new TextBlock { Text = Loc.PopupLine(Loc.Get("Localized_Undo")), FontSize = 12 };
+        if (uiFont is not null) undoLabel.FontFamily = uiFont;
         _undoBtn = new Button
         {
             Style = secondaryBtnStyle,
             MinHeight = 30,
             Padding = new Thickness(10, 0, 10, 0),
             FontSize = 12,
-            Content = new TextBlock { Text = Loc.PopupLine(Loc.Get("Localized_Undo")), FontSize = 12 },
+            FlowDirection = uiFlow,
+            VerticalAlignment = VerticalAlignment.Top,
+            Content = undoLabel,
             Visibility = Visibility.Collapsed,
         };
         _undoBtn.Click += (_, _) => ApplyUndo();
@@ -126,7 +184,7 @@ internal sealed class LocalizedFieldPair
         {
             Text = Loc.PopupLine(Loc.Get("Localized_Arabic") + suffix),
             Style = mutedStyle,
-            FlowDirection = FlowDirection.RightToLeft,
+            FlowDirection = FlowDirection.LeftToRight,
             HorizontalAlignment = HorizontalAlignment.Right,
         };
         if (arabicFont is not null) arHeader.FontFamily = arabicFont;
@@ -152,8 +210,16 @@ internal sealed class LocalizedFieldPair
         grid.Children.Add(enCol);
         grid.Children.Add(arCol);
 
-        var statusRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-        statusRow.Children.Add(_statusText);
+        // Constrained Grid so long status/error text wraps within the dialog width instead of clipping
+        var statusTextCol = new StackPanel { Spacing = 2 };
+        statusTextCol.Children.Add(_statusText);
+        statusTextCol.Children.Add(_statusDetailRow);
+        var statusRow = new Grid { ColumnSpacing = 8, FlowDirection = uiFlow };
+        statusRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        statusRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        Grid.SetColumn(statusTextCol, 0);
+        Grid.SetColumn(_undoBtn, 1);
+        statusRow.Children.Add(statusTextCol);
         statusRow.Children.Add(_undoBtn);
 
         var root = new StackPanel { Spacing = 6 };
@@ -182,6 +248,43 @@ internal sealed class LocalizedFieldPair
         SetErrorBlock(_arError, arError);
     }
 
+    /// <summary>Screenshot/demo helper: renders the Translate busy state (disabled buttons + "Translating…").</summary>
+    internal void SetDemoWorking()
+    {
+        _busy = true;
+        ClearUndo();
+        UpdateButtons();
+        SetStatus(Loc.Get("Localized_Translating"));
+    }
+
+    /// <summary>Screenshot/demo helper: renders a status or error line (with optional separate detail label + LTR value).</summary>
+    internal void SetDemoStatus(string message, bool isError = false, string? detailLabel = null, string? detailValue = null)
+    {
+        _busy = false;
+        ClearUndo();
+        UpdateButtons();
+        SetStatus(message, isError, detailLabel, detailValue);
+    }
+
+    /// <summary>Screenshot/demo helper: renders a post-translation replacement status with the Undo button visible.</summary>
+    internal void SetDemoUndo(string targetLang, string previousText, string statusMessage)
+    {
+        _busy = false;
+        var applied = targetLang == "en" ? English : Arabic;
+        _undo = (targetLang, previousText, applied);
+        _undoBtn.Visibility = Visibility.Visible;
+        UpdateButtons();
+        SetStatus(statusMessage);
+    }
+
+    internal static string TruncateAtCodePoint(string text, int maxLength)
+    {
+        if (text.Length <= maxLength) return text;
+        var len = maxLength;
+        if (len > 0 && char.IsHighSurrogate(text[len - 1])) len--;
+        return text[..len];
+    }
+
     private static void SetErrorBlock(TextBlock block, string? message)
     {
         if (string.IsNullOrWhiteSpace(message))
@@ -191,7 +294,7 @@ internal sealed class LocalizedFieldPair
         }
         else
         {
-            block.Text = Loc.PopupLine(message);
+            block.Text = message;
             block.Visibility = Visibility.Visible;
         }
     }
@@ -224,10 +327,13 @@ internal sealed class LocalizedFieldPair
         _arTranslateBtn.IsEnabled = !_busy && !string.IsNullOrWhiteSpace(_arBox.Text);
     }
 
-    private void SetStatus(string? message, bool isError = false)
+    private void SetStatus(string? message, bool isError = false, string? detailLabel = null, string? detailValue = null)
     {
         var res = Application.Current.Resources;
-        _statusText.Foreground = (Brush)res[isError ? "FanousErrorTextBrush" : "FanousTextMutedBrush"];
+        var brush = (Brush)res[isError ? "FanousErrorTextBrush" : "FanousTextMutedBrush"];
+        _statusText.Foreground = brush;
+        _statusDetailLabel.Foreground = brush;
+        _statusDetailValue.Foreground = brush;
         if (string.IsNullOrWhiteSpace(message))
         {
             _statusText.Text = "";
@@ -235,8 +341,20 @@ internal sealed class LocalizedFieldPair
         }
         else
         {
-            _statusText.Text = Loc.PopupLine(message);
+            _statusText.Text = message;
             _statusText.Visibility = Visibility.Visible;
+        }
+        if (string.IsNullOrWhiteSpace(detailValue))
+        {
+            _statusDetailLabel.Text = "";
+            _statusDetailValue.Text = "";
+            _statusDetailRow.Visibility = Visibility.Collapsed;
+        }
+        else
+        {
+            _statusDetailLabel.Text = string.IsNullOrWhiteSpace(detailLabel) ? "" : detailLabel;
+            _statusDetailValue.Text = detailValue;
+            _statusDetailRow.Visibility = Visibility.Visible;
         }
     }
 
@@ -249,11 +367,11 @@ internal sealed class LocalizedFieldPair
     private void ApplyUndo()
     {
         if (_undo is not { } u) return;
+        ClearUndo();
         if (u.Lang == "en") _enBox.Text = u.Previous;
         else _arBox.Text = u.Previous;
         var langName = Loc.Get(u.Lang == "en" ? "Localized_LangEnglish" : "Localized_LangArabic");
         SetStatus(Loc.Format("Localized_Undone", langName));
-        ClearUndo();
     }
 
     private async Task TranslateAsync(string from, string to)
@@ -276,10 +394,9 @@ internal sealed class LocalizedFieldPair
             var item = await _translate(from, to, source, _field, CancellationToken.None);
             if (string.Equals(item.Refused, "quran", StringComparison.OrdinalIgnoreCase))
             {
-                var refs = item.Quran is { Count: > 0 }
-                    ? " " + Loc.Format("Localized_QuranRefs", string.Join(Loc.IsArabic ? "، " : ", ", item.Quran.Select(q => q.Label)))
-                    : "";
-                SetStatus(Loc.Get("Localized_QuranRefused") + refs, isError: true);
+                // Label (localized) and Latin Surah refs sit in separate TextBlocks so Uno Skia never scrambles bidi runs
+                var refs = item.Quran is { Count: > 0 } ? string.Join(", ", item.Quran.Select(q => q.Label)) : null;
+                SetStatus(Loc.Get("Localized_QuranRefused"), isError: true, detailLabel: Loc.Get("Localized_QuranRefs"), detailValue: refs);
                 return;
             }
             var translated = (item.Text ?? "").Trim();
@@ -288,19 +405,21 @@ internal sealed class LocalizedFieldPair
                 SetStatus(Loc.Get("Localized_ErrorFailed"), isError: true);
                 return;
             }
-            if (translated.Length > _maxLength) translated = translated[.._maxLength];
+            var wasTruncated = translated.Length > _maxLength;
+            if (wasTruncated) translated = TruncateAtCodePoint(translated, _maxLength);
 
             var targetBox = to == "en" ? _enBox : _arBox;
             var previous = targetBox.Text ?? "";
             var replaced = !string.IsNullOrWhiteSpace(previous) && !string.Equals(previous, translated, StringComparison.Ordinal);
-            targetBox.Text = translated;
             if (replaced)
             {
-                _undo = (to, previous);
+                _undo = (to, previous, translated);
                 _undoBtn.Visibility = Visibility.Visible;
             }
+            targetBox.Text = translated;
             var toName = Loc.Get(to == "en" ? "Localized_LangEnglish" : "Localized_LangArabic");
-            SetStatus(Loc.Format(replaced ? "Localized_Replaced" : "Localized_Filled", toName));
+            var baseStatus = Loc.Format(replaced ? "Localized_Replaced" : "Localized_Filled", toName);
+            SetStatus(wasTruncated ? Loc.Format("Localized_Truncated", baseStatus, Loc.Number(_maxLength)) : baseStatus);
         }
         catch (ImportApiException ex)
         {

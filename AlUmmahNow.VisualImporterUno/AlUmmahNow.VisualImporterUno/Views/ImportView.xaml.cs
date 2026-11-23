@@ -227,11 +227,59 @@ public sealed partial class ImportView : Page
             multiline: true,
             maxLength: ChannelValidation.MaxDescriptionLength);
 
-        if (ImportWorkspace.Current.IsDemo && Environment.GetEnvironmentVariable("TOOLS_DEMO_IMPORT_CHANNEL") == "filled")
+        if (ImportWorkspace.Current.IsDemo && Environment.GetEnvironmentVariable("TOOLS_DEMO_IMPORT_CHANNEL") is { Length: > 0 } demoMode)
         {
-            namePair.SetValues("Fiqh Academy", "أكاديمية الفقه");
-            handle.Text = "fiqhacademy";
-            descriptionPair.SetValues("Weekly lessons on the jurisprudence of worship.", "دروس أسبوعية في فقه العبادات.");
+            switch (demoMode)
+            {
+                case "filled":
+                    namePair.SetValues("Fiqh Academy", "أكاديمية الفقه");
+                    handle.Text = "fiqhacademy";
+                    descriptionPair.SetValues("Weekly lessons on the jurisprudence of worship.", "دروس أسبوعية في فقه العبادات.");
+                    break;
+                case "working":
+                    namePair.SetValues("Fiqh Academy", "");
+                    handle.Text = "fiqhacademy";
+                    descriptionPair.SetValues("Weekly lessons on the jurisprudence of worship.", "دروس أسبوعية في فقه العبادات.");
+                    namePair.SetDemoWorking();
+                    break;
+                case "undo":
+                    namePair.SetValues("Fiqh Academy", "أكاديمية الفقه الإسلامي");
+                    handle.Text = "fiqhacademy";
+                    descriptionPair.SetValues("Weekly lessons on the jurisprudence of worship.", "دروس أسبوعية في فقه العبادات.");
+                    namePair.SetDemoUndo("ar", "أكاديمية الفقه", Loc.Format("Localized_Replaced", Loc.Get("Localized_LangArabic")));
+                    break;
+                case "error-source-empty":
+                    namePair.SetValues("", "");
+                    namePair.SetDemoStatus(Loc.Format("Localized_SourceEmpty", Loc.Get("Localized_LangEnglish")), isError: true);
+                    break;
+                case "error-quran":
+                    namePair.SetValues("Quran Reflections", "تأملات قرآنية");
+                    descriptionPair.SetValues("", "الله لا إله إلا هو الحي القيوم");
+                    descriptionPair.SetDemoStatus(
+                        Loc.Get("Localized_QuranRefused"),
+                        isError: true,
+                        detailLabel: Loc.Get("Localized_QuranRefs"),
+                        detailValue: "Al-Baqarah 2:255");
+                    break;
+                case "error-limit":
+                    namePair.SetValues("Fiqh Academy", "");
+                    namePair.SetDemoStatus(Loc.Get("Localized_ErrorLimit"), isError: true);
+                    break;
+                case "error-failed":
+                    namePair.SetValues("Fiqh Academy", "");
+                    namePair.SetDemoStatus(Loc.Get("Localized_ErrorFailed"), isError: true);
+                    break;
+                case "errors-validation":
+                    namePair.SetValues("Fiqh Academy", "");
+                    descriptionPair.SetValues("Weekly lessons on the jurisprudence of worship.", "");
+                    namePair.SetErrors(
+                        ChannelFieldErrorText("NameEn", "too_long"),
+                        ChannelFieldErrorText("NameAr", "required"));
+                    descriptionPair.SetErrors(
+                        ChannelFieldErrorText("DescEn", "too_long"),
+                        ChannelFieldErrorText("DescAr", "required_pair"));
+                    break;
+            }
         }
 
         var error = new TextBlock { Style = (Style)Application.Current.Resources["ToolsMuted"], Visibility = Visibility.Collapsed };
@@ -311,7 +359,9 @@ public sealed partial class ImportView : Page
         null => null,
         "required" => Loc.Get($"Import_NewChannelError_{slot}_Required"),
         "required_pair" => Loc.Get($"Import_NewChannelError_{slot}_Pair"),
-        "too_long" => Loc.Get($"Import_NewChannelError_{slot}_TooLong"),
+        "too_long" => Loc.Format(
+            $"Import_NewChannelError_{slot}_TooLong",
+            Loc.Number(slot.StartsWith("Name", StringComparison.Ordinal) ? ChannelValidation.MaxNameLength : ChannelValidation.MaxDescriptionLength)),
         _ => Loc.Get("Import_NewChannelNameNeeded"),
     };
 
