@@ -235,6 +235,10 @@ namespace AlUmmahNow.FileScanService
         {
             var app = builder.Build();
 
+            // Block DNS rebinding (non-loopback Host headers) and cross-origin WebSocket upgrades
+            // from same-machine web pages before CORS or SignalR routing runs.
+            app.Use(ValidateLoopbackHostAndOriginAsync);
+
             // Enable CORS
             app.UseCors();
 
@@ -251,6 +255,40 @@ namespace AlUmmahNow.FileScanService
             });
 
             return app;
+        }
+
+        internal static async Task ValidateLoopbackHostAndOriginAsync(HttpContext context, RequestDelegate next)
+        {
+            var host = context.Request.Host.Host;
+            if (string.IsNullOrEmpty(host) || !IsLoopbackHost(host))
+            {
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                await context.Response.WriteAsync("Forbidden: non-loopback Host header.");
+                return;
+            }
+
+            if (context.Request.Headers.TryGetValue("Origin", out var origins))
+            {
+                foreach (var rawOrigin in origins)
+                {
+                    if (string.IsNullOrWhiteSpace(rawOrigin))
+                    {
+                        continue;
+                    }
+
+                    if (!Uri.TryCreate(rawOrigin, UriKind.Absolute, out var originUri)
+                        || (!string.Equals(originUri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+                            && !string.Equals(originUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+                        || !IsLoopbackHost(originUri.Host))
+                    {
+                        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                        await context.Response.WriteAsync("Forbidden: non-loopback Origin header.");
+                        return;
+                    }
+                }
+            }
+
+            await next(context);
         }
 
         internal static void ClearConfiguredKestrelEndpoints(ConfigurationManager configuration)

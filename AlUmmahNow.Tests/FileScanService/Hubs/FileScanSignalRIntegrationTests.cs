@@ -267,6 +267,28 @@ public sealed class FileScanServiceStartupTests : IDisposable
             http.DefaultRequestHeaders.ConnectionClose = true;
             var health = await http.GetAsync($"http://127.0.0.1:{fallbackLoopbackPort}/health");
             health.StatusCode.Should().Be(HttpStatusCode.OK);
+
+            // DNS rebinding protection: non-loopback Host header is rejected with 403
+            using var rebindReq = new HttpRequestMessage(HttpMethod.Get, $"http://127.0.0.1:{fallbackLoopbackPort}/health");
+            rebindReq.Headers.Host = $"evil.example:{fallbackLoopbackPort}";
+            var rebindResp = await http.SendAsync(rebindReq);
+            rebindResp.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+            // Cross-origin WebSocket protection: non-loopback Origin header on /scanHub upgrade is rejected with 403
+            using var wsReq = new HttpRequestMessage(HttpMethod.Get, $"http://127.0.0.1:{fallbackLoopbackPort}/scanHub");
+            wsReq.Headers.TryAddWithoutValidation("Origin", "https://evil.example");
+            wsReq.Headers.TryAddWithoutValidation("Upgrade", "websocket");
+            wsReq.Headers.TryAddWithoutValidation("Connection", "Upgrade");
+            wsReq.Headers.TryAddWithoutValidation("Sec-WebSocket-Version", "13");
+            wsReq.Headers.TryAddWithoutValidation("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==");
+            var wsResp = await http.SendAsync(wsReq);
+            wsResp.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+            // Loopback Origin header is allowed
+            using var localOriginReq = new HttpRequestMessage(HttpMethod.Get, $"http://127.0.0.1:{fallbackLoopbackPort}/health");
+            localOriginReq.Headers.TryAddWithoutValidation("Origin", $"http://localhost:{fallbackLoopbackPort}");
+            var localOriginResp = await http.SendAsync(localOriginReq);
+            localOriginResp.StatusCode.Should().Be(HttpStatusCode.OK);
         }
         finally
         {
