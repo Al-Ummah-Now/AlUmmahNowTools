@@ -44,6 +44,7 @@ jobs:
       name: ${{ steps.version.outputs.name }}
       numeric: ${{ steps.version.outputs.numeric }}
       msi: ${{ steps.version.outputs.msi }}
+      display: ${{ steps.version.outputs.display }}
       build: ${{ steps.version.outputs.build }}
     steps:
       - uses: actions/checkout@v4
@@ -70,7 +71,11 @@ jobs:
             echo "name=${tag#v}"                       # file names, InformationalVersion, .deb version
             echo "numeric=$y.$m.$d.$n"                 # assembly and file version
             echo "msi=$((y - 2000)).$m.$((d * 100 + n))" # MSI: major<=255.minor<=255.build<=65535
-            echo "build=$y$(printf %02d%02d%02d "$m" "$d" "$n")" # CFBundleVersion
+            # Uno (Resizetizer) wants ApplicationDisplayVersion as 3 parts and ApplicationVersion as one small
+            # integer; together they make the 4-part package version YYYY.M.D.N (CFBundleShortVersionString and
+            # CFBundleVersion on macOS)
+            echo "display=$y.$m.$d"
+            echo "build=$n"
           } | tee -a "$GITHUB_OUTPUT"
       - uses: actions/setup-dotnet@v4
         with:
@@ -117,7 +122,7 @@ jobs:
         run: >
           dotnet publish $env:APP -f net9.0-desktop -c Release -r win-x64 --self-contained
           -p:Version=${{ needs.verify.outputs.numeric }} -p:FileVersion=${{ needs.verify.outputs.numeric }}
-          -p:InformationalVersion=$env:NAME -p:ApplicationDisplayVersion=$env:NAME
+          -p:InformationalVersion=$env:NAME -p:ApplicationDisplayVersion=${{ needs.verify.outputs.display }}
           -p:ApplicationVersion=${{ needs.verify.outputs.build }} -o out/publish
       - name: Signing certificate
         id: sign
@@ -270,7 +275,7 @@ jobs:
           fi
           dotnet publish "$APP" -f net9.0-desktop -c Release -r ${{ matrix.rid }} --self-contained -p:PackageFormat=app \
             -p:Version=${{ needs.verify.outputs.numeric }} -p:FileVersion=${{ needs.verify.outputs.numeric }} \
-            -p:InformationalVersion="$NAME" -p:ApplicationDisplayVersion="$NAME" \
+            -p:InformationalVersion="$NAME" -p:ApplicationDisplayVersion=${{ needs.verify.outputs.display }} \
             -p:ApplicationVersion=${{ needs.verify.outputs.build }} "${sign[@]}" -o out/publish
           app=$(find out/publish -maxdepth 2 -name '*.app' -type d | head -1)
           [ -n "$app" ] || { echo "::error::no .app bundle"; find out/publish -maxdepth 2; exit 1; }
@@ -336,7 +341,7 @@ jobs:
         run: |
           dotnet publish "$APP" -f net9.0-desktop -c Release -r linux-x64 --self-contained \
             -p:Version=${{ needs.verify.outputs.numeric }} -p:FileVersion=${{ needs.verify.outputs.numeric }} \
-            -p:InformationalVersion="$NAME" -p:ApplicationDisplayVersion="$NAME" \
+            -p:InformationalVersion="$NAME" -p:ApplicationDisplayVersion=${{ needs.verify.outputs.display }} \
             -p:ApplicationVersion=${{ needs.verify.outputs.build }} -o out/publish
           test -f out/publish/licenses/THIRD-PARTY-NOTICES.md
       - name: Packages (.tar.gz, .deb)
