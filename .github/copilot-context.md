@@ -98,12 +98,8 @@ All recent work completed successfully. Ready for new tasks.
 - FileScanService:Url (http://localhost:5000)
 
 **VisualImporter**:
-- R2DB configuration (Cloudflare R2)
-- BunnyVideo, BunnyImage, BunnyStream configuration
+- R2DB configuration (Cloudflare R2; active desktop imports use `admin-api` sign-in via `ToolsCore`, legacy Bunny config removed under `TP-D4`)
 - ConnectionStrings:DefaultConnection
-
-**BunnyBulkUploader**:
-- BunnyVideo configuration only
 
 ### Database Connection
 **Default**: `Server=(localdb)\\MSSQLLocalDB;Database=AlUmmahNowFileScan;Trusted_Connection=true`
@@ -159,4 +155,4 @@ dotnet ef migrations remove --project AlUmmahNow.Data/AlUmmahNow.Data.csproj --c
 - Entity Framework Core 9.0.9
 - WinUI 3 (VisualImporter)
 - SignalR (FileScanService communication)
-- BunnyCDN, Cloudflare R2, DeepL
+- Cloudflare R2, DeepL

@@ -71,16 +71,13 @@ Applications use **User Secrets** for sensitive configuration:
 
 ```bash
 cd AlUmmahNow.DataImporter
-dotnet user-secrets set "BunnyVideo:Key" "your-api-key"
 dotnet user-secrets set "R2DB:S3Api" "your-endpoint"
 dotnet user-secrets set "FileScanService:Url" "http://localhost:5000"
 ```
 
 ## ?? Supported Services
 
-- **BunnyCDN** - Video and image storage
-- **Cloudflare R2** - S3-compatible storage  
-- **BunnyStream** - Video streaming API
+- **Cloudflare R2** - S3-compatible storage (active desktop imports upload through `admin-api` TUS to Cloudflare R2; legacy direct BunnyCDN/BunnyStream clients were removed under `TP-D4`)
 - **DeepL** - Translation services
 - **SignalR** - Real-time communication
 

@@ -1,6 +1,6 @@
 # AlUmmahNowTools - Developer Instructions
 
-AlUmmahNowTools is a collection of .NET 8 applications for managing video and image content with cloud storage services (Cloudflare R2, BunnyCDN, DeepL translation). The solution contains multiple tools: DataImporter (SignalR client), BunnyBulkUploader, VisualImporter (GUI), plus shared libraries.
+AlUmmahNowTools is a collection of .NET 8/9 applications for managing video and image content with Cloudflare R2 (via `admin-api` TUS in `AlUmmahNow.ToolsCore`) and DeepL translation. The solution contains DataImporter (SignalR client), VisualImporterUno (cross-platform GUI), FileScanService (SignalR hub), ToolsCore, plus shared libraries. (Legacy BunnyCDN/BunnyStream clients and `AlUmmahNow.BunnyBulkUploader` were removed under `TP-D4`.)
 
 **Always reference these instructions first and fallback to search or bash commands only when you encounter unexpected information that does not match the info here.**
 
@@ -27,7 +27,6 @@ AlUmmahNowTools is a collection of .NET 8 applications for managing video and im
 
 ### Publishing Applications
 - Publish DataImporter: `dotnet publish AlUmmahNow.DataImporter/AlUmmahNow.DataImporter.csproj --configuration Release --runtime linux-x64 --self-contained` - takes ~10 seconds. NEVER CANCEL.
-- Publish BunnyBulkUploader: `dotnet publish AlUmmahNow.BunnyBulkUploader/AlUmmahNow.BunnyBulkUploader.csproj --configuration Release --runtime linux-x64 --self-contained` - takes ~10 seconds. NEVER CANCEL.
 - Published executables are self-contained and located in `bin/Release/net8.0/linux-x64/publish/`
 
 ### Configuration Requirements
@@ -45,37 +44,13 @@ Applications require user secrets configuration before they can run successfully
 }
 ```
 
-#### Required User Secrets for BunnyBulkUploader:
-```json
-{
-  "BunnyVideo": {
-    "Zone": "your-bunny-video-zone-name",
-    "Key": "your-bunny-video-api-key", 
-    "Region": "your-bunny-video-region"
-  }
-}
-```
-
-#### Required User Secrets for VisualImporter (Full Import):
+#### Required User Secrets for VisualImporter (Legacy LocalDB / R2):
 ```json
 {
   "R2DB": {
     "S3Api": "https://your-cloudflare-r2-endpoint",
     "S3Key": "your-r2-access-key", 
     "S3Secret": "your-r2-secret-key"
-  },
-  "BunnyVideo": {
-    "Zone": "your-bunny-video-zone-name",
-    "Key": "your-bunny-video-api-key",
-    "Region": "your-bunny-video-region"
-  },
-  "BunnyImage": {
-    "Zone": "your-bunny-image-zone-name", 
-    "Key": "your-bunny-image-api-key",
-    "Region": "your-bunny-image-region"
-  },
-  "BunnyStream": {
-    "Key": "your-bunny-stream-api-key"
   },
   "ConnectionStrings": {
     "DefaultConnection": "Server=(localdb)\\MSSQLLocalDB;Database=AlUmmahNowFileScan;Trusted_Connection=true"
@@ -90,9 +65,9 @@ Applications require user secrets configuration before they can run successfully
 ### Solution Components
 - **AlUmmahNow.sln** - Main solution file containing 7 projects
 - **AlUmmahNow.Data** - Shared data library (.NET 8 library)
-  - Storage clients for BunnyCDN and Cloudflare R2
+  - Storage client for Cloudflare R2 (`R2Client`) and `IStorageClient<T>` abstraction
   - Translation services using DeepL (for future content processing)
-  - Video streaming integration with Bunny Stream
+  - Video metadata probing and thumbnail helpers (`MediaProbe`, `VideoThumbnailService`)
   - Models for videos, images, storage objects, and file scanning
 - **AlUmmahNow.Importer** - Centralized import logic library (.NET 8 library)
   - VideoImporter class with session management and progress tracking
@@ -105,17 +80,9 @@ Applications require user secrets configuration before they can run successfully
   - Communicates with FileScanService via SignalR Hub for real-time file discovery
   - **NOT for direct video processing** - delegates to FileScanService
   - Uses FileScanSignalRClient for real-time communication
-- **AlUmmahNow.BunnyBulkUploader** - Console application for bulk uploading to BunnyCDN
-  - UserSecretsId: `4de61621-8c00-4020-a0b6-0ff95676f865`
-  - Requires folder path parameter: `-f|--folder <path>` and the storage root `-r|--root </zone/folder/>` (no default: each channel/folder gets its own root)
-  - Never overwrites a different file at an existing key; `check-records` lists R2 records sharing one video URL (read-only)
-  - Uses AlUmmahNow.Importer library for upload functionality
-- **AlUmmahNow.VisualImporter** - WinUI 3 visual interface for importing video content
-  - UserSecretsId: `4803ba67-724e-4477-aeb0-1d38aa664f85`
-  - Modern WinUI application with session management and real-time progress tracking
-  - Uses AlUmmahNow.Importer library for core import operations
-  - **Currently uses local FileDiscoveryService** (not SignalR - planned for future)
-- **AlUmmahNow.FileScanService** - Background Windows Service for file scanning (SignalR Hub Host)
+- **AlUmmahNow.ToolsCore** - Shared .NET 9 library for admin-API sign-in, persistent `WorkQueue`, TUS uploads, local pre-encoding, and speech-to-text
+- **AlUmmahNow.VisualImporterUno** - Cross-platform Uno Platform GUI for importing video content via `ToolsCore` / `admin-api`
+- **AlUmmahNow.FileScanService** - Background Service for file scanning (SignalR Hub Host)
   - **This service does ALL the actual file scanning work**
   - Hosts SignalR Hub (FileScanHub) for real-time communication
   - Contains FileScanEngine for actual scanning operations
@@ -124,10 +91,8 @@ Applications require user secrets configuration before they can run successfully
 
 ### Key Dependencies
 - **AWSSDK.S3** (3.7.415.26) - Cloudflare R2 S3-compatible storage
-- **BunnyCDN.Net.Storage** (1.0.4) - BunnyCDN storage client
 - **DeepL.net** (1.15.0) - Translation services (for future content processing)
 - **McMaster.Extensions.CommandLineUtils** (4.1.1) - CLI argument parsing
-- **RestSharp** (112.1.0) - HTTP client for API calls
 - **ShellProgressBar** (5.2.0) - Progress indication during operations
 - **Microsoft.EntityFrameworkCore** (9.0.9) - Database operations
 - **Microsoft.WindowsAppSDK** (1.8.250916003) - WinUI 3 framework
@@ -146,15 +111,6 @@ dotnet run -- -f "/path/to/video/files"        # Start folder scan (via SignalR)
 dotnet run -- --status "session-guid"          # Check scan status (via SignalR)
 dotnet run -- --start-import "session-guid"    # Start import after scan
 dotnet run -- --wait                           # Wait for scan completion with real-time updates
-```
-
-### BunnyBulkUploader Commands  
-```bash
-# Build and run BunnyBulkUploader (requires user secrets)
-cd AlUmmahNow.BunnyBulkUploader
-dotnet run -- --help                    # Shows usage (fails without config)
-dotnet run -- -f "/path/to/video/files" -r /my-zone/channel-name/ # Upload videos from folder
-dotnet run -- check-records             # List R2 records that share one video URL (read-only)
 ```
 
 ### VisualImporter Usage
@@ -178,7 +134,6 @@ dotnet run
 ```bash
 # After publishing, run standalone executables
 ./AlUmmahNow.DataImporter/bin/Release/net8.0/linux-x64/publish/AlUmmahNow.DataImporter --list-sessions
-./AlUmmahNow.BunnyBulkUploader/bin/Release/net8.0/linux-x64/publish/AlUmmahNow.BunnyBulkUploader -f "/path/to/videos"
 ```
 
 ## Application Purposes
@@ -201,18 +156,9 @@ dotnet run
 - Database operations for session tracking (ImportDbContext)
 - **Translation NOT used here** - this is about file operations, not content
 
-### BunnyBulkUploader - Simple Video Upload
-- Direct video upload to BunnyCDN storage
-- Bulk operations on video files
-- Simple progress tracking during uploads
-
-### VisualImporter - Full Import Workflow
-- GUI interface for comprehensive video import
-- Session management with visual progress tracking
-- Multi-channel support with thumbnail handling
-- **Currently scans files locally via FileDiscoveryService**
-- **Future: Will use SignalR to communicate with FileScanService**
-- **This is where translation WOULD be used** for video metadata
+### VisualImporterUno - Full Import Workflow
+- Cross-platform GUI interface for bulk video import via `ToolsCore` and `admin-api` TUS to Cloudflare R2
+- Local pre-encoding, speech-to-text, and progress tracking via persistent `WorkQueue`
 
 ## Development Workflow
 
@@ -221,8 +167,7 @@ dotnet run
 2. Test builds pass: `dotnet build --configuration Release` (3 seconds)
 3. **FileScanService must be running for DataImporter to work**
 4. DataImporter connects to SignalR hub at configured URL (default: http://localhost:5000)
-5. BunnyBulkUploader expects video folders with `.mp4` or `.mkv` files
-6. VisualImporter handles thumbnails in `.thumbs/` subfolders
+5. VisualImporterUno handles thumbnails and sidecars next to video files
 
 ### Code Navigation
 
@@ -235,17 +180,17 @@ dotnet run
 - **Scan DTOs**: `AlUmmahNow.Data/Models/FileScanning/ScanDtos.cs`
 
 #### Import Logic
-- **Centralized Import Logic**: `AlUmmahNow.Importer/`
-  - `VideoImporter.cs` - Main import functionality with session management
+- **Active Admin-API Import Pipeline**: `AlUmmahNow.ToolsCore/Import/`
+- **Legacy Import Library**: `AlUmmahNow.Importer/`
+  - `VideoImporter.cs` - Legacy session-based importer
   - `SimpleVideoUploader.cs` - Basic bulk upload operations
   - `ImportCommandExecutor.cs` - CLI command handling
 
 #### Storage & Services
 - **Storage implementations**: `AlUmmahNow.Data/Storage/`
-  - `BunnyStorageClient.cs` - BunnyCDN storage operations
   - `R2Client.cs` - Cloudflare R2 S3-compatible client
 - **Translation services**: `AlUmmahNow.Data/Translation/DeepLClient.cs` (for future content processing)
-- **Video services**: `AlUmmahNow.Data/Video/BunnyStreamClient.cs`
+- **Video services**: `AlUmmahNow.Data/Video/` (`MediaProbe.cs`, `VideoThumbnailService.cs`, `ThumbnailShape.cs`)
 - **Models**: `AlUmmahNow.Data/Models/` - Video, Image, Bucket, FileScanning definitions
 
 #### Application Entry Points
@@ -333,29 +278,20 @@ dotnet run
 - Should receive real-time progress updates during scans
 - Shows connection errors when FileScanService is down
 
-**BunnyBulkUploader (requires BunnyCDN configuration):**
-- Should accept folder parameter and upload video files
-- Shows progress bars during operations
-- Scans for `.mp4`, `.mkv`, `.avi`, `.mov`, and `.wmv` files
-
-**VisualImporter (requires full configuration):**
-- Provides GUI interface for import operations
-- Session management with real-time progress
-- Multi-channel video organization
-- Currently scans locally (not via SignalR yet)
+**VisualImporterUno (active desktop app):**
+- Signs in via Al Ummah Now Auth SSO and uploads through `admin-api` TUS to Cloudflare R2
+- Local pre-encoding, captions, and work queue persisted on disk
 
 ## Common Issues and Solutions
 
 ### Build Issues
 - All builds produce nullable reference warnings - this is expected
-- No build errors should occur with .NET 8.0 SDK
+- No build errors should occur with .NET 8.0 / 9.0 SDKs
 - Missing packages are auto-restored on first build
 
 ### Runtime Issues  
 - **DataImporter**: "Unable to connect to FileScan service" - FileScanService not running or wrong URL configured
 - **DataImporter**: SignalR connection fails - Check FileScanService:Url in configuration
-- **BunnyBulkUploader**: "No RegionEndpoint or ServiceURL configured" - Missing BunnyCDN secrets
-- **VisualImporter**: "Object reference not set" - Missing storage configuration
 - **FileScanService**: Port already in use - Change port in configuration or stop conflicting service
 
 ### Configuration Issues
@@ -363,8 +299,7 @@ dotnet run
 - Each project has unique UserSecretsId in .csproj files
 - DataImporter needs database and FileScanService URL configuration
 - FileScanService needs database configuration
-- BunnyBulkUploader only needs BunnyCDN configuration
-- VisualImporter needs full storage and streaming configuration
+- VisualImporterUno authenticates via browser SSO (no Bunny secrets needed)
 
 ### SignalR Issues
 - **Connection timeout**: FileScanService may not be running on configured URL
@@ -382,21 +317,20 @@ dotnet run
 - `/AlUmmahNow.Importer/` - Centralized import logic library
 - `/AlUmmahNow.FileScanService/` - SignalR hub host and file scanning worker
 - `/AlUmmahNow.DataImporter/` - SignalR client for file scanning
-- `/AlUmmahNow.BunnyBulkUploader/` - Bulk upload console application
-- `/AlUmmahNow.VisualImporter/` - WinUI 3 visual import application
+- `/AlUmmahNow.ToolsCore/` - Admin-API import pipeline, sign-in, and local encoding
+- `/AlUmmahNow.VisualImporterUno/` - Cross-platform Uno Platform visual import application
 
 ### Configuration Files
 - `AlUmmahNow.FileScanService/appsettings.json` - Service configuration (port, database)
 - `AlUmmahNow.DataImporter/appsettings.json` - Client configuration (SignalR URL)
 - `AlUmmahNow.DataImporter/Properties/launchSettings.json` - Debug settings
-- `AlUmmahNow.BunnyBulkUploader/Properties/launchSettings.json` - Debug settings
-- `AlUmmahNow.VisualImporter/Package.appxmanifest` - WinUI app manifest
 
 ## Important Architecture Notes
 
 ### ?? REMOVED:
 - ? **AlUmmahNow.FileScanApi** - This project has been REMOVED
 - ? **FileScanApiClient** - REST API client has been REMOVED
+- ? **AlUmmahNow.BunnyBulkUploader**, `BunnyStorageClient`, `BunnyStreamClient`, `BunnyRetry`, `BunnyVideo` - REMOVED (`TP-D4`); active imports run via `AlUmmahNow.ToolsCore` and `admin-api` TUS to Cloudflare R2
 - ? All REST API endpoints have been replaced with SignalR
 
 ### ? DO:

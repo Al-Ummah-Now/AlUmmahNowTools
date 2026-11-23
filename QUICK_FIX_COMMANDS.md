@@ -7,7 +7,6 @@ All XAML errors have been fixed. The core .NET 8 projects build successfully:
 - AlUmmahNow.FileScanService ?
 - AlUmmahNow.DataImporter ?
 - AlUmmahNow.Importer ?
-- AlUmmahNow.BunnyBulkUploader ?
 
 ## ?? To Fix Uno Platform Project (NuGet Issue)
 
@@ -55,8 +54,7 @@ dotnet run --project AlUmmahNow.DataImporter -- --help
 ### Build All Core Projects
 ```powershell
 dotnet build AlUmmahNow.FileScanService
-dotnet build AlUmmahNow.DataImporter  
-dotnet build AlUmmahNow.BunnyBulkUploader
+dotnet build AlUmmahNow.DataImporter
 ```
 
 ## ?? Verify Everything Works
