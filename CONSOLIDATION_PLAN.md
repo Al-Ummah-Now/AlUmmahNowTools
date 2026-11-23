@@ -1,6 +1,6 @@
 # FileScan Service Consolidation Plan
 
-> **Status: Completed (verified and closed out 2026-11-23 under `TOOLS-PLANS` TP-1).** `AlUmmahNow.FileScanApi` has been removed from the solution, `AlUmmahNow.FileScanService` hosts the consolidated SignalR hub (`/scanHub`) with `/health` and `/singleton` endpoints, both `AlUmmahNow.DataImporter` and `AlUmmahNow.VisualImporterUno` communicate via `FileScanSignalRClient`, and live SignalR hub-to-client integration tests verify the end-to-end transport.
+> **Status: Completed (verified and closed out 2026-11-23 under `TOOLS-PLANS` TP-1).** `AlUmmahNow.FileScanApi` has been removed from the solution, `AlUmmahNow.FileScanService` hosts the consolidated SignalR hub (`/scanHub`) with `/health` and `/singleton` endpoints bound to loopback only, both `AlUmmahNow.DataImporter` and `AlUmmahNow.VisualImporterUno` communicate via `FileScanSignalRClient`, and live SignalR hub-to-client integration tests verify the end-to-end transport. (Note: `FileScanService` defaults to port `5000` when unconfigured, while `AlUmmahNow.VisualImporterUno` defaults `FileScanService:Url` to `http://localhost:47923` to match the Visual Studio development launch profile.)
 
 ## Executive Summary
 

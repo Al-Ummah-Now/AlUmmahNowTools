@@ -1,6 +1,8 @@
 using AlUmmahNow.Data.Database;
 using AlUmmahNow.FileScanService.Services;
 using AlUmmahNow.FileScanService.Hubs;
+using Microsoft.AspNetCore.Cors.Infrastructure;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -9,6 +11,7 @@ using Microsoft.Extensions.Logging;
 using Serilog;
 using AlUmmahNow.Data.Models.FileScanning;
 using System.Linq;
+using System.Net;
 
 namespace AlUmmahNow.FileScanService
 {
@@ -116,8 +119,10 @@ namespace AlUmmahNow.FileScanService
         {
             var builder = WebApplication.CreateBuilder(args);
 
-            // Get the port from configuration
+            // Resolve a loopback-only port and bind Kestrel explicitly so the singleton lock,
+            // /health output, and bound listener always agree and never expose the hub off-host.
             var port = ResolvePort(builder.Configuration);
+            builder.WebHost.UseKestrel(options => ConfigureLoopbackEndpoint(options, port));
 
             // Initialize and check singleton status
             var loggerFactory = LoggerFactory.Create(builder => builder.AddSerilog());
@@ -171,22 +176,7 @@ namespace AlUmmahNow.FileScanService
             builder.Services.AddHostedService<ImportWorker>();
 
             // Configure CORS for SignalR clients
-            builder.Services.AddCors(options =>
-            {
-                options.AddDefaultPolicy(policy =>
-                {
-                    policy.SetIsOriginAllowed(origin =>
-                          {
-                              // Allow any localhost origin in development
-                              if (string.IsNullOrEmpty(origin)) return false;
-                              var uri = new Uri(origin);
-                              return uri.Host == "localhost" || uri.Host == "127.0.0.1";
-                          })
-                          .AllowAnyHeader()
-                          .AllowAnyMethod()
-                          .AllowCredentials();
-                });
-            });
+            builder.Services.AddCors(ConfigureSignalRCors);
 
             var app = builder.Build();
 
@@ -206,44 +196,7 @@ namespace AlUmmahNow.FileScanService
             // Enable CORS
             app.UseCors();
 
-            // Map SignalR hub - this is the KEY component for UI communication
-            app.MapHub<FileScanHub>("/scanHub");
-
-            // Add a simple health check endpoint
-            app.MapGet("/health", () => Results.Ok(new {
-                status = "healthy",
-                service = "FileScanService",
-                signalRHub = "/scanHub",
-                timestamp = DateTime.UtcNow,
-                processId = Environment.ProcessId,
-                port = port
-            }));
-
-            // Add singleton status endpoint
-            app.MapGet("/singleton", () => 
-            {
-                var lockInfo = _singletonManager?.GetLockInfo();
-                return Results.Ok(new {
-                    singleton = true,
-                    lockInfo = lockInfo,
-                    service = "FileScanService",
-                    timestamp = DateTime.UtcNow
-                });
-            });
-
-            // Add console help endpoint
-            app.MapGet("/", () => Results.Ok(new { 
-                message = "AlUmmahNow File Scan Service - SignalR Hub Host",
-                signalRHub = "/scanHub",
-                health = "/health",
-                singleton = "/singleton",
-                consoleCommands = new {
-                    help = "Add --help argument when starting",
-                    listSessions = "Add --list-sessions argument when starting",
-                    status = "Add --status <session-id> argument when starting",
-                    singletonInfo = "Add --singleton-info argument for singleton status"
-                }
-            }));
+            MapFileScanEndpoints(app, port, () => _singletonManager?.GetLockInfo());
 
             Log.Information("FileScanService SignalR Hub available at /scanHub on port {Port}", port);
             Console.WriteLine($"?? FileScanService running on port {port}");
@@ -263,19 +216,84 @@ namespace AlUmmahNow.FileScanService
             }
         }
 
+        internal static void ConfigureLoopbackEndpoint(KestrelServerOptions options, int port)
+        {
+            options.Listen(IPAddress.Loopback, port);
+        }
+
+        internal static void ConfigureSignalRCors(CorsOptions options)
+        {
+            options.AddDefaultPolicy(policy =>
+            {
+                policy.SetIsOriginAllowed(origin =>
+                      {
+                          if (string.IsNullOrEmpty(origin) || !Uri.TryCreate(origin, UriKind.Absolute, out var uri))
+                          {
+                              return false;
+                          }
+
+                          return IsLoopbackHost(uri.Host);
+                      })
+                      .AllowAnyHeader()
+                      .AllowAnyMethod()
+                      .AllowCredentials();
+            });
+        }
+
+        internal static void MapFileScanEndpoints(IEndpointRouteBuilder endpoints, int port, Func<object?>? getLockInfo = null)
+        {
+            endpoints.MapHub<FileScanHub>("/scanHub");
+
+            endpoints.MapGet("/health", () => Results.Ok(new
+            {
+                status = "healthy",
+                service = "FileScanService",
+                signalRHub = "/scanHub",
+                timestamp = DateTime.UtcNow,
+                processId = Environment.ProcessId,
+                port = port
+            }));
+
+            endpoints.MapGet("/singleton", () => Results.Ok(new
+            {
+                singleton = true,
+                lockInfo = getLockInfo?.Invoke(),
+                service = "FileScanService",
+                timestamp = DateTime.UtcNow
+            }));
+
+            endpoints.MapGet("/", () => Results.Ok(new
+            {
+                message = "AlUmmahNow File Scan Service - SignalR Hub Host",
+                signalRHub = "/scanHub",
+                health = "/health",
+                singleton = "/singleton",
+                consoleCommands = new
+                {
+                    help = "Add --help argument when starting",
+                    listSessions = "Add --list-sessions argument when starting",
+                    status = "Add --status <session-id> argument when starting",
+                    singletonInfo = "Add --singleton-info argument for singleton status"
+                }
+            }));
+        }
+
         internal static int ResolvePort(IConfiguration configuration)
         {
-            if (TryParsePortFromUrls(configuration["ASPNETCORE_URLS"], out var aspnetPort))
-            {
-                return aspnetPort;
-            }
-
-            if (TryParsePort(configuration["Kestrel:Endpoints:Http:Url"], out var kestrelPort))
+            // Match Kestrel's own precedence (endpoint config before ASPNETCORE_URLS), then fall
+            // back to the client-style FileScanService:Url and finally 5000. Only loopback URLs
+            // are accepted so the unauthenticated hub is never exposed on non-loopback interfaces.
+            if (TryParseLoopbackPort(configuration["Kestrel:Endpoints:Http:Url"], "Kestrel:Endpoints:Http:Url", out var kestrelPort))
             {
                 return kestrelPort;
             }
 
-            if (TryParsePort(configuration["FileScanService:Url"], out var servicePort))
+            if (TryParseLoopbackPortFromUrls(configuration["ASPNETCORE_URLS"], "ASPNETCORE_URLS", out var aspnetPort))
+            {
+                return aspnetPort;
+            }
+
+            if (TryParseLoopbackPort(configuration["FileScanService:Url"], "FileScanService:Url", out var servicePort))
             {
                 return servicePort;
             }
@@ -283,7 +301,7 @@ namespace AlUmmahNow.FileScanService
             return 5000;
         }
 
-        private static bool TryParsePortFromUrls(string? urls, out int port)
+        private static bool TryParseLoopbackPortFromUrls(string? urls, string key, out int port)
         {
             port = 0;
             if (string.IsNullOrWhiteSpace(urls))
@@ -291,44 +309,95 @@ namespace AlUmmahNow.FileScanService
                 return false;
             }
 
-            foreach (var raw in urls.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            var entries = urls.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+            // Prefer an http:// entry when both https:// and http:// are present (e.g. dev launch profile)
+            // because SignalR clients connect over HTTP on loopback.
+            int? fallbackPort = null;
+            foreach (var raw in entries)
             {
-                if (TryParsePort(raw, out port))
+                if (!TryParseLoopbackUri(raw, key, out var uri))
                 {
+                    continue;
+                }
+
+                if (string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase))
+                {
+                    port = uri.Port;
                     return true;
                 }
+
+                fallbackPort ??= uri.Port;
+            }
+
+            if (fallbackPort.HasValue)
+            {
+                port = fallbackPort.Value;
+                return true;
             }
 
             return false;
         }
 
-        private static bool TryParsePort(string? value, out int port)
+        private static bool TryParseLoopbackPort(string? value, string key, out int port)
         {
             port = 0;
+            if (!TryParseLoopbackUri(value, key, out var uri))
+            {
+                return false;
+            }
+
+            port = uri.Port;
+            return true;
+        }
+
+        private static bool TryParseLoopbackUri(string? value, string key, out Uri uri)
+        {
+            uri = null!;
             if (string.IsNullOrWhiteSpace(value))
             {
                 return false;
             }
 
             var trimmed = value.Trim();
-            if (int.TryParse(trimmed, out var parsedInt) && parsedInt is > 0 and <= 65535)
+            if (trimmed.Contains("://*:", StringComparison.Ordinal) || trimmed.Contains("://+:", StringComparison.Ordinal))
             {
-                port = parsedInt;
+                Log.Warning("Ignoring wildcard URL '{Url}' in {Key}; FileScanService binds to loopback only.", trimmed, key);
+                return false;
+            }
+
+            if (!Uri.TryCreate(trimmed, UriKind.Absolute, out var parsed)
+                || (!string.Equals(parsed.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(parsed.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)))
+            {
+                return false;
+            }
+
+            if (!IsLoopbackHost(parsed.Host))
+            {
+                Log.Warning("Ignoring non-loopback URL '{Url}' in {Key}; FileScanService binds to loopback only.", trimmed, key);
+                return false;
+            }
+
+            // Reject explicit :0 (dynamic port) so SingletonManager and Kestrel never disagree.
+            var hasExplicitZeroPort = trimmed.EndsWith(":0", StringComparison.Ordinal) || trimmed.Contains(":0/", StringComparison.Ordinal);
+            if (hasExplicitZeroPort || parsed.Port is <= 0 or > 65535)
+            {
+                return false;
+            }
+
+            uri = parsed;
+            return true;
+        }
+
+        private static bool IsLoopbackHost(string host)
+        {
+            if (string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase))
+            {
                 return true;
             }
 
-            // Kestrel allows wildcard hosts like http://*:5055 or http://+:5055
-            var normalized = trimmed
-                .Replace("://*:", "://localhost:", StringComparison.Ordinal)
-                .Replace("://+:", "://localhost:", StringComparison.Ordinal);
-
-            if (Uri.TryCreate(normalized, UriKind.Absolute, out var uri) && uri.Port is > 0 and <= 65535)
-            {
-                port = uri.Port;
-                return true;
-            }
-
-            return false;
+            return IPAddress.TryParse(host, out var ip) && IPAddress.IsLoopback(ip);
         }
 
         private static void ShowHelp()
