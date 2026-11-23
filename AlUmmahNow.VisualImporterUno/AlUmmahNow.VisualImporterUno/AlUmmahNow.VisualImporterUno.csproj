@@ -55,6 +55,12 @@
     <PackageReference Include="Serilog.Enrichers.Thread" />
   </ItemGroup>
 
+  <!-- Third-party notices (packaging/licenses, docs/RELEASE.md) in every build and package, in a licenses folder.
+       NUGET-PACKAGES.txt is generated there by the release workflow before it publishes. -->
+  <ItemGroup>
+    <None Include="..\..\packaging\licenses\**\*" Link="licenses\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <!-- Skia Desktop support for Linux -->
   <ItemGroup Condition="'$(TargetFramework)' == 'net9.0-desktop'">
     <PackageReference Include="SkiaSharp.NativeAssets.Linux" />

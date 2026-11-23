@@ -1,0 +1,413 @@
+name: Release
+# Al Ummah Now Tools releases (docs/RELEASE.md, wiki TOOLS-ADMIN TA-15).
+# A tag vYYYY.MM.DD on master (vYYYY.MM.DD.N, N >= 2, for a later release that day; the date is the US Eastern
+# date, America/New_York, as for the videos releases) runs the tests, builds Windows, macOS and Linux packages,
+# launches each installed app once, and publishes a GitHub release with SHA256SUMS.txt, the third-party
+# licences and notes (install table, which server release each page needs, the PRs merged since the last tag).
+# One build serves every environment: the app's environment picker chooses QA, stage or production.
+# Pull requests that change packaging, and workflow_dispatch, are dry runs: same builds and launches, no release.
+#
+# Signing is optional and never fails the run when a value is missing (a ::notice:: names it):
+#   Windows Authenticode (exe + MSI): WINDOWS_CERT_PFX_BASE64, WINDOWS_CERT_PASSWORD (AlUmmahNowDesktop's names)
+#   macOS Developer ID + notarization: DEVELOPER_ID_P12 (base64), DEVELOPER_ID_P12_PASSWORD, APPLE_TEAM_ID,
+#     ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8 (AlUmmahNowApple's names)
+on:
+  push:
+    tags:
+      - 'v[0-9][0-9][0-9][0-9].[0-9][0-9].[0-9][0-9]'
+      - 'v[0-9][0-9][0-9][0-9].[0-9][0-9].[0-9][0-9].*'
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+      - packaging/**
+      - scripts/build-deb.sh
+      - scripts/nuget-notices.py
+      - scripts/release-notes.py
+      - scripts/smoke-launch.sh
+  workflow_dispatch:
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+permissions:
+  contents: read
+env:
+  APP: AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno.csproj
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  DOTNET_NOLOGO: '1'
+jobs:
+  verify:
+    name: Version and tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      name: ${{ steps.version.outputs.name }}
+      numeric: ${{ steps.version.outputs.numeric }}
+      msi: ${{ steps.version.outputs.msi }}
+      build: ${{ steps.version.outputs.build }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Only release from master
+        if: github.event_name == 'push'
+        run: git merge-base --is-ancestor "$GITHUB_SHA" origin/master
+      - id: version
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = push ]; then tag="$GITHUB_REF_NAME"; else tag="v$(TZ=America/New_York date +%Y.%m.%d).0"; fi
+          if [[ ! "$tag" =~ ^v([0-9]{4})\.([0-9]{2})\.([0-9]{2})(\.([0-9]+))?$ ]]; then
+            echo "::error::$tag is not vYYYY.MM.DD or vYYYY.MM.DD.N"; exit 1
+          fi
+          y=${BASH_REMATCH[1]} m=$((10#${BASH_REMATCH[2]})) d=$((10#${BASH_REMATCH[3]})) n=${BASH_REMATCH[5]:-1}
+          if [ "$GITHUB_EVENT_NAME" = push ] && [ -n "${BASH_REMATCH[5]}" ] && [ "$n" -lt 2 ]; then
+            echo "::error::the first release of a day is vYYYY.MM.DD; later ones are .2, .3, ..."; exit 1
+          fi
+          if [ "$m" -lt 1 ] || [ "$m" -gt 12 ] || [ "$d" -lt 1 ] || [ "$d" -gt 31 ] || [ "$n" -gt 99 ]; then
+            echo "::error::$tag has an impossible date or more than 99 releases that day"; exit 1
+          fi
+          {
+            echo "tag=$tag"
+            echo "name=${tag#v}"                       # file names, InformationalVersion, .deb version
+            echo "numeric=$y.$m.$d.$n"                 # assembly and file version
+            echo "msi=$((y - 2000)).$m.$((d * 100 + n))" # MSI: major<=255.minor<=255.build<=65535
+            echo "build=$y$(printf %02d%02d%02d "$m" "$d" "$n")" # CFBundleVersion
+          } | tee -a "$GITHUB_OUTPUT"
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+      - name: Fetch AlUmmahNow.Core
+        run: scripts/fetch-core.sh
+      - name: Test ToolsCore
+        run: dotnet test AlUmmahNow.ToolsCore.Tests/AlUmmahNow.ToolsCore.Tests.csproj -c Release
+      - name: Test the importer libraries
+        run: dotnet test AlUmmahNow.Tests/AlUmmahNow.Tests.csproj -c Release
+      - name: NuGet licence list
+        run: |
+          dotnet restore "$APP"
+          python3 scripts/nuget-notices.py "$(dirname "$APP")/obj/project.assets.json" packaging/licenses/NUGET-PACKAGES.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: notices
+          path: packaging/licenses/NUGET-PACKAGES.txt
+          if-no-files-found: error
+
+  windows:
+    needs: verify
+    runs-on: windows-latest
+    timeout-minutes: 45
+    outputs:
+      signed: ${{ steps.sign.outputs.signed }}
+    env:
+      NAME: ${{ needs.verify.outputs.name }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+      - name: Fetch AlUmmahNow.Core
+        shell: bash
+        run: scripts/fetch-core.sh
+      - uses: actions/download-artifact@v4
+        with:
+          name: notices
+          path: packaging/licenses
+      - name: Publish self-contained (win-x64)
+        run: >
+          dotnet publish $env:APP -f net9.0-desktop -c Release -r win-x64 --self-contained
+          -p:Version=${{ needs.verify.outputs.numeric }} -p:FileVersion=${{ needs.verify.outputs.numeric }}
+          -p:InformationalVersion=$env:NAME -p:ApplicationDisplayVersion=$env:NAME
+          -p:ApplicationVersion=${{ needs.verify.outputs.build }} -o out/publish
+      - name: Signing certificate
+        id: sign
+        shell: pwsh
+        env:
+          PFX: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
+          PFX_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: |
+          if (-not $env:PFX -or -not $env:PFX_PASSWORD) {
+            Write-Output "::notice::Windows files are not signed: WINDOWS_CERT_PFX_BASE64 and WINDOWS_CERT_PASSWORD are not set (docs/RELEASE.md)"
+            "signed=false" >> $env:GITHUB_OUTPUT; "suffix=-unsigned" >> $env:GITHUB_OUTPUT; exit 0
+          }
+          $pfx = Join-Path $env:RUNNER_TEMP "tools-sign.pfx"
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:PFX))
+          $tool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" | Sort-Object FullName -Descending | Select-Object -First 1
+          "SIGNTOOL=$($tool.FullName)" >> $env:GITHUB_ENV
+          "PFX_PATH=$pfx" >> $env:GITHUB_ENV
+          & $tool.FullName sign /fd SHA256 /f $pfx /p $env:PFX_PASSWORD /tr http://timestamp.digicert.com /td SHA256 out/publish/AlUmmahNow.VisualImporterUno.exe
+          if ($LASTEXITCODE -ne 0) { throw "signing the exe failed" }
+          "signed=true" >> $env:GITHUB_OUTPUT; "suffix=" >> $env:GITHUB_OUTPUT
+      - name: Portable zip
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Compress-Archive -Path out/publish/* -DestinationPath "dist/AlUmmahNow-Tools-Windows-$env:NAME-x64-portable${{ steps.sign.outputs.suffix }}.zip"
+      - name: MSI installer (WiX 5)
+        shell: pwsh
+        env:
+          PFX_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: |
+          dotnet tool install --global wix --version 5.0.2
+          $msi = "dist/AlUmmahNow-Tools-Windows-$env:NAME-x64${{ steps.sign.outputs.suffix }}.msi"
+          wix build packaging/windows/tools.wxs -arch x64 -d Version=${{ needs.verify.outputs.msi }} -d "PublishDir=$((Resolve-Path out/publish).Path)" -o $msi
+          if ($LASTEXITCODE -ne 0) { throw "wix build failed" }
+          if ("${{ steps.sign.outputs.signed }}" -eq "true") {
+            try {
+              & $env:SIGNTOOL sign /fd SHA256 /f $env:PFX_PATH /p $env:PFX_PASSWORD /tr http://timestamp.digicert.com /td SHA256 $msi
+              if ($LASTEXITCODE -ne 0) { throw "signing the MSI failed" }
+              & $env:SIGNTOOL verify /pa $msi
+              if ($LASTEXITCODE -ne 0) { throw "the MSI signature does not verify" }
+            } finally { Remove-Item $env:PFX_PATH -Force -ErrorAction SilentlyContinue }
+          }
+      - name: Install, launch and uninstall the MSI
+        shell: pwsh
+        run: |
+          $msi = (Resolve-Path "dist/AlUmmahNow-Tools-Windows-$env:NAME-x64${{ steps.sign.outputs.suffix }}.msi").Path
+          $p = Start-Process msiexec -ArgumentList "/i `"$msi`" /qn /l*v install.log" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Get-Content install.log -Tail 50; throw "install failed: $($p.ExitCode)" }
+          $exe = "$env:ProgramFiles\Al Ummah Now Tools\AlUmmahNow.VisualImporterUno.exe"
+          if (-not (Test-Path $exe)) { throw "not installed at $exe" }
+          if (-not (Test-Path "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Al Ummah Now Tools.lnk")) { throw "no Start menu shortcut" }
+          if (-not (Test-Path "$env:ProgramFiles\Al Ummah Now Tools\licenses\THIRD-PARTY-NOTICES.md")) { throw "no licences in the install" }
+          New-Item -ItemType Directory -Force smoke | Out-Null
+          $png = Join-Path (Resolve-Path smoke).Path "windows.png"
+          $env:TOOLS_DEMO = "1"; $env:TOOLS_DEMO_LANG = "en"; $env:TOOLS_SCREENSHOT = $png
+          $app = Start-Process $exe -PassThru -RedirectStandardOutput smoke/windows.log -RedirectStandardError smoke/windows.err
+          if (-not $app.WaitForExit(120000)) { Stop-Process -Id $app.Id -Force; Write-Output "::warning::the app was still running after 120 s" }
+          if (-not (Test-Path $png) -or (Get-Item $png).Length -eq 0) { Get-Content smoke/windows.log, smoke/windows.err -Tail 40 -ErrorAction SilentlyContinue; throw "the installed app did not start (no screenshot)" }
+          Write-Output "smoke launch passed: $((Get-Item $png).Length) byte screenshot"
+          $p = Start-Process msiexec -ArgumentList "/x `"$msi`" /qn" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "uninstall failed: $($p.ExitCode)" }
+          if (Test-Path $exe) { throw "uninstall left the app behind" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-windows
+          path: dist/*
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-windows
+          path: smoke
+          if-no-files-found: ignore
+
+  macos:
+    needs: verify
+    runs-on: macos-15
+    timeout-minutes: 60
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - rid: osx-arm64
+            arch: arm64
+            smoke: true
+          # Built on the Apple-silicon runner; launched by staff on Intel Macs only
+          - rid: osx-x64
+            arch: x64
+            smoke: false
+    outputs:
+      signed: ${{ steps.keychain.outputs.notarize }}
+    env:
+      NAME: ${{ needs.verify.outputs.name }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+      - name: Fetch AlUmmahNow.Core
+        run: scripts/fetch-core.sh
+      - uses: actions/download-artifact@v4
+        with:
+          name: notices
+          path: packaging/licenses
+      - name: Developer ID certificate
+        id: keychain
+        env:
+          DEVELOPER_ID_P12: ${{ secrets.DEVELOPER_ID_P12 }}
+          DEVELOPER_ID_P12_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          missing=""
+          for n in DEVELOPER_ID_P12 DEVELOPER_ID_P12_PASSWORD APPLE_TEAM_ID; do [ -n "${!n}" ] || missing="$missing $n"; done
+          if [ -n "$missing" ]; then
+            echo "::notice::macOS app is not signed or notarized: missing$missing (docs/RELEASE.md)"
+            { echo "identity="; echo "notarize=false"; echo "suffix=-unsigned"; } >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          kc="$RUNNER_TEMP/release.keychain-db" pw=$(uuidgen)
+          printf '%s' "$DEVELOPER_ID_P12" | base64 --decode > "$RUNNER_TEMP/developer-id.p12"
+          security create-keychain -p "$pw" "$kc"
+          security set-keychain-settings -lut 3600 "$kc"
+          security unlock-keychain -p "$pw" "$kc"
+          security import "$RUNNER_TEMP/developer-id.p12" -k "$kc" -P "$DEVELOPER_ID_P12_PASSWORD" -T /usr/bin/codesign
+          rm -f "$RUNNER_TEMP/developer-id.p12"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$pw" "$kc" >/dev/null
+          # shellcheck disable=SC2046 # one keychain path per word
+          security list-keychains -d user -s "$kc" $(security list-keychains -d user | tr -d '"')
+          identity=$(security find-identity -v -p codesigning "$kc" | grep -o "\"Developer ID Application: .*($APPLE_TEAM_ID)\"" | head -1 | tr -d '"')
+          [ -n "$identity" ] || { echo "::error::no Developer ID Application identity for team $APPLE_TEAM_ID in DEVELOPER_ID_P12"; exit 1; }
+          echo "identity=$identity" >> "$GITHUB_OUTPUT"
+          missing=""
+          for n in ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8; do [ -n "${!n}" ] || missing="$missing $n"; done
+          if [ -n "$missing" ]; then
+            echo "::notice::macOS app is signed but not notarized: missing$missing (docs/RELEASE.md)"
+            { echo "notarize=false"; echo "suffix=-unsigned"; } >> "$GITHUB_OUTPUT"
+          else
+            printf '%s' "$ASC_KEY_P8" > "$RUNNER_TEMP/AuthKey.p8"
+            { echo "notarize=true"; echo "suffix="; } >> "$GITHUB_OUTPUT"
+          fi
+      - name: Publish the app bundle (${{ matrix.rid }})
+        env:
+          IDENTITY: ${{ steps.keychain.outputs.identity }}
+        run: |
+          sign=()
+          if [ -n "$IDENTITY" ]; then
+            sign=(-p:CodesignKey="$IDENTITY" -p:UnoMacOSHardenedRuntime=true -p:UnoMacOSEntitlements="$PWD/packaging/macos/entitlements.plist")
+          fi
+          dotnet publish "$APP" -f net9.0-desktop -c Release -r ${{ matrix.rid }} --self-contained -p:PackageFormat=app \
+            -p:Version=${{ needs.verify.outputs.numeric }} -p:FileVersion=${{ needs.verify.outputs.numeric }} \
+            -p:InformationalVersion="$NAME" -p:ApplicationDisplayVersion="$NAME" \
+            -p:ApplicationVersion=${{ needs.verify.outputs.build }} "${sign[@]}" -o out/publish
+          app=$(find out/publish -maxdepth 2 -name '*.app' -type d | head -1)
+          [ -n "$app" ] || { echo "::error::no .app bundle"; find out/publish -maxdepth 2; exit 1; }
+          # Without a Developer ID the bundle still needs a (local) signature to run on Apple silicon
+          [ -n "$IDENTITY" ] || codesign --force --deep --sign - "$app"
+          codesign --verify --deep --strict "$app"
+          find "$app" -name THIRD-PARTY-NOTICES.md | grep -q . || { echo "::error::no licences in the app bundle"; exit 1; }
+          echo "APP_BUNDLE=$app" >> "$GITHUB_ENV"
+      - name: Launch the app
+        if: matrix.smoke
+        run: |
+          exe=$(/usr/libexec/PlistBuddy -c 'Print CFBundleExecutable' "$APP_BUNDLE/Contents/Info.plist")
+          scripts/smoke-launch.sh "$PWD/smoke/macos.png" 120 "$APP_BUNDLE/Contents/MacOS/$exe"
+      - name: Disk image
+        env:
+          IDENTITY: ${{ steps.keychain.outputs.identity }}
+          NOTARIZE: ${{ steps.keychain.outputs.notarize }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          mkdir -p dist stage
+          cp -R "$APP_BUNDLE" stage/
+          ln -s /Applications stage/Applications
+          dmg="dist/AlUmmahNow-Tools-macOS-$NAME-${{ matrix.arch }}${{ steps.keychain.outputs.suffix }}.dmg"
+          hdiutil create -volname "Al Ummah Now Tools" -srcfolder stage -ov -format UDZO "$dmg"
+          if [ -n "$IDENTITY" ]; then codesign --force --sign "$IDENTITY" --timestamp "$dmg"; fi
+          if [ "$NOTARIZE" = true ]; then
+            xcrun notarytool submit "$dmg" --key "$RUNNER_TEMP/AuthKey.p8" --key-id "$ASC_KEY_ID" --issuer "$ASC_ISSUER_ID" --wait --timeout 30m
+            xcrun stapler staple "$dmg"
+            spctl --assess --type open --context context:primary-signature -v "$dmg"
+          fi
+          rm -f "$RUNNER_TEMP/AuthKey.p8"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-macos-${{ matrix.arch }}
+          path: dist/*
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always() && matrix.smoke
+        with:
+          name: smoke-macos
+          path: smoke
+          if-no-files-found: ignore
+
+  linux:
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      NAME: ${{ needs.verify.outputs.name }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+      - name: Fetch AlUmmahNow.Core
+        run: scripts/fetch-core.sh
+      - uses: actions/download-artifact@v4
+        with:
+          name: notices
+          path: packaging/licenses
+      - name: Publish self-contained (linux-x64)
+        run: |
+          dotnet publish "$APP" -f net9.0-desktop -c Release -r linux-x64 --self-contained \
+            -p:Version=${{ needs.verify.outputs.numeric }} -p:FileVersion=${{ needs.verify.outputs.numeric }} \
+            -p:InformationalVersion="$NAME" -p:ApplicationDisplayVersion="$NAME" \
+            -p:ApplicationVersion=${{ needs.verify.outputs.build }} -o out/publish
+          test -f out/publish/licenses/THIRD-PARTY-NOTICES.md
+      - name: Packages (.tar.gz, .deb)
+        run: |
+          mkdir -p dist
+          tar -C out/publish -czf "dist/AlUmmahNow-Tools-Linux-$NAME-x64.tar.gz" .
+          scripts/build-deb.sh out/publish "$NAME" AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno/Assets/Icons/staff_icon.png dist
+      - name: Install the .deb
+        run: |
+          sudo apt-get update -o Acquire::Retries=3
+          sudo apt-get install -y -o Acquire::Retries=3 ./dist/alummahnow-tools_*_amd64.deb xvfb
+      - name: Launch the installed app
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+        run: |
+          test -x /usr/bin/alummahnow-tools
+          test -f /usr/share/applications/net.alummahnow.tools.desktop
+          XDG_CONFIG_HOME=$(mktemp -d); XDG_DATA_HOME=$(mktemp -d); XDG_STATE_HOME=$(mktemp -d)
+          export XDG_CONFIG_HOME XDG_DATA_HOME XDG_STATE_HOME
+          scripts/smoke-launch.sh "$PWD/smoke/linux.png" 120 xvfb-run -a -s "-screen 0 1280x800x24" /usr/bin/alummahnow-tools
+          sudo dpkg --remove alummahnow-tools
+          test ! -e /usr/bin/alummahnow-tools
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-linux
+          path: dist/*
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-linux
+          path: smoke
+          if-no-files-found: ignore
+
+  release:
+    # Dry runs stop after the builds and launches above.
+    if: github.event_name == 'push'
+    needs: [verify, windows, macos, linux]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ needs.verify.outputs.tag }}
+      NAME: ${{ needs.verify.outputs.name }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: dist
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: notices
+          path: packaging/licenses
+      - name: Licences and checksums
+        run: |
+          (cd packaging && zip -r "../dist/AlUmmahNow-Tools-$NAME-licenses.zip" licenses)
+          cd dist && sha256sum -- * > SHA256SUMS.txt && cat SHA256SUMS.txt
+      - name: Release notes
+        run: |
+          # The tag before this one in version order (vYYYY.MM.DD < vYYYY.MM.DD.2 < ...), if any
+          prev=$(git tag -l 'v[0-9][0-9][0-9][0-9].[0-9][0-9].[0-9][0-9]*' | sort -V | awk -v t="$TAG" '$0 == t { print p; exit } { p = $0 }')
+          args=(-f tag_name="$TAG" -f target_commitish="$GITHUB_SHA")
+          [ -z "$prev" ] || args+=(-f previous_tag_name="$prev")
+          gh api "repos/$GITHUB_REPOSITORY/releases/generate-notes" "${args[@]}" -q .body > generated.md
+          python3 scripts/release-notes.py "$TAG" "$NAME" "${{ needs.windows.outputs.signed }}" "${{ needs.macos.outputs.signed }}" generated.md > notes.md
+          cat notes.md
+      - name: Publish the release
+        run: gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --verify-tag --latest --title "Al Ummah Now Tools $TAG" --notes-file notes.md
