@@ -26,7 +26,7 @@ public sealed partial class ImportView : Page
         ViewModel = App.GetService<BulkImportViewModel>();
         InitializeComponent();
         DataContext = ViewModel;
-        if (ViewModel.SelectedChannel is { } channel) ChannelBox.Text = channel.Name;
+        if (ViewModel.SelectedChannel is { } channel) ChannelBox.Text = channel.LocalizedName;
         SuggestionsUnderBox.Attach(ChannelBox);
         AutomationProperties.SetName(RemoveAllButton, Loc.Get("Import_RemoveAllConfirm"));
         Loaded += (_, _) =>
@@ -198,52 +198,103 @@ public sealed partial class ImportView : Page
     {
         if (args.SelectedItem is not ImportChannel channel) return;
         ViewModel.SelectedChannel = channel;
-        sender.Text = channel.Name;
+        sender.Text = channel.LocalizedName;
     }
 
     private async void NewChannel_Click(object sender, RoutedEventArgs e)
     {
-        // Name and description are typed in the interface's language, so an Arabic field starts on the right
-        var typed = Loc.IsArabic ? FlowDirection.RightToLeft : FlowDirection.LeftToRight;
-        // Uno places an empty field's caret by its alignment, not its direction: an Arabic field is aligned right too
-        var typedAlign = Loc.IsArabic ? TextAlignment.Right : TextAlignment.Left;
-        var name = new TextBox { Header = Loc.PopupLine(Loc.Get("Import_NewChannelName")), FlowDirection = typed, TextAlignment = typedAlign };
+        var namePair = new LocalizedFieldPair(
+            Loc.Get("Import_NewChannelName"),
+            "channels.name",
+            ViewModel.TranslateFieldAsync,
+            required: true,
+            multiline: false,
+            maxLength: ChannelValidation.MaxNameLength);
         // The handle is typed left to right in both languages; its label follows the dialog's direction
-        var handle = new TextBox { FlowDirection = FlowDirection.LeftToRight, PlaceholderText = "@" };
-        var handleLabel = new TextBlock { Text = Loc.PopupLine(Loc.Get("Import_NewChannelHandle")), Margin = new Thickness(0, 0, 0, -6) };
+        var handle = new TextBox { FlowDirection = FlowDirection.LeftToRight, TextAlignment = TextAlignment.Left, PlaceholderText = "@" };
+        var handleLabel = new TextBlock
+        {
+            Text = Loc.PopupLine(Loc.Get("Import_NewChannelHandle")),
+            Style = (Style)Application.Current.Resources["ToolsLabel"],
+            Margin = new Thickness(0, 0, 0, -6),
+        };
         AutomationProperties.SetName(handle, Loc.Get("Import_NewChannelHandle"));
-        var description = new TextBox { Header = Loc.PopupLine(Loc.Get("Import_NewChannelDescription")), AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 80, FlowDirection = typed, TextAlignment = typedAlign };
+        var descriptionPair = new LocalizedFieldPair(
+            Loc.Get("Import_NewChannelDescription"),
+            "channels.description",
+            ViewModel.TranslateFieldAsync,
+            required: false,
+            multiline: true,
+            maxLength: ChannelValidation.MaxDescriptionLength);
+
+        if (ImportWorkspace.Current.IsDemo && Environment.GetEnvironmentVariable("TOOLS_DEMO_IMPORT_CHANNEL") == "filled")
+        {
+            namePair.SetValues("Fiqh Academy", "أكاديمية الفقه");
+            handle.Text = "fiqhacademy";
+            descriptionPair.SetValues("Weekly lessons on the jurisprudence of worship.", "دروس أسبوعية في فقه العبادات.");
+        }
+
         var error = new TextBlock { Style = (Style)Application.Current.Resources["ToolsMuted"], Visibility = Visibility.Collapsed };
         error.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["FanousErrorTextBrush"];
-        var panel = new StackPanel { Spacing = 12, MinWidth = 320 };
+        var panel = new StackPanel { Spacing = 14, MinWidth = 520 };
         panel.Children.Add(DialogText(Loc.Get("Import_NewChannelBody")));
-        panel.Children.Add(name);
+        panel.Children.Add(namePair.Element);
         panel.Children.Add(handleLabel);
         panel.Children.Add(handle);
-        panel.Children.Add(description);
+        panel.Children.Add(descriptionPair.Element);
         panel.Children.Add(error);
+        var scroller = new ScrollViewer
+        {
+            Content = panel,
+            MaxHeight = 560,
+            HorizontalScrollMode = ScrollMode.Disabled,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+        };
         var dialog = new ContentDialog
         {
-            Title = Loc.Get("Import_NewChannelTitle"),
-            PrimaryButtonText = Loc.Get("Import_NewChannelCreate"),
-            CloseButtonText = Loc.Get("Import_Cancel"),
+            Title = Loc.PopupLine(Loc.Get("Import_NewChannelTitle")),
+            PrimaryButtonText = Loc.PopupLine(Loc.Get("Import_NewChannelCreate")),
+            CloseButtonText = Loc.PopupLine(Loc.Get("Import_Cancel")),
             DefaultButton = ContentDialogButton.Primary,
-            Content = panel,
+            Content = scroller,
             FlowDirection = FlowDirection,
             XamlRoot = XamlRoot,
         };
+        dialog.Resources["ContentDialogMaxWidth"] = 660.0;
+        if (Loc.IsArabic && ShellState.TextFontFor("ar") is { } arFont) dialog.FontFamily = arFont;
         DialogLook.Apply(dialog);
         dialog.PrimaryButtonClick += async (d, args) =>
         {
-            // Keep the dialog open until admin-api has answered, and show its reason when it says no
+            // Keep the dialog open until admin-api has answered, and show inline or server errors when refused
             var deferral = args.GetDeferral();
             try
             {
-                var problem = await ViewModel.CreateChannelAsync(name.Text, handle.Text, description.Text);
-                if (problem is not null)
+                namePair.SetErrors(null, null);
+                descriptionPair.SetErrors(null, null);
+                error.Visibility = Visibility.Collapsed;
+                var outcome = await ViewModel.CreateChannelAsync(
+                    namePair.English,
+                    namePair.Arabic,
+                    handle.Text,
+                    descriptionPair.English,
+                    descriptionPair.Arabic);
+                if (!outcome.Succeeded)
                 {
-                    error.Text = Loc.PopupLine(problem);
-                    error.Visibility = Visibility.Visible;
+                    if (outcome.FieldErrors is { } fe)
+                    {
+                        namePair.SetErrors(
+                            ChannelFieldErrorText("NameEn", fe.NameEn),
+                            ChannelFieldErrorText("NameAr", fe.NameAr));
+                        descriptionPair.SetErrors(
+                            ChannelFieldErrorText("DescEn", fe.DescriptionEn),
+                            ChannelFieldErrorText("DescAr", fe.DescriptionAr));
+                    }
+                    if (outcome.Error is not null)
+                    {
+                        error.Text = Loc.PopupLine(outcome.Error);
+                        error.Visibility = Visibility.Visible;
+                    }
                     args.Cancel = true;
                 }
             }
@@ -252,8 +303,17 @@ public sealed partial class ImportView : Page
                 deferral.Complete();
             }
         };
-        if (await dialog.ShowAsync() == ContentDialogResult.Primary && ViewModel.SelectedChannel is { } channel) ChannelBox.Text = channel.Name;
+        if (await dialog.ShowAsync() == ContentDialogResult.Primary && ViewModel.SelectedChannel is { } channel) ChannelBox.Text = channel.LocalizedName;
     }
+
+    private static string? ChannelFieldErrorText(string slot, string? code) => code switch
+    {
+        null => null,
+        "required" => Loc.Get($"Import_NewChannelError_{slot}_Required"),
+        "required_pair" => Loc.Get($"Import_NewChannelError_{slot}_Pair"),
+        "too_long" => Loc.Get($"Import_NewChannelError_{slot}_TooLong"),
+        _ => Loc.Get("Import_NewChannelNameNeeded"),
+    };
 
     // ------------------------------------------------------------ Folder
 

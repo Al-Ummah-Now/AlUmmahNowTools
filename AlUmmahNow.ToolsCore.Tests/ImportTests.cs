@@ -370,10 +370,141 @@ public class ImportApiClientTests
     [Fact]
     public async Task Lists_channels_by_name_from_the_admin_content_list()
     {
-        var handler = new FakeHandler { Answer = _ => FakeHandler.Json(HttpStatusCode.OK, "{\"success\":true,\"result\":{\"items\":[{\"id\":\"ch1\",\"name\":\"Al-Azhar\",\"handle\":\"azhar\",\"ownerEmail\":\"o@example.org\"}],\"total\":1,\"page\":1,\"pageSize\":20,\"indexComplete\":true}}") };
+        var handler = new FakeHandler { Answer = _ => FakeHandler.Json(HttpStatusCode.OK, "{\"success\":true,\"result\":{\"items\":[{\"id\":\"ch1\",\"name\":\"Al-Azhar\",\"nameLocalized\":{\"en\":\"Al-Azhar\",\"ar\":\"الأزهر\"},\"handle\":\"azhar\",\"ownerEmail\":\"o@example.org\"}],\"total\":1,\"page\":1,\"pageSize\":20,\"indexComplete\":true}}") };
         var channels = await new ImportApiClient(Admin, _ => Task.FromResult<string?>("tok"), handler).ListChannelsAsync("azhar ");
-        Assert.Equal("Al-Azhar", Assert.Single(channels).Name);
+        var channel = Assert.Single(channels);
+        Assert.Equal("Al-Azhar", channel.Name);
+        Assert.Equal("Al-Azhar", channel.NameFor(arabic: false));
+        Assert.Equal("الأزهر", channel.NameFor(arabic: true));
         Assert.Equal("/api/content/channels?page=1&pageSize=20&sort=name&q=azhar", handler.Requests[0].RequestUri!.PathAndQuery);
+    }
+
+    [Fact]
+    public async Task Creates_a_channel_with_bilingual_name_and_description()
+    {
+        string? captured = null;
+        var handler = new FakeHandler
+        {
+            Answer = req =>
+            {
+                captured = req.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+                return FakeHandler.Json(HttpStatusCode.Created, "{\"success\":true,\"result\":{\"channel\":{\"id\":\"ch2\",\"name\":\"Fiqh Academy\",\"nameLocalized\":{\"en\":\"Fiqh Academy\",\"ar\":\"أكاديمية الفقه\"},\"handle\":\"fiqh\"}}}");
+            },
+        };
+        var api = new ImportApiClient(Admin, _ => Task.FromResult<string?>("tok"), handler);
+        var created = await api.CreateChannelAsync("  Fiqh Academy  ", "  أكاديمية الفقه  ", "@fiqh", "Weekly lessons", "دروس أسبوعية");
+
+        Assert.Equal("ch2", created.Id);
+        Assert.Equal("أكاديمية الفقه", created.NameFor(arabic: true));
+        Assert.Equal("/api/admin/import/channels", handler.Requests[0].RequestUri!.AbsolutePath);
+        var body = JsonNode.Parse(captured!)!;
+        Assert.Equal("Fiqh Academy", body["name"]!.GetValue<string>());
+        Assert.Equal("Fiqh Academy", body["nameLocalized"]!["en"]!.GetValue<string>());
+        Assert.Equal("أكاديمية الفقه", body["nameLocalized"]!["ar"]!.GetValue<string>());
+        Assert.Equal("fiqh", body["handle"]!.GetValue<string>());
+        Assert.Equal("Weekly lessons", body["description"]!.GetValue<string>());
+        Assert.Equal("Weekly lessons", body["descriptionLocalized"]!["en"]!.GetValue<string>());
+        Assert.Equal("دروس أسبوعية", body["descriptionLocalized"]!["ar"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task Omits_optional_description_fields_when_both_are_empty()
+    {
+        string? captured = null;
+        var handler = new FakeHandler
+        {
+            Answer = req =>
+            {
+                captured = req.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+                return FakeHandler.Json(HttpStatusCode.Created, "{\"success\":true,\"result\":{\"channel\":{\"id\":\"ch3\",\"name\":\"Seerah\",\"nameLocalized\":{\"en\":\"Seerah\",\"ar\":\"السيرة\"}}}}");
+            },
+        };
+        var api = new ImportApiClient(Admin, _ => Task.FromResult<string?>("tok"), handler);
+        await api.CreateChannelAsync("Seerah", "السيرة", null, null, null);
+
+        var body = JsonNode.Parse(captured!)!.AsObject();
+        Assert.False(body.ContainsKey("description"));
+        Assert.False(body.ContainsKey("descriptionLocalized"));
+        Assert.False(body.ContainsKey("handle"));
+    }
+
+    [Fact]
+    public async Task Translates_fields_through_admin_api_and_handles_quran_refusal_and_errors()
+    {
+        string? captured = null;
+        var handler = new FakeHandler
+        {
+            Answer = req =>
+            {
+                captured = req.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+                return FakeHandler.Json(HttpStatusCode.OK, "{\"success\":true,\"result\":{\"items\":[{\"text\":\"أكاديمية الفقه\",\"cached\":false}],\"provider\":\"workers-ai\",\"machineTranslation\":true}}");
+            },
+        };
+        var api = new ImportApiClient(Admin, _ => Task.FromResult<string?>("tok"), handler);
+        var item = await api.TranslateFieldAsync("en", "ar", "Fiqh Academy", "channels.name");
+        Assert.Equal("أكاديمية الفقه", item.Text);
+        Assert.Null(item.Refused);
+        Assert.Equal("/api/translate/fields", handler.Requests[0].RequestUri!.AbsolutePath);
+        var body = JsonNode.Parse(captured!)!;
+        Assert.Equal("en", body["from"]!.GetValue<string>());
+        Assert.Equal("ar", body["to"]!.GetValue<string>());
+        Assert.Equal("channels.name", body["field"]!.GetValue<string>());
+        Assert.Equal("Fiqh Academy", body["texts"]![0]!.GetValue<string>());
+
+        var quranHandler = new FakeHandler
+        {
+            Answer = _ => FakeHandler.Json(HttpStatusCode.OK, "{\"success\":true,\"result\":{\"items\":[{\"text\":\"\",\"refused\":\"quran\",\"quran\":[{\"range\":\"2:255\",\"label\":\"Al-Baqarah 2:255\"}],\"cached\":false}]}}"),
+        };
+        var refused = await new ImportApiClient(Admin, _ => Task.FromResult<string?>("tok"), quranHandler).TranslateFieldAsync("ar", "en", "آية", "channels.description");
+        Assert.Equal("quran", refused.Refused);
+        Assert.Equal("Al-Baqarah 2:255", Assert.Single(refused.Quran!).Label);
+
+        var limitedHandler = new FakeHandler
+        {
+            Answer = _ => FakeHandler.Json(HttpStatusCode.TooManyRequests, "{\"success\":false,\"code\":\"daily_limit\",\"error\":\"daily_limit\"}"),
+        };
+        var ex = await Assert.ThrowsAsync<ImportApiException>(() => new ImportApiClient(Admin, _ => Task.FromResult<string?>("tok"), limitedHandler).TranslateFieldAsync("en", "ar", "Test", "channels.name"));
+        Assert.Equal(429, ex.Status);
+        Assert.Equal("daily_limit", ex.Code);
+    }
+
+    [Fact]
+    public void ChannelValidation_requires_both_languages_for_name_and_paired_descriptions()
+    {
+        var empty = ChannelValidation.Validate("", "", null, null);
+        Assert.True(empty.HasErrors);
+        Assert.Equal("required", empty.NameEn);
+        Assert.Equal("required", empty.NameAr);
+        Assert.Null(empty.DescriptionEn);
+        Assert.Null(empty.DescriptionAr);
+
+        var enOnly = ChannelValidation.Validate("Fiqh", "   ", null, null);
+        Assert.Null(enOnly.NameEn);
+        Assert.Equal("required", enOnly.NameAr);
+
+        var arOnly = ChannelValidation.Validate(" ", "الفقه", null, null);
+        Assert.Equal("required", arOnly.NameEn);
+        Assert.Null(arOnly.NameAr);
+
+        var halfDesc = ChannelValidation.Validate("Fiqh", "الفقه", "English only", "");
+        Assert.True(halfDesc.HasErrors);
+        Assert.Null(halfDesc.DescriptionEn);
+        Assert.Equal("required_pair", halfDesc.DescriptionAr);
+
+        var halfDescAr = ChannelValidation.Validate("Fiqh", "الفقه", "", "وصف فقط");
+        Assert.True(halfDescAr.HasErrors);
+        Assert.Equal("required_pair", halfDescAr.DescriptionEn);
+        Assert.Null(halfDescAr.DescriptionAr);
+
+        var tooLong = ChannelValidation.Validate(new string('a', 101), "الفقه", new string('b', 5001), "وصف");
+        Assert.Equal("too_long", tooLong.NameEn);
+        Assert.Equal("too_long", tooLong.DescriptionEn);
+
+        var validNoDesc = ChannelValidation.Validate("Fiqh", "الفقه", "", "");
+        Assert.False(validNoDesc.HasErrors);
+
+        var validWithDesc = ChannelValidation.Validate("Fiqh", "الفقه", "Lessons", "دروس");
+        Assert.False(validWithDesc.HasErrors);
     }
 }
 

@@ -230,9 +230,9 @@ internal static class DemoImport
 
     public static readonly ImportChannel[] Channels =
     {
-        new(ChannelId, "Shaykh Ahmad al-Azhari", "azhari", "ahmad.azhari@mail.alummahnow.net"),
-        new("ch_demo_seerah", "Seerah Circle", "seerahcircle", "seerah.circle@mail.alummahnow.net"),
-        new("ch_demo_quran", "Quran Recitations Archive", "recitations", "archive@mail.alummahnow.net"),
+        new(ChannelId, "Shaykh Ahmad al-Azhari", "azhari", "ahmad.azhari@mail.alummahnow.net", new Dictionary<string, string> { ["en"] = "Shaykh Ahmad al-Azhari", ["ar"] = "الشيخ أحمد الأزهري" }),
+        new("ch_demo_seerah", "Seerah Circle", "seerahcircle", "seerah.circle@mail.alummahnow.net", new Dictionary<string, string> { ["en"] = "Seerah Circle", ["ar"] = "حلقة السيرة" }),
+        new("ch_demo_quran", "Quran Recitations Archive", "recitations", "archive@mail.alummahnow.net", new Dictionary<string, string> { ["en"] = "Quran Recitations Archive", ["ar"] = "أرشيف تلاوات القرآن" }),
     };
 
     private static ScannedVideo Video(string folder, string name, long size, string? titleAr, string[] captions, bool chapters, bool thumbnail, ScanNote[]? notes = null) =>
@@ -478,25 +478,45 @@ internal sealed class DemoTranscriber : ITranscriber
     public Task<string> TranscribeAsync(string modelPath, string mediaPath, string? language, IProgress<double> progress, CancellationToken ct) => Task.FromException<string>(new TranscribeException("unavailable", "Demo"));
 }
 
-/// <summary>admin-api for screenshots: the channel list, new channels and batches, and social sources; nothing sent anywhere.</summary>
+/// <summary>admin-api for screenshots: the channel list, new channels, batches, field translation and social sources; nothing sent anywhere.</summary>
 internal sealed class DemoImportServer : HttpMessageHandler
 {
-    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         var path = request.RequestUri!.AbsolutePath;
         if (DemoSocial.IsMissing(request.RequestUri))
-            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound) { Content = new StringContent("404 Not Found", Encoding.UTF8, "text/plain") });
+            return new HttpResponseMessage(HttpStatusCode.NotFound) { Content = new StringContent("404 Not Found", Encoding.UTF8, "text/plain") };
         // Social sources and their sync jobs (TA-13)
         if (DemoSocial.Answer(request) is { } social)
-            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(social, Encoding.UTF8, "application/json") });
-        string body = path switch
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(social, Encoding.UTF8, "application/json") };
+        string body;
+        if (path == "/api/content/channels")
         {
-            "/api/content/channels" => "{\"success\":true,\"result\":{\"items\":[" + string.Join(",", DemoImport.Channels.Select(c =>
-                $"{{\"id\":\"{c.Id}\",\"name\":\"{c.Name}\",\"handle\":\"{c.Handle}\",\"ownerEmail\":\"{c.OwnerEmail}\"}}")) + "],\"total\":3,\"page\":1,\"pageSize\":20,\"indexComplete\":true}}",
-            "/api/admin/import/channels" => "{\"success\":true,\"result\":{\"channel\":{\"id\":\"ch_demo_new\",\"name\":\"New channel\",\"handle\":\"newchannel\"}}}",
-            "/api/admin/import/batches" => "{\"success\":true,\"result\":{\"batch\":{\"id\":\"batch_demo_2\",\"channelId\":\"" + DemoImport.ChannelId + "\",\"name\":null}}}",
-            _ => "{\"success\":true,\"result\":{}}",
-        };
-        return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body, Encoding.UTF8, "application/json") });
+            body = "{\"success\":true,\"result\":{\"items\":[" + string.Join(",", DemoImport.Channels.Select(c =>
+            {
+                var locJson = c.NameLocalized is null ? "" : ",\"nameLocalized\":" + System.Text.Json.JsonSerializer.Serialize(c.NameLocalized);
+                return $"{{\"id\":\"{c.Id}\",\"name\":\"{c.Name}\",\"handle\":\"{c.Handle}\",\"ownerEmail\":\"{c.OwnerEmail}\"{locJson}}}";
+            })) + "],\"total\":3,\"page\":1,\"pageSize\":20,\"indexComplete\":true}}";
+        }
+        else if (path == "/api/admin/import/channels")
+        {
+            body = "{\"success\":true,\"result\":{\"channel\":{\"id\":\"ch_demo_new\",\"name\":\"Fiqh Academy\",\"nameLocalized\":{\"en\":\"Fiqh Academy\",\"ar\":\"أكاديمية الفقه\"},\"handle\":\"fiqhacademy\"}}}";
+        }
+        else if (path == "/api/admin/import/batches")
+        {
+            body = "{\"success\":true,\"result\":{\"batch\":{\"id\":\"batch_demo_2\",\"channelId\":\"" + DemoImport.ChannelId + "\",\"name\":null}}}";
+        }
+        else if (path == "/api/translate/fields")
+        {
+            var reqText = request.Content is not null ? await request.Content.ReadAsStringAsync(cancellationToken) : "";
+            var toAr = reqText.Contains("\"to\":\"ar\"", StringComparison.OrdinalIgnoreCase);
+            var translated = toAr ? "أكاديمية الفقه" : "Fiqh Academy";
+            body = "{\"success\":true,\"result\":{\"items\":[{\"text\":\"" + translated + "\",\"cached\":false}],\"provider\":\"workers-ai\",\"machineTranslation\":true}}";
+        }
+        else
+        {
+            body = "{\"success\":true,\"result\":{}}";
+        }
+        return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
     }
 }

@@ -2098,7 +2098,94 @@
     <value>إنشاء القناة</value>
   </data>
   <data name="Import_NewChannelNameNeeded" xml:space="preserve">
-    <value>أعطِ القناة اسمًا.</value>
+    <value>أعطِ القناة اسمًا بالإنجليزية والعربية.</value>
+  </data>
+  <data name="Import_NewChannelError_NameEn_Required" xml:space="preserve">
+    <value>أدخل الاسم بالإنجليزية.</value>
+  </data>
+  <data name="Import_NewChannelError_NameAr_Required" xml:space="preserve">
+    <value>أدخل الاسم بالعربية.</value>
+  </data>
+  <data name="Import_NewChannelError_NameEn_TooLong" xml:space="preserve">
+    <value>استخدم ١٠٠ حرف على الأكثر.</value>
+  </data>
+  <data name="Import_NewChannelError_NameAr_TooLong" xml:space="preserve">
+    <value>استخدم ١٠٠ حرف على الأكثر.</value>
+  </data>
+  <data name="Import_NewChannelError_DescEn_Pair" xml:space="preserve">
+    <value>أضف الوصف بالإنجليزية أو اتركهما فارغين.</value>
+  </data>
+  <data name="Import_NewChannelError_DescAr_Pair" xml:space="preserve">
+    <value>أضف الوصف بالعربية أو اتركهما فارغين.</value>
+  </data>
+  <data name="Import_NewChannelError_DescEn_TooLong" xml:space="preserve">
+    <value>استخدم ٥٠٠٠ حرف على الأكثر.</value>
+  </data>
+  <data name="Import_NewChannelError_DescAr_TooLong" xml:space="preserve">
+    <value>استخدم ٥٠٠٠ حرف على الأكثر.</value>
+  </data>
+  <data name="Localized_English" xml:space="preserve">
+    <value>English</value>
+  </data>
+  <data name="Localized_Arabic" xml:space="preserve">
+    <value>العربية</value>
+  </data>
+  <data name="Localized_LangEnglish" xml:space="preserve">
+    <value>الإنجليزية</value>
+  </data>
+  <data name="Localized_LangArabic" xml:space="preserve">
+    <value>العربية</value>
+  </data>
+  <data name="Localized_FieldIn" xml:space="preserve">
+    <value>{0} ({1})</value>
+  </data>
+  <data name="Localized_TranslateToAr" xml:space="preserve">
+    <value>ترجم إلى العربية</value>
+  </data>
+  <data name="Localized_TranslateToEn" xml:space="preserve">
+    <value>ترجم إلى الإنجليزية</value>
+  </data>
+  <data name="Localized_Translating" xml:space="preserve">
+    <value>جارٍ الترجمة…</value>
+  </data>
+  <data name="Localized_Filled" xml:space="preserve">
+    <value>مُلئ حقل {0} بترجمة آلية، راجعه قبل الحفظ.</value>
+  </data>
+  <data name="Localized_Replaced" xml:space="preserve">
+    <value>استُبدل نص {0} بترجمة آلية، راجعه قبل الحفظ.</value>
+  </data>
+  <data name="Localized_Undo" xml:space="preserve">
+    <value>تراجع</value>
+  </data>
+  <data name="Localized_Undone" xml:space="preserve">
+    <value>استُعيد نص {0} السابق.</value>
+  </data>
+  <data name="Localized_SourceEmpty" xml:space="preserve">
+    <value>أدخل نص {0} أولًا.</value>
+  </data>
+  <data name="Localized_QuranRefused" xml:space="preserve">
+    <value>لا يُترجم النص القرآني آليًا، الصق النص المعتمد بدلًا من ذلك.</value>
+  </data>
+  <data name="Localized_QuranRefs" xml:space="preserve">
+    <value>المواضع: {0}</value>
+  </data>
+  <data name="Localized_ErrorLimit" xml:space="preserve">
+    <value>بلغت حد الترجمة اليومي، حاول مجددًا غدًا.</value>
+  </data>
+  <data name="Localized_ErrorPaused" xml:space="preserve">
+    <value>الترجمة متوقفة حاليًا.</value>
+  </data>
+  <data name="Localized_ErrorBudget" xml:space="preserve">
+    <value>نفدت ميزانية الترجمة اليوم، حاول مجددًا غدًا.</value>
+  </data>
+  <data name="Localized_ErrorForbidden" xml:space="preserve">
+    <value>لا يملك حسابك صلاحية ترجمة الحقول.</value>
+  </data>
+  <data name="Localized_ErrorUnavailable" xml:space="preserve">
+    <value>تعذّر الوصول إلى خدمة الترجمة، حاول مجددًا.</value>
+  </data>
+  <data name="Localized_ErrorFailed" xml:space="preserve">
+    <value>تعذّرت الترجمة، حاول مجددًا.</value>
   </data>
   <data name="Import_NewChannelTaken" xml:space="preserve">
     <value>هذا المعرّف مستخدم. اختر غيره.</value>

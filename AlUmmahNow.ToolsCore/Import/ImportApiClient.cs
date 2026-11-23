@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -13,7 +14,80 @@ public sealed record ImportChannel(
     [property: JsonPropertyName("id")] string Id,
     [property: JsonPropertyName("name")] string Name,
     [property: JsonPropertyName("handle")] string? Handle,
-    [property: JsonPropertyName("ownerEmail")] string? OwnerEmail);
+    [property: JsonPropertyName("ownerEmail")] string? OwnerEmail,
+    [property: JsonPropertyName("nameLocalized")] IReadOnlyDictionary<string, string>? NameLocalized = null)
+{
+    /// <summary>The channel's name in the requested UI language when present, falling back to <see cref="Name"/>.</summary>
+    public string NameFor(bool arabic)
+    {
+        var key = arabic ? "ar" : "en";
+        if (NameLocalized is not null && NameLocalized.TryGetValue(key, out var own) && !string.IsNullOrWhiteSpace(own))
+        {
+            return own.Trim();
+        }
+        return Name;
+    }
+
+    /// <summary>The channel's name for the current UI culture.</summary>
+    [JsonIgnore]
+    public string LocalizedName => NameFor(CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "ar");
+}
+
+/// <summary>Per-field validation codes for the bilingual New Channel form (no silent fallback).</summary>
+public sealed record ChannelFormErrors(
+    string? NameEn = null,
+    string? NameAr = null,
+    string? DescriptionEn = null,
+    string? DescriptionAr = null)
+{
+    public bool HasErrors => NameEn is not null || NameAr is not null || DescriptionEn is not null || DescriptionAr is not null;
+}
+
+/// <summary>Validates bilingual channel inputs before calling admin-api.</summary>
+public static class ChannelValidation
+{
+    public const int MaxNameLength = 100;
+    public const int MaxDescriptionLength = 5000;
+
+    public static ChannelFormErrors Validate(string? nameEn, string? nameAr, string? descriptionEn, string? descriptionAr)
+    {
+        var enName = (nameEn ?? "").Trim();
+        var arName = (nameAr ?? "").Trim();
+        var enDesc = (descriptionEn ?? "").Trim();
+        var arDesc = (descriptionAr ?? "").Trim();
+
+        string? nameEnErr = enName.Length == 0 ? "required" : enName.Length > MaxNameLength ? "too_long" : null;
+        string? nameArErr = arName.Length == 0 ? "required" : arName.Length > MaxNameLength ? "too_long" : null;
+
+        string? descEnErr = null;
+        string? descArErr = null;
+        if (enDesc.Length > 0 || arDesc.Length > 0)
+        {
+            descEnErr = enDesc.Length == 0 ? "required_pair" : enDesc.Length > MaxDescriptionLength ? "too_long" : null;
+            descArErr = arDesc.Length == 0 ? "required_pair" : arDesc.Length > MaxDescriptionLength ? "too_long" : null;
+        }
+
+        return new ChannelFormErrors(nameEnErr, nameArErr, descEnErr, descArErr);
+    }
+}
+
+/// <summary>A Quran reference returned when the translate endpoint refuses Quranic text.</summary>
+public sealed record FieldTranslateQuranRef(
+    [property: JsonPropertyName("range")] string Range,
+    [property: JsonPropertyName("label")] string Label);
+
+/// <summary>One translated item from admin-api <c>POST /api/translate/fields</c>.</summary>
+public sealed record FieldTranslateItem(
+    [property: JsonPropertyName("text")] string Text,
+    [property: JsonPropertyName("refused")] string? Refused = null,
+    [property: JsonPropertyName("quran")] IReadOnlyList<FieldTranslateQuranRef>? Quran = null,
+    [property: JsonPropertyName("cached")] bool Cached = false);
+
+/// <summary>Reply from admin-api <c>POST /api/translate/fields</c>.</summary>
+public sealed record FieldTranslateReply(
+    [property: JsonPropertyName("items")] IReadOnlyList<FieldTranslateItem> Items,
+    [property: JsonPropertyName("provider")] string? Provider = null,
+    [property: JsonPropertyName("machineTranslation")] bool MachineTranslation = true);
 
 public sealed record ImportBatch(
     [property: JsonPropertyName("id")] string Id,
@@ -266,10 +340,54 @@ public partial class ImportApiClient
         return result?["items"]?.Deserialize<List<ImportChannel>>(Json) ?? new List<ImportChannel>();
     }
 
-    public virtual async Task<ImportChannel> CreateChannelAsync(string name, string? handle, string? description, CancellationToken ct = default)
+    public virtual async Task<ImportChannel> CreateChannelAsync(
+        string nameEn,
+        string nameAr,
+        string? handle,
+        string? descriptionEn,
+        string? descriptionAr,
+        CancellationToken ct = default)
     {
-        var result = await SendAsync(HttpMethod.Post, "/api/admin/import/channels", new { name, handle, description }, ct).ConfigureAwait(false);
+        var enName = nameEn.Trim();
+        var arName = nameAr.Trim();
+        var body = new Dictionary<string, object?>
+        {
+            ["name"] = enName,
+            ["nameLocalized"] = new Dictionary<string, string> { ["en"] = enName, ["ar"] = arName },
+        };
+        if (!string.IsNullOrWhiteSpace(handle)) body["handle"] = handle.Trim().TrimStart('@');
+        var enDesc = string.IsNullOrWhiteSpace(descriptionEn) ? null : descriptionEn.Trim();
+        var arDesc = string.IsNullOrWhiteSpace(descriptionAr) ? null : descriptionAr.Trim();
+        if (enDesc is not null && arDesc is not null)
+        {
+            body["description"] = enDesc;
+            body["descriptionLocalized"] = new Dictionary<string, string> { ["en"] = enDesc, ["ar"] = arDesc };
+        }
+        var result = await SendAsync(HttpMethod.Post, "/api/admin/import/channels", body, ct).ConfigureAwait(false);
         return result?["channel"]?.Deserialize<ImportChannel>(Json) ?? throw Unreadable();
+    }
+
+    /// <summary>
+    /// Translates one staff-set field between English and Arabic via admin-api <c>POST /api/translate/fields</c>.
+    /// Never calls a paid AI directly; uses the platform's Workers AI translation endpoint with glossary and Quran refusal.
+    /// </summary>
+    public virtual async Task<FieldTranslateItem> TranslateFieldAsync(
+        string from,
+        string to,
+        string text,
+        string field,
+        CancellationToken ct = default)
+    {
+        var result = await SendAsync(HttpMethod.Post, "/api/translate/fields", new
+        {
+            from,
+            to,
+            texts = new[] { text },
+            field,
+        }, ct).ConfigureAwait(false);
+        var reply = result?.Deserialize<FieldTranslateReply>(Json);
+        var first = reply?.Items?.FirstOrDefault();
+        return first ?? throw Unreadable();
     }
 
     public virtual async Task<ImportBatch> CreateBatchAsync(string channelId, string? name, CancellationToken ct = default)
