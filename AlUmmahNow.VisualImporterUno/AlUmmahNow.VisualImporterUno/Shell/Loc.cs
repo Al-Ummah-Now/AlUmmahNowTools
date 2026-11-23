@@ -131,6 +131,9 @@ public static class Loc
     public static string Languages(IEnumerable<string> names) => string.Join(IsArabic ? " و" : ", ", names);
 
     /// <summary>Groups on one line: "captions: Arabic, English · chapters" / «ترجمات: العربية والإنجليزية؛ فصول».</summary>
+    /// <summary>A short list ("5 sources · 2 need attention" / «٥ مصادر، بحاجة إلى نظر: ٢»): the Arabic comma, not «؛».</summary>
+    public static string Commas(IEnumerable<string> parts) => string.Join(IsArabic ? "، " : "\u00A0· ", parts);
+
     public static string Groups(IEnumerable<string> groups) => string.Join(IsArabic ? "؛ " : "\u00A0· ", groups);
 
     /// <summary>A time of day in the device's zone: "2:05 PM" / «٢:٠٥ م».</summary>

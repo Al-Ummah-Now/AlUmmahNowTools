@@ -54,7 +54,7 @@
                             <FontIcon Glyph="&#xE73E;" FontSize="16" Foreground="{ThemeResource FanousAccentBrush}" VerticalAlignment="Center" />
                             <StackPanel Grid.Column="1" Spacing="2">
                                 <TextBlock Text="{x:Bind ViewModel.SelectedChannel.Name, Mode=OneWay}" Style="{StaticResource ToolsBody}" Foreground="{ThemeResource FanousTextPrimaryBrush}" />
-                                <TextBlock Text="{x:Bind ViewModel.ChannelSummary, Mode=OneWay}" Style="{StaticResource ToolsMuted}" FlowDirection="LeftToRight" HorizontalAlignment="Left"
+                                <TextBlock x:Name="ChannelSummaryText" Text="{x:Bind ViewModel.ChannelSummary, Mode=OneWay}" Style="{StaticResource ToolsMuted}" FlowDirection="LeftToRight" HorizontalAlignment="Left"
                                            Visibility="{x:Bind ViewModel.ChannelSummary, Mode=OneWay, Converter={StaticResource StringToVisibility}}" />
                             </StackPanel>
                             <HyperlinkButton Grid.Column="2" Style="{StaticResource ToolsLinkButton}" Padding="8,4" VerticalAlignment="Center" Click="ShowAll_Click">
@@ -186,13 +186,13 @@
                                                         <Button Style="{StaticResource ToolsPrimaryButton}" Tag="{x:Bind}" Click="RetryJob_Click" Visibility="{x:Bind CanRetryJob, Mode=OneWay}" IsEnabled="{x:Bind IsIdle, Mode=OneWay}">
                                                             <StackPanel Orientation="Horizontal" Spacing="8">
                                                                 <FontIcon Glyph="&#xE72C;" FontSize="14" />
-                                                                <TextBlock x:Uid="Social_RetryJob" Text="Try again" />
+                                                                <TextBlock x:Uid="Social_RetryJob" Text="Retry" />
                                                             </StackPanel>
                                                         </Button>
                                                         <Button Style="{StaticResource ToolsSecondaryButton}" Tag="{x:Bind}" Click="CancelJob_Click" Visibility="{x:Bind CanCancelJob, Mode=OneWay}" IsEnabled="{x:Bind IsIdle, Mode=OneWay}">
                                                             <StackPanel Orientation="Horizontal" Spacing="8">
                                                                 <FontIcon Glyph="&#xE711;" FontSize="14" />
-                                                                <TextBlock x:Uid="Social_CancelJob" Text="Cancel" />
+                                                                <TextBlock x:Uid="Social_CancelJob" Text="Cancel sync" />
                                                             </StackPanel>
                                                         </Button>
                                                         <Button Style="{StaticResource ToolsSecondaryButton}" Tag="{x:Bind}" Click="CopyJob_Click">
@@ -263,7 +263,7 @@
                                                         </Grid.ColumnDefinitions>
                                                         <TextBlock Text="{x:Bind TakeoutJobStatus, Mode=OneWay}" Style="{StaticResource ToolsBody}" TextWrapping="Wrap" VerticalAlignment="Center" />
                                                         <HyperlinkButton Grid.Column="1" Style="{StaticResource ToolsLinkButton}" Padding="8,4" Tag="{x:Bind}" Click="CancelTakeout_Click" Visibility="{x:Bind TakeoutJobActive, Mode=OneWay}">
-                                                            <TextBlock x:Uid="Social_CancelJob" Text="Cancel" />
+                                                            <TextBlock x:Uid="Takeout_CancelJob" Text="Cancel matching" />
                                                         </HyperlinkButton>
                                                     </Grid>
                                                     <TextBlock Text="{x:Bind TakeoutSummary, Mode=OneWay}" Style="{StaticResource ToolsBody}" Foreground="{ThemeResource FanousTextPrimaryBrush}" TextWrapping="Wrap" Visibility="{x:Bind HasTakeoutSummary, Mode=OneWay}" />
@@ -382,21 +382,21 @@
                                 <StackPanel Spacing="6" Visibility="{x:Bind ViewModel.ShowAddressBox, Mode=OneWay}">
                                     <TextBlock x:Name="AddressLabel" x:Uid="Social_AddressLabel" Text="Address" Style="{StaticResource ToolsLabel}" />
                                     <!-- Addresses read left to right in both languages -->
-                                    <TextBox x:Name="AddressBox" FlowDirection="LeftToRight" Text="{x:Bind ViewModel.Address, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                    <TextBox x:Name="AddressBox" TextChanged="ValueBox_TextChanged" FlowDirection="LeftToRight" Text="{x:Bind ViewModel.Address, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                              AutomationProperties.LabeledBy="{Binding ElementName=AddressLabel}" />
                                     <TextBlock Text="{x:Bind ViewModel.AddressHint, Mode=OneWay}" Style="{StaticResource ToolsMuted}" TextWrapping="Wrap" />
                                 </StackPanel>
                                 <StackPanel Spacing="6" Visibility="{x:Bind ViewModel.ShowAddressBox, Mode=OneWay}">
                                     <TextBlock x:Name="LabelLabel" x:Uid="Social_LabelLabel" Text="Name in the list (optional)" Style="{StaticResource ToolsLabel}" />
-                                    <TextBox x:Name="LabelBox" Text="{x:Bind ViewModel.Label, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.LabeledBy="{Binding ElementName=LabelLabel}" />
+                                    <TextBox x:Name="LabelBox" TextChanged="ValueBox_TextChanged" Text="{x:Bind ViewModel.Label, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.LabeledBy="{Binding ElementName=LabelLabel}" />
                                 </StackPanel>
                                 <StackPanel Spacing="8" Visibility="{x:Bind ViewModel.ShowPermission, Mode=OneWay}">
                                     <TextBlock x:Uid="Social_PermissionTitle" Text="The owner’s permission" Style="{StaticResource ToolsLabel}" />
                                     <TextBlock x:Uid="Social_PermissionBody" Text="Unless the owner connected this account, record whose written permission you have and what they agreed to. It is saved with the source and in the audit log." Style="{StaticResource ToolsMuted}" TextWrapping="Wrap" />
                                     <TextBlock x:Name="ByLabel" x:Uid="Social_PermissionByLabel" Text="Who gave permission" Style="{StaticResource ToolsLabel}" />
-                                    <TextBox x:Name="ByBox" Text="{x:Bind ViewModel.PermissionBy, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.LabeledBy="{Binding ElementName=ByLabel}" />
+                                    <TextBox x:Name="ByBox" TextChanged="ValueBox_TextChanged" Text="{x:Bind ViewModel.PermissionBy, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.LabeledBy="{Binding ElementName=ByLabel}" />
                                     <TextBlock x:Name="NoteLabel" x:Uid="Social_PermissionNoteLabel" Text="How they gave it, and what they agreed to" Style="{StaticResource ToolsLabel}" />
-                                    <TextBox x:Name="NoteBox" Text="{x:Bind ViewModel.PermissionNote, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="72"
+                                    <TextBox x:Name="NoteBox" TextChanged="ValueBox_TextChanged" Text="{x:Bind ViewModel.PermissionNote, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="72"
                                              AutomationProperties.LabeledBy="{Binding ElementName=NoteLabel}" />
                                 </StackPanel>
                                 <TextBlock Text="{x:Bind ViewModel.FormError, Mode=OneWay}" Style="{StaticResource ToolsMuted}" Foreground="{ThemeResource FanousErrorTextBrush}"
