@@ -47,7 +47,7 @@ jobs:
       display: ${{ steps.version.outputs.display }}
       build: ${{ steps.version.outputs.build }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
       - name: Only release from master
@@ -77,7 +77,7 @@ jobs:
             echo "display=$y.$m.$d"
             echo "build=$n"
           } | tee -a "$GITHUB_OUTPUT"
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
         with:
           dotnet-version: |
             8.0.x
@@ -92,7 +92,7 @@ jobs:
         run: |
           dotnet restore "$APP"
           python3 scripts/nuget-notices.py "$(dirname "$APP")/obj/project.assets.json" packaging/licenses/NUGET-PACKAGES.txt
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: notices
           path: packaging/licenses/NUGET-PACKAGES.txt
@@ -107,14 +107,14 @@ jobs:
     env:
       NAME: ${{ needs.verify.outputs.name }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
         with:
           dotnet-version: 9.0.x
       - name: Fetch AlUmmahNow.Core
         shell: bash
         run: scripts/fetch-core.sh
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: notices
           path: packaging/licenses
@@ -186,12 +186,12 @@ jobs:
           $p = Start-Process msiexec -ArgumentList "/x `"$msi`" /qn" -Wait -PassThru
           if ($p.ExitCode -ne 0) { throw "uninstall failed: $($p.ExitCode)" }
           if (Test-Path $exe) { throw "uninstall left the app behind" }
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-windows
           path: dist/*
           if-no-files-found: error
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: smoke-windows
@@ -218,13 +218,13 @@ jobs:
     env:
       NAME: ${{ needs.verify.outputs.name }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
         with:
           dotnet-version: 9.0.x
       - name: Fetch AlUmmahNow.Core
         run: scripts/fetch-core.sh
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: notices
           path: packaging/licenses
@@ -309,12 +309,12 @@ jobs:
             spctl --assess --type open --context context:primary-signature -v "$dmg"
           fi
           rm -f "$RUNNER_TEMP/AuthKey.p8"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-macos-${{ matrix.arch }}
           path: dist/*
           if-no-files-found: error
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always() && matrix.smoke
         with:
           name: smoke-macos
@@ -328,13 +328,13 @@ jobs:
     env:
       NAME: ${{ needs.verify.outputs.name }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
         with:
           dotnet-version: 9.0.x
       - name: Fetch AlUmmahNow.Core
         run: scripts/fetch-core.sh
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: notices
           path: packaging/licenses
@@ -365,12 +365,12 @@ jobs:
           scripts/smoke-launch.sh "$PWD/smoke/linux.png" 120 xvfb-run -a -s "-screen 0 1280x800x24" /usr/bin/alummahnow-tools
           sudo dpkg --remove alummahnow-tools
           test ! -e /usr/bin/alummahnow-tools
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-linux
           path: dist/*
           if-no-files-found: error
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: smoke-linux
@@ -390,15 +390,15 @@ jobs:
       NAME: ${{ needs.verify.outputs.name }}
       GH_TOKEN: ${{ github.token }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           pattern: release-*
           path: dist
           merge-multiple: true
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: notices
           path: packaging/licenses
