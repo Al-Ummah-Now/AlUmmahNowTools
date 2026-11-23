@@ -73,26 +73,73 @@ public class EncodeLadderTests
              V....D libopenh264          OpenH264 H.264
              V....D h264_vaapi           H.264/AVC (VAAPI) (codec h264)
             """;
+        // Default vaapiAvailable is false so non-Linux callers don't pick VAAPI by mistake
+        Assert.Equal("libopenh264", H264Encoders.Pick(linuxVaapi));
         Assert.Equal("h264_vaapi", H264Encoders.Pick(linuxVaapi, vaapiAvailable: true));
         Assert.Equal("libopenh264", H264Encoders.Pick(linuxVaapi, vaapiAvailable: false));
     }
 
     [Fact]
-    public void Vaapi_passes_render_device_hwupload_and_vbr_options()
+    public async Task Hardware_encoder_probe_skips_broken_gpu_encoders_and_tries_all_vaapi_render_nodes()
+    {
+        const string lgplLinuxList = """
+             V....D h264_nvenc           NVIDIA NVENC H.264 encoder
+             V....D h264_qsv             H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10 (Intel Quick Sync Video acceleration)
+             V....D h264_amf             AMD AMF H.264 Encoder
+             V....D h264_vaapi           H.264/AVC (VAAPI) (codec h264)
+             V....D libopenh264          OpenH264 H.264
+            """;
+        var candidates = H264Encoders.Candidates(lgplLinuxList);
+        Assert.Equal(new[] { "h264_nvenc", "h264_qsv", "h264_amf", "h264_vaapi", "libopenh264" }, candidates);
+
+        // Dual-GPU Linux machine: nvenc/qsv/amf fail probe, renderD128 (dGPU) fails VAAPI, renderD129 (iGPU) succeeds
+        var probed = new List<string>();
+        var (encoder, device) = await FfmpegMediaTools.SelectWorkingEncoderAsync(
+            candidates,
+            new HashSet<string>(),
+            new[] { "/dev/dri/renderD128", "/dev/dri/renderD129" },
+            (enc, dev, _) =>
+            {
+                probed.Add(dev is null ? enc : $"{enc}@{dev}");
+                return Task.FromResult(enc == "h264_vaapi" && dev == "/dev/dri/renderD129");
+            },
+            default);
+        Assert.Equal("h264_vaapi", encoder);
+        Assert.Equal("/dev/dri/renderD129", device);
+        Assert.Equal(new[] { "h264_nvenc", "h264_qsv", "h264_amf", "h264_vaapi@/dev/dri/renderD128", "h264_vaapi@/dev/dri/renderD129" }, probed);
+
+        // When every hardware probe fails, falls through cleanly to software libopenh264
+        var (sw, swDev) = await FfmpegMediaTools.SelectWorkingEncoderAsync(
+            candidates,
+            new HashSet<string>(),
+            new[] { "/dev/dri/renderD128" },
+            (_, _, _) => Task.FromResult(false),
+            default);
+        Assert.Equal("libopenh264", sw);
+        Assert.Null(swDev);
+    }
+
+    [Fact]
+    public void Vaapi_passes_render_device_hwupload_vbr_options_and_probe_arguments()
     {
         var info = new SourceInfo(1280, 720, 0, 30, true, 10);
         var settings = Ladder.Settings.Ladder;
         var rungs = EncodeLadder.For(info, settings).Take(2).ToList();
-        var args = (List<string>)FfmpegMediaTools.Arguments("/in.mp4", info, rungs, new[] { "/w/360p.mp4", "/w/480p.mp4" }, "h264_vaapi", settings);
+        var args = (List<string>)FfmpegMediaTools.Arguments("/in.mp4", info, rungs, new[] { "/w/360p.mp4", "/w/480p.mp4" }, "h264_vaapi", settings, "/dev/dri/renderD129");
         var text = string.Join(" ", args);
 
         Assert.Equal("nv12", H264Encoders.InputFormat("h264_vaapi"));
         Assert.Equal("format=nv12,hwupload", H264Encoders.FilterFormat("h264_vaapi"));
         Assert.True(args.IndexOf("-vaapi_device") >= 0 && args.IndexOf("-vaapi_device") < args.IndexOf("-i"));
-        Assert.Equal(H264Encoders.VaapiDevice, args[args.IndexOf("-vaapi_device") + 1]);
+        Assert.Equal("/dev/dri/renderD129", args[args.IndexOf("-vaapi_device") + 1]);
         Assert.Contains("[v0]scale=w=640:h=360:flags=bicubic,format=nv12,hwupload[v0o]", text);
         Assert.Contains("-c:v:0 h264_vaapi", text);
         Assert.Contains("-rc_mode:v:0 VBR -b:v:0 480000 -maxrate:v:0 800000 -bufsize:v:0 1600000", text);
+
+        var probe = string.Join(" ", H264Encoders.ProbeArguments("h264_vaapi", "/dev/dri/renderD129"));
+        Assert.Contains("-vaapi_device /dev/dri/renderD129", probe);
+        Assert.Contains("-vf format=nv12,hwupload", probe);
+        Assert.Contains("-c:v h264_vaapi -frames:v 1 -f null -", probe);
     }
 
     [Fact]
@@ -135,16 +182,29 @@ internal sealed class FakeMedia : IMediaTools
 {
     public SourceInfo Info = new(1280, 720, 0, 30, true, 12);
     public Exception? Fail;
+    public HashSet<string> FailEncoders = new(StringComparer.Ordinal);
+    public List<string> EncoderOrder = new();
+    public List<string> MarkedFailed = new();
     public string? Encoder = "libx264";
     public int Encodes;
 
     public Task<SourceInfo> ProbeAsync(string path, CancellationToken ct) => Fail is LocalEncodeException { Code: "probe_failed" } ? throw Fail : Task.FromResult(Info);
 
-    public Task<string?> PickEncoderAsync(CancellationToken ct) => Task.FromResult(Encoder);
+    public Task<string?> PickEncoderAsync(CancellationToken ct)
+    {
+        if (EncoderOrder.Count > 0)
+        {
+            return Task.FromResult(EncoderOrder.FirstOrDefault(e => !MarkedFailed.Contains(e)));
+        }
+        return Task.FromResult(Encoder);
+    }
+
+    public void MarkEncoderFailed(string encoder) => MarkedFailed.Add(encoder);
 
     public Task EncodeAsync(string source, SourceInfo info, IReadOnlyList<PlannedRung> rungs, IReadOnlyList<string> outputs, string encoder, EncodeLadderSettings settings, IProgress<double> progress, CancellationToken ct)
     {
         Encodes++;
+        if (FailEncoders.Contains(encoder)) throw new LocalEncodeException("ffmpeg_failed", $"ffmpeg stopped ({encoder}): driver error");
         if (Fail is not null) throw Fail;
         foreach (var o in outputs) File.WriteAllBytes(o, new byte[64]);
         return Task.CompletedTask;
@@ -305,6 +365,27 @@ public class EncodeStepTests
 
         var (noEncoder, _, api2, work2) = Setup();
         Assert.Equal(StepResult.Skipped, await Step(api2, work2, new FakeMedia { Encoder = null }).RunAsync(noEncoder, new RecordingContext(), default));
+    }
+
+    [Fact]
+    public async Task A_failed_hardware_encoder_marks_itself_unusable_and_falls_back_locally_to_the_next_encoder()
+    {
+        var (item, _, api, work) = Setup();
+        var media = new FakeMedia
+        {
+            EncoderOrder = new List<string> { "h264_vaapi", "libopenh264" },
+            FailEncoders = new HashSet<string> { "h264_vaapi" },
+        };
+        var context = new RecordingContext();
+
+        Assert.Equal(StepResult.Done, await Step(api, work, media).RunAsync(item, context, default));
+        Assert.Equal(2, media.Encodes);
+        Assert.Equal(new[] { "h264_vaapi" }, media.MarkedFailed);
+        Assert.NotNull(item.Renditions);
+        Assert.Equal("Tools test, ffmpeg libopenh264", item.Renditions!.Encoder);
+        Assert.Contains(context.Lines, l => l.Code == "encoder_fallback" && l.Level == LogLevel.Warning);
+        // Subsequent picks skip the failed hardware encoder
+        Assert.Equal("libopenh264", await media.PickEncoderAsync(default));
     }
 
     [Fact]

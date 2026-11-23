@@ -95,8 +95,10 @@ public static class H264Encoders
 
     public static readonly string[] Preferred = { "libx264", "h264_videotoolbox", "h264_nvenc", "h264_qsv", "h264_amf", "h264_vaapi", "h264_mf", "libopenh264" };
 
-    /// <summary>The first preferred encoder in <c>ffmpeg -encoders</c>' list, or null.</summary>
-    public static string? Pick(string encodersOutput, bool vaapiAvailable = true)
+    public static bool IsHardware(string encoder) => encoder is not ("libx264" or "libopenh264");
+
+    /// <summary>Every preferred encoder present in <c>ffmpeg -encoders</c>' list, best first.</summary>
+    public static IReadOnlyList<string> Candidates(string encodersOutput)
     {
         var names = new HashSet<string>(StringComparer.Ordinal);
         foreach (var line in encodersOutput.Split('\n'))
@@ -105,7 +107,43 @@ public static class H264Encoders
             // " V....D libx264  libx264 H.264 …": capabilities, then the name
             if (parts.Length >= 2 && parts[0].Length == 6 && parts[0][0] == 'V') names.Add(parts[1]);
         }
-        return Preferred.FirstOrDefault(name => (vaapiAvailable || name != "h264_vaapi") && names.Contains(name));
+        return Preferred.Where(names.Contains).ToList();
+    }
+
+    /// <summary>The first preferred encoder in <c>ffmpeg -encoders</c>' list, or null. VAAPI is opt-in so non-Linux callers never pick it by mistake.</summary>
+    public static string? Pick(string encodersOutput, bool vaapiAvailable = false) =>
+        Candidates(encodersOutput).FirstOrDefault(name => vaapiAvailable || name != "h264_vaapi");
+
+    /// <summary>DRM render nodes on Linux, sorted so <c>renderD128</c> is probed before <c>renderD129</c> on dual-GPU machines.</summary>
+    public static IReadOnlyList<string> FindVaapiDevices(string driDirectory = "/dev/dri")
+    {
+        if (!Directory.Exists(driDirectory)) return Array.Empty<string>();
+        try
+        {
+            return Directory.EnumerateFileSystemEntries(driDirectory, "renderD*")
+                .OrderBy(p => p, StringComparer.Ordinal)
+                .ToList();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return Array.Empty<string>();
+        }
+    }
+
+    /// <summary>Arguments for a fast 1-frame null encode that verifies a hardware encoder actually works on this machine.</summary>
+    public static IReadOnlyList<string> ProbeArguments(string encoder, string? vaapiDevice = null)
+    {
+        var args = new List<string> { "-hide_banner", "-nostdin", "-v", "error" };
+        if (encoder == "h264_vaapi") args.AddRange(new[] { "-vaapi_device", vaapiDevice ?? VaapiDevice });
+        args.AddRange(new[]
+        {
+            "-f", "lavfi", "-i", "color=c=black:s=128x128:r=30:d=0.1",
+            "-vf", FilterFormat(encoder),
+            "-c:v", encoder,
+            "-frames:v", "1",
+            "-f", "null", "-",
+        });
+        return args;
     }
 
     /// <summary>The encoder's rate and keyframe options for one output: a keyframe every GOP and never one from a scene cut.</summary>
@@ -143,6 +181,8 @@ public interface IMediaTools
     Task<SourceInfo> ProbeAsync(string path, CancellationToken ct);
     /// <summary>The H.264 encoder to use, or null when this ffmpeg has none of the preferred ones.</summary>
     Task<string?> PickEncoderAsync(CancellationToken ct);
+    /// <summary>Marks a hardware encoder unusable for the rest of this session so the next pick falls back.</summary>
+    void MarkEncoderFailed(string encoder) { }
     /// <summary>One decode, one progressive MP4 per rung (<paramref name="outputs"/>, in rung order). Progress 0–1.</summary>
     Task EncodeAsync(string source, SourceInfo info, IReadOnlyList<PlannedRung> rungs, IReadOnlyList<string> outputs, string encoder, EncodeLadderSettings settings, IProgress<double> progress, CancellationToken ct);
     /// <summary>
@@ -183,7 +223,9 @@ public sealed class CoreRenditionPackager : IRenditionPackager
 public sealed class FfmpegMediaTools : IMediaTools
 {
     private readonly Func<CancellationToken, Task<(string Ffmpeg, string Ffprobe)?>> _locate;
+    private readonly HashSet<string> _failedEncoders = new(StringComparer.Ordinal);
     private string? _encoder;
+    private string? _vaapiDevice;
 
     public FfmpegMediaTools(Func<CancellationToken, Task<(string Ffmpeg, string Ffprobe)?>> locate) => _locate = locate;
 
@@ -233,17 +275,72 @@ public sealed class FfmpegMediaTools : IMediaTools
 
     public async Task<string?> PickEncoderAsync(CancellationToken ct)
     {
-        if (_encoder is not null) return _encoder;
+        if (_encoder is not null && !_failedEncoders.Contains(_encoder)) return _encoder;
         var (ffmpeg, _) = await Paths(ct).ConfigureAwait(false);
         var (_, output, _) = await RunAsync(ffmpeg, new[] { "-hide_banner", "-encoders" }, null, ct).ConfigureAwait(false);
-        var vaapiAvailable = OperatingSystem.IsLinux() && Path.Exists(H264Encoders.VaapiDevice);
-        return _encoder = H264Encoders.Pick(output, vaapiAvailable);
+        var vaapiDevices = OperatingSystem.IsLinux() ? H264Encoders.FindVaapiDevices() : Array.Empty<string>();
+        var (encoder, device) = await SelectWorkingEncoderAsync(
+            H264Encoders.Candidates(output),
+            _failedEncoders,
+            vaapiDevices,
+            async (candidate, vaapiDevice, token) =>
+            {
+                var (code, _, _) = await RunAsync(ffmpeg, H264Encoders.ProbeArguments(candidate, vaapiDevice), null, token).ConfigureAwait(false);
+                return code == 0;
+            },
+            ct).ConfigureAwait(false);
+        _vaapiDevice = device;
+        return _encoder = encoder;
+    }
+
+    public void MarkEncoderFailed(string encoder)
+    {
+        _failedEncoders.Add(encoder);
+        if (string.Equals(_encoder, encoder, StringComparison.Ordinal))
+        {
+            _encoder = null;
+            if (encoder == "h264_vaapi") _vaapiDevice = null;
+        }
+    }
+
+    /// <summary>
+    /// Walks preferred encoder candidates in priority order, probing hardware encoders with a 1-frame test encode
+    /// (trying each Linux DRM render node for VAAPI) so missing drivers/GPUs fall cleanly down to the next working encoder.
+    /// </summary>
+    internal static async Task<(string? Encoder, string? VaapiDevice)> SelectWorkingEncoderAsync(
+        IReadOnlyList<string> candidates,
+        IReadOnlySet<string> failedEncoders,
+        IReadOnlyList<string> vaapiDevices,
+        Func<string, string?, CancellationToken, Task<bool>> probeAsync,
+        CancellationToken ct)
+    {
+        foreach (var candidate in candidates)
+        {
+            if (failedEncoders.Contains(candidate)) continue;
+            if (!H264Encoders.IsHardware(candidate)) return (candidate, null);
+            if (candidate == "h264_vaapi")
+            {
+                foreach (var device in vaapiDevices)
+                {
+                    if (await probeAsync(candidate, device, ct).ConfigureAwait(false))
+                    {
+                        return (candidate, device);
+                    }
+                }
+                continue;
+            }
+            if (await probeAsync(candidate, null, ct).ConfigureAwait(false))
+            {
+                return (candidate, null);
+            }
+        }
+        return (null, null);
     }
 
     public async Task EncodeAsync(string source, SourceInfo info, IReadOnlyList<PlannedRung> rungs, IReadOnlyList<string> outputs, string encoder, EncodeLadderSettings settings, IProgress<double> progress, CancellationToken ct)
     {
         var (ffmpeg, _) = await Paths(ct).ConfigureAwait(false);
-        var args = Arguments(source, info, rungs, outputs, encoder, settings);
+        var args = Arguments(source, info, rungs, outputs, encoder, settings, _vaapiDevice);
         var duration = info.DurationSeconds;
         void OnLine(string line)
         {
@@ -261,13 +358,13 @@ public sealed class FfmpegMediaTools : IMediaTools
     /// One decode split to every rung, scaled with bicubic to the rung's size, a keyframe every GOP from the start
     /// (as the server's <c>-force_key_frames</c>), AAC stereo at the rung's rate when there is sound.
     /// </summary>
-    public static IReadOnlyList<string> Arguments(string source, SourceInfo info, IReadOnlyList<PlannedRung> rungs, IReadOnlyList<string> outputs, string encoder, EncodeLadderSettings settings)
+    public static IReadOnlyList<string> Arguments(string source, SourceInfo info, IReadOnlyList<PlannedRung> rungs, IReadOnlyList<string> outputs, string encoder, EncodeLadderSettings settings, string? vaapiDevice = null)
     {
         var filterFormat = H264Encoders.FilterFormat(encoder);
         var split = $"[0:v]split={rungs.Count}" + string.Concat(rungs.Select((_, i) => $"[v{i}]"));
         var scales = rungs.Select((r, i) => $"[v{i}]scale=w={r.Width}:h={r.Height}:flags=bicubic,{filterFormat}[v{i}o]");
         var args = new List<string> { "-hide_banner", "-nostdin", "-y" };
-        if (encoder == "h264_vaapi") args.AddRange(new[] { "-vaapi_device", H264Encoders.VaapiDevice });
+        if (encoder == "h264_vaapi") args.AddRange(new[] { "-vaapi_device", vaapiDevice ?? H264Encoders.VaapiDevice });
         args.AddRange(new[] { "-i", source, "-filter_complex", string.Join(";", new[] { split }.Concat(scales)) });
         var fps = EncodeLadder.CappedFps(info, settings);
         var outFps = fps ?? (info.Fps > 0 ? info.Fps : 30);
@@ -434,15 +531,37 @@ public sealed class EncodeStep : IImportStep
             DeleteFolder(directory);
             var info = await _media.ProbeAsync(item.Video.Path, ct).ConfigureAwait(false);
             var rungs = EncodeLadder.For(info, settings.Ladder);
-            var encoder = await _media.PickEncoderAsync(ct).ConfigureAwait(false)
-                ?? throw new LocalEncodeException("ffmpeg_failed", "This ffmpeg has no H.264 encoder");
             CheckSpace(directory, info, rungs);
             System.IO.Directory.CreateDirectory(directory);
-            context.Log(LogLevel.Info, "encode_plan", $"Encoding {string.Join(", ", rungs.Select(r => r.Name))} with {encoder}", encoder, string.Join(", ", rungs.Select(r => r.Name)));
 
-            // 90% for the encode, 10% for packaging
+            // 90% for the encode, 10% for packaging. If a hardware encoder fails at runtime,
+            // mark it failed and fall back to the next available encoder before giving up to the server.
             var outputs = rungs.Select(r => Path.Combine(directory, r.Name + ".mp4")).ToList();
-            await _media.EncodeAsync(item.Video.Path, info, rungs, outputs, encoder, settings.Ladder, new Progress<double>(p => context.Progress(p * 0.9)), ct).ConfigureAwait(false);
+            var tried = new HashSet<string>(StringComparer.Ordinal);
+            string encoder;
+            while (true)
+            {
+                encoder = await _media.PickEncoderAsync(ct).ConfigureAwait(false)
+                    ?? throw new LocalEncodeException("ffmpeg_failed", "This ffmpeg has no H.264 encoder");
+                if (!tried.Add(encoder))
+                {
+                    throw new LocalEncodeException("ffmpeg_failed", $"No working H.264 encoder left after {encoder} failed");
+                }
+                context.Log(LogLevel.Info, "encode_plan", $"Encoding {string.Join(", ", rungs.Select(r => r.Name))} with {encoder}", encoder, string.Join(", ", rungs.Select(r => r.Name)));
+                try
+                {
+                    await _media.EncodeAsync(item.Video.Path, info, rungs, outputs, encoder, settings.Ladder, new Progress<double>(p => context.Progress(p * 0.9)), ct).ConfigureAwait(false);
+                    break;
+                }
+                catch (LocalEncodeException ex) when (ex.Code == "ffmpeg_failed" && H264Encoders.IsHardware(encoder))
+                {
+                    _media.MarkEncoderFailed(encoder);
+                    foreach (var o in outputs) { try { if (File.Exists(o)) File.Delete(o); } catch (IOException) { } catch (UnauthorizedAccessException) { } }
+                    var next = await _media.PickEncoderAsync(ct).ConfigureAwait(false);
+                    if (next is null || tried.Contains(next)) throw;
+                    context.Log(LogLevel.Warning, "encoder_fallback", $"Hardware encoder {encoder} failed ({ex.Message}); retrying with {next}", encoder, next);
+                }
+            }
             for (var i = 0; i < rungs.Count; i++)
             {
                 await _packager.PackageAsync(outputs[i], Path.Combine(directory, rungs[i].Name), settings.Ladder.SegmentSeconds, ct).ConfigureAwait(false);
