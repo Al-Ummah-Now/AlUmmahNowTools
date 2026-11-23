@@ -91,10 +91,12 @@ public static class EncodeLadder
 /// <summary>The H.264 encoders the app can use, best first: libx264 is what the server uses; hardware encoders and OpenH264 follow.</summary>
 public static class H264Encoders
 {
-    public static readonly string[] Preferred = { "libx264", "h264_videotoolbox", "h264_nvenc", "h264_qsv", "h264_amf", "h264_mf", "libopenh264" };
+    public const string VaapiDevice = "/dev/dri/renderD128";
+
+    public static readonly string[] Preferred = { "libx264", "h264_videotoolbox", "h264_nvenc", "h264_qsv", "h264_amf", "h264_vaapi", "h264_mf", "libopenh264" };
 
     /// <summary>The first preferred encoder in <c>ffmpeg -encoders</c>' list, or null.</summary>
-    public static string? Pick(string encodersOutput)
+    public static string? Pick(string encodersOutput, bool vaapiAvailable = true)
     {
         var names = new HashSet<string>(StringComparer.Ordinal);
         foreach (var line in encodersOutput.Split('\n'))
@@ -103,7 +105,7 @@ public static class H264Encoders
             // " V....D libx264  libx264 H.264 …": capabilities, then the name
             if (parts.Length >= 2 && parts[0].Length == 6 && parts[0][0] == 'V') names.Add(parts[1]);
         }
-        return Preferred.FirstOrDefault(names.Contains);
+        return Preferred.FirstOrDefault(name => (vaapiAvailable || name != "h264_vaapi") && names.Contains(name));
     }
 
     /// <summary>The encoder's rate and keyframe options for one output: a keyframe every GOP and never one from a scene cut.</summary>
@@ -122,13 +124,17 @@ public static class H264Encoders
             "h264_nvenc" => new[] { S("rc"), "vbr", S("cq"), crf.ToString(CultureInfo.InvariantCulture), S("b"), average, S("maxrate"), max, S("bufsize"), buf, S("no-scenecut"), "1", S("forced-idr"), "1" },
             "h264_qsv" => new[] { S("b"), average, S("maxrate"), max, S("bufsize"), buf, S("forced_idr"), "1", S("idr_interval"), "0" },
             "h264_amf" => new[] { S("rc"), "vbr_peak", S("b"), average, S("maxrate"), max, S("bufsize"), buf },
+            "h264_vaapi" => new[] { S("rc_mode"), "VBR", S("b"), average, S("maxrate"), max, S("bufsize"), buf },
             _ => new[] { S("b"), average, S("maxrate"), max, S("bufsize"), buf },
         };
         return common.Concat(rate);
     }
 
     /// <summary>The pixel format the encoder takes from the scaler (the stream it writes is 4:2:0 either way).</summary>
-    public static string InputFormat(string encoder) => encoder == "h264_qsv" ? "nv12" : "yuv420p";
+    public static string InputFormat(string encoder) => encoder is "h264_qsv" or "h264_vaapi" ? "nv12" : "yuv420p";
+
+    /// <summary>Filter tail after <c>scale</c> for the encoder: VAAPI uploads <c>nv12</c> frames to the hardware surface.</summary>
+    public static string FilterFormat(string encoder) => encoder == "h264_vaapi" ? "format=nv12,hwupload" : $"format={InputFormat(encoder)}";
 }
 
 /// <summary>Runs ffprobe and ffmpeg.</summary>
@@ -230,7 +236,8 @@ public sealed class FfmpegMediaTools : IMediaTools
         if (_encoder is not null) return _encoder;
         var (ffmpeg, _) = await Paths(ct).ConfigureAwait(false);
         var (_, output, _) = await RunAsync(ffmpeg, new[] { "-hide_banner", "-encoders" }, null, ct).ConfigureAwait(false);
-        return _encoder = H264Encoders.Pick(output);
+        var vaapiAvailable = OperatingSystem.IsLinux() && Path.Exists(H264Encoders.VaapiDevice);
+        return _encoder = H264Encoders.Pick(output, vaapiAvailable);
     }
 
     public async Task EncodeAsync(string source, SourceInfo info, IReadOnlyList<PlannedRung> rungs, IReadOnlyList<string> outputs, string encoder, EncodeLadderSettings settings, IProgress<double> progress, CancellationToken ct)
@@ -256,10 +263,12 @@ public sealed class FfmpegMediaTools : IMediaTools
     /// </summary>
     public static IReadOnlyList<string> Arguments(string source, SourceInfo info, IReadOnlyList<PlannedRung> rungs, IReadOnlyList<string> outputs, string encoder, EncodeLadderSettings settings)
     {
-        var format = H264Encoders.InputFormat(encoder);
+        var filterFormat = H264Encoders.FilterFormat(encoder);
         var split = $"[0:v]split={rungs.Count}" + string.Concat(rungs.Select((_, i) => $"[v{i}]"));
-        var scales = rungs.Select((r, i) => $"[v{i}]scale=w={r.Width}:h={r.Height}:flags=bicubic,format={format}[v{i}o]");
-        var args = new List<string> { "-hide_banner", "-nostdin", "-y", "-i", source, "-filter_complex", string.Join(";", new[] { split }.Concat(scales)) };
+        var scales = rungs.Select((r, i) => $"[v{i}]scale=w={r.Width}:h={r.Height}:flags=bicubic,{filterFormat}[v{i}o]");
+        var args = new List<string> { "-hide_banner", "-nostdin", "-y" };
+        if (encoder == "h264_vaapi") args.AddRange(new[] { "-vaapi_device", H264Encoders.VaapiDevice });
+        args.AddRange(new[] { "-i", source, "-filter_complex", string.Join(";", new[] { split }.Concat(scales)) });
         var fps = EncodeLadder.CappedFps(info, settings);
         var outFps = fps ?? (info.Fps > 0 ? info.Fps : 30);
         var keyint = Math.Max(1, (int)Math.Round(outFps * settings.GopSeconds));

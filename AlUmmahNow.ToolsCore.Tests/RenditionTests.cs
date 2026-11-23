@@ -68,6 +68,31 @@ public class EncodeLadderTests
         Assert.Equal("libx264", H264Encoders.Pick(list + "\n V....D libx264              libx264 H.264\n"));
         Assert.Equal("libopenh264", H264Encoders.Pick(" V....D libopenh264 OpenH264\n"));
         Assert.Null(H264Encoders.Pick(" A....D aac AAC\n"));
+
+        const string linuxVaapi = """
+             V....D libopenh264          OpenH264 H.264
+             V....D h264_vaapi           H.264/AVC (VAAPI) (codec h264)
+            """;
+        Assert.Equal("h264_vaapi", H264Encoders.Pick(linuxVaapi, vaapiAvailable: true));
+        Assert.Equal("libopenh264", H264Encoders.Pick(linuxVaapi, vaapiAvailable: false));
+    }
+
+    [Fact]
+    public void Vaapi_passes_render_device_hwupload_and_vbr_options()
+    {
+        var info = new SourceInfo(1280, 720, 0, 30, true, 10);
+        var settings = Ladder.Settings.Ladder;
+        var rungs = EncodeLadder.For(info, settings).Take(2).ToList();
+        var args = (List<string>)FfmpegMediaTools.Arguments("/in.mp4", info, rungs, new[] { "/w/360p.mp4", "/w/480p.mp4" }, "h264_vaapi", settings);
+        var text = string.Join(" ", args);
+
+        Assert.Equal("nv12", H264Encoders.InputFormat("h264_vaapi"));
+        Assert.Equal("format=nv12,hwupload", H264Encoders.FilterFormat("h264_vaapi"));
+        Assert.True(args.IndexOf("-vaapi_device") >= 0 && args.IndexOf("-vaapi_device") < args.IndexOf("-i"));
+        Assert.Equal(H264Encoders.VaapiDevice, args[args.IndexOf("-vaapi_device") + 1]);
+        Assert.Contains("[v0]scale=w=640:h=360:flags=bicubic,format=nv12,hwupload[v0o]", text);
+        Assert.Contains("-c:v:0 h264_vaapi", text);
+        Assert.Contains("-rc_mode:v:0 VBR -b:v:0 480000 -maxrate:v:0 800000 -bufsize:v:0 1600000", text);
     }
 
     [Fact]
