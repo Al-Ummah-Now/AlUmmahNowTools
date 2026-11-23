@@ -7,8 +7,8 @@
 - `AlUmmahNow.Tests` (`net8.0`): Data models, `ImportDbContext` / `SqliteImportDb`, `FileScanService` (unit + live in-process SignalR integration tests), `Importer`, `DataImporter`, `BunnyBulkUploader`, `R2Client`.
 - `AlUmmahNow.ToolsCore.Tests` (`net9.0`): Auth/session, `FolderScanner`, `ImportQueue` / `ImportSteps`, `Renditions` (`EncodeLadder`, `H264Encoders`, `EncodeStep`, `RenditionSender`, `CheckStep`), `Transcriber`, `QuranMatcher`, `TranscriptUpload`.
 - `AlUmmahNow.VisualImporterUno.Tests` (`net9.0-desktop`): Headless cross-platform xUnit tests for desktop ViewModels, Models, Converters, and `Loc` (English/Arabic digits, CLDR plurals, zones, formatting).
-- Desktop UI smoke (`TOOLS_DEMO=1` + `TOOLS_SCREENSHOT`): Launches the `net9.0-desktop` binary headlessly in CI (`xvfb-run` on Ubuntu) to verify `signed-out`, `not-staff`, and `staff` Import screens in `en` and `ar`.
-- `AlUmmahNow.VisualImporterUno.UITests`: Legacy WinAppDriver stub (unbuilt in CI; scheduled for removal pending owner decision `TP-D1`).
+- Desktop UI smoke (`TOOLS_DEMO=1` + `TOOLS_SCREENSHOT`): Launches the `net9.0-desktop` binary headlessly on Ubuntu PR CI (`xvfb-run`) to verify `signed-out`, `not-staff`, and `staff` Import screens in `en` and `ar`; packaged 3-OS smoke (Windows, macOS, Linux) runs in `release.yml`.
+- ~~`AlUmmahNow.VisualImporterUno.UITests`~~: Deleted per owner decision `TP-D1` (PR #63).
 
 ---
 

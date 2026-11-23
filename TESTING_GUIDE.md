@@ -29,9 +29,7 @@ The repository has three active xUnit test projects plus a headless desktop UI s
    ```bash
    dotnet test AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno.Tests/AlUmmahNow.VisualImporterUno.Tests.csproj
    ```
-4. **Headless Desktop UI Smoke (`TOOLS_DEMO=1` + `TOOLS_SCREENSHOT`)** — Verifies real `net9.0-desktop` launch and frame rendering across `signed-out`, `not-staff`, and `staff` states in `en` and `ar` (runs under `xvfb-run` on Ubuntu Linux CI).
-
-> **Note:** `AlUmmahNow.VisualImporterUno.UITests` is a legacy WinAppDriver stub and is not part of the cross-platform test workflow.
+4. **Headless Desktop UI Smoke (`TOOLS_DEMO=1` + `TOOLS_SCREENSHOT`)** — Verifies real `net9.0-desktop` launch and frame rendering across `signed-out`, `not-staff`, and `staff` states in `en` and `ar` (runs under `xvfb-run` on Ubuntu Linux CI; packaged Windows/macOS/Linux smoke runs in `release.yml`).
 
 ### Existing Test Coverage (AlUmmahNow.Tests)
 - ✅ SignalR Hub & Client: `AlUmmahNow.Tests/FileScanService/Hubs/FileScanHubTests.cs`, `FileScanHubWatchApprovalTests.cs`, `FileScanSignalRIntegrationTests.cs`, `AlUmmahNow.Tests/DataImporter/Services/FileScanSignalRClientTests.cs`

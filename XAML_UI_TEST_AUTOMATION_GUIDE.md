@@ -1,7 +1,7 @@
 # XAML-Based UI Test Automation Guide
 ## Comprehensive Testing Strategy for Uno Platform, WPF, and WinUI 3
 
-> **Status: Superseded (2026-11-23, owner decision `TP-D1`).** Microsoft archived WinAppDriver in 2021 and `AlUmmahNow.VisualImporterUno.UITests` has been removed. The active cross-platform desktop test strategy is documented in [`TESTING_GUIDE.md`](TESTING_GUIDE.md) and [`TESTING_IMPLEMENTATION_PLAN.md`](TESTING_IMPLEMENTATION_PLAN.md): headless `net9.0-desktop` xUnit ViewModel/helper tests (`AlUmmahNow.VisualImporterUno.Tests`) plus `TOOLS_DEMO=1` / `TOOLS_SCREENSHOT` headless smoke runs across Linux, macOS, and Windows.
+> **Status: Superseded (2026-11-23, owner decision `TP-D1`).** Microsoft archived WinAppDriver in 2021 and `AlUmmahNow.VisualImporterUno.UITests` has been removed. The active cross-platform desktop test strategy is documented in [`TESTING_GUIDE.md`](TESTING_GUIDE.md) and [`TESTING_IMPLEMENTATION_PLAN.md`](TESTING_IMPLEMENTATION_PLAN.md): headless `net9.0-desktop` xUnit ViewModel/helper tests (`AlUmmahNow.VisualImporterUno.Tests`) plus `TOOLS_DEMO=1` / `TOOLS_SCREENSHOT` headless smoke runs (on Linux CI under `xvfb-run`; packaged 3-OS smoke runs in `release.yml`, and the same runner works locally on macOS and Windows).
 
 **Project:** AlUmmahNow.VisualImporterUno
 **Date:** 2025-10-12
