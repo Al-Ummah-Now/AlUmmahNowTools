@@ -130,7 +130,7 @@ namespace AlUmmahNow.FileScanService.Services
             // TODO: Implement actual import logic here
             // This would involve:
             // 1. Reading the file
-            // 2. Uploading to cloud storage (R2, BunnyCDN)
+            // 2. Uploading to cloud storage (Cloudflare R2)
             // 3. Creating video stream entries
             // 4. Processing thumbnails
             // 5. Handling translation if needed

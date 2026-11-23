@@ -11,16 +11,18 @@ AlUmmahNowTools/
 ??? AlUmmahNow.Data/                    # Shared Data Library
 ??? AlUmmahNow.Importer/                # Core Import Logic Library
 ??? AlUmmahNow.DataImporter/            # CLI SignalR Client Application
-??? AlUmmahNow.BunnyBulkUploader/       # CLI Bulk Upload Application
-??? AlUmmahNow.VisualImporterUno/       # Uno Platform Cross-Platform GUI (Windows, Linux, macOS, Web, Mobile)
+??? AlUmmahNow.ToolsCore/               # Admin-API Sign-in, WorkQueue, TUS & Local Encoding (.NET 9)
+??? AlUmmahNow.VisualImporterUno/       # Uno Platform Cross-Platform GUI (Windows, Linux, macOS)
 ??? AlUmmahNow.FileScanService/         # SignalR Hub & Background Processing Service
-??? AlUmmahNow.Tests/                   # Comprehensive Unit Tests (258 tests)
+??? AlUmmahNow.Tests/                   # .NET 8 Unit & Integration Tests
+??? AlUmmahNow.ToolsCore.Tests/         # .NET 9 ToolsCore Tests
 ??? .github/copilot-instructions.md    # Development Guidelines
 ```
 
 **Recent Changes**:
 - `AlUmmahNow.FileScanApi` has been **REMOVED** and replaced with SignalR-based real-time communication
 - `AlUmmahNow.VisualImporter` (WinUI 3) has been **REMOVED** and replaced with `AlUmmahNow.VisualImporterUno` for cross-platform support
+- `AlUmmahNow.BunnyBulkUploader`, `BunnyStorageClient`, and `BunnyStreamClient` have been **REMOVED** (`TP-D4`); active imports run through `AlUmmahNow.ToolsCore` and `admin-api` to Cloudflare R2
 
 ## ?? Core Principles
 
@@ -57,11 +59,11 @@ AlUmmahNow.Data/
 ?   ??? Video/                 # Video-related models
 ?   ??? Storage/               # Storage abstractions
 ??? Storage/                    # Storage Implementations
-?   ??? BunnyStorageClient.cs  # BunnyCDN integration
 ?   ??? R2Client.cs            # Cloudflare R2 integration
 ?   ??? IStorageClient.cs      # Storage abstraction
 ??? Video/                      # Video Services
-?   ??? BunnyStreamClient.cs   # Video streaming API
+?   ??? MediaProbe.cs          # FFprobe metadata helper
+?   ??? VideoThumbnailService.cs # Thumbnail extraction
 ??? Translation/                # Translation Services
     ??? DeepLClient.cs         # DeepL translation API
 ```
@@ -69,7 +71,7 @@ AlUmmahNow.Data/
 **Responsibilities:**
 - ?? Domain models and entities for watch/approval workflows
 - ?? Storage abstractions and implementations
-- ?? External service integrations (BunnyCDN, Cloudflare R2, DeepL)
+- ?? External service integrations (Cloudflare R2, DeepL)
 - ?? Database context and configurations
 - ?? Data transfer objects for SignalR communication
 
@@ -231,7 +233,6 @@ graph LR
     F --> H[ApprovalService]
     
     C --> I[External Services]
-    I --> J[BunnyCDN]
     I --> K[Cloudflare R2]
     I --> L[DeepL]
 ```
@@ -265,9 +266,8 @@ graph LR
 ### **Storage Layer**
 - **Abstraction**: `IStorageClient<T>` interface
 - **Implementations**: 
-  - `BunnyStorageClient` for BunnyCDN
-  - `R2Client` for Cloudflare R2
-- **Features**: Upload, download, list, delete operations
+  - `R2Client` for Cloudflare R2 (legacy `BunnyStorageClient` removed under `TP-D4`)
+- **Features**: Upload, download, list operations (no platform hard deletes)
 
 ### **Import Engine**
 - **VideoImporter**: Main orchestrator with session tracking
@@ -328,14 +328,6 @@ PendingApproval:
     "S3Key": "access-key",
     "S3Secret": "secret-key"
   },
-  "BunnyVideo": {
-    "Zone": "bunny-video-zone",
-    "Key": "bunny-api-key",
-    "Region": "bunny-region"
-  },
-  "BunnyStream": {
-    "Key": "bunny-stream-key"
-  },
   "DeepL": {
     "ApiKey": "deepl-api-key",
     "IsFreeApi": false
@@ -383,7 +375,7 @@ PendingApproval:
 ### **Production Environment**
 - **Runtime**: .NET 8.0 Runtime
 - **Database**: SQL Server / SQLite
-- **Storage**: Cloudflare R2 + BunnyCDN
+- **Storage**: Cloudflare R2 (via `admin-api` TUS in `AlUmmahNow.ToolsCore`)
 - **Services**: Windows Services / Linux systemd
 - **SignalR**: Production-ready hosting with scaling considerations
 

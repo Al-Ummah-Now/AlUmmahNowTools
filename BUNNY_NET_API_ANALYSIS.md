@@ -1,5 +1,7 @@
 # Bunny.net API Analysis & Implementation Report
 
+> **Status: Superseded and retired (2026-11-23, owner decision `TP-D4`).** All legacy Bunny.net client code (`AlUmmahNow.BunnyBulkUploader`, `BunnyStorageClient`, `BunnyRetry`, `BunnyStreamClient`, `BunnyVideo`, `BunnyCDN.Net.Storage`, and `VideoImporter.ImportFromBunnyApiAsync`) has been removed from `AlUmmahNowTools`. Active imports go through `AlUmmahNow.ToolsCore` and `admin-api` TUS to Cloudflare R2 (see the wiki guide `guides/tools-bunny-research.md`). This document is kept for historical context only.
+
 **Generated:** 2025-10-12
 **Project:** AlUmmahNowTools
 **Focus:** BunnyCDN Storage, Stream, and CDN Integration

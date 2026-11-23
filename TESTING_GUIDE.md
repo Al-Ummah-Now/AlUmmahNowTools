@@ -16,7 +16,7 @@
 
 The repository has three active xUnit test projects plus a headless desktop UI smoke mode:
 
-1. **`AlUmmahNow.Tests` (`net8.0`)** — `AlUmmahNow.Data`, `AlUmmahNow.Importer`, `AlUmmahNow.FileScanService` (including live in-process Kestrel SignalR hub tests via `FileScanSignalRIntegrationTests`), `AlUmmahNow.DataImporter`, and `AlUmmahNow.BunnyBulkUploader`.
+1. **`AlUmmahNow.Tests` (`net8.0`)** — `AlUmmahNow.Data`, `AlUmmahNow.Importer`, `AlUmmahNow.FileScanService` (including live in-process Kestrel SignalR hub tests via `FileScanSignalRIntegrationTests`), and `AlUmmahNow.DataImporter`.
    ```bash
    dotnet test AlUmmahNow.Tests/AlUmmahNow.Tests.csproj
    ```
@@ -37,7 +37,7 @@ The repository has three active xUnit test projects plus a headless desktop UI s
 - ✅ SignalR Hub & Client: `AlUmmahNow.Tests/FileScanService/Hubs/FileScanHubTests.cs`, `FileScanHubWatchApprovalTests.cs`, `FileScanSignalRIntegrationTests.cs`, `AlUmmahNow.Tests/DataImporter/Services/FileScanSignalRClientTests.cs`
 - ✅ FileScan Engine & Services: `FileScanEngineTests.cs`, `HashCalculatorBasicTests.cs`, `HashCalculatorAdvancedTests.cs`, `MetadataExtractorTests.cs`, `ThumbnailServiceTests.cs`, `ImportWorkerClaimTests.cs`
 - ✅ Repository & Data Models: `AlUmmahNow.Tests/Repository/RepositoryTests.cs`, `AlUmmahNow.Tests/Data/Models/`
-- ✅ Importer & Storage Clients: `ImporterTests.cs`, `IdempotentImportTests.cs`, `SessionScopedImportTests.cs`, `BunnyStorageClientTests.cs`, `BunnyStreamClientTests.cs`, `R2ClientTests.cs`
+- ✅ Importer & Storage Clients: `ImporterTests.cs`, `IdempotentImportTests.cs`, `SessionScopedImportTests.cs`, `R2ClientTests.cs`, `NoPlatformHardDeleteTests.cs` (legacy Bunny storage/stream client tests removed with the Bunny clients under `TP-D4`)
 
 ---
 
@@ -70,10 +70,8 @@ AlUmmahNow.Tests/
 ├── Repository/
 │   └── RepositoryTests.cs ✅
 ├── Storage/
-│   ├── BunnyStorageClientTests.cs ✅
+│   ├── NoPlatformHardDeleteTests.cs ✅
 │   └── R2ClientTests.cs ✅
-├── Video/
-│   └── BunnyStreamClientTests.cs ✅
 └── Infrastructure/
     └── FileSystemTestBase.cs ✅
 ```
