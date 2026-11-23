@@ -2155,7 +2155,7 @@
     <value>استُبدل نص {0} بترجمة آلية، راجعه قبل الحفظ.</value>
   </data>
   <data name="Localized_Truncated" xml:space="preserve">
-    <value>{0} اختُصر إلى {1} حرفًا.</value>
+    <value>{0} اختُصر إلى {1} حرف.</value>
   </data>
   <data name="Localized_Undo" xml:space="preserve">
     <value>تراجع</value>
