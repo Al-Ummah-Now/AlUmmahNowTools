@@ -2816,6 +2816,7 @@
   </data>
   <data name="Import_TranslateNote.Text" xml:space="preserve">
     <value>كل ترجمة آلية مسودةٌ يراجعها شخص وينشرها. والمرئي الذي له ملفات ترجمة خاصة به يُترجم منها، وتبقى كما هي.</value>
+  </data>
   <data name="Nav_SocialSources.Content" xml:space="preserve">
     <value>المصادر الاجتماعية</value>
   </data>
