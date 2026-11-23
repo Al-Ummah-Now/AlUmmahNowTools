@@ -9,7 +9,6 @@
           <ExcludeByAttribute>GeneratedCode,ExcludeFromCodeCoverage</ExcludeByAttribute>
           <ExcludeByFile>**/Migrations/**/*.cs</ExcludeByFile>
           <IncludeDirectory>../AlUmmahNow.FileScanService/</IncludeDirectory>
-          <IncludeDirectory>../AlUmmahNow.FileScanApi/</IncludeDirectory>
           <IncludeDirectory>../AlUmmahNow.DataImporter/</IncludeDirectory>
           <IncludeDirectory>../AlUmmahNow.Data/</IncludeDirectory>
           <IncludeDirectory>../AlUmmahNow.Importer/</IncludeDirectory>

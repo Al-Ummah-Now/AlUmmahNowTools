@@ -1,5 +1,7 @@
 # FileScan Service Consolidation Plan
 
+> **Status: Completed (verified and closed out 2026-11-23 under `TOOLS-PLANS` TP-1).** `AlUmmahNow.FileScanApi` has been removed from the solution, `AlUmmahNow.FileScanService` hosts the consolidated SignalR hub (`/scanHub`) with `/health` and `/singleton` endpoints, both `AlUmmahNow.DataImporter` and `AlUmmahNow.VisualImporterUno` communicate via `FileScanSignalRClient`, and live SignalR hub-to-client integration tests verify the end-to-end transport.
+
 ## Executive Summary
 
 This document outlines the plan to consolidate **FileScanApi** (Web API) and **FileScanService** (Windows Service) into a single, more efficient Windows Service with SignalR for real-time communication.
@@ -824,7 +826,7 @@ If issues arise during consolidation:
 
 ---
 
-**Document Version**: 1.0  
-**Last Updated**: 2025-01-21  
+**Document Version**: 1.1  
+**Last Updated**: 2026-11-23  
 **Author**: Development Team  
-**Status**: Proposed - Awaiting Approval
+**Status**: Completed (all phases P1–P5 implemented and verified)

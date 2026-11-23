@@ -117,16 +117,7 @@ namespace AlUmmahNow.FileScanService
             var builder = WebApplication.CreateBuilder(args);
 
             // Get the port from configuration
-            var port = builder.Configuration.GetValue<int?>("Kestrel:Endpoints:Http:Url") ?? 5000;
-            if (builder.Configuration["ASPNETCORE_URLS"] != null)
-            {
-                // Try to extract port from ASPNETCORE_URLS
-                var urls = builder.Configuration["ASPNETCORE_URLS"];
-                if (Uri.TryCreate(urls?.Split(';')[0], UriKind.Absolute, out var uri))
-                {
-                    port = uri.Port;
-                }
-            }
+            var port = ResolvePort(builder.Configuration);
 
             // Initialize and check singleton status
             var loggerFactory = LoggerFactory.Create(builder => builder.AddSerilog());
@@ -270,6 +261,74 @@ namespace AlUmmahNow.FileScanService
                 Log.Fatal(ex, "Failed to start SignalR service");
                 return 1;
             }
+        }
+
+        internal static int ResolvePort(IConfiguration configuration)
+        {
+            if (TryParsePortFromUrls(configuration["ASPNETCORE_URLS"], out var aspnetPort))
+            {
+                return aspnetPort;
+            }
+
+            if (TryParsePort(configuration["Kestrel:Endpoints:Http:Url"], out var kestrelPort))
+            {
+                return kestrelPort;
+            }
+
+            if (TryParsePort(configuration["FileScanService:Url"], out var servicePort))
+            {
+                return servicePort;
+            }
+
+            return 5000;
+        }
+
+        private static bool TryParsePortFromUrls(string? urls, out int port)
+        {
+            port = 0;
+            if (string.IsNullOrWhiteSpace(urls))
+            {
+                return false;
+            }
+
+            foreach (var raw in urls.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                if (TryParsePort(raw, out port))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool TryParsePort(string? value, out int port)
+        {
+            port = 0;
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return false;
+            }
+
+            var trimmed = value.Trim();
+            if (int.TryParse(trimmed, out var parsedInt) && parsedInt is > 0 and <= 65535)
+            {
+                port = parsedInt;
+                return true;
+            }
+
+            // Kestrel allows wildcard hosts like http://*:5055 or http://+:5055
+            var normalized = trimmed
+                .Replace("://*:", "://localhost:", StringComparison.Ordinal)
+                .Replace("://+:", "://localhost:", StringComparison.Ordinal);
+
+            if (Uri.TryCreate(normalized, UriKind.Absolute, out var uri) && uri.Port is > 0 and <= 65535)
+            {
+                port = uri.Port;
+                return true;
+            }
+
+            return false;
         }
 
         private static void ShowHelp()

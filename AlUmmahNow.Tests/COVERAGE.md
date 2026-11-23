@@ -17,9 +17,9 @@ This document describes the comprehensive test suite for AlUmmahNowTools, design
 
 #### Base Classes
 
-- **DatabaseTestBase** - Provides in-memory database for testing
+- **SqliteImportDb** - File-backed SQLite database for EF Core integration tests
 - **FileSystemTestBase** - Creates temporary file structures for testing
-- **FileScanApiWebApplicationFactory** - Integration test factory for API testing
+- **FileScanSignalRIntegrationTests** - In-process Kestrel + SignalR hub-to-client integration tests
 
 #### Test Data Management
 
@@ -72,25 +72,9 @@ All test classes use standardized test data creation methods:
 - ? **FileScanWorker** - Covered via ImportWorker tests
 - ? **WebSocketCommunicationService** - Covered via integration tests
 
-### ?? AlUmmahNow.FileScanApi (Target: 100%)
+### SignalR Hub (`AlUmmahNow.FileScanService/Hubs/FileScanHub.cs`)
 
-#### Controllers
-- ? **ScanController** - 100% coverage
-  - All HTTP endpoints (GET, POST, DELETE)
-  - Request validation
-  - Response formatting
-  - Error scenarios (404, 400, 500)
-  - File selection workflows
-  - Import triggering
-  - Statistics retrieval
-
-#### Integration Tests
-- ? **API Endpoints** - 100% coverage
-  - Full HTTP request/response cycles
-  - Database persistence verification
-  - Concurrent request handling
-  - Large payload handling
-  - Error response formatting
+`AlUmmahNow.FileScanApi` was consolidated into `AlUmmahNow.FileScanService` (SignalR `/scanHub`). Hub RPC methods and real-time client notifications are covered by `FileScanHubTests`, `FileScanHubWatchApprovalTests`, and `FileScanSignalRIntegrationTests`.
 
 ### ?? AlUmmahNow.Data (Target: 100%)
 
@@ -168,10 +152,10 @@ The test suite generates multiple coverage report formats:
 
 | Component | Target | Current | Status |
 |-----------|--------|---------|--------|
-| FileScanService | 100% | ?? | ? Ready |
-| FileScanApi | 100% | ?? | ? Ready |
-| Data Models | 100% | ?? | ? Ready |
-| DataImporter | 100% | ?? | ? Ready |
+| FileScanService (incl. SignalR Hub) | 100% | Active | Ready |
+| Data Models | 100% | Active | Ready |
+| DataImporter | 100% | Active | Ready |
+| ToolsCore (`AlUmmahNow.ToolsCore.Tests`) | 80%+ | Active | Ready |
 | **Overall** | **100%** | **??** | **? Ready** |
 
 ## Test Quality Metrics
