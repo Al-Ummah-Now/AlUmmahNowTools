@@ -156,7 +156,7 @@ The test suite generates multiple coverage report formats:
 | Data Models | 100% | Active | Ready |
 | DataImporter | 100% | Active | Ready |
 | ToolsCore (`AlUmmahNow.ToolsCore.Tests`) | 80%+ | Active | Ready |
-| **Overall** | **100%** | **??** | **? Ready** |
+| **Overall** | **100%** | **Active** | **Ready** |
 
 ## Test Quality Metrics
 
