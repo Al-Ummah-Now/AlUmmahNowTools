@@ -34,8 +34,9 @@
 
   <ItemGroup>
     <!-- The staff icon (Tools #44): the logo's lantern in a gold octagon ring, from AlUmmahNow
-         packages/app-icons (the app-icons build with app tools, its icon-512.png) -->
-    <UnoIcon Include="Assets\Icons\staff_icon.png" Color="#09151E" />
+         packages/app-icons (the app-icons build with app tools, its icon-512.png).
+         Named icon.png: the macOS bundle (Uno PackageFormat=app) only takes the icon16x16@1x… sizes of an icon called "icon". -->
+    <UnoIcon Include="Assets\Icons\icon.png" Color="#09151E" />
   </ItemGroup>
 
   <ItemGroup>
