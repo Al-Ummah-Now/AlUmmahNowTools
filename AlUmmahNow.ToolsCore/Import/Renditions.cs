@@ -267,19 +267,38 @@ public static class H264Encoders
     }
 
     /// <summary>
-    /// True when ffmpeg's stderr clearly points to a corrupt/missing source or full disk rather than an encoder failure,
+    /// True when ffmpeg's stderr clearly points to a corrupt/missing source or full disk rather than an encoder/device failure,
     /// so hardware encoders are not permanently blacklisted for the rest of the session.
     /// </summary>
-    public static bool IsSourceOrDiskError(string stderr)
+    public static bool IsSourceOrDiskError(string stderr, string? sourcePath = null)
     {
         var lower = stderr.ToLowerInvariant();
-        return lower.Contains("no space left on device", StringComparison.Ordinal)
+        if (lower.Contains("no space left on device", StringComparison.Ordinal)
             || lower.Contains("disk full", StringComparison.Ordinal)
             || lower.Contains("invalid data found when processing input", StringComparison.Ordinal)
-            || lower.Contains("no such file or directory", StringComparison.Ordinal)
-            || lower.Contains("permission denied", StringComparison.Ordinal)
             || lower.Contains("moov atom not found", StringComparison.Ordinal)
-            || lower.Contains("input/output error", StringComparison.Ordinal);
+            || lower.Contains("input/output error", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        // Only treat missing-file / permission errors as source errors when they do not point at a GPU/DRM device or driver library.
+        var mentionsHardware = lower.Contains("/dev/dri", StringComparison.Ordinal)
+            || lower.Contains("libcuda", StringComparison.Ordinal)
+            || lower.Contains("vaapi", StringComparison.Ordinal)
+            || lower.Contains("nvenc", StringComparison.Ordinal)
+            || lower.Contains("qsv", StringComparison.Ordinal)
+            || lower.Contains("amf", StringComparison.Ordinal)
+            || lower.Contains("videotoolbox", StringComparison.Ordinal);
+        if (mentionsHardware) return false;
+
+        var isFileAccessError = lower.Contains("no such file or directory", StringComparison.Ordinal)
+            || lower.Contains("permission denied", StringComparison.Ordinal);
+        if (!isFileAccessError) return false;
+
+        return string.IsNullOrEmpty(sourcePath)
+            || lower.Contains(sourcePath.ToLowerInvariant(), StringComparison.Ordinal)
+            || lower.Contains(Path.GetFileName(sourcePath).ToLowerInvariant(), StringComparison.Ordinal);
     }
 
     /// <summary>The encoder's rate and keyframe options for one output: a keyframe every GOP and never one from a scene cut.</summary>
@@ -380,6 +399,8 @@ public sealed class FfmpegMediaTools : IMediaTools
     private readonly string? _osOverride;
     private readonly Func<string?> _preferOverride;
     private readonly Func<IReadOnlyList<string>> _findVaapiDevices;
+    // Shared across concurrent EncodeStep workers (up to MaxEncodes = 4); all mutable encoder state is guarded by _stateLock.
+    private readonly object _stateLock = new();
     private readonly HashSet<string> _failedEncoders = new(StringComparer.Ordinal);
     private readonly HashSet<string> _failedVaapiDevices = new(StringComparer.Ordinal);
     private readonly Dictionary<string, DateTimeOffset> _busyUntil = new(StringComparer.Ordinal);
@@ -454,33 +475,44 @@ public sealed class FfmpegMediaTools : IMediaTools
     public async Task<string?> PickEncoderAsync(IReadOnlySet<string>? skipEncoders, CancellationToken ct)
     {
         var now = _time.GetUtcNow();
-        foreach (var expired in _busyUntil.Where(kv => kv.Value <= now).Select(kv => kv.Key).ToList())
+        HashSet<string> failedSnapshot;
+        HashSet<string> failedVaapiSnapshot;
+        HashSet<string> transientSkip;
+
+        lock (_stateLock)
         {
-            _busyUntil.Remove(expired);
+            foreach (var expired in _busyUntil.Where(kv => kv.Value <= now).Select(kv => kv.Key).ToList())
+            {
+                _busyUntil.Remove(expired);
+            }
+
+            if (_encoder is not null
+                && !_failedEncoders.Contains(_encoder)
+                && !_busyUntil.ContainsKey(_encoder)
+                && (skipEncoders is null || !skipEncoders.Contains(_encoder)))
+            {
+                return _encoder;
+            }
+
+            failedSnapshot = new HashSet<string>(_failedEncoders, StringComparer.Ordinal);
+            failedVaapiSnapshot = new HashSet<string>(_failedVaapiDevices, StringComparer.Ordinal);
+            transientSkip = new HashSet<string>(_busyUntil.Keys, StringComparer.Ordinal);
         }
 
-        if (_encoder is not null
-            && !_failedEncoders.Contains(_encoder)
-            && !_busyUntil.ContainsKey(_encoder)
-            && (skipEncoders is null || !skipEncoders.Contains(_encoder)))
-        {
-            return _encoder;
-        }
+        if (skipEncoders is not null) transientSkip.UnionWith(skipEncoders);
 
         var (ffmpeg, _) = await Paths(ct).ConfigureAwait(false);
         var (_, output, _) = await RunAsync(ffmpeg, new[] { "-hide_banner", "-encoders" }, null, ct).ConfigureAwait(false);
         var os = _osOverride ?? H264Encoders.CurrentOs();
         var prefer = _preferOverride();
         var vaapiDevices = os == "linux"
-            ? _findVaapiDevices().Where(d => !_failedVaapiDevices.Contains(d)).ToList()
+            ? _findVaapiDevices().Where(d => !failedVaapiSnapshot.Contains(d)).ToList()
             : (IReadOnlyList<string>)Array.Empty<string>();
-        var transientSkip = new HashSet<string>(_busyUntil.Keys, StringComparer.Ordinal);
-        if (skipEncoders is not null) transientSkip.UnionWith(skipEncoders);
 
         var sawBusyOrSkipped = false;
         var (encoder, device) = await SelectWorkingEncoderAsync(
             H264Encoders.Candidates(output, os, prefer),
-            _failedEncoders,
+            failedSnapshot,
             transientSkip,
             vaapiDevices,
             async (candidate, vaapiDevice, token) =>
@@ -493,7 +525,10 @@ public sealed class FfmpegMediaTools : IMediaTools
                     if (code == 0) return (true, false);
                     if (H264Encoders.IsRefusedSession(err))
                     {
-                        _busyUntil[candidate] = _time.GetUtcNow() + H264Encoders.BusyCooldown;
+                        lock (_stateLock)
+                        {
+                            _busyUntil[candidate] = _time.GetUtcNow() + H264Encoders.BusyCooldown;
+                        }
                         sawBusyOrSkipped = true;
                         return (false, true);
                     }
@@ -507,34 +542,53 @@ public sealed class FfmpegMediaTools : IMediaTools
             onTransientSkip: () => sawBusyOrSkipped = true,
             ct).ConfigureAwait(false);
 
-        _vaapiDevice = device;
-        // Never permanently cache a lower-priority/software fallback while a higher-priority GPU was only skipped
-        // for this file or transiently busy (mirrors Maktaba's non-sticky busy fallback).
-        _encoder = sawBusyOrSkipped ? null : encoder;
+        lock (_stateLock)
+        {
+            _vaapiDevice = device;
+            // Never permanently cache a lower-priority/software fallback while a higher-priority GPU was only skipped
+            // for this file or transiently busy (mirrors Maktaba's non-sticky busy fallback).
+            var stillUsable = encoder is not null && !_failedEncoders.Contains(encoder) && !_busyUntil.ContainsKey(encoder);
+            _encoder = sawBusyOrSkipped || !stillUsable ? null : encoder;
+        }
         return encoder;
     }
 
     public void MarkEncoderFailed(string encoder, bool transientBusy = false)
     {
-        if (transientBusy)
+        string? failedVaapiDevice = null;
+        lock (_stateLock)
         {
-            _busyUntil[encoder] = _time.GetUtcNow() + H264Encoders.BusyCooldown;
-        }
-        else if (encoder == "h264_vaapi" && _vaapiDevice is not null)
-        {
-            _failedVaapiDevices.Add(_vaapiDevice);
-            var remaining = _findVaapiDevices().Any(d => !_failedVaapiDevices.Contains(d));
-            if (!remaining) _failedEncoders.Add(encoder);
-        }
-        else
-        {
-            _failedEncoders.Add(encoder);
+            if (transientBusy)
+            {
+                _busyUntil[encoder] = _time.GetUtcNow() + H264Encoders.BusyCooldown;
+            }
+            else if (encoder == "h264_vaapi" && _vaapiDevice is not null)
+            {
+                failedVaapiDevice = _vaapiDevice;
+                _failedVaapiDevices.Add(failedVaapiDevice);
+            }
+            else
+            {
+                _failedEncoders.Add(encoder);
+            }
+
+            if (string.Equals(_encoder, encoder, StringComparison.Ordinal))
+            {
+                _encoder = null;
+                if (encoder == "h264_vaapi") _vaapiDevice = null;
+            }
         }
 
-        if (string.Equals(_encoder, encoder, StringComparison.Ordinal))
+        if (failedVaapiDevice is not null)
         {
-            _encoder = null;
-            if (encoder == "h264_vaapi") _vaapiDevice = null;
+            var allDevices = _findVaapiDevices();
+            lock (_stateLock)
+            {
+                if (!allDevices.Any(d => !_failedVaapiDevices.Contains(d)))
+                {
+                    _failedEncoders.Add(encoder);
+                }
+            }
         }
     }
 
@@ -700,7 +754,8 @@ public sealed class FfmpegMediaTools : IMediaTools
         const double segmentSlackSeconds = 1.0;
         const double peakFactor = 1.5;
         var maxSegSeconds = settings.SegmentSeconds + segmentSlackSeconds;
-        var maxPeakBitrate = (rung.Maxrate + (source.HasAudio ? rung.Audio : 0)) * peakFactor;
+        // Match apps/media/container/prebuilt.mjs:verifyRenditions (always adds rung.Audio to the budget).
+        var maxPeakBitrate = (rung.Maxrate + rung.Audio) * peakFactor;
         var totalSeconds = 0.0;
 
         foreach (var (file, seconds) in segments)
@@ -784,7 +839,12 @@ public sealed class FfmpegMediaTools : IMediaTools
     public async Task EncodeAsync(string source, SourceInfo info, IReadOnlyList<PlannedRung> rungs, IReadOnlyList<string> outputs, string encoder, EncodeLadderSettings settings, IProgress<double> progress, CancellationToken ct)
     {
         var (ffmpeg, _) = await Paths(ct).ConfigureAwait(false);
-        var args = Arguments(source, info, rungs, outputs, encoder, settings, _vaapiDevice);
+        string? vaapiDevice;
+        lock (_stateLock)
+        {
+            vaapiDevice = _vaapiDevice;
+        }
+        var args = Arguments(source, info, rungs, outputs, encoder, settings, vaapiDevice);
         var duration = info.DurationSeconds;
         void OnLine(string line)
         {
@@ -799,7 +859,7 @@ public sealed class FfmpegMediaTools : IMediaTools
         {
             var errCode = H264Encoders.IsRefusedSession(error)
                 ? "gpu_busy"
-                : H264Encoders.IsSourceOrDiskError(error)
+                : H264Encoders.IsSourceOrDiskError(error, source)
                     ? "source_error"
                     : "ffmpeg_failed";
             throw new LocalEncodeException(errCode, $"ffmpeg stopped ({encoder}): " + LastLine(error));
@@ -1078,13 +1138,13 @@ public sealed class EncodeStep : IImportStep
             DeleteFolder(directory);
             throw;
         }
-        catch (Exception ex) when (ex is LocalEncodeException or IOException or UnauthorizedAccessException)
+        catch (Exception ex)
         {
-            // Not the file's failure: the server encodes it as any upload
+            // Any non-cancellation local encoding error falls back to the server instead of failing the file's upload.
             DeleteFolder(directory);
             item.Renditions = null;
             context.Save();
-            var code = ex is LocalEncodeException local ? local.Code : "disk";
+            var code = ex is LocalEncodeException local ? local.Code : ex is IOException or UnauthorizedAccessException ? "disk" : "encode_error";
             context.Log(LogLevel.Warning, "encode_failed", $"Could not encode here: {ex.Message}. The server encodes this file", code, ex.Message);
             _report?.Invoke(ex, item);
             return StepResult.Skipped;

@@ -175,10 +175,12 @@ public class EncodeLadderTests
         Assert.False(H264Encoders.IsRefusedSession("OpenEncodeSessionEx failed: unsupported device (2)"));
         Assert.False(H264Encoders.IsRefusedSession("Cannot load libcuda.so.1"));
 
-        // Source/disk errors are separated from encoder failures
+        // Source/disk errors are separated from encoder/device failures
         Assert.True(H264Encoders.IsSourceOrDiskError("av_interleaved_write_frame(): No space left on device"));
         Assert.True(H264Encoders.IsSourceOrDiskError("in.mp4: Invalid data found when processing input"));
         Assert.True(H264Encoders.IsSourceOrDiskError("[mov,mp4] moov atom not found"));
+        Assert.True(H264Encoders.IsSourceOrDiskError("/videos/in.mp4: Permission denied", "/videos/in.mp4"));
+        Assert.False(H264Encoders.IsSourceOrDiskError("/dev/dri/renderD128: Permission denied", "/videos/in.mp4"));
         Assert.False(H264Encoders.IsSourceOrDiskError("Cannot load libcuda.so.1"));
 
         // Local output verification catches bad pix_fmt, codec, size, audio channels, unexpected silent audio, duration slack, keyframes, and peak bitrate
@@ -695,6 +697,39 @@ public class EncodeStepTests
         File.Delete(probeBusyFlag);
         clock.Advance(TimeSpan.FromSeconds(31));
         Assert.Equal("h264_nvenc", await realMedia2.PickEncoderAsync(default));
+
+        // 5. Concurrent PickEncoderAsync + MarkEncoderFailed across 4 parallel workers is thread-safe
+        var sharedClock = new FakeTimeProvider();
+        var sharedMedia = new FfmpegMediaTools(
+            _ => Task.FromResult<(string, string)?>((ffmpegPath, ffprobePath)),
+            time: sharedClock,
+            osOverride: "linux",
+            preferOverride: () => "auto",
+            findVaapiDevices: () => Array.Empty<string>());
+        var workers = Enumerable.Range(0, 4).Select(w => Task.Run(async () =>
+        {
+            for (var i = 0; i < 8; i++)
+            {
+                var picked = await sharedMedia.PickEncoderAsync(default);
+                Assert.True(picked is "h264_nvenc" or "libx264");
+                sharedMedia.MarkEncoderFailed("h264_nvenc", transientBusy: true);
+                if (w == 0 && i % 2 == 0) sharedClock.Advance(TimeSpan.FromSeconds(31));
+            }
+        }));
+        await Task.WhenAll(workers);
+    }
+
+    [Fact]
+    public async Task An_unexpected_local_encode_exception_falls_back_to_the_server()
+    {
+        var (item, _, api, work) = Setup();
+        var reported = new List<Exception>();
+        var context = new RecordingContext();
+        var media = new FakeMedia { Fail = new InvalidOperationException("unexpected local error") };
+        Assert.Equal(StepResult.Skipped, await Step(api, work, media, reported).RunAsync(item, context, default));
+        Assert.Null(item.Renditions);
+        Assert.Contains(context.Lines, l => l.Code == "encode_failed" && l.Level == LogLevel.Warning);
+        Assert.Single(reported);
     }
 
     [Fact]
