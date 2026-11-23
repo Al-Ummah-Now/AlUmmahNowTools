@@ -4,7 +4,7 @@
 > **Status Update (2026-11-23, epic `TOOLS-PLANS`):** The original 7-week WinAppDriver rollout below predates the cross-platform Uno Skia Desktop port (`net9.0-desktop`) and `AlUmmahNow.ToolsCore`. WinAppDriver is archived (Windows-only); UI smoke testing now uses the built-in `TOOLS_DEMO=1` + `TOOLS_SCREENSHOT` runner (Windows, macOS, and Ubuntu under `xvfb-run`).
 
 ### Current Test Projects
-- `AlUmmahNow.Tests` (`net8.0`): Data models, `ImportDbContext` / `SqliteImportDb`, `FileScanService` (unit + live in-process SignalR integration tests), `Importer`, `DataImporter`, `BunnyBulkUploader`, `R2Client`.
+- `AlUmmahNow.Tests` (`net8.0`): Data models, `ImportDbContext` / `SqliteImportDb`, `FileScanService` (unit + live in-process SignalR integration tests), `Importer`, `DataImporter`, `R2Client`.
 - `AlUmmahNow.ToolsCore.Tests` (`net9.0`): Auth/session, `FolderScanner`, `ImportQueue` / `ImportSteps`, `Renditions` (`EncodeLadder`, `H264Encoders`, `EncodeStep`, `RenditionSender`, `CheckStep`), `Transcriber`, `QuranMatcher`, `TranscriptUpload`.
 - `AlUmmahNow.VisualImporterUno.Tests` (`net9.0-desktop`): Headless cross-platform xUnit tests for desktop ViewModels, Models, Converters, and `Loc` (English/Arabic digits, CLDR plurals, zones, formatting).
 - Desktop UI smoke (`TOOLS_DEMO=1` + `TOOLS_SCREENSHOT`): Launches the `net9.0-desktop` binary headlessly on Ubuntu PR CI (`xvfb-run`) to verify `signed-out`, `not-staff`, and `staff` Import screens in `en` and `ar`; packaged 3-OS smoke (Windows, macOS, Linux) runs in `release.yml`.
