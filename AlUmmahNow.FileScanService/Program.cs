@@ -2,6 +2,8 @@ using AlUmmahNow.Data.Database;
 using AlUmmahNow.FileScanService.Services;
 using AlUmmahNow.FileScanService.Hubs;
 using Microsoft.AspNetCore.Cors.Infrastructure;
+using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -117,15 +119,10 @@ namespace AlUmmahNow.FileScanService
 
         private static async Task<int> RunAsSignalRServiceAsync(string[] args)
         {
-            var builder = WebApplication.CreateBuilder(args);
-
-            // Resolve a loopback-only port and bind Kestrel explicitly so the singleton lock,
-            // /health output, and bound listener always agree and never expose the hub off-host.
-            var port = ResolvePort(builder.Configuration);
-            builder.WebHost.UseKestrel(options => ConfigureLoopbackEndpoint(options, port));
+            var (builder, port) = CreateSignalRBuilder(args);
 
             // Initialize and check singleton status
-            var loggerFactory = LoggerFactory.Create(builder => builder.AddSerilog());
+            var loggerFactory = LoggerFactory.Create(b => b.AddSerilog());
             var singletonLogger = loggerFactory.CreateLogger<SingletonManager>();
 
             _singletonManager = new SingletonManager(singletonLogger, port);
@@ -152,33 +149,7 @@ namespace AlUmmahNow.FileScanService
             // Register singleton manager in DI container
             builder.Services.AddSingleton(_singletonManager);
 
-            // Add SignalR
-            builder.Services.AddSignalR();
-
-            // Configure database with SQL Server
-            builder.Services.AddDbContext<ImportDbContext>(options =>
-                options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection") 
-                    ?? "Server=(localdb)\\MSSQLLocalDB;Database=AlUmmahNowFileScan;Trusted_Connection=true;MultipleActiveResultSets=true;TrustServerCertificate=true"));
-
-            // Register services
-            builder.Services.AddScoped<IFileScanEngine, FileScanEngine>();
-            builder.Services.AddScoped<IHashCalculator, HashCalculator>();
-            builder.Services.AddScoped<IMetadataExtractor, MetadataExtractor>();
-            // One watcher registry per process: a singleton hosted service that restores active watches at
-            // startup and outlives hub calls (it opens a DI scope per operation and per file event).
-            builder.Services.AddSingleton<FileWatchService>();
-            builder.Services.AddSingleton<IFileWatchService>(sp => sp.GetRequiredService<FileWatchService>());
-            builder.Services.AddHostedService(sp => sp.GetRequiredService<FileWatchService>());
-            builder.Services.AddScoped<IApprovalService, ApprovalService>();
-
-            // Register background services
-            builder.Services.AddHostedService<FileScanWorker>();
-            builder.Services.AddHostedService<ImportWorker>();
-
-            // Configure CORS for SignalR clients
-            builder.Services.AddCors(ConfigureSignalRCors);
-
-            var app = builder.Build();
+            var app = BuildSignalRApp(builder, port, () => _singletonManager?.GetLockInfo());
 
             // Bring the shared database up to the current schema (creates it if missing; adds indexes
             // introduced since it was created). The workers rely on these constraints.
@@ -193,17 +164,12 @@ namespace AlUmmahNow.FileScanService
                 return 1;
             }
 
-            // Enable CORS
-            app.UseCors();
-
-            MapFileScanEndpoints(app, port, () => _singletonManager?.GetLockInfo());
-
             Log.Information("FileScanService SignalR Hub available at /scanHub on port {Port}", port);
             Console.WriteLine($"?? FileScanService running on port {port}");
             Console.WriteLine($"   SignalR Hub: http://localhost:{port}/scanHub");
             Console.WriteLine($"   Health Check: http://localhost:{port}/health");
             Console.WriteLine($"   Singleton Info: http://localhost:{port}/singleton");
-            
+
             try
             {
                 await app.RunAsync();
@@ -216,9 +182,126 @@ namespace AlUmmahNow.FileScanService
             }
         }
 
+        internal static (WebApplicationBuilder Builder, int Port) CreateSignalRBuilder(
+            string[] args,
+            Action<IConfigurationBuilder>? configureAdditionalConfig = null,
+            bool registerBackgroundWorkers = true)
+        {
+            var builder = WebApplication.CreateBuilder(args);
+            configureAdditionalConfig?.Invoke(builder.Configuration);
+
+            // Resolve a loopback-only port before clearing Kestrel endpoint configuration so that
+            // any wildcard or non-loopback Kestrel:Endpoints:* / ASPNETCORE_URLS values cannot be
+            // bound alongside our explicit loopback listener.
+            var port = ResolvePort(builder.Configuration);
+            ClearConfiguredKestrelEndpoints(builder.Configuration);
+            builder.WebHost.UseKestrel(options => ConfigureLoopbackEndpoint(options, port));
+
+            // Add SignalR
+            builder.Services.AddSignalR();
+
+            // Configure database with SQL Server
+            builder.Services.AddDbContext<ImportDbContext>(options =>
+                options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")
+                    ?? "Server=(localdb)\\MSSQLLocalDB;Database=AlUmmahNowFileScan;Trusted_Connection=true;MultipleActiveResultSets=true;TrustServerCertificate=true"));
+
+            // Register services
+            builder.Services.AddScoped<IFileScanEngine, FileScanEngine>();
+            builder.Services.AddScoped<IHashCalculator, HashCalculator>();
+            builder.Services.AddScoped<IMetadataExtractor, MetadataExtractor>();
+            // One watcher registry per process: a singleton hosted service that restores active watches at
+            // startup and outlives hub calls (it opens a DI scope per operation and per file event).
+            builder.Services.AddSingleton<FileWatchService>();
+            builder.Services.AddSingleton<IFileWatchService>(sp => sp.GetRequiredService<FileWatchService>());
+            builder.Services.AddScoped<IApprovalService, ApprovalService>();
+
+            if (registerBackgroundWorkers)
+            {
+                builder.Services.AddHostedService(sp => sp.GetRequiredService<FileWatchService>());
+                builder.Services.AddHostedService<FileScanWorker>();
+                builder.Services.AddHostedService<ImportWorker>();
+            }
+
+            // Configure CORS for SignalR clients
+            builder.Services.AddCors(ConfigureSignalRCors);
+
+            return (builder, port);
+        }
+
+        internal static WebApplication BuildSignalRApp(
+            WebApplicationBuilder builder,
+            int port,
+            Func<object?>? getLockInfo = null)
+        {
+            var app = builder.Build();
+
+            // Enable CORS
+            app.UseCors();
+
+            MapFileScanEndpoints(app, port, getLockInfo);
+
+            // Defense in depth: verify Kestrel bound exclusively to loopback once started.
+            app.Lifetime.ApplicationStarted.Register(() =>
+            {
+                if (!AreAllBoundAddressesLoopback(app.Services, out var nonLoopback))
+                {
+                    Log.Fatal("Refusing to serve FileScanService on non-loopback address(es): {Addresses}", string.Join(", ", nonLoopback));
+                    app.Lifetime.StopApplication();
+                }
+            });
+
+            return app;
+        }
+
+        internal static void ClearConfiguredKestrelEndpoints(ConfigurationManager configuration)
+        {
+            // Wipe every Kestrel:Endpoints:* key and ASPNETCORE_URLS/urls from configuration so
+            // Kestrel's default configuration loader never binds a configured wildcard endpoint
+            // alongside ConfigureLoopbackEndpoint.
+            var overrides = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["urls"] = null,
+                ["ASPNETCORE_URLS"] = null,
+                ["Kestrel:Endpoints"] = null,
+            };
+
+            foreach (var kvp in configuration.AsEnumerable())
+            {
+                if (kvp.Key.StartsWith("Kestrel:Endpoints", StringComparison.OrdinalIgnoreCase))
+                {
+                    overrides[kvp.Key] = null;
+                }
+            }
+
+            configuration.AddInMemoryCollection(overrides);
+        }
+
+        internal static bool AreAllBoundAddressesLoopback(IServiceProvider services, out List<string> nonLoopbackAddresses)
+        {
+            nonLoopbackAddresses = new List<string>();
+            var addresses = services.GetService<IServer>()?.Features.Get<IServerAddressesFeature>()?.Addresses;
+            if (addresses is null || addresses.Count == 0)
+            {
+                return false;
+            }
+
+            foreach (var address in addresses)
+            {
+                if (!Uri.TryCreate(address, UriKind.Absolute, out var uri) || !IsLoopbackHost(uri.Host))
+                {
+                    nonLoopbackAddresses.Add(address);
+                }
+            }
+
+            return nonLoopbackAddresses.Count == 0;
+        }
+
         internal static void ConfigureLoopbackEndpoint(KestrelServerOptions options, int port)
         {
-            options.Listen(IPAddress.Loopback, port);
+            // Replace Kestrel's default configuration loader with an empty configuration so no
+            // Kestrel:Endpoints:* entry can bind a non-loopback interface, then bind loopback only.
+            options.Configure(new ConfigurationBuilder().Build(), reloadOnChange: false);
+            options.ListenLocalhost(port);
         }
 
         internal static void ConfigureSignalRCors(CorsOptions options)
@@ -390,7 +473,7 @@ namespace AlUmmahNow.FileScanService
             return true;
         }
 
-        private static bool IsLoopbackHost(string host)
+        internal static bool IsLoopbackHost(string host)
         {
             if (string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase))
             {

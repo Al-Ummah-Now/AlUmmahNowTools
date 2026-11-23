@@ -108,7 +108,7 @@ public sealed class FileScanSignalRIntegrationTests : IAsyncLifetime
     public async Task ConnectAndHealth_WithConsolidatedHost_BindsResolvedLoopbackPortAndSucceeds()
     {
         var boundUri = new Uri(_baseUrl);
-        boundUri.Host.Should().Be("127.0.0.1");
+        FileScanProgram.IsLoopbackHost(boundUri.Host).Should().BeTrue();
         boundUri.Port.Should().Be(_boundPort);
 
         using var handler = new SocketsHttpHandler { PooledConnectionLifetime = TimeSpan.Zero };
@@ -187,6 +187,92 @@ public sealed class FileScanSignalRIntegrationTests : IAsyncLifetime
             .Should().ThrowAsync<InvalidOperationException>();
 
         errors.Should().NotBeEmpty();
+    }
+}
+
+[Trait("Category", "Integration")]
+public sealed class FileScanServiceStartupTests : IDisposable
+{
+    private readonly SqliteImportDb _db = new();
+
+    private static int PickUnusedLoopbackPort()
+    {
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        return ((IPEndPoint)listener.LocalEndpoint).Port;
+    }
+
+    public void Dispose() => _db.Dispose();
+
+    [Fact]
+    public async Task RealStartupPath_WithWildcardKestrelAndAspNetUrls_BindsLoopbackOnlyOnResolvedPort()
+    {
+        var wildcardKestrelPort = PickUnusedLoopbackPort();
+        var wildcardExtraPort = PickUnusedLoopbackPort();
+        var wildcardAspNetPort = PickUnusedLoopbackPort();
+        var fallbackLoopbackPort = PickUnusedLoopbackPort();
+
+        var (builder, resolvedPort) = FileScanProgram.CreateSignalRBuilder(
+            new[] { "--hostBuilder:reloadConfigOnChange=false" },
+            config => config.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Kestrel:Endpoints:Http:Url"] = $"http://0.0.0.0:{wildcardKestrelPort}",
+                ["Kestrel:Endpoints:Extra:Url"] = $"http://*:{wildcardExtraPort}",
+                ["ASPNETCORE_URLS"] = $"http://*:{wildcardAspNetPort}",
+                ["FileScanService:Url"] = $"http://127.0.0.1:{fallbackLoopbackPort}"
+            }),
+            registerBackgroundWorkers: false);
+
+        resolvedPort.Should().Be(fallbackLoopbackPort);
+
+        builder.Services.Configure<HostOptions>(o => o.ShutdownTimeout = TimeSpan.FromSeconds(2));
+        var dbDescriptors = builder.Services
+            .Where(d => d.ServiceType == typeof(ImportDbContext) || d.ServiceType == typeof(Microsoft.EntityFrameworkCore.DbContextOptions<ImportDbContext>))
+            .ToList();
+        foreach (var descriptor in dbDescriptors)
+        {
+            builder.Services.Remove(descriptor);
+        }
+        builder.Services.AddScoped<ImportDbContext>(_ => _db.NewContext());
+        builder.Logging.ClearProviders();
+
+        await using var app = FileScanProgram.BuildSignalRApp(builder, resolvedPort);
+        await app.StartAsync();
+
+        try
+        {
+            var addresses = app.Services.GetRequiredService<IServer>()
+                .Features.Get<IServerAddressesFeature>()!
+                .Addresses
+                .ToList();
+
+            addresses.Should().NotBeEmpty();
+            FileScanProgram.AreAllBoundAddressesLoopback(app.Services, out var nonLoopback).Should().BeTrue();
+            nonLoopback.Should().BeEmpty();
+
+            foreach (var address in addresses)
+            {
+                var uri = new Uri(address);
+                uri.Port.Should().Be(fallbackLoopbackPort);
+                FileScanProgram.IsLoopbackHost(uri.Host)
+                    .Should().BeTrue($"bound address '{address}' must be loopback only");
+            }
+
+            addresses.Should().NotContain(a => a.Contains($":{wildcardKestrelPort}", StringComparison.Ordinal));
+            addresses.Should().NotContain(a => a.Contains($":{wildcardExtraPort}", StringComparison.Ordinal));
+            addresses.Should().NotContain(a => a.Contains($":{wildcardAspNetPort}", StringComparison.Ordinal));
+
+            using var handler = new SocketsHttpHandler { PooledConnectionLifetime = TimeSpan.Zero };
+            using var http = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(5) };
+            http.DefaultRequestHeaders.ConnectionClose = true;
+            var health = await http.GetAsync($"http://127.0.0.1:{fallbackLoopbackPort}/health");
+            health.StatusCode.Should().Be(HttpStatusCode.OK);
+        }
+        finally
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+            try { await app.StopAsync(cts.Token); } catch (OperationCanceledException) { }
+        }
     }
 }
 
