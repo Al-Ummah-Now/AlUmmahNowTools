@@ -39,7 +39,7 @@ namespace AlUmmahNow.Data.Storage
         /// conflict and is never overwritten.
         /// </summary>
         /// <remarks>
-        /// Bunny Storage has no conditional PUT, so this is check-then-put. Two runs racing on the same row
+        /// <see cref="IStorageClient{T}"/> has no conditional PUT, so this is check-then-put. Two runs racing on the same row
         /// are prevented by the importer's row claims; this check stops reruns and colliding keys from
         /// re-sending or replacing files.
         /// </remarks>

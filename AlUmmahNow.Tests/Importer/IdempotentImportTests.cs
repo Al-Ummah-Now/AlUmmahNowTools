@@ -2,7 +2,6 @@ using System.Text.Json;
 using AlUmmahNow.Data.Database;
 using AlUmmahNow.Data.Models;
 using AlUmmahNow.Data.Repository;
-using AlUmmahNow.Data.Video;
 using AlUmmahNow.Importer;
 using AlUmmahNow.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -38,7 +37,7 @@ public class IdempotentImportTests : IDisposable
     }
 
     private VideoImporter Importer(ImportDbContext db, TimeSpan? lease = null) =>
-        new(new Repository<CoreVideo>(_r2), _videos, _images, new BunnyStreamClient("k"), db)
+        new(new Repository<CoreVideo>(_r2), _videos, _images, db)
         {
             SessionLease = lease ?? TimeSpan.FromMinutes(10),
         };

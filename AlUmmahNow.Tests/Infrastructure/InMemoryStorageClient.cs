@@ -5,8 +5,8 @@ using AlUmmahNow.Data.Storage;
 namespace AlUmmahNow.Tests.Infrastructure;
 
 /// <summary>
-/// Thread-safe in-memory stand-in for Bunny Storage: a key → bytes map with the same semantics as the
-/// real client (PUT replaces, GET returns null when absent). Counts PUTs so tests can assert no re-upload.
+/// Thread-safe in-memory stand-in for <see cref="IStorageClient{T}"/>: a key → bytes map with standard object-storage
+/// semantics (PUT replaces, GET returns null when absent). Counts PUTs so tests can assert no re-upload.
 /// </summary>
 public sealed class InMemoryStorageClient<T> : IStorageClient<T>
 {

@@ -15,7 +15,6 @@ if (-not (Test-Path $sourceLogo)) {
 # Projects to add icons to
 $projects = @(
     "AlUmmahNow.FileScanService",
-    "AlUmmahNow.BunnyBulkUploader",
     "AlUmmahNow.DataImporter"
 )
 

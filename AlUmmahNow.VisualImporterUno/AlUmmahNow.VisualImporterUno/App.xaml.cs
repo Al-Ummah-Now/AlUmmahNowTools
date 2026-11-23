@@ -244,30 +244,6 @@ public partial class App : Application
                                 r2Config["S3Secret"] ?? "");
                         });
 
-                        services.AddSingleton<IStorageClient<Video>>(sp =>
-                        {
-                            var bunnyConfig = configuration.GetSection("BunnyVideo");
-                            return new BunnyStorageClient<Video>(
-                                bunnyConfig["Zone"] ?? "",
-                                bunnyConfig["Key"] ?? "",
-                                bunnyConfig["Region"] ?? "");
-                        });
-
-                        services.AddSingleton<IStorageClient<AlUmmahNow.Importer.Core.Image>>(sp =>
-                        {
-                            var bunnyConfig = configuration.GetSection("BunnyImage");
-                            return new BunnyStorageClient<AlUmmahNow.Importer.Core.Image>(
-                                bunnyConfig["Zone"] ?? "",
-                                bunnyConfig["Key"] ?? "",
-                                bunnyConfig["Region"] ?? "");
-                        });
-
-                        services.AddSingleton(sp =>
-                        {
-                            var bunnyStreamKey = configuration.GetSection("BunnyStream")["Key"] ?? "";
-                            return new BunnyStreamClient(bunnyStreamKey);
-                        });
-
                         // Register FileScanServiceManager as singleton
                         var fileScanServiceUrl = configuration["FileScanService:Url"] ?? "http://localhost:5000";
                         services.AddSingleton<FileScanServiceManager>(sp =>
@@ -336,12 +312,6 @@ public partial class App : Application
                         // Register file discovery service (local scanning)
                         services.AddTransient<FileDiscoveryService>();
 
-                        // Register video importer (with all dependencies)
-                        services.AddTransient<VideoImporter>();
-
-                        // Register import service (uses FileDiscoveryService and VideoImporter)
-                        services.AddTransient<ImportService>();
-
                         // Register filter preset service
                         services.AddSingleton<IFilterPresetService, FilterPresetService>();
 
@@ -352,7 +322,6 @@ public partial class App : Application
                         services.AddSingleton<VideoThumbnailService>();
 
                         // Register view models with safe initialization
-                        services.AddTransient<MainViewModel>();
                         services.AddTransient<BulkImportViewModel>();
                         services.AddSingleton<ServiceStatusViewModel>();
                         services.AddTransient<SettingsViewModel>();

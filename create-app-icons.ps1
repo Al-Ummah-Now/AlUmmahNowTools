@@ -94,7 +94,6 @@ try {
     # Copy icon to each project directory
     $projects = @(
         "AlUmmahNow.FileScanService",
-        "AlUmmahNow.BunnyBulkUploader",
         "AlUmmahNow.DataImporter"
     )
 

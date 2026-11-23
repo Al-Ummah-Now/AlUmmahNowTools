@@ -3,7 +3,6 @@ using AlUmmahNow.Data.Database;
 using AlUmmahNow.Data.Models;
 using AlUmmahNow.Data.Repository;
 using AlUmmahNow.Data.Storage;
-using AlUmmahNow.Data.Video;
 using AlUmmahNow.Importer;
 using AlUmmahNow.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -52,7 +51,7 @@ public class ResumeWritesRecordsTests : IDisposable
         var videos = new FlakyStorage<CoreVideo> { Failing = true };
         var images = new InMemoryStorageClient<CoreImage>();
         var r2 = new InMemoryR2Client();
-        VideoImporter Importer(ImportDbContext db) => new(new Repository<CoreVideo>(r2), videos, images, new BunnyStreamClient("k"), db);
+        VideoImporter Importer(ImportDbContext db) => new(new Repository<CoreVideo>(r2), videos, images, db);
 
         Guid sessionId;
         using (var db = _db.NewContext())
@@ -96,7 +95,7 @@ public class ResumeWritesRecordsTests : IDisposable
         var r2 = new InMemoryR2Client { BeforePut = (_, _) => throw new IOException("R2 down") };
         using var db = _db.NewContext();
         var importer = new VideoImporter(new Repository<CoreVideo>(r2), new InMemoryStorageClient<CoreVideo>(),
-            new InMemoryStorageClient<CoreImage>(), new BunnyStreamClient("k"), db);
+            new InMemoryStorageClient<CoreImage>(), db);
 
         var sessionId = await importer.ImportMultiChannelAsync(_root, "u", "https://v/", "https://i/");
 
