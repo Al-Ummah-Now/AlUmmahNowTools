@@ -8,30 +8,31 @@ on:
 
 permissions:
   contents: read
-  checks: write
-  pull-requests: write
 
 jobs:
   test:
     name: Test on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      checks: write
     strategy:
       matrix:
         os: [ubuntu-latest]
-        # Optionally add: windows-latest, macos-latest
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
     - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
       with:
         dotnet-version: '8.0.x'
 
     - name: Restore dependencies
       run: |
-        # Restore all projects except VisualImporterUno (has circular dependency issue on Linux)
+        # Restore .NET 8 projects (VisualImporterUno and ToolsCore target net9.0 in the tools job)
         dotnet restore AlUmmahNow.Data/AlUmmahNow.Data.csproj
         dotnet restore AlUmmahNow.Importer/AlUmmahNow.Importer.csproj
         dotnet restore AlUmmahNow.FileScanService/AlUmmahNow.FileScanService.csproj
@@ -41,31 +42,12 @@ jobs:
 
     - name: Build solution
       run: |
-        # Build all projects except VisualImporterUno
         dotnet build AlUmmahNow.Data/AlUmmahNow.Data.csproj --no-restore --configuration Release
         dotnet build AlUmmahNow.Importer/AlUmmahNow.Importer.csproj --no-restore --configuration Release
         dotnet build AlUmmahNow.FileScanService/AlUmmahNow.FileScanService.csproj --no-restore --configuration Release
         dotnet build AlUmmahNow.DataImporter/AlUmmahNow.DataImporter.csproj --no-restore --configuration Release
         dotnet build AlUmmahNow.BunnyBulkUploader/AlUmmahNow.BunnyBulkUploader.csproj --no-restore --configuration Release
         dotnet build AlUmmahNow.Tests/AlUmmahNow.Tests.csproj --no-restore --configuration Release
-
-    - name: Run Unit Tests
-      run: |
-        dotnet test AlUmmahNow.Tests/AlUmmahNow.Tests.csproj \
-          --no-build \
-          --configuration Release \
-          --filter "Category=Unit" \
-          --logger "trx;LogFileName=unit-tests.trx" \
-          --logger "console;verbosity=detailed"
-
-    - name: Run Integration Tests
-      run: |
-        dotnet test AlUmmahNow.Tests/AlUmmahNow.Tests.csproj \
-          --no-build \
-          --configuration Release \
-          --filter "Category=Integration" \
-          --logger "trx;LogFileName=integration-tests.trx" \
-          --logger "console;verbosity=detailed"
 
     - name: Run All Tests with Coverage
       run: |
@@ -74,35 +56,25 @@ jobs:
           --configuration Release \
           --collect:"XPlat Code Coverage" \
           --settings AlUmmahNow.Tests/coverage.runsettings \
-          --results-directory ./coverage \
-          --logger "trx;LogFileName=all-tests.trx"
+          --results-directory ./coverage-net8 \
+          --logger "trx;LogFileName=all-tests.trx" \
+          --logger "console;verbosity=normal"
 
-    - name: Install ReportGenerator
-      run: dotnet tool install -g dotnet-reportgenerator-globaltool
-
-    - name: Generate Coverage Report
-      run: |
-        reportgenerator \
-          -reports:"./coverage/**/coverage.cobertura.xml" \
-          -targetdir:"./coveragereport" \
-          -reporttypes:"Html;Badges;Cobertura" \
-          -verbosity:"Info"
-
-    - name: Upload Coverage Artifact
-      uses: actions/upload-artifact@v4
+    - name: Upload .NET 8 Coverage Raw Data
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
       with:
-        name: coverage-report-${{ matrix.os }}
-        path: ./coveragereport
-        retention-days: 30
+        name: coverage-net8
+        path: ./coverage-net8/**/coverage.cobertura.xml
+        retention-days: 7
 
     - name: Upload Test Results
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
       if: always()
       with:
         name: test-results-${{ matrix.os }}
         path: |
           **/*.trx
-          ./coverage/**/coverage.cobertura.xml
+          ./coverage-net8/**/coverage.cobertura.xml
         retention-days: 30
 
     # The report goes to this job's summary, not to a check run of its own: v1 created
@@ -120,10 +92,176 @@ jobs:
         fail-on-error: false
         use-actions-summary: 'true'
 
+  # Tools core, desktop ViewModel tests, desktop build, and headless UI smoke (net9.0)
+  tools:
+    name: Tools core and desktop build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+      with:
+        dotnet-version: '9.0.x'
+
+    - name: Fetch AlUmmahNow.Core
+      run: scripts/fetch-core.sh
+
+    - name: Test ToolsCore with Coverage
+      run: |
+        dotnet test AlUmmahNow.ToolsCore.Tests/AlUmmahNow.ToolsCore.Tests.csproj \
+          --configuration Release \
+          --collect:"XPlat Code Coverage" \
+          --results-directory ./coverage-net9/toolscore \
+          --logger "trx;LogFileName=toolscore-tests.trx" \
+          --logger "console;verbosity=normal"
+
+    - name: Test VisualImporterUno ViewModels and Helpers
+      run: |
+        dotnet test AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno.Tests/AlUmmahNow.VisualImporterUno.Tests.csproj \
+          --configuration Release \
+          --collect:"XPlat Code Coverage" \
+          --results-directory ./coverage-net9/desktop \
+          --logger "trx;LogFileName=desktop-tests.trx" \
+          --logger "console;verbosity=normal"
+
+    - name: Build the desktop app
+      run: dotnet build AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno.csproj -f net9.0-desktop --configuration Release
+
+    - name: Install headless display dependencies for desktop smoke
+      run: |
+        sudo apt-get update -o Acquire::Retries=3
+        sudo apt-get install -y --no-install-recommends -o Acquire::Retries=3 \
+          xvfb libx11-6 libxcursor1 libxi6 libxrandr2 libxext6 libfontconfig1 libfreetype6 libgl1 libegl1
+
+    - name: Headless desktop UI smoke (en/ar, signed-out/not-staff/staff)
+      env:
+        LIBGL_ALWAYS_SOFTWARE: '1'
+        TOOLS_DEMO: '1'
+        TOOLS_SCREENSHOT_DELAY_MS: '2000'
+      run: |
+        set -euo pipefail
+        exe="AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno/bin/Release/net9.0-desktop/AlUmmahNow.VisualImporterUno"
+        test -x "$exe"
+        mkdir -p smoke
+        min_bytes=30720
+        run_smoke() {
+          local lang=$1 state=$2
+          local png="$PWD/smoke/${lang}-${state}.png"
+          local log="$PWD/smoke/${lang}-${state}.log"
+          local xdg code=0
+          xdg=$(mktemp -d)
+          rm -f "$png"
+          # Run inside a fresh process group so a 90 s timeout terminates xvfb-run, Xvfb, and the app together.
+          XDG_CONFIG_HOME="$xdg/config" XDG_DATA_HOME="$xdg/data" XDG_STATE_HOME="$xdg/state" \
+            TOOLS_DEMO_LANG="$lang" TOOLS_DEMO_STATE="$state" TOOLS_SCREENSHOT="$png" \
+            timeout --foreground --kill-after=5 90s \
+            xvfb-run -a -s "-screen 0 1280x800x24" "$exe" > "$log" 2>&1 || code=$?
+          rm -rf "$xdg"
+          if [ "$code" -ne 0 ]; then
+            tail -n 40 "$log" || true
+            echo "::error::desktop smoke failed for ${lang}/${state}: exited with code $code (124 = timed out)"
+            exit 1
+          fi
+          local bytes=0
+          if [ -f "$png" ]; then
+            bytes=$(wc -c < "$png")
+          fi
+          if [ "$bytes" -lt "$min_bytes" ]; then
+            tail -n 40 "$log" || true
+            echo "::error::desktop smoke failed for ${lang}/${state}: screenshot too small ($bytes bytes < $min_bytes bytes; possible blank frame)"
+            exit 1
+          fi
+          echo "smoke ${lang}/${state} passed: $bytes bytes (exit 0)"
+        }
+        run_smoke en signed-out
+        run_smoke en not-staff
+        run_smoke en staff
+        run_smoke ar staff
+        # Verify all 4 screens rendered distinct frames (catches stuck/blank/identical renders).
+        sha256sum smoke/en-signed-out.png smoke/en-not-staff.png smoke/en-staff.png smoke/ar-staff.png
+        unique_hashes=$(sha256sum smoke/en-signed-out.png smoke/en-not-staff.png smoke/en-staff.png smoke/ar-staff.png | awk '{print $1}' | sort -u | wc -l)
+        if [ "$unique_hashes" -ne 4 ]; then
+          echo "::error::desktop smoke produced duplicate frames (expected 4 unique PNG hashes, got $unique_hashes)"
+          exit 1
+        fi
+
+    - name: Upload .NET 9 Coverage Raw Data
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      with:
+        name: coverage-net9
+        path: ./coverage-net9/**/coverage.cobertura.xml
+        retention-days: 7
+
+    - name: Upload Tools Smoke Screenshots and Test Results
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      if: always()
+      with:
+        name: tools-smoke-and-results
+        path: |
+          ./coverage-net9/**/*.trx
+          ./smoke/*.png
+          ./smoke/*.log
+        retention-days: 14
+
+  # Merge Cobertura reports from both .NET 8 (AlUmmahNow.Tests) and .NET 9 (ToolsCore + VisualImporterUno.Tests)
+  coverage:
+    name: Unified coverage report
+    runs-on: ubuntu-latest
+    needs: [test, tools]
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Download .NET 8 coverage
+      uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      with:
+        name: coverage-net8
+        path: ./coverage-all/net8
+
+    - name: Download .NET 9 coverage
+      uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      with:
+        name: coverage-net9
+        path: ./coverage-all/net9
+
+    - name: Install ReportGenerator
+      run: dotnet tool install -g dotnet-reportgenerator-globaltool
+
+    - name: Generate Unified Coverage Report
+      run: |
+        reportgenerator \
+          -reports:"./coverage-all/**/coverage.cobertura.xml" \
+          -targetdir:"./coveragereport" \
+          -reporttypes:"Html;Badges;Cobertura" \
+          -verbosity:"Info"
+
+    - name: Upload Unified Coverage Artifact
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      with:
+        name: coverage-report-unified
+        path: ./coveragereport
+        retention-days: 30
+
     - name: Code Coverage Report
       uses: irongut/CodeCoverageSummary@51cc3a756ddcd398d447c044c02cb6aa83fdae95 # v1.3.0
       with:
-        filename: ./coverage/**/coverage.cobertura.xml
+        filename: ./coveragereport/Cobertura.xml
         badge: true
         fail_below_min: false
         format: markdown
@@ -134,123 +272,18 @@ jobs:
         thresholds: '60 80'
 
     - name: Add Coverage Comment to PR
-      uses: marocchino/sticky-pull-request-comment@773744901bac0e8cbb5a0dc842800d45e9b2b405 # v2
+      uses: marocchino/sticky-pull-request-comment@773744901bac0e8cbb5a0dc842800d45e9b2b405 # v2.9.4
       if: github.event_name == 'pull_request'
       continue-on-error: true
       with:
         recreate: true
         path: code-coverage-results.md
 
-  # Tools sign-in core and the desktop app (net9.0)
-  tools:
-    name: Tools core and desktop build
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: '9.0.x'
-
-    - name: Fetch AlUmmahNow.Core
-      run: scripts/fetch-core.sh
-
-    - name: Test ToolsCore
-      run: dotnet test AlUmmahNow.ToolsCore.Tests/AlUmmahNow.ToolsCore.Tests.csproj --configuration Release --logger "console;verbosity=normal"
-
-    - name: Test VisualImporterUno ViewModels and Helpers
-      run: dotnet test AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno.Tests/AlUmmahNow.VisualImporterUno.Tests.csproj --configuration Release --logger "console;verbosity=normal"
-
-    - name: Build the desktop app
-      run: dotnet build AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno.csproj -f net9.0-desktop --configuration Release
-
-  # Optional: Upload to Codecov
-  codecov:
-    name: Upload to Codecov
-    runs-on: ubuntu-latest
-    needs: test
-    if: github.event_name == 'push'
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: '8.0.x'
-
-    - name: Restore and Build
-      run: |
-        # Restore and build all projects except VisualImporterUno
-        dotnet restore AlUmmahNow.Data/AlUmmahNow.Data.csproj
-        dotnet restore AlUmmahNow.Importer/AlUmmahNow.Importer.csproj
-        dotnet restore AlUmmahNow.FileScanService/AlUmmahNow.FileScanService.csproj
-        dotnet restore AlUmmahNow.Tests/AlUmmahNow.Tests.csproj
-        dotnet build AlUmmahNow.Data/AlUmmahNow.Data.csproj --no-restore --configuration Release
-        dotnet build AlUmmahNow.Importer/AlUmmahNow.Importer.csproj --no-restore --configuration Release
-        dotnet build AlUmmahNow.FileScanService/AlUmmahNow.FileScanService.csproj --no-restore --configuration Release
-        dotnet build AlUmmahNow.Tests/AlUmmahNow.Tests.csproj --no-restore --configuration Release
-
-    - name: Run Tests with Coverage
-      run: |
-        dotnet test AlUmmahNow.Tests/AlUmmahNow.Tests.csproj \
-          --no-build \
-          --configuration Release \
-          --collect:"XPlat Code Coverage" \
-          --settings AlUmmahNow.Tests/coverage.runsettings \
-          --results-directory ./coverage
-
     - name: Upload to Codecov
       uses: codecov/codecov-action@ab904c41d6ece82784817410c45d8b8c02684457 # v3
+      if: github.event_name == 'push'
       with:
-        files: ./coverage/**/coverage.cobertura.xml
+        files: ./coveragereport/Cobertura.xml
         fail_ci_if_error: false
         verbose: true
         token: ${{ secrets.CODECOV_TOKEN }}
-
-  # Optional: Quality Gate - fail if coverage below threshold
-  quality-gate:
-    name: Quality Gate
-    runs-on: ubuntu-latest
-    needs: test
-    continue-on-error: true
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: '8.0.x'
-
-    - name: Restore and Build
-      run: |
-        # Restore and build all projects except VisualImporterUno
-        dotnet restore AlUmmahNow.Data/AlUmmahNow.Data.csproj
-        dotnet restore AlUmmahNow.Importer/AlUmmahNow.Importer.csproj
-        dotnet restore AlUmmahNow.FileScanService/AlUmmahNow.FileScanService.csproj
-        dotnet restore AlUmmahNow.Tests/AlUmmahNow.Tests.csproj
-        dotnet build AlUmmahNow.Data/AlUmmahNow.Data.csproj --no-restore --configuration Release
-        dotnet build AlUmmahNow.Importer/AlUmmahNow.Importer.csproj --no-restore --configuration Release
-        dotnet build AlUmmahNow.FileScanService/AlUmmahNow.FileScanService.csproj --no-restore --configuration Release
-        dotnet build AlUmmahNow.Tests/AlUmmahNow.Tests.csproj --no-restore --configuration Release
-
-    - name: Run Tests with Coverage
-      run: |
-        dotnet test AlUmmahNow.Tests/AlUmmahNow.Tests.csproj \
-          --no-build \
-          --configuration Release \
-          /p:CollectCoverage=true \
-          /p:CoverletOutputFormat=cobertura
-
-    - name: Check for Test Failures
-      if: failure()
-      run: |
-        echo "❌ Quality gate failed!"
-        echo "Tests failed"
-        exit 1
