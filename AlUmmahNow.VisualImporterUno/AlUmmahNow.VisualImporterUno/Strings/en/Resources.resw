@@ -1858,10 +1858,10 @@
     <value>Enter the Arabic name.</value>
   </data>
   <data name="Import_NewChannelError_NameEn_TooLong" xml:space="preserve">
-    <value>Use at most 100 characters.</value>
+    <value>Use at most {0} characters.</value>
   </data>
   <data name="Import_NewChannelError_NameAr_TooLong" xml:space="preserve">
-    <value>Use at most 100 characters.</value>
+    <value>Use at most {0} characters.</value>
   </data>
   <data name="Import_NewChannelError_DescEn_Pair" xml:space="preserve">
     <value>Add the English description or leave both empty.</value>
@@ -1870,10 +1870,10 @@
     <value>Add the Arabic description or leave both empty.</value>
   </data>
   <data name="Import_NewChannelError_DescEn_TooLong" xml:space="preserve">
-    <value>Use at most 5,000 characters.</value>
+    <value>Use at most {0} characters.</value>
   </data>
   <data name="Import_NewChannelError_DescAr_TooLong" xml:space="preserve">
-    <value>Use at most 5,000 characters.</value>
+    <value>Use at most {0} characters.</value>
   </data>
   <data name="Localized_English" xml:space="preserve">
     <value>English</value>
@@ -1905,6 +1905,9 @@
   <data name="Localized_Replaced" xml:space="preserve">
     <value>Replaced {0} from machine translation. Review before saving.</value>
   </data>
+  <data name="Localized_Truncated" xml:space="preserve">
+    <value>{0} Shortened to {1} characters.</value>
+  </data>
   <data name="Localized_Undo" xml:space="preserve">
     <value>Undo</value>
   </data>
@@ -1918,7 +1921,7 @@
     <value>Quran text is not machine-translated. Paste the official text instead.</value>
   </data>
   <data name="Localized_QuranRefs" xml:space="preserve">
-    <value>Detected: {0}</value>
+    <value>Detected:</value>
   </data>
   <data name="Localized_ErrorLimit" xml:space="preserve">
     <value>Daily translation limit reached. Try again tomorrow.</value>

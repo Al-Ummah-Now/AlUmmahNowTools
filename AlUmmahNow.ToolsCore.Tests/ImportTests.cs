@@ -424,6 +424,9 @@ public class ImportApiClientTests
         Assert.False(body.ContainsKey("description"));
         Assert.False(body.ContainsKey("descriptionLocalized"));
         Assert.False(body.ContainsKey("handle"));
+
+        await Assert.ThrowsAsync<ArgumentException>(() => api.CreateChannelAsync("Seerah", "السيرة", null, "English only", null));
+        await Assert.ThrowsAsync<ArgumentException>(() => api.CreateChannelAsync("Seerah", "السيرة", null, null, "عربي فقط"));
     }
 
     [Fact]

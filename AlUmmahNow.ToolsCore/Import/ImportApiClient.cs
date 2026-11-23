@@ -358,6 +358,10 @@ public partial class ImportApiClient
         if (!string.IsNullOrWhiteSpace(handle)) body["handle"] = handle.Trim().TrimStart('@');
         var enDesc = string.IsNullOrWhiteSpace(descriptionEn) ? null : descriptionEn.Trim();
         var arDesc = string.IsNullOrWhiteSpace(descriptionAr) ? null : descriptionAr.Trim();
+        if ((enDesc is null) != (arDesc is null))
+        {
+            throw new ArgumentException("Both English and Arabic descriptions must be provided together, or both omitted.");
+        }
         if (enDesc is not null && arDesc is not null)
         {
             body["description"] = enDesc;
