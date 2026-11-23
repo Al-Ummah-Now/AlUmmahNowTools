@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Al Ummah Now Tools
+Name[ar]=أدوات الأمة الآن
+Comment=Staff app for bulk imports into Al Ummah Now
+Comment[ar]=تطبيق فريق العمل لاستيراد المرئيات إلى الأمة الآن
+Exec=alummahnow-tools
+Icon=net.alummahnow.tools
+Terminal=false
+Categories=AudioVideo;Video;Utility;
+StartupWMClass=AlUmmahNow.VisualImporterUno

@@ -1,0 +1,29 @@
+<!--
+  Per-machine MSI for the self-contained Al Ummah Now Tools (net9.0-desktop, win-x64). Built by
+  .github/workflows/release.yml (same shape as AlUmmahNowDesktop's packaging/windows/app.wxs):
+    wix build packaging/windows/tools.wxs -arch x64 -d Version=26.11.2201 -d PublishDir=... -o out.msi
+  MSI versions are major(<=255).minor(<=255).build(<=65535) and only those three fields count for upgrades,
+  so tag vYYYY.MM.DD.N becomes YY.MM.(DD*100+N). The UpgradeCode never changes, so a newer MSI replaces
+  the older one.
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="Al Ummah Now Tools" Manufacturer="Al Ummah Now" Version="$(var.Version)" UpgradeCode="{74ACE656-F3E4-443A-818C-37BC23DF9781}" Scope="perMachine" Language="1033">
+    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/Al-Ummah-Now/AlUmmahNowTools" />
+    <Property Id="ARPNOMODIFY" Value="1" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="Al Ummah Now Tools" />
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder" />
+
+    <Feature Id="Main" Title="Al Ummah Now Tools">
+      <Files Directory="INSTALLFOLDER" Include="$(var.PublishDir)\**" />
+      <Component Id="StartMenuShortcut" Directory="ProgramMenuFolder" Guid="*">
+        <Shortcut Id="AppShortcut" Name="Al Ummah Now Tools" Target="[INSTALLFOLDER]AlUmmahNow.VisualImporterUno.exe" WorkingDirectory="INSTALLFOLDER" />
+        <RegistryValue Root="HKLM" Key="Software\Al Ummah Now\Al Ummah Now Tools" Name="installed" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </Feature>
+  </Package>
+</Wix>
