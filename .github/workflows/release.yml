@@ -348,7 +348,7 @@ jobs:
         run: |
           mkdir -p dist
           tar -C out/publish -czf "dist/AlUmmahNow-Tools-Linux-$NAME-x64.tar.gz" .
-          scripts/build-deb.sh out/publish "$NAME" AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno/Assets/Icons/staff_icon.png dist
+          scripts/build-deb.sh out/publish "$NAME" AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno/Assets/Icons/icon.png dist
       - name: Install the .deb
         run: |
           sudo apt-get update -o Acquire::Retries=3
