@@ -157,10 +157,10 @@ jobs:
           local xdg code=0
           xdg=$(mktemp -d)
           rm -f "$png"
-          # Run inside a fresh process group so a 90 s timeout terminates xvfb-run, Xvfb, and the app together.
+          # Run without --foreground so timeout creates a new process group and terminates xvfb-run, Xvfb, and the app together.
           XDG_CONFIG_HOME="$xdg/config" XDG_DATA_HOME="$xdg/data" XDG_STATE_HOME="$xdg/state" \
             TOOLS_DEMO_LANG="$lang" TOOLS_DEMO_STATE="$state" TOOLS_SCREENSHOT="$png" \
-            timeout --foreground --kill-after=5 90s \
+            timeout --kill-after=5 90s \
             xvfb-run -a -s "-screen 0 1280x800x24" "$exe" > "$log" 2>&1 || code=$?
           rm -rf "$xdg"
           if [ "$code" -ne 0 ]; then
@@ -241,7 +241,7 @@ jobs:
         path: ./coverage-all/net9
 
     - name: Install ReportGenerator
-      run: dotnet tool install -g dotnet-reportgenerator-globaltool
+      run: dotnet tool install -g dotnet-reportgenerator-globaltool --version 5.6.1
 
     - name: Generate Unified Coverage Report
       run: |
