@@ -5,7 +5,7 @@ using AlUmmahNow.Data.Storage;
 namespace AlUmmahNow.Tests.Storage;
 
 /// <summary>
-/// Admin deletes of published content (Bunny Stream videos, Bunny Storage files, R2 records) are soft deletes owned by
+/// Admin deletes of published content (object storage files and R2 records) are soft deletes owned by
 /// the platform: admin-api marks the item deleted and the platform's cleanup purge is the only code path that removes
 /// the external copies. The tools only publish, so the clients they share must not offer a way to hard-delete
 /// platform content.

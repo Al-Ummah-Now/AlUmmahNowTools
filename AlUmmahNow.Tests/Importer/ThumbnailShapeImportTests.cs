@@ -63,7 +63,7 @@ public class ThumbnailShapeImportTests : IDisposable
     private async Task ImportAsync(IMediaProbe probe)
     {
         using var db = _db.NewContext();
-        var importer = new VideoImporter(new Repository<CoreVideo>(_r2), _videos, _images, new BunnyStreamClient("k"), db)
+        var importer = new VideoImporter(new Repository<CoreVideo>(_r2), _videos, _images, db)
         {
             MediaProbe = probe,
         };

@@ -49,7 +49,6 @@ namespace AlUmmahNow.Importer.Examples
             //     repo,
             //     videoStorageClient,
             //     imageStorageClient,
-            //     bunnyStreamClient,
             //     dbContext,
             //     translationService  // Pass translation service here
             // );

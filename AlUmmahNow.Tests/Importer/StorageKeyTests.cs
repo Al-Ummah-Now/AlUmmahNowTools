@@ -1,10 +1,8 @@
 using System.Text;
-using AlUmmahNow.BunnyBulkUploader;
 using AlUmmahNow.Data.Database;
 using AlUmmahNow.Data.Models;
 using AlUmmahNow.Data.Repository;
 using AlUmmahNow.Data.Storage;
-using AlUmmahNow.Data.Video;
 using AlUmmahNow.Importer;
 using AlUmmahNow.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -106,7 +104,7 @@ public class StorageKeyTests : IDisposable
         var videos = new InMemoryStorageClient<CoreVideo>();
         var images = new InMemoryStorageClient<CoreImage>();
         var r2 = new Mock<IR2Client>();
-        var importer = new VideoImporter(new Repository<CoreVideo>(r2.Object), videos, images, new BunnyStreamClient("k"), db);
+        var importer = new VideoImporter(new Repository<CoreVideo>(r2.Object), videos, images, db);
 
         await importer.ImportMultiChannelAsync(_root, "user", "https://v.example/", "https://i.example/");
 
@@ -121,21 +119,6 @@ public class StorageKeyTests : IDisposable
         Assert.Contains("https://v.example/B/Season1/ep1.mp4", urls);
         Assert.Contains("https://v.example/B/Season2/ep1.mp4", urls);
         Assert.All(db.ImportVideos, v => Assert.Equal(VideoImportStatus.Uploaded, v.Status));
-    }
-
-    [Theory]
-    [InlineData("/zone/chan/", "zone", true, "/zone/chan/")]
-    [InlineData("zone/chan", "zone", true, "/zone/chan/")]
-    [InlineData(@"\zone\chan\sub", "zone", true, "/zone/chan/sub/")]
-    [InlineData("/zone/", "zone", false, "")]
-    [InlineData("/other/chan/", "zone", false, "")]
-    [InlineData("/zone/../x/", "zone", false, "")]
-    [InlineData("", "zone", false, "")]
-    public void Bulk_uploader_root_must_be_a_folder_inside_the_zone(string value, string zone, bool ok, string expected)
-    {
-        Assert.Equal(ok, UploadRoot.TryNormalize(value, zone, out var root, out var error));
-        Assert.Equal(expected, root);
-        Assert.Equal(ok, error.Length == 0);
     }
 
     [Fact]

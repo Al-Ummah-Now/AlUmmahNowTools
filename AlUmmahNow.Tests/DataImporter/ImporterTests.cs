@@ -2,7 +2,6 @@ using Xunit;
 using Moq;
 using AlUmmahNow.Data.Repository;
 using AlUmmahNow.Data.Storage;
-using AlUmmahNow.Data.Video;
 using AlUmmahNow.Data.Database;
 using AlUmmahNow.Importer;
 using Microsoft.EntityFrameworkCore;
@@ -32,14 +31,12 @@ namespace AlUmmahNow.Tests.DataImporter
             var repository = new Repository<AlUmmahNow.Importer.Core.Video>(mockR2Client.Object);
             var mockVideoStorageClient = new Mock<IStorageClient<AlUmmahNow.Importer.Core.Video>>();
             var mockImageStorageClient = new Mock<IStorageClient<AlUmmahNow.Importer.Core.Image>>();
-            var bunnyStreamClient = new BunnyStreamClient("test-key");
 
             // Act
             var importer = new VideoImporter(
                 repository,
                 mockVideoStorageClient.Object,
                 mockImageStorageClient.Object,
-                bunnyStreamClient,
                 _dbContext);
 
             // Assert
@@ -54,13 +51,11 @@ namespace AlUmmahNow.Tests.DataImporter
             var repository = new Repository<AlUmmahNow.Importer.Core.Video>(mockR2Client.Object);
             var mockVideoStorageClient = new Mock<IStorageClient<AlUmmahNow.Importer.Core.Video>>();
             var mockImageStorageClient = new Mock<IStorageClient<AlUmmahNow.Importer.Core.Image>>();
-            var bunnyStreamClient = new BunnyStreamClient("test-key");
             
             var importer = new VideoImporter(
                 repository,
                 mockVideoStorageClient.Object,
                 mockImageStorageClient.Object,
-                bunnyStreamClient,
                 _dbContext);
 
             var nonExistentFolder = "/non/existent/folder";
@@ -85,13 +80,11 @@ namespace AlUmmahNow.Tests.DataImporter
             var repository = new Repository<AlUmmahNow.Importer.Core.Video>(mockR2Client.Object);
             var mockVideoStorageClient = new Mock<IStorageClient<AlUmmahNow.Importer.Core.Video>>();
             var mockImageStorageClient = new Mock<IStorageClient<AlUmmahNow.Importer.Core.Image>>();
-            var bunnyStreamClient = new BunnyStreamClient("test-key");
             
             var importer = new VideoImporter(
                 repository,
                 mockVideoStorageClient.Object,
                 mockImageStorageClient.Object,
-                bunnyStreamClient,
                 _dbContext);
 
             // Create a temporary empty directory
@@ -132,13 +125,11 @@ namespace AlUmmahNow.Tests.DataImporter
             var repository = new Repository<AlUmmahNow.Importer.Core.Video>(mockR2Client.Object);
             var mockVideoStorageClient = new Mock<IStorageClient<AlUmmahNow.Importer.Core.Video>>();
             var mockImageStorageClient = new Mock<IStorageClient<AlUmmahNow.Importer.Core.Image>>();
-            var bunnyStreamClient = new BunnyStreamClient("test-key");
             
             var importer = new VideoImporter(
                 repository,
                 mockVideoStorageClient.Object,
                 mockImageStorageClient.Object,
-                bunnyStreamClient,
                 _dbContext);
 
             // Create temporary directory structure with channel folders and mock video files
@@ -199,13 +190,11 @@ namespace AlUmmahNow.Tests.DataImporter
             var repository = new Repository<AlUmmahNow.Importer.Core.Video>(mockR2Client.Object);
             var mockVideoStorageClient = new Mock<IStorageClient<AlUmmahNow.Importer.Core.Video>>();
             var mockImageStorageClient = new Mock<IStorageClient<AlUmmahNow.Importer.Core.Image>>();
-            var bunnyStreamClient = new BunnyStreamClient("test-key");
             
             var importer = new VideoImporter(
                 repository,
                 mockVideoStorageClient.Object,
                 mockImageStorageClient.Object,
-                bunnyStreamClient,
                 _dbContext);
 
             var nonExistentSessionId = Guid.NewGuid();
@@ -225,13 +214,11 @@ namespace AlUmmahNow.Tests.DataImporter
             var repository = new Repository<AlUmmahNow.Importer.Core.Video>(mockR2Client.Object);
             var mockVideoStorageClient = new Mock<IStorageClient<AlUmmahNow.Importer.Core.Video>>();
             var mockImageStorageClient = new Mock<IStorageClient<AlUmmahNow.Importer.Core.Image>>();
-            var bunnyStreamClient = new BunnyStreamClient("test-key");
             
             var importer = new VideoImporter(
                 repository,
                 mockVideoStorageClient.Object,
                 mockImageStorageClient.Object,
-                bunnyStreamClient,
                 _dbContext);
 
             var nonExistentSessionId = Guid.NewGuid();
@@ -244,46 +231,6 @@ namespace AlUmmahNow.Tests.DataImporter
 
             Assert.Contains("Session", exception.Message);
             Assert.Contains("not found", exception.Message);
-        }
-
-        [Fact]
-        public async Task ImportFromBunnyApiAsync_WithInvalidCredentials_ThrowsException()
-        {
-            // Arrange
-            var mockR2Client = new Mock<IR2Client>();
-            var repository = new Repository<AlUmmahNow.Importer.Core.Video>(mockR2Client.Object);
-            var mockVideoStorageClient = new Mock<IStorageClient<AlUmmahNow.Importer.Core.Video>>();
-            var mockImageStorageClient = new Mock<IStorageClient<AlUmmahNow.Importer.Core.Image>>();
-            // Bunny's real answer to an unknown library / bad key, served locally (no live API in tests)
-            using var bunny = new AlUmmahNow.Tests.Video.StubBunnyServer(System.Net.HttpStatusCode.NotFound,
-                "{\"Success\":false,\"Message\":\"The requested video library was not found.\",\"StatusCode\":404}");
-            var bunnyStreamClient = new BunnyStreamClient("invalid-test-key", bunny.BaseUrl);
-            
-            var importer = new VideoImporter(
-                repository,
-                mockVideoStorageClient.Object,
-                mockImageStorageClient.Object,
-                bunnyStreamClient,
-                _dbContext);
-
-            var libraryId = "12345";
-            var userId = "test-user";
-            var channelName = "Test Channel";
-            var channelThumbnail = "https://example.com/thumb.jpg";
-            var videoStoreRoot = "/videos/";
-            var videoStoreUrl = "https://videos.example.com/";
-            var imageStoreRoot = "/images/";
-            var imageStoreUrl = "https://images.example.com/";
-
-            // Act & Assert
-            var exception = await Record.ExceptionAsync(async () =>
-            {
-                await importer.ImportFromBunnyApiAsync(libraryId, userId, channelName, channelThumbnail,
-                    videoStoreRoot, videoStoreUrl, imageStoreRoot, imageStoreUrl);
-            });
-
-            // Should throw due to invalid API credentials, not import an empty library
-            Assert.IsType<System.Net.Http.HttpRequestException>(exception);
         }
 
         public void Dispose()

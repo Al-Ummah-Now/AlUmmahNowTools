@@ -2,7 +2,6 @@ using AlUmmahNow.Data.Database;
 using AlUmmahNow.Data.Models;
 using AlUmmahNow.Data.Repository;
 using AlUmmahNow.Data.Storage;
-using AlUmmahNow.Data.Video;
 using AlUmmahNow.Importer;
 using AlUmmahNow.Tests.Infrastructure;
 using Microsoft.Data.SqlClient;
@@ -41,7 +40,7 @@ public class SessionScopedImportTests : IDisposable
     private VideoImporter Importer(ImportDbContext db)
     {
         var r2 = new Mock<IR2Client>();
-        return new VideoImporter(new Repository<CoreVideo>(r2.Object), _videos, _images, new BunnyStreamClient("k"), db);
+        return new VideoImporter(new Repository<CoreVideo>(r2.Object), _videos, _images, db);
     }
 
     [Fact]

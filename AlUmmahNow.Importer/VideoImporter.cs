@@ -25,7 +25,6 @@ namespace AlUmmahNow.Importer
         private readonly Repository<Video> _repo;
         private readonly IStorageClient<Video> _videoStorageClient;
         private readonly IStorageClient<Image> _imageStorageClient;
-        private readonly BunnyStreamClient _bunnyStreamClient;
         private readonly ImportDbContext? _dbContext;
         private readonly VideoTranslationService? _translationService;
         private ImportSessionLease? _lease;
@@ -74,14 +73,12 @@ namespace AlUmmahNow.Importer
             Repository<Video> repo, 
             IStorageClient<Video> videoStorageClient, 
             IStorageClient<Image> imageStorageClient, 
-            BunnyStreamClient bunnyStreamClient, 
             ImportDbContext dbContext,
             VideoTranslationService? translationService = null)
         {
             _repo = repo ?? throw new ArgumentNullException(nameof(repo));
             _videoStorageClient = videoStorageClient ?? throw new ArgumentNullException(nameof(videoStorageClient));
             _imageStorageClient = imageStorageClient ?? throw new ArgumentNullException(nameof(imageStorageClient));
-            _bunnyStreamClient = bunnyStreamClient ?? throw new ArgumentNullException(nameof(bunnyStreamClient));
             _dbContext = dbContext;
             _translationService = translationService;
         }
@@ -93,13 +90,11 @@ namespace AlUmmahNow.Importer
             Repository<Video> repo,
             IStorageClient<Video> videoStorageClient,
             IStorageClient<Image> imageStorageClient,
-            BunnyStreamClient bunnyStreamClient,
             VideoTranslationService? translationService = null)
         {
             _repo = repo ?? throw new ArgumentNullException(nameof(repo));
             _videoStorageClient = videoStorageClient ?? throw new ArgumentNullException(nameof(videoStorageClient));
             _imageStorageClient = imageStorageClient ?? throw new ArgumentNullException(nameof(imageStorageClient));
-            _bunnyStreamClient = bunnyStreamClient ?? throw new ArgumentNullException(nameof(bunnyStreamClient));
             _dbContext = null;
             _translationService = translationService;
         }
@@ -390,99 +385,6 @@ namespace AlUmmahNow.Importer
                 // Simple upload for non-session scenarios
                 await BulkUploadAsync(folder, videoStoreRoot);
             }
-        }
-
-        #endregion
-
-        #region Bunny API Import
-
-        /// <summary>
-        /// Import videos from Bunny.net API
-        /// </summary>
-        public async Task ImportFromBunnyApiAsync(string libraryId, string userId, string channelName, 
-            string channelThumbnail, string videoStoreRoot, string videoStoreUrl, string imageStoreRoot, string imageStoreUrl)
-        {
-            var response = await _bunnyStreamClient.GetVideosAsync(libraryId, 1);
-            var thumbnails = await _imageStorageClient.ListAsync(imageStoreRoot);
-
-            int totalItems = response.TotalItems;
-            int processedItems = 0;
-            int successfulImports = 0;
-            int failedImports = 0;
-
-            do
-            {
-                foreach (var bunnyVideo in response.Items)
-                {
-                    // Report progress
-                    ProgressChanged?.Invoke(this, new ImportProgressEventArgs(
-                        totalItems, processedItems, bunnyVideo.Title ?? "Unknown", channelName, "Processing"));
-
-                    try
-                    {
-                        var video = await _repo.GetObjectAsync("videos", bunnyVideo.Guid ?? string.Empty);
-                        if (video != null)
-                        {
-                            processedItems++;
-                            ProgressChanged?.Invoke(this, new ImportProgressEventArgs(
-                                totalItems, processedItems, bunnyVideo.Title ?? "Unknown", channelName, "Skipped (exists)"));
-                            continue;
-                        }
-
-                        var thumbnail = thumbnails.FirstOrDefault(f => f.ObjectName == bunnyVideo.Title?.Replace(Path.GetExtension(bunnyVideo.Title), ".jpg"));
-                        // Bunny's own thumbnail is a frame of the encoded video, so it has the video's shape.
-                        var frameUrl = $"https://vz-215a1ffd-a5a.b-cdn.net/{bunnyVideo.Guid}/{bunnyVideo.ThumbnailFileName}";
-                        var thumbnailUrl = await ChooseBunnyThumbnailAsync(channelName, bunnyVideo, thumbnail,
-                            imageStoreRoot, imageStoreUrl, frameUrl);
-
-                        video = new Video
-                        {
-                            ID = Guid.Parse(bunnyVideo.Guid!),
-                            Title = bunnyVideo.Title ?? "",
-                            Description = bunnyVideo.Description ?? "",
-                            UserId = userId,
-                            VideoUrl = bunnyVideo.VideoUrl,
-                            ThumbnailUrl = thumbnailUrl,
-                            Channel = channelName,
-                            ChannelThumbnailUrl = channelThumbnail,
-                            DateModified = DateTime.UtcNow,
-                            DateCreated = bunnyVideo.DateUploaded,
-                            Width = bunnyVideo.Width,
-                            Height = bunnyVideo.Height,
-                            AvailableResolutions = bunnyVideo.AvailableResolutions?.Split(',').ToList() ?? new List<string>()
-                        };
-
-                        // Create-only: a parallel import of the same library can't overwrite the record.
-                        if (!await _repo.CreateObjectAsync("videos", video.ID.ToString(), video))
-                        {
-                            processedItems++;
-                            ProgressChanged?.Invoke(this, new ImportProgressEventArgs(
-                                totalItems, processedItems, bunnyVideo.Title ?? "Unknown", channelName, "Skipped (exists)"));
-                            continue;
-                        }
-                        successfulImports++;
-                        processedItems++;
-                        
-                        ProgressChanged?.Invoke(this, new ImportProgressEventArgs(
-                            totalItems, processedItems, bunnyVideo.Title ?? "Unknown", channelName, "Imported"));
-                    }
-                    catch (Exception ex)
-                    {
-                        failedImports++;
-                        processedItems++;
-                        
-                        FileImportError?.Invoke(this, new FileImportErrorEventArgs(
-                            bunnyVideo.Title ?? "Unknown", channelName, ex));
-                        
-                        ProgressChanged?.Invoke(this, new ImportProgressEventArgs(
-                            totalItems, processedItems, bunnyVideo.Title ?? "Unknown", channelName, "Failed"));
-                    }
-                }
-                response = await _bunnyStreamClient.GetVideosAsync(libraryId, response.CurrentPage + 1);
-            } while ((response.CurrentPage - 1) * response.ItemsPerPage < response.TotalItems);
-
-            // Report completion
-            ImportCompleted?.Invoke(this, new ImportCompletedEventArgs(successfulImports, failedImports, totalItems));
         }
 
         #endregion
@@ -908,50 +810,6 @@ namespace AlUmmahNow.Importer
             }
             await _dbContext.SaveChangesAsync();
             return !created && videoUpload == UploadOutcome.AlreadyPresent ? ItemOutcome.AlreadyDone : ItemOutcome.Uploaded;
-        }
-
-        /// <summary>
-        /// The thumbnail for a video synced from Bunny: the image-store art when it has the video's shape,
-        /// otherwise Bunny's own thumbnail (a frame of the video).
-        /// </summary>
-        private async Task<string> ChooseBunnyThumbnailAsync(string channelName, BunnyVideo bunnyVideo,
-            StorageObject? thumbnail, string imageStoreRoot, string imageStoreUrl, string frameUrl)
-        {
-            (int Width, int Height)? videoSize = bunnyVideo.Width > 0 && bunnyVideo.Height > 0
-                ? (bunnyVideo.Width, bunnyVideo.Height)
-                : null;
-            (int Width, int Height)? thumbSize = null;
-            if (thumbnail?.ObjectName != null && videoSize != null)
-            {
-                thumbSize = await ReadStoredImageSizeAsync(imageStoreRoot + thumbnail.ObjectName);
-            }
-
-            var decision = ThumbnailShape.Choose(thumbnail?.ObjectName != null, thumbSize, videoSize);
-            ReportThumbnailChoice(new ThumbnailChoiceEventArgs(channelName, bunnyVideo.Title ?? bunnyVideo.Guid ?? "",
-                decision, thumbSize, videoSize, decision.UsesFrame() ? frameUrl : thumbnail!.ObjectName, frameFailed: false));
-            return decision.UsesFrame() ? frameUrl : $"{imageStoreUrl}{thumbnail!.ObjectName}";
-        }
-
-        private async Task<(int Width, int Height)?> ReadStoredImageSizeAsync(string path)
-        {
-            var local = Path.Combine(Path.GetTempPath(), $"aun-thumb-{Guid.NewGuid():N}{Path.GetExtension(path)}");
-            try
-            {
-                await using (var remote = await _imageStorageClient.DownloadAsync(path))
-                await using (var file = File.Create(local))
-                {
-                    await remote.CopyToAsync(file);
-                }
-                return await MediaProbe.GetImageSizeAsync(local);
-            }
-            catch (Exception)
-            {
-                return null;
-            }
-            finally
-            {
-                try { File.Delete(local); } catch { /* best effort */ }
-            }
         }
 
         /// <summary>
