@@ -2916,6 +2916,9 @@
   <data name="Social_StatusFailed" xml:space="preserve">
     <value>فشلت آخر مزامنة. وهي في صفحة الأخطاء أيضًا مع زر «أعِد المحاولة»</value>
   </data>
+  <data name="Social_StatusFailedQuiet" xml:space="preserve">
+    <value>فشلت آخر مزامنة. وهي في صفحة الأخطاء أيضًا</value>
+  </data>
   <data name="Social_StatusOff" xml:space="preserve">
     <value>متوقف: لا يُستورد شيء حتى يُشغَّل</value>
   </data>
@@ -3005,6 +3008,9 @@
   </data>
   <data name="SocialJob_failed" xml:space="preserve">
     <value>توقفت بعد {0} من {1} محاولات. «أعِد المحاولة» يشغّلها مرة أخرى</value>
+  </data>
+  <data name="SocialJob_failedQuiet" xml:space="preserve">
+    <value>توقفت بعد {0} من {1} محاولات</value>
   </data>
   <data name="SocialJob_succeededAt" xml:space="preserve">
     <value>انتهت {0}</value>
@@ -3149,6 +3155,9 @@
   </data>
   <data name="Social_Added" xml:space="preserve">
     <value>أُضيف المصدر. زامِنه الآن، أو يُزامَن وفق جدوله.</value>
+  </data>
+  <data name="Social_AddedQuiet" xml:space="preserve">
+    <value>أُضيف المصدر.</value>
   </data>
   <data name="Social_Hint_rss" xml:space="preserve">
     <value>عنوان الخلاصة أو البودكاست، مثل:</value>
@@ -3390,6 +3399,9 @@
   <data name="TakeoutState_matched" xml:space="preserve">
     <value>مطابَق وجاهز للرفع</value>
   </data>
+  <data name="TakeoutState_matchedQuiet" xml:space="preserve">
+    <value>مطابَق</value>
+  </data>
   <data name="TakeoutState_unmatched" xml:space="preserve">
     <value>غير مطابَق</value>
   </data>
@@ -3435,6 +3447,9 @@
   <data name="TakeoutNote_upload_incomplete" xml:space="preserve">
     <value>لم يكتمل رفعه. ارفعه مرة أخرى.</value>
   </data>
+  <data name="TakeoutNote_upload_incompleteQuiet" xml:space="preserve">
+    <value>لم يكتمل رفعه.</value>
+  </data>
   <data name="TakeoutNote_post_refused" xml:space="preserve">
     <value>رُفض المنشور أو المرئي.</value>
   </data>
@@ -3446,6 +3461,9 @@
   </data>
   <data name="TakeoutJob_failed" xml:space="preserve">
     <value>فشلت المطابقة. وهي في صفحة الأخطاء مع زر «أعِد المحاولة»</value>
+  </data>
+  <data name="TakeoutJob_failedQuiet" xml:space="preserve">
+    <value>فشلت المطابقة. وهي في صفحة الأخطاء</value>
   </data>
   <data name="TakeoutJob_cancelled" xml:space="preserve">
     <value>ألغى مشرف المطابقة</value>
@@ -3500,6 +3518,9 @@
   </data>
   <data name="SocialReason_upload_incomplete" xml:space="preserve">
     <value>لم يكتمل رفع أحد الملفات. ارفعه مرة أخرى، ثم اضغط «أعِد المحاولة».</value>
+  </data>
+  <data name="SocialReason_upload_incompleteQuiet" xml:space="preserve">
+    <value>لم يكتمل رفع أحد الملفات.</value>
   </data>
   <data name="SocialReason_HttpStatus" xml:space="preserve">
     <value>رمز الخادم: {0}</value>

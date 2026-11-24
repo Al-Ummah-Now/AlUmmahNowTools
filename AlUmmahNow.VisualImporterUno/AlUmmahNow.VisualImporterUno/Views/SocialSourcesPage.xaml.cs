@@ -44,9 +44,10 @@ public sealed partial class SocialSourcesPage : Page
     }
 
     /// <summary>
-    /// Demo frames (<c>TOOLS_DEMO_SOCIAL=job|items|remove|add|cancel|cancelled|takeout|uploads_off</c>): the failed source's job log open,
-    /// the Telegram source's items open, the Remove dialog, the Add card at the top, the Cancel dialog on the Telegram
-    /// source's running sync, that sync cancelled with its log, or the YouTube source's Takeout match.
+    /// Demo frames (<c>TOOLS_DEMO_SOCIAL=job|items|remove|add|cancel|cancelled|takeout|uploads_off|uploads_off_takeout|uploads_off_job</c>):
+    /// the failed source's job log open, the Telegram source's items open, the Remove dialog, the Add card at the top, the Cancel
+    /// dialog on the Telegram source's running sync, that sync cancelled with its log, the YouTube source's Takeout match, or the
+    /// uploads-off views (sources list, Takeout panel, failed sync-job drawer).
     /// </summary>
     private async System.Threading.Tasks.Task OpenDemoAsync()
     {
@@ -60,9 +61,17 @@ public sealed partial class SocialSourcesPage : Page
                 ViewModel.ToggleJob(failed);
                 ScrollTo(SourcesCard);
                 break;
-            case "items" when Row(DemoSocial.TelegramId) is { } telegram:
+            case "uploads_off" when Row(DemoSocial.FailedId) is { } failed:
+                ViewModel.ToggleJob(failed);
+                ScrollTo(failed);
+                break;
+            case "uploads_off_job" when Row(DemoSocial.FailedId) is { } failed:
+                ViewModel.ToggleJob(failed);
+                ScrollToBottomOf(failed, "JobCard");
+                break;
+            case "items" or "uploads_off_items" when Row(DemoSocial.TelegramId) is { } telegram:
                 await ViewModel.ToggleItemsAsync(telegram);
-                ScrollTo(SourcesCard);
+                ScrollTo(telegram);
                 break;
             case "add":
                 ScrollTo(AddCard);
@@ -81,7 +90,12 @@ public sealed partial class SocialSourcesPage : Page
                 ViewModel.ToggleJob(stopped);
                 ScrollTo(SourcesCard);
                 break;
-            case "takeout" or "uploads_off" when Row(DemoSocial.YouTubeId) is { } youtube:
+            case "uploads_off_takeout" when Row(DemoSocial.YouTubeId) is { } yt:
+                await ViewModel.ToggleTakeoutAsync(yt);
+                await ViewModel.ListTakeoutFolderAsync(yt, "/Takeout");
+                ScrollTo(yt, "TakeoutCard");
+                break;
+            case "takeout" when Row(DemoSocial.YouTubeId) is { } youtube:
                 await ViewModel.ToggleTakeoutAsync(youtube);
                 await ViewModel.ListTakeoutFolderAsync(youtube, "/Takeout");
                 // From the top of the Sources card, so the frame shows the card whole (TOOLS_SCREENSHOT_SIZE tall enough)
@@ -90,16 +104,43 @@ public sealed partial class SocialSourcesPage : Page
         }
     }
 
-    /// <summary>Puts a source's row at the top (its panel below it).</summary>
-    private void ScrollTo(SourceRow row)
+    /// <summary>Puts a source's row (or a tagged panel inside it) at the top of the viewport.</summary>
+    private void ScrollTo(SourceRow row, string? childTag = null)
     {
         PageContent.Padding = new Thickness(PageContent.Padding.Left, PageContent.Padding.Top, PageContent.Padding.Right, 4000);
         DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
         {
-            var element = FindTagged(SourcesCard, row);
-            var top = element is null ? 0 : element.TransformToVisual(PageContent).TransformPoint(new Windows.Foundation.Point(0, 0)).Y;
+            var container = FindTagged(SourcesCard, row);
+            var target = container is not null && childTag is not null ? FindByTag(container, childTag) ?? container : container;
+            var top = target is null ? 0 : target.TransformToVisual(PageContent).TransformPoint(new Windows.Foundation.Point(0, 0)).Y;
             PageScroll.ChangeView(null, Math.Max(0, top - 8), null, true);
         });
+    }
+
+    /// <summary>Scrolls so the bottom of a tagged panel inside a row sits cleanly inside the viewport.</summary>
+    private void ScrollToBottomOf(SourceRow row, string childTag)
+    {
+        PageContent.Padding = new Thickness(PageContent.Padding.Left, PageContent.Padding.Top, PageContent.Padding.Right, 4000);
+        DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+        {
+            var container = FindTagged(SourcesCard, row);
+            var target = container is not null ? FindByTag(container, childTag) ?? container : null;
+            if (target is null) return;
+            var bottom = target.TransformToVisual(PageContent).TransformPoint(new Windows.Foundation.Point(0, target.ActualHeight)).Y;
+            var viewport = PageScroll.ViewportHeight > 0 ? PageScroll.ViewportHeight : 640;
+            PageScroll.ChangeView(null, Math.Max(0, bottom - viewport + 120), null, true);
+        });
+    }
+
+    private static FrameworkElement? FindByTag(DependencyObject parent, string tag)
+    {
+        for (var i = 0; i < Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChildrenCount(parent); i++)
+        {
+            var child = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChild(parent, i);
+            if (child is FrameworkElement fe && fe.Tag as string == tag) return fe;
+            if (FindByTag(child, tag) is { } found) return found;
+        }
+        return null;
     }
 
     /// <summary>The row's own Border (its DataContext), found in the sources list.</summary>
@@ -251,7 +292,10 @@ public sealed partial class SocialSourcesPage : Page
     private async void CancelJob_Click(object sender, RoutedEventArgs e)
     {
         if (RowOf(sender) is not { } row) return;
-        if (await ConfirmCancelAsync(row.Label, Loc.Get("Social_CancelBody"), Loc.Get("Social_CancelBody2"))) await ViewModel.CancelJobAsync(row);
+        var lines = ViewModel.UploadsOn
+            ? new[] { row.Label, Loc.Get("Social_CancelBody"), Loc.Get("Social_CancelBody2") }
+            : new[] { row.Label, Loc.Get("Social_CancelBody") };
+        if (await ConfirmCancelAsync(lines)) await ViewModel.CancelJobAsync(row);
     }
 
     /// <summary>Asks before cancelling. Each line is short enough for one line: the popup's Arabic order only holds on one.</summary>

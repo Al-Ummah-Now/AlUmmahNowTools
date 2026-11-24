@@ -295,8 +295,9 @@ internal static class DemoSocial
         var path = request.RequestUri!.AbsolutePath;
         var query = System.Web.HttpUtility.ParseQueryString(request.RequestUri.Query);
         const string sources = "/api/admin/import/sources";
-        // The Features page's switches: uploads off for the uploads_off frame (Sync now and Takeout uploads not offered)
-        if (path == "/api/features") return Ok(new { items = new[] { new { key = "upload", enabled = Mode != "uploads_off", effective = Mode != "uploads_off" } } });
+        // The Features page's switches: uploads off for uploads_off frames (Sync now, Retry, and Takeout uploads not offered)
+        var uploadsOff = Mode is "uploads_off" or "uploads_off_takeout" or "uploads_off_job" or "uploads_off_items";
+        if (path == "/api/features") return Ok(new { items = new[] { new { key = "upload", enabled = !uploadsOff, effective = !uploadsOff } } });
         if (path == sources && request.Method == HttpMethod.Get)
         {
             var channel = query["channelId"];
