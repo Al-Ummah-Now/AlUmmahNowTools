@@ -51,7 +51,10 @@ public sealed partial class ForcedUpdateView : UserControl
         };
         var buttons = new StackPanel { Spacing = 10, Width = 280, HorizontalAlignment = HorizontalAlignment.Center, Children = { _update, _quit } };
         var panel = new StackPanel { Spacing = 16, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, Padding = new Thickness(24), Children = { icon, title, _body, _message, _progress, buttons } };
-        Content = new Grid { Background = (Brush)Application.Current.Resources["FanousBackgroundBrush"], Children = { new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto } } };
+        // The page background through {ThemeResource}, so the screen follows Light and Dark
+        var root = UpdateBar.Themed<Grid>("<Grid Background=\"{ThemeResource FanousBackgroundBrush}\" />");
+        root.Children.Add(new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto });
+        Content = root;
         _service.Changed += v => DispatcherQueue.TryEnqueue(() => Render(v));
         Visibility = Visibility.Collapsed;
         Render(_service.View);

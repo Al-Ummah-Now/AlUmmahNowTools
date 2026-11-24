@@ -54,16 +54,17 @@ public sealed partial class UpdateBar : UserControl
         row.Children.Add(_whatsNew);
         row.Children.Add(_action);
         row.Children.Add(_close);
-        Content = new Border
-        {
-            Background = (Brush)Application.Current.Resources["FanousSurfaceBrush"],
-            BorderBrush = (Brush)Application.Current.Resources["FanousOutlineBrush"],
-            BorderThickness = new Thickness(0, 0, 0, 1),
-            Child = row,
-        };
+        // Brushes through {ThemeResource} so the bar follows Light and Dark (a code lookup would pin one theme)
+        var border = Themed<Border>("<Border Background=\"{ThemeResource FanousSurfaceBrush}\" BorderBrush=\"{ThemeResource FanousOutlineBrush}\" BorderThickness=\"0,0,0,1\" />");
+        border.Child = row;
+        Content = border;
         _service.Changed += v => DispatcherQueue.TryEnqueue(() => Render(v));
         Render(_service.View);
     }
+
+    /// <summary>An element whose brushes are {ThemeResource}s, so they follow the app's Light/Dark theme.</summary>
+    internal static T Themed<T>(string xaml) where T : class =>
+        (T)Microsoft.UI.Xaml.Markup.XamlReader.Load(xaml.Replace("<" + typeof(T).Name + " ", "<" + typeof(T).Name + " xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\" ", StringComparison.Ordinal));
 
     /// <summary>The forced screen is its own view; everything else shows here.</summary>
     private void Render(UpdateView v)

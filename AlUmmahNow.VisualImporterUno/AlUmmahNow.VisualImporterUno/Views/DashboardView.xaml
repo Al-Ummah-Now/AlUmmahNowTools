@@ -105,15 +105,20 @@
                             <RowDefinition Height="*"/>
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
-                        <StackPanel Orientation="Horizontal" Spacing="10">
-                            <Border Width="40" Height="40" CornerRadius="20" Background="{ThemeResource FanousBackgroundBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                        <!-- A grid, not a horizontal panel: the title wraps in a narrow window instead of being cut -->
+                        <Grid ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Border Width="40" Height="40" CornerRadius="20" VerticalAlignment="Top" Background="{ThemeResource FanousBackgroundBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
                                 <FontIcon Glyph="&#xE898;" FontSize="18" Foreground="{ThemeResource FanousPrimaryBrush}" />
                             </Border>
-                            <StackPanel VerticalAlignment="Center" Spacing="2">
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
                                 <TextBlock x:Uid="Dashboard_ImportHeading" Text="Bulk import" Style="{StaticResource ToolsLabel}" />
-                                <TextBlock x:Uid="Dashboard_ImportTitle" Text="Bring a folder of videos to a channel" Style="{StaticResource ToolsCardTitle}" />
+                                <TextBlock x:Uid="Dashboard_ImportTitle" Text="Bring a folder of videos to a channel" Style="{StaticResource ToolsCardTitle}" TextWrapping="Wrap" />
                             </StackPanel>
-                        </StackPanel>
+                        </Grid>
                         <TextBlock Grid.Row="1" x:Uid="Dashboard_ImportBody" Text="Pick a folder. Tools finds the videos and their caption, chapter and thumbnail files, then uploads them to the channel you choose, with no upload limits." Style="{StaticResource ToolsBody}" />
                         <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="12">
                             <Button Style="{StaticResource ToolsPrimaryButton}" Click="StartNewImportButton_Click">
