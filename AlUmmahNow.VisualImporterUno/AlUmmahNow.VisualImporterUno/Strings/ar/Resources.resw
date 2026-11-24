@@ -3258,7 +3258,7 @@
   <data name="SocialError_server" xml:space="preserve">
     <value>واجه الخادم مشكلة. أعِد المحاولة بعد لحظة، وهي مسجّلة في صفحة الأخطاء.</value>
   </data>
-  <data name="SocialError_http_404" xml:space="preserve">
+  <data name="SocialError_route_missing" xml:space="preserve">
     <value>هذا غير متاح على هذا الخادم بعد، ويحتاج إلى إصدار أحدث.</value>
   </data>
   <data name="SocialError_refused" xml:space="preserve">

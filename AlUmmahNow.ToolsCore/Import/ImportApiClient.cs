@@ -211,11 +211,18 @@ public sealed class ImportApiException : Exception
     /// <summary>A feature switched off on the Features page (<c>404 feature_off</c>): the action is not offered, nothing to show.</summary>
     public bool IsFeatureOff => Status == 404 && Code == "feature_off";
 
-    /// <summary>The server has no such route (a 404 without one of admin-api's codes): it runs a release from before it.</summary>
+    /// <summary>The server has no such route (<see cref="IsMissingRouteAnswer"/>): it runs a release from before it.</summary>
     public bool IsRouteMissing => Status == 404 && Code == RouteMissing;
 
-    /// <summary>The code of a 404 answered without one, which is how admin-api answers a route it does not have.</summary>
-    public const string RouteMissing = "http_404";
+    /// <summary>The app's own code for that answer, which carries none.</summary>
+    public const string RouteMissing = "route_missing";
+
+    /// <summary>
+    /// How admin-api answers a route it does not have: it sets no notFound handler, so Hono's own, 404 with the plain text
+    /// "404 Not Found" (its error envelope rewrites JSON only). Any other 404 (a proxy's page, a JSON error) is not that.
+    /// </summary>
+    internal static bool IsMissingRouteAnswer(HttpStatusCode status, string? mediaType, string body) =>
+        status == HttpStatusCode.NotFound && string.Equals(mediaType, "text/plain", StringComparison.OrdinalIgnoreCase) && body == "404 Not Found";
 
     /// <summary>Worth trying again later: not answered, timed out, rate limited, busy or a server error.</summary>
     public bool IsRetryable => Status is 0 or 408 or 429 or >= 500 || Code == "busy";
@@ -384,7 +391,20 @@ public partial class ImportApiClient
         SendAsync(HttpMethod.Post, "/api/admin/import/errors", new { events }, ct);
 
     private static string? TextOf(JsonNode? json, string key) =>
-        (json as JsonObject)?[key] is JsonValue v && v.TryGetValue<string>(out var text) ? text : null;
+        (json as JsonObject)?[key] is JsonValue v && v.TryGetValue<string>(out var text) && !string.IsNullOrWhiteSpace(text) ? text : null;
+
+    /// <summary>The item of a 409 already_imported, or null when the answer has none the app can read.</summary>
+    private static ImportItemRecord? ItemOf(JsonNode? json)
+    {
+        try
+        {
+            return (json as JsonObject)?["item"] is JsonObject item && item.Deserialize<ImportItemRecord>(Json) is { Id.Length: > 0 } read ? read : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
 
     private static ImportApiException Unreadable() => new(200, "unreadable", "admin-api answered something the app cannot read");
 
@@ -410,9 +430,9 @@ public partial class ImportApiClient
         using (response)
         {
             JsonNode? json = null;
+            var text = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
             try
             {
-                var text = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
                 if (!string.IsNullOrWhiteSpace(text)) json = JsonNode.Parse(text);
             }
             catch (JsonException)
@@ -422,13 +442,11 @@ public partial class ImportApiClient
 
             if (response.IsSuccessStatusCode) return json?["result"];
             // Any body may come with an error (a proxy's page, plain text): only an object's own text is read
-            var code = TextOf(json, "code") ?? "http_" + (int)response.StatusCode;
+            var code = ImportApiException.IsMissingRouteAnswer(response.StatusCode, response.Content.Headers.ContentType?.MediaType, text)
+                ? ImportApiException.RouteMissing
+                : TextOf(json, "code") ?? "http_" + (int)response.StatusCode;
             var message = TextOf(json, "error") ?? response.ReasonPhrase ?? "Request failed";
-            if (response.StatusCode == HttpStatusCode.Conflict && code == "already_imported")
-            {
-                var item = (json as JsonObject)?["item"]?.Deserialize<ImportItemRecord>(Json);
-                if (item is not null) throw new AlreadyImportedException(item);
-            }
+            if (response.StatusCode == HttpStatusCode.Conflict && code == "already_imported" && ItemOf(json) is { } item) throw new AlreadyImportedException(item);
             var retryAfter = response.Headers.RetryAfter?.Delta;
             throw new ImportApiException((int)response.StatusCode, code, message, retryAfter, body: json);
         }
