@@ -631,13 +631,13 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
     /// A line of a social source's sync job log (wiki TOOLS-ADMIN TA-13): the server logs events, not sentences
     /// (shared-types AdminJobLogEntry), so each is worded here; the server's own error text goes on its own line.
     /// </summary>
-    internal static string LogText(AlUmmahNow.ToolsCore.Social.SyncJobLogLine line)
+    internal static string LogText(AlUmmahNow.ToolsCore.Social.SyncJobLogLine line, bool uploadsOn = true)
     {
         var attempt = Loc.Number(line.Attempt ?? 0);
         var delay = Loc.Duration(TimeSpan.FromSeconds(Math.Max(0, line.DelaySeconds ?? 0)));
         var text = line.Event switch
         {
-            "queued" => Loc.Get(line.Retried == true ? "SocialLog_queued_retried" : "SocialLog_queued"),
+            "queued" => Loc.Get(line.Retried == true ? (uploadsOn ? "SocialLog_queued_retried" : "SocialLog_queued_retriedQuiet") : "SocialLog_queued"),
             "started" => Loc.Format("SocialLog_started", attempt),
             "waiting" => line.DelaySeconds is > 0 ? Loc.Format("SocialLog_waiting", delay) : Loc.Get("SocialLog_waiting_now"),
             "failed_attempt" => Loc.Format("SocialLog_failed_attempt", attempt, delay),
@@ -647,7 +647,7 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
             "cancelled" => Loc.Get("SocialLog_cancelled"),
             _ => line.Event,
         };
-        return line.Error is { Length: > 0 } error ? Loc.WithDetail(text, SourceRow.ReasonText(error, labelled: false)) : text;
+        return line.Error is { Length: > 0 } error ? Loc.WithDetail(text, SourceRow.ReasonText(error, labelled: false, uploadsOn: uploadsOn)) : text;
     }
 
     private static string Bytes(string value) =>

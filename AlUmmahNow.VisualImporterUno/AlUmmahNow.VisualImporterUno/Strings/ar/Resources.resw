@@ -3024,6 +3024,9 @@
   <data name="SocialLog_queued_retried" xml:space="preserve">
     <value>أُعيدت إلى الطابور بزر «أعِد المحاولة»</value>
   </data>
+  <data name="SocialLog_queued_retriedQuiet" xml:space="preserve">
+    <value>أُعيدت إلى الطابور</value>
+  </data>
   <data name="SocialLog_started" xml:space="preserve">
     <value>بدأت المحاولة {0}</value>
   </data>

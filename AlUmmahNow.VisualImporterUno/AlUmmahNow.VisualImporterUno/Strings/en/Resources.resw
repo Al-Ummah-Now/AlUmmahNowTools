@@ -2709,6 +2709,9 @@
   <data name="SocialLog_queued_retried" xml:space="preserve">
     <value>Queued again by “Retry”</value>
   </data>
+  <data name="SocialLog_queued_retriedQuiet" xml:space="preserve">
+    <value>Queued again</value>
+  </data>
   <data name="SocialLog_started" xml:space="preserve">
     <value>Attempt {0} started</value>
   </data>

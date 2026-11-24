@@ -189,4 +189,82 @@ public sealed class SocialSourcesViewModelTests
             candidateRow.OriginalAlignment.Should().Be(TextAlignment.Right);
         });
     }
+
+    [Fact]
+    public void Retried_job_log_line_uses_quiet_copy_when_uploads_are_off_and_updates_live()
+    {
+        var retriedLine = new SyncJobLogLine(DateTimeOffset.UtcNow, "queued", null, null, null, Retried: true);
+        var incompleteLine = new SyncJobLogLine(DateTimeOffset.UtcNow, "failed", 6, "upload_incomplete: pending", null, null);
+
+        foreach (var culture in new[] { "en-US", "ar" })
+        {
+            WithCulture(culture, () =>
+            {
+                BulkImportViewModel.LogText(retriedLine, uploadsOn: true).Should().Be(Loc.Get("SocialLog_queued_retried"));
+                BulkImportViewModel.LogText(retriedLine, uploadsOn: false).Should().Be(Loc.Get("SocialLog_queued_retriedQuiet"));
+                BulkImportViewModel.LogText(incompleteLine, uploadsOn: false).Should().Contain(Loc.Get("SocialReason_upload_incompleteQuiet"));
+
+                var source = MakeSource(lastError: "upload_incomplete: pending");
+                var job = new SyncJob("job_1", "import.source-sync", "failed", 6, 6, null, "upload_incomplete: pending",
+                    DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, new[] { retriedLine, incompleteLine });
+                var row = new SourceRow(source.Id) { UploadsOn = true };
+                row.Update(source, job, null);
+
+                row.JobEntries[0].Lines.Should().Contain(Loc.Get("SocialLog_queued_retried"));
+                row.CanRetryJob.Should().BeTrue();
+
+                row.UploadsOn = false;
+
+                row.CanRetryJob.Should().BeFalse();
+                row.Status.Should().Be(Loc.KeepLastWords(Loc.Get("Social_StatusFailedQuiet")));
+                row.JobStatus.Should().Be(Loc.KeepLastWords(Loc.Format("SocialJob_failedQuiet", 6, 6)));
+                row.JobEntries[0].Lines.Should().Contain(Loc.Get("SocialLog_queued_retriedQuiet"));
+                row.JobEntries[1].Lines.Should().Contain(Loc.Get("SocialReason_upload_incompleteQuiet"));
+            });
+        }
+    }
+
+    [Fact]
+    public void Cancel_dialog_lines_omit_start_new_sync_line_when_uploads_are_off()
+    {
+        foreach (var culture in new[] { "en-US", "ar" })
+        {
+            WithCulture(culture, () =>
+            {
+                SocialSourcesViewModel.CancelDialogLines("Mastodon posts", uploadsOn: true)
+                    .Should().Equal("Mastodon posts", Loc.Get("Social_CancelBody"), Loc.Get("Social_CancelBody2"));
+                SocialSourcesViewModel.CancelDialogLines("Mastodon posts", uploadsOn: false)
+                    .Should().Equal("Mastodon posts", Loc.Get("Social_CancelBody"));
+            });
+        }
+    }
+
+    [Fact]
+    public void ViewModel_UploadsOn_change_updates_FormMessage_and_hides_Retry_live()
+    {
+        WithCulture("en-US", () =>
+        {
+            using var vm = new SocialSourcesViewModel(workspace: null);
+            var source = MakeSource(lastError: "source_unreachable: The source could not be read (http_503)");
+            var failedJob = MakeJob("failed", lastError: "source_unreachable: The source could not be read (http_503)");
+            var row = new SourceRow(source.Id) { UploadsOn = true };
+            row.Update(source, failedJob, null);
+            vm.Sources.Add(row);
+
+            vm.SetAddedSource("Podcast");
+            vm.FormMessage.Should().Be(Loc.GetWithDetail("Social_Added", "Podcast"));
+            row.CanRetryJob.Should().BeTrue();
+
+            vm.UploadsOn = false;
+
+            vm.FormMessage.Should().Be(Loc.GetWithDetail("Social_AddedQuiet", "Podcast"));
+            row.CanRetryJob.Should().BeFalse();
+
+            // Switching back on restores full banner and Retry
+            vm.UploadsOn = true;
+
+            vm.FormMessage.Should().Be(Loc.GetWithDetail("Social_Added", "Podcast"));
+            row.CanRetryJob.Should().BeTrue();
+        });
+    }
 }
