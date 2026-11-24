@@ -245,24 +245,92 @@ public class SourcesApiTests
         Assert.Equal("forbidden", error.Code);
     }
 
-    /// <summary>A server from before social sources: Hono answers a route it does not have with plain text, no code.</summary>
+    /// <summary>
+    /// A server from before social sources: admin-api sets no notFound handler, so an unknown route is Hono's own answer
+    /// (hono 4.13.19 with chanfana 3.7.0, as v2026.11.22.7 and v2026.11.24 run).
+    /// </summary>
     [Theory]
-    [InlineData("404 Not Found", "text/plain")]
-    [InlineData("", "text/plain")]
-    [InlineData("<html><body>Not Found</body></html>", "text/html")]
-    [InlineData("\"Not Found\"", "application/json")]
-    [InlineData("[]", "application/json")]
-    [InlineData("{\"code\":404}", "application/json")]
-    public async Task A_server_without_the_route_is_told_apart_whatever_its_404_says(string body, string type)
+    [InlineData("text/plain; charset=UTF-8")]
+    [InlineData("text/plain")]
+    public async Task A_server_without_the_route_is_told_apart(string type)
     {
-        var (api, _) = Client(_ => new HttpResponseMessage(HttpStatusCode.NotFound) { Content = new StringContent(body, System.Text.Encoding.UTF8, type) });
+        var (api, _) = Client(_ => NotFound("404 Not Found", type));
         var error = await Assert.ThrowsAsync<ImportApiException>(() => api.ListSourcesAsync(null));
+        Assert.Equal(404, error.Status);
+        Assert.Equal(ImportApiException.RouteMissing, error.Code);
         Assert.True(error.IsRouteMissing);
         Assert.False(error.IsFeatureOff);
         Assert.False(error.IsRetryable);
-        Assert.Null(error.ServerMessage);
         // The switch is on FEAT-4's route, which such a server may not have either: unknown, never off
         Assert.Null(await api.IsFeatureOnAsync("upload"));
+    }
+
+    /// <summary>Every other 404 keeps its own words: a proxy's page, a JSON error with or without a code, an odd body.</summary>
+    [Theory]
+    [InlineData("<html><body>404 Not Found</body></html>", "text/html", "http_404", "Not Found", null)]
+    [InlineData("404 Not Found", "text/html", "http_404", "Not Found", null)]
+    [InlineData("404 Not Found", "application/json", "http_404", "Not Found", null)]
+    [InlineData("404 page not found", "text/plain", "http_404", "Not Found", null)]
+    [InlineData("", "text/plain", "http_404", "Not Found", null)]
+    [InlineData("{\"success\":false,\"error\":\"Channel not found\"}", "application/json", "http_404", "Channel not found", null)]
+    [InlineData("{\"message\":\"No such channel\"}", "application/json", "http_404", "Not Found", "No such channel")]
+    [InlineData("{\"code\":\"not_found\",\"error\":\"Gone\",\"message\":\"We could not find it\"}", "application/json", "not_found", "Gone", "We could not find it")]
+    [InlineData("{\"code\":404}", "application/json", "http_404", "Not Found", null)]
+    [InlineData("{\"code\":\"\",\"error\":\"   \",\"message\":\" \"}", "application/json", "http_404", "Not Found", null)]
+    [InlineData("{\"code\":\" \\t\",\"error\":\"\"}", "application/json", "http_404", "Not Found", null)]
+    [InlineData("\"404 Not Found\"", "application/json", "http_404", "Not Found", null)]
+    [InlineData("[]", "application/json", "http_404", "Not Found", null)]
+    public async Task Any_other_404_is_not_a_missing_route(string body, string type, string code, string message, string? said)
+    {
+        var (api, _) = Client(_ => NotFound(body, type));
+        var error = await Assert.ThrowsAsync<ImportApiException>(() => api.ListSourcesAsync(null));
+        Assert.False(error.IsRouteMissing);
+        Assert.Equal(code, error.Code);
+        Assert.Equal(message, error.Message);
+        Assert.Equal(said, error.ServerMessage);
+    }
+
+    /// <summary>The same plain text with another status is not a missing route.</summary>
+    [Fact]
+    public async Task Only_a_404_is_a_missing_route()
+    {
+        var (api, _) = Client(_ => new HttpResponseMessage(HttpStatusCode.BadGateway) { Content = new StringContent("404 Not Found") });
+        var error = await Assert.ThrowsAsync<ImportApiException>(() => api.ListSourcesAsync(null));
+        Assert.False(error.IsRouteMissing);
+        Assert.Equal("http_502", error.Code);
+        Assert.True(error.IsRetryable);
+    }
+
+    private static HttpResponseMessage NotFound(string body, string type)
+    {
+        var content = new ByteArrayContent(System.Text.Encoding.UTF8.GetBytes(body));
+        content.Headers.ContentType = System.Net.Http.Headers.MediaTypeHeaderValue.Parse(type);
+        return new HttpResponseMessage(HttpStatusCode.NotFound) { Content = content };
+    }
+
+    [Theory]
+    [InlineData("\"bad\"")]
+    [InlineData("[]")]
+    [InlineData("null")]
+    [InlineData("{}")]
+    [InlineData("{\"id\":7}")]
+    [InlineData("{\"id\":\"\"}")]
+    [InlineData("{\"id\":\"item-1\",\"batchId\":{}}")]
+    public async Task An_already_imported_answer_with_an_unreadable_item_is_its_own_refusal(string item)
+    {
+        var (api, _) = Client(_ => FakeHandler.Json(HttpStatusCode.Conflict, "{\"success\":false,\"code\":\"already_imported\",\"error\":\"Already there\",\"item\":" + item + "}"));
+        var error = await Assert.ThrowsAsync<ImportApiException>(() => api.ListSourcesAsync(null));
+        Assert.Equal(409, error.Status);
+        Assert.Equal("already_imported", error.Code);
+        Assert.Equal("Already there", error.Message);
+    }
+
+    [Fact]
+    public async Task An_already_imported_answer_with_its_item_is_still_told_apart()
+    {
+        var (api, _) = Client(_ => FakeHandler.Json(HttpStatusCode.Conflict, "{\"code\":\"already_imported\",\"item\":{\"id\":\"item-1\",\"batchId\":\"b1\",\"videoId\":\"v1\",\"state\":\"uploaded\",\"error\":null}}"));
+        var already = await Assert.ThrowsAsync<AlreadyImportedException>(() => api.ListSourcesAsync(null));
+        Assert.Equal("item-1", already.Item.Id);
     }
 
     [Theory]

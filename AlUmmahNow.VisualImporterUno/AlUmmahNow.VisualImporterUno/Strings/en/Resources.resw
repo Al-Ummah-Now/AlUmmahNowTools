@@ -2943,7 +2943,7 @@
   <data name="SocialError_server" xml:space="preserve">
     <value>The server ran into a problem. Try again in a moment; it is on the Errors page.</value>
   </data>
-  <data name="SocialError_http_404" xml:space="preserve">
+  <data name="SocialError_route_missing" xml:space="preserve">
     <value>This server doesn’t have this yet. It needs a newer release.</value>
   </data>
   <data name="SocialError_refused" xml:space="preserve">

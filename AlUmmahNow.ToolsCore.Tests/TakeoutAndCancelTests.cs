@@ -419,6 +419,8 @@ public class ReasonTests
                 Assert.True(values.TryGetValue(key, out var text) && text.Length > 0, $"{lang}: {key} is missing");
                 if (lang == "ar") Assert.DoesNotMatch("[A-Za-z]", text);
             }
+            // A 404 that is not the missing route keeps its own words: no text of the app's stands in for it
+            Assert.DoesNotContain("SocialError_http_404", values.Keys);
         }
     }
 

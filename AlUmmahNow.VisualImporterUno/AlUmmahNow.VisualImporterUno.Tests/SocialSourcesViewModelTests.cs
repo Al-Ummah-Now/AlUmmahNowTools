@@ -298,4 +298,34 @@ public sealed class SocialSourcesViewModelTests
             vm.ListError.Should().NotBeEmpty();
         });
     }
+
+    [Fact]
+    public void Only_the_missing_route_shows_the_card_and_every_other_failure_keeps_its_words()
+    {
+        WithCulture("en-US", () =>
+        {
+            using var vm = new SocialSourcesViewModel(workspace: null);
+
+            // A proxy's page: refused, with what it said
+            var page = new ImportApiException(404, "http_404", "Not Found");
+            vm.ShowListFailure(page);
+            vm.NotOnServer.Should().BeFalse();
+            vm.ListError.Should().Be(Loc.GetWithDetail("SocialError_refused", "Not Found"));
+
+            // A JSON error without a code: its own sentence, else its error text
+            var said = new ImportApiException(404, "http_404", "Not Found", body: System.Text.Json.Nodes.JsonNode.Parse("{\"message\":\"No such channel\"}"));
+            vm.ShowListFailure(said);
+            vm.NotOnServer.Should().BeFalse();
+            vm.ListError.Should().Be("No such channel");
+            vm.ShowListFailure(new ImportApiException(404, "http_404", "Channel not found"));
+            vm.ListError.Should().Be(Loc.GetWithDetail("SocialError_refused", "Channel not found"));
+
+            foreach (var (status, code) in new[] { (404, "source_not_found"), (404, "feature_off"), (403, "forbidden") })
+            {
+                vm.ShowListFailure(new ImportApiException(status, code, "The server's own words"));
+                vm.NotOnServer.Should().BeFalse(code);
+                vm.ListError.Should().NotBeEmpty(code);
+            }
+        });
+    }
 }
