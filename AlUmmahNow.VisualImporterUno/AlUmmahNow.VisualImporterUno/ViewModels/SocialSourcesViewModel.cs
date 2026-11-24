@@ -61,6 +61,17 @@ public sealed partial class SocialSourcesViewModel : ObservableObject, IDisposab
 
     public bool IsNotSuperAdmin => !IsSuperAdmin;
 
+    /// <summary>
+    /// The environment's server has no social sources yet (it runs a release from before AlUmmahNow #1741, and already gives
+    /// super admins the permission): the page says so and offers only Refresh.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowPage))]
+    private bool _notOnServer;
+
+    /// <summary>The page's cards: for super admins, on a server that has social sources.</summary>
+    public bool ShowPage => !NotOnServer && IsSuperAdmin;
+
     // ---------------------------------------------------------------- Channel
 
     public ObservableCollection<ImportChannel> Channels { get; } = new();
@@ -189,14 +200,21 @@ public sealed partial class SocialSourcesViewModel : ObservableObject, IDisposab
         }
         catch (ImportApiException ex)
         {
-            ListError = ErrorText(ex);
-            Report(ex, "list");
+            ShowListFailure(ex);
         }
         finally
         {
             IsLoading = false;
             SchedulePoll();
         }
+    }
+
+    /// <summary>The list could not be read: the server does not have it yet, or the reason above the list.</summary>
+    internal void ShowListFailure(ImportApiException ex)
+    {
+        NotOnServer = ex.IsRouteMissing;
+        ListError = NotOnServer ? "" : ErrorText(ex);
+        Report(ex, "list");
     }
 
     private async Task LoadJobsAsync(IReadOnlyList<ImportSource> sources)
@@ -233,8 +251,9 @@ public sealed partial class SocialSourcesViewModel : ObservableObject, IDisposab
         }
     }
 
-    private void ShowSources(IReadOnlyList<ImportSource> sources)
+    internal void ShowSources(IReadOnlyList<ImportSource> sources)
     {
+        NotOnServer = false;
         var showChannel = SelectedChannel is null;
         var keep = Sources.ToDictionary(r => r.Id);
         Sources.Clear();

@@ -405,6 +405,24 @@ public class ReasonTests
     }
 
     [Fact]
+    public void A_server_without_social_sources_is_worded_in_English_and_in_Arabic_without_Latin_letters()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !Directory.Exists(Path.Combine(dir.FullName, "AlUmmahNow.VisualImporterUno"))) dir = dir.Parent;
+        Assert.NotNull(dir);
+        foreach (var lang in new[] { "en", "ar" })
+        {
+            var resw = System.Xml.Linq.XDocument.Load(Path.Combine(dir!.FullName, "AlUmmahNow.VisualImporterUno", "AlUmmahNow.VisualImporterUno", "Strings", lang, "Resources.resw"));
+            var values = resw.Root!.Elements("data").ToDictionary(d => (string)d.Attribute("name")!, d => (string?)d.Element("value") ?? "");
+            foreach (var key in new[] { "Social_NotOnServerTitle.Text", "Social_NotOnServerBody.Text", "SocialError_" + ImportApiException.RouteMissing })
+            {
+                Assert.True(values.TryGetValue(key, out var text) && text.Length > 0, $"{lang}: {key} is missing");
+                if (lang == "ar") Assert.DoesNotMatch("[A-Za-z]", text);
+            }
+        }
+    }
+
+    [Fact]
     public void Quiet_uploads_off_strings_exist_in_English_and_Arabic_without_naming_hidden_actions()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);

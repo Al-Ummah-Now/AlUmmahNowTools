@@ -11,6 +11,7 @@ namespace AlUmmahNow.VisualImporterUno.Shell;
 /// waiting for Takeout files) and its connected accounts. <c>TOOLS_DEMO_SOCIAL=all</c> lists every channel,
 /// <c>empty</c> a channel with nothing yet, <c>add</c> a filled form with its error, <c>cancel</c> the Cancel dialog on the
 /// running sync, <c>cancelled</c> that sync cancelled by an admin, <c>takeout</c> the YouTube source's Takeout files matched,
+/// <c>not_on_server</c> a server from before social sources (a 404 for every source call),
 /// <c>uploads_off</c> the same with uploads switched off on the Features page (no Sync now, no Upload matched files).
 /// Nothing is sent anywhere.
 /// </summary>
@@ -288,6 +289,9 @@ internal static class DemoSocial
         counts = new Dictionary<string, int> { ["matched"] = 2, ["ambiguous"] = 1, ["unmatched"] = 1, ["attached"] = 1 },
         jobId = "job_demo_takeout",
     };
+
+    /// <summary>A path the older server of the <c>not_on_server</c> frame does not have: 404, as Hono answers it.</summary>
+    public static bool IsMissing(Uri url) => Mode == "not_on_server" && url.AbsolutePath.StartsWith("/api/admin/import/sources", StringComparison.Ordinal);
 
     /// <summary>The demo admin-api's answer for a sources or jobs path, or null for any other path.</summary>
     public static string? Answer(HttpRequestMessage request)

@@ -245,6 +245,37 @@ public class SourcesApiTests
         Assert.Equal("forbidden", error.Code);
     }
 
+    /// <summary>A server from before social sources: Hono answers a route it does not have with plain text, no code.</summary>
+    [Theory]
+    [InlineData("404 Not Found", "text/plain")]
+    [InlineData("", "text/plain")]
+    [InlineData("<html><body>Not Found</body></html>", "text/html")]
+    [InlineData("\"Not Found\"", "application/json")]
+    [InlineData("[]", "application/json")]
+    [InlineData("{\"code\":404}", "application/json")]
+    public async Task A_server_without_the_route_is_told_apart_whatever_its_404_says(string body, string type)
+    {
+        var (api, _) = Client(_ => new HttpResponseMessage(HttpStatusCode.NotFound) { Content = new StringContent(body, System.Text.Encoding.UTF8, type) });
+        var error = await Assert.ThrowsAsync<ImportApiException>(() => api.ListSourcesAsync(null));
+        Assert.True(error.IsRouteMissing);
+        Assert.False(error.IsFeatureOff);
+        Assert.False(error.IsRetryable);
+        Assert.Null(error.ServerMessage);
+        // The switch is on FEAT-4's route, which such a server may not have either: unknown, never off
+        Assert.Null(await api.IsFeatureOnAsync("upload"));
+    }
+
+    [Theory]
+    [InlineData("source_not_found")]
+    [InlineData("feature_off")]
+    public async Task A_404_with_a_code_is_not_a_missing_route(string code)
+    {
+        var (api, _) = Client(_ => FakeHandler.Json(HttpStatusCode.NotFound, "{\"success\":false,\"code\":\"" + code + "\",\"error\":\"Not here\"}"));
+        var error = await Assert.ThrowsAsync<ImportApiException>(() => api.ListSourcesAsync(null));
+        Assert.Equal(code, error.Code);
+        Assert.False(error.IsRouteMissing);
+    }
+
     [Fact]
     public async Task Sync_now_answers_the_queued_job()
     {

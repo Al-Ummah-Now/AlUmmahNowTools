@@ -206,10 +206,16 @@ public sealed class ImportApiException : Exception
     /// The server's sentence for a person, in the language the app asked for (<c>X-App-Locale</c>; admin-api's error
     /// envelope), or null when it sent none. <see cref="Exception.Message"/> keeps the old English <c>error</c>.
     /// </summary>
-    public string? ServerMessage => Body?["message"] is JsonValue v && v.TryGetValue<string>(out var text) && !string.IsNullOrWhiteSpace(text) ? text : null;
+    public string? ServerMessage => (Body as JsonObject)?["message"] is JsonValue v && v.TryGetValue<string>(out var text) && !string.IsNullOrWhiteSpace(text) ? text : null;
 
     /// <summary>A feature switched off on the Features page (<c>404 feature_off</c>): the action is not offered, nothing to show.</summary>
     public bool IsFeatureOff => Status == 404 && Code == "feature_off";
+
+    /// <summary>The server has no such route (a 404 without one of admin-api's codes): it runs a release from before it.</summary>
+    public bool IsRouteMissing => Status == 404 && Code == RouteMissing;
+
+    /// <summary>The code of a 404 answered without one, which is how admin-api answers a route it does not have.</summary>
+    public const string RouteMissing = "http_404";
 
     /// <summary>Worth trying again later: not answered, timed out, rate limited, busy or a server error.</summary>
     public bool IsRetryable => Status is 0 or 408 or 429 or >= 500 || Code == "busy";
@@ -377,6 +383,9 @@ public partial class ImportApiClient
     public virtual Task ReportErrorsAsync(IReadOnlyList<ErrorReport> events, CancellationToken ct = default) =>
         SendAsync(HttpMethod.Post, "/api/admin/import/errors", new { events }, ct);
 
+    private static string? TextOf(JsonNode? json, string key) =>
+        (json as JsonObject)?[key] is JsonValue v && v.TryGetValue<string>(out var text) ? text : null;
+
     private static ImportApiException Unreadable() => new(200, "unreadable", "admin-api answered something the app cannot read");
 
     private async Task<JsonNode?> SendAsync(HttpMethod method, string path, object? body, CancellationToken ct)
@@ -412,11 +421,12 @@ public partial class ImportApiClient
             }
 
             if (response.IsSuccessStatusCode) return json?["result"];
-            var code = json?["code"]?.GetValue<string>() ?? "http_" + (int)response.StatusCode;
-            var message = json?["error"]?.GetValue<string>() ?? response.ReasonPhrase ?? "Request failed";
+            // Any body may come with an error (a proxy's page, plain text): only an object's own text is read
+            var code = TextOf(json, "code") ?? "http_" + (int)response.StatusCode;
+            var message = TextOf(json, "error") ?? response.ReasonPhrase ?? "Request failed";
             if (response.StatusCode == HttpStatusCode.Conflict && code == "already_imported")
             {
-                var item = json?["item"]?.Deserialize<ImportItemRecord>(Json);
+                var item = (json as JsonObject)?["item"]?.Deserialize<ImportItemRecord>(Json);
                 if (item is not null) throw new AlreadyImportedException(item);
             }
             var retryAfter = response.Headers.RetryAfter?.Delta;

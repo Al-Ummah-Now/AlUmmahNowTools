@@ -411,6 +411,8 @@ internal sealed class DemoImportServer : HttpMessageHandler
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         var path = request.RequestUri!.AbsolutePath;
+        if (DemoSocial.IsMissing(request.RequestUri))
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound) { Content = new StringContent("404 Not Found", Encoding.UTF8, "text/plain") });
         // Social sources and their sync jobs (TA-13)
         if (DemoSocial.Answer(request) is { } social)
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(social, Encoding.UTF8, "application/json") });
