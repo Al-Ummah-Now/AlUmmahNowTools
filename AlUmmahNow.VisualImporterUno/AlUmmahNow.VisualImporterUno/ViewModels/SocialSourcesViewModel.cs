@@ -31,16 +31,21 @@ public sealed partial class SocialSourcesViewModel : ObservableObject, IDisposab
     private CancellationTokenSource? _poll;
     private bool _disposed;
 
-    public SocialSourcesViewModel()
+    public SocialSourcesViewModel() : this(ImportWorkspace.Current)
     {
-        _workspace = ImportWorkspace.Current;
-        _dispatcher = App.Current?.MainWindow?.DispatcherQueue ?? DispatcherQueue.GetForCurrentThread();
-        foreach (var c in DemoImport.Channels.Where(_ => _workspace.IsDemo)) _channelNames[c.Id] = c.Name;
+    }
+
+    internal SocialSourcesViewModel(ImportWorkspace? workspace)
+    {
+        _workspace = workspace!;
+        _dispatcher = workspace is null ? null : App.Current?.MainWindow?.DispatcherQueue ?? DispatcherQueue.GetForCurrentThread();
+        var isDemo = workspace?.IsDemo == true;
+        foreach (var c in DemoImport.Channels.Where(_ => isDemo)) _channelNames[c.Id] = c.Name;
         NetworkChoices = SourceNetworks.All.Select(NetworkName).ToArray();
         ScheduleChoices = SourceSchedules.All.Select(ScheduleName).ToArray();
         _scheduleIndex = SourceSchedules.All.ToList().IndexOf(SourceSchedules.Daily);
         UpdateNetworkHelp();
-        if (_workspace.IsDemo && DemoSocial.Channel is { } channel)
+        if (isDemo && DemoSocial.Channel is { } channel)
         {
             Channels.Add(channel);
             _selectedChannel = channel;
@@ -127,10 +132,18 @@ public sealed partial class SocialSourcesViewModel : ObservableObject, IDisposab
     [ObservableProperty] private bool _uploadsOn = true;
 
     private DateTimeOffset _featuresReadAt = DateTimeOffset.MinValue;
+    private string? _addedSourceLabel;
 
     partial void OnUploadsOnChanged(bool value)
     {
         foreach (var row in Sources) row.UploadsOn = value;
+        if (_addedSourceLabel is { } label && FormMessage.Length > 0) FormMessage = AddedMessage(label, value);
+    }
+
+    internal void SetAddedSource(string? label)
+    {
+        _addedSourceLabel = label;
+        FormMessage = label is { Length: > 0 } ? AddedMessage(label, UploadsOn) : "";
     }
 
     private async Task ReadUploadsSwitchAsync()
@@ -640,12 +653,12 @@ public sealed partial class SocialSourcesViewModel : ObservableObject, IDisposab
     {
         IsAdding = true;
         FormError = "";
-        FormMessage = "";
+        SetAddedSource(null);
         try
         {
             var source = await _workspace.Api.AddSourceAsync(request).ConfigureAwait(true);
             await RefreshAsync().ConfigureAwait(true);
-            FormMessage = AddedMessage(source.Label, UploadsOn);
+            SetAddedSource(source.Label);
             return true;
         }
         catch (ImportApiException ex)
@@ -669,6 +682,12 @@ public sealed partial class SocialSourcesViewModel : ObservableObject, IDisposab
     /// <summary>The message shown after a source is added (drops "Sync it now" while uploads are off).</summary>
     internal static string AddedMessage(string label, bool uploadsOn) =>
         Loc.GetWithDetail(uploadsOn ? "Social_Added" : "Social_AddedQuiet", label);
+
+    /// <summary>Lines for the Cancel sync dialog (omits "You can start a new sync later" while uploads are off).</summary>
+    internal static string[] CancelDialogLines(string label, bool uploadsOn) =>
+        uploadsOn
+            ? new[] { label, Loc.Get("Social_CancelBody"), Loc.Get("Social_CancelBody2") }
+            : new[] { label, Loc.Get("Social_CancelBody") };
 
     /// <summary>A time with its date when not today and the device's zone: "Tomorrow, 2:20 PM EST" / «غدًا، ٢:٢٠ م غرينتش-٥».</summary>
     public static string When(DateTimeOffset at) => Loc.When(at.LocalDateTime) + " " + Loc.ZoneLabel(at.LocalDateTime);
@@ -1002,7 +1021,7 @@ public sealed partial class SourceRow : ObservableObject
         JobEntries.Clear();
         foreach (var line in job.Log ?? Array.Empty<SyncJobLogLine>())
         {
-            JobEntries.Add(new LogEntry(Loc.TimeWithZone(line.At.LocalDateTime), Loc.UtcText(line.At), BulkImportViewModel.LogText(line).Split('\n'), line.Event is "failed" or "failed_attempt"));
+            JobEntries.Add(new LogEntry(Loc.TimeWithZone(line.At.LocalDateTime), Loc.UtcText(line.At), BulkImportViewModel.LogText(line, UploadsOn).Split('\n'), line.Event is "failed" or "failed_attempt"));
         }
     }
 

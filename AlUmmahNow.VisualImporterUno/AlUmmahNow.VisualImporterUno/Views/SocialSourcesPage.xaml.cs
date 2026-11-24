@@ -61,7 +61,7 @@ public sealed partial class SocialSourcesPage : Page
                 ViewModel.ToggleJob(failed);
                 ScrollTo(SourcesCard);
                 break;
-            case "uploads_off" when Row(DemoSocial.FailedId) is { } failed:
+            case "uploads_off" or "uploads_off_retried" when Row(DemoSocial.FailedId) is { } failed:
                 ViewModel.ToggleJob(failed);
                 ScrollTo(failed);
                 break;
@@ -292,10 +292,7 @@ public sealed partial class SocialSourcesPage : Page
     private async void CancelJob_Click(object sender, RoutedEventArgs e)
     {
         if (RowOf(sender) is not { } row) return;
-        var lines = ViewModel.UploadsOn
-            ? new[] { row.Label, Loc.Get("Social_CancelBody"), Loc.Get("Social_CancelBody2") }
-            : new[] { row.Label, Loc.Get("Social_CancelBody") };
-        if (await ConfirmCancelAsync(lines)) await ViewModel.CancelJobAsync(row);
+        if (await ConfirmCancelAsync(SocialSourcesViewModel.CancelDialogLines(row.Label, ViewModel.UploadsOn))) await ViewModel.CancelJobAsync(row);
     }
 
     /// <summary>Asks before cancelling. Each line is short enough for one line: the popup's Arabic order only holds on one.</summary>

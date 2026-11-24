@@ -171,7 +171,7 @@ internal static class DemoSocial
                 // Six attempts, backing off 10 s × 2ⁿ, then the DLQ and the Errors page
                 const string error = "source_unreachable: The source could not be read (http_503)";
                 var at = Now.AddMinutes(-58);
-                var log = new List<object> { new { at = Iso(at), @event = "queued" } };
+                var log = new List<object> { Mode == "uploads_off_retried" ? (object)new { at = Iso(at), @event = "queued", retried = true } : new { at = Iso(at), @event = "queued" } };
                 var t = at.AddSeconds(1);
                 for (var attempt = 1; attempt <= 6; attempt++)
                 {
@@ -296,7 +296,7 @@ internal static class DemoSocial
         var query = System.Web.HttpUtility.ParseQueryString(request.RequestUri.Query);
         const string sources = "/api/admin/import/sources";
         // The Features page's switches: uploads off for uploads_off frames (Sync now, Retry, and Takeout uploads not offered)
-        var uploadsOff = Mode is "uploads_off" or "uploads_off_takeout" or "uploads_off_job" or "uploads_off_items";
+        var uploadsOff = Mode is "uploads_off" or "uploads_off_takeout" or "uploads_off_job" or "uploads_off_items" or "uploads_off_retried";
         if (path == "/api/features") return Ok(new { items = new[] { new { key = "upload", enabled = !uploadsOff, effective = !uploadsOff } } });
         if (path == sources && request.Method == HttpMethod.Get)
         {

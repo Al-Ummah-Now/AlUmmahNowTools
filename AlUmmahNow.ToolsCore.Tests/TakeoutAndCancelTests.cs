@@ -418,6 +418,7 @@ public class ReasonTests
             "SocialJob_failedQuiet",
             "SocialJob_cancelledQuiet",
             "SocialJob_cancelledByQuiet",
+            "SocialLog_queued_retriedQuiet",
             "Social_AddedQuiet",
             "SocialReason_upload_incompleteQuiet",
             "TakeoutState_matchedQuiet",
