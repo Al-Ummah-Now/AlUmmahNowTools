@@ -1,3 +1,4 @@
+using AlUmmahNow.ToolsCore.Updates;
 using AlUmmahNow.VisualImporterUno.Shell;
 using AlUmmahNow.VisualImporterUno.ViewModels;
 using Microsoft.UI.Xaml;
@@ -17,6 +18,39 @@ namespace AlUmmahNow.VisualImporterUno.Views
         {
             ViewModel = App.GetService<SettingsViewModel>();
             InitializeComponent();
+            ShowUpdates();
+        }
+
+        /// <summary>Settings → Updates (wiki AUN-APP-UPDATES §5.3): version, last check, install automatically, Check now.</summary>
+        private void ShowUpdates()
+        {
+            if (AppUpdates.Service is not { CanSelfUpdate: true, Enabled: true } updates) return;
+            UpdatesCard.Visibility = Visibility.Visible;
+            UpdatesTitle.Text = Loc.Get("Update_SettingsTitle");
+            UpdatesVersion.Text = Loc.Format("Update_SettingsVersion", Loc.Version(updates.InstalledVersion));
+            UpdatesLastChecked.Text = updates.LastChecked is { } at ? Loc.Format("Update_SettingsLastChecked", Loc.When(at.LocalDateTime)) : Loc.Get("Update_SettingsNeverChecked");
+            UpdatesAuto.Header = Loc.Get("Update_SettingsAuto");
+            UpdatesAuto.IsOn = updates.AutoInstall;
+            UpdatesAutoHint.Text = Loc.Get("Update_SettingsAutoHint");
+            UpdatesCheckNow.Content = Loc.Get("Update_SettingsCheckNow");
+        }
+
+        private void UpdatesAuto_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (AppUpdates.Service is { } updates && updates.AutoInstall != UpdatesAuto.IsOn) updates.AutoInstall = UpdatesAuto.IsOn;
+        }
+
+        private async void UpdatesCheckNow_Click(object sender, RoutedEventArgs e)
+        {
+            if (AppUpdates.Service is not { } updates) return;
+            UpdatesCheckNow.IsEnabled = false;
+            UpdatesStatus.Text = Loc.Get("Update_SettingsChecking");
+            var reached = await updates.CheckAsync(userAsked: true);
+            UpdatesCheckNow.IsEnabled = true;
+            UpdatesStatus.Text = !reached
+                ? Loc.Get("Update_SettingsCheckFailed")
+                : updates.View is { Stage: not UpdateStage.Hidden, Version: { } v } ? Loc.Format("Update_SettingsFound", Loc.Version(v)) : Loc.Get("Update_SettingsUpToDate");
+            UpdatesLastChecked.Text = updates.LastChecked is { } at ? Loc.Format("Update_SettingsLastChecked", Loc.When(at.LocalDateTime)) : Loc.Get("Update_SettingsNeverChecked");
         }
 
         private async void TestConnectionButton_Click(object sender, RoutedEventArgs e) => await ViewModel.TestConnectionAsync();

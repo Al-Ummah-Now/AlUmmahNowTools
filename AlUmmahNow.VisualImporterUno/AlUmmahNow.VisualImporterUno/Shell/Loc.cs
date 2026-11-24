@@ -124,6 +124,13 @@ public static class Loc
         return Decimal(cut) + unit;
     }
 
+    /// <summary>
+    /// An app version: "2026.11.23" / «٢٠٢٦.١١.٢٣» (wiki AUN-APP-UPDATES §12). The dots stay dots (a version is not a
+    /// decimal number) and the parts stay in reading order inside Arabic text (a left-to-right isolate).
+    /// </summary>
+    public static string Version(string? version) =>
+        string.IsNullOrEmpty(version) ? string.Empty : IsArabic ? "\u2066" + ToArabicDigits(version) + "\u2069" : version;
+
     /// <summary>A percentage of 0 to 100: "42%" / «٤٢٪».</summary>
     public static string Percent(double value) => IsArabic ? Decimal(value, 0) + "٪" : Decimal(value, 0) + "%";
 

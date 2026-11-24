@@ -31,6 +31,11 @@ public sealed partial class ToolsShell : UserControl
             SetMenuFont(AccountMenu.Items, font);
         }
         ApplyTheme();
+        if (AppUpdates.Service is { } updates)
+        {
+            UpdateBarHost.Content = new UpdateBar(updates, AppUpdates.IsBusy);
+            ForcedUpdateHost.Content = new ForcedUpdateView(updates);
+        }
         AutomationProperties.SetName(LanguageButton, L("Shell_LanguageButtonName"));
         AutomationProperties.SetName(AccountButton, L("Shell_AccountButtonName"));
         SizeChanged += (_, _) => FitHeader();
