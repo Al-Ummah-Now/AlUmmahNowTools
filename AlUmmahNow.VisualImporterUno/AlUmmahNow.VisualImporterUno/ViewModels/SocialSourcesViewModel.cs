@@ -121,7 +121,7 @@ public sealed partial class SocialSourcesViewModel : ObservableObject, IDisposab
 
     /// <summary>
     /// The upload switch (Features page): a sync and a Takeout file's upload make new posts and videos, so while it is off
-    /// Sync now, a cancelled sync's Retry and Upload matched files are not offered (no text says why; admins see it on
+    /// Sync now, Retry on sync jobs, and Upload matched files are not offered (no text says why; admins see it on
     /// the Features page). Read with the list, and set off by a <c>404 feature_off</c> answer.
     /// </summary>
     [ObservableProperty] private bool _uploadsOn = true;
@@ -302,7 +302,7 @@ public sealed partial class SocialSourcesViewModel : ObservableObject, IDisposab
         }
         catch (ImportApiException ex) when (UploadsWentOff(ex))
         {
-            // Uploads were switched off meanwhile: Sync now (and a cancelled sync's Retry) are no longer offered
+            // Uploads were switched off meanwhile: Sync now and Retry are no longer offered
         }
         catch (ImportApiException ex)
         {
@@ -644,8 +644,8 @@ public sealed partial class SocialSourcesViewModel : ObservableObject, IDisposab
         try
         {
             var source = await _workspace.Api.AddSourceAsync(request).ConfigureAwait(true);
-            FormMessage = Loc.GetWithDetail("Social_Added", source.Label);
             await RefreshAsync().ConfigureAwait(true);
+            FormMessage = AddedMessage(source.Label, UploadsOn);
             return true;
         }
         catch (ImportApiException ex)
@@ -665,6 +665,10 @@ public sealed partial class SocialSourcesViewModel : ObservableObject, IDisposab
     public static string NetworkName(string network) => Loc.Get("SocialNetwork_" + network);
 
     public static string ScheduleName(string schedule) => Loc.Get("SocialSchedule_" + schedule);
+
+    /// <summary>The message shown after a source is added (drops "Sync it now" while uploads are off).</summary>
+    internal static string AddedMessage(string label, bool uploadsOn) =>
+        Loc.GetWithDetail(uploadsOn ? "Social_Added" : "Social_AddedQuiet", label);
 
     /// <summary>A time with its date when not today and the device's zone: "Tomorrow, 2:20 PM EST" / «غدًا، ٢:٢٠ م غرينتش-٥».</summary>
     public static string When(DateTimeOffset at) => Loc.When(at.LocalDateTime) + " " + Loc.ZoneLabel(at.LocalDateTime);
@@ -744,18 +748,21 @@ public sealed partial class SourceRow : ObservableObject
     [ObservableProperty] private bool _isOffNotConnected;
     [ObservableProperty] private bool _canSync;
 
-    /// <summary>The upload switch (see <see cref="SocialSourcesViewModel.UploadsOn"/>): Sync now, a cancelled sync's Retry and Takeout uploads need it.</summary>
+    /// <summary>The upload switch (see <see cref="SocialSourcesViewModel.UploadsOn"/>): Sync now, sync job Retry, and Takeout uploads need it.</summary>
     [ObservableProperty] private bool _uploadsOn = true;
 
     private bool _syncable;
     private bool _retryable;
 
     private (ImportSource Source, SyncJob? Job, string? Channel)? _shown;
+    private (TakeoutReport Report, SyncJob? Job)? _takeoutShown;
 
     partial void OnUploadsOnChanged(bool value)
     {
-        // The status line names "Sync now" for a manual source: shown again without it
+        // Status, failed job, and Takeout rows drop "Sync now", "Retry", and "ready to upload" while uploads are off
         if (_shown is { } shown) Update(shown.Source, shown.Job, shown.Channel);
+        if (_takeoutShown is { } takeout) UpdateTakeoutJob(takeout.Job);
+        foreach (var file in TakeoutFiles) file.SetUploadsOn(value);
         UpdateUploadable();
     }
 
@@ -813,12 +820,13 @@ public sealed partial class SourceRow : ObservableObject
 
     internal void SetTakeout(TakeoutReport report, SyncJob? job)
     {
+        _takeoutShown = (report, job);
         TakeoutError = "";
         TakeoutJobId = report.JobId;
         TakeoutFiles.Clear();
         foreach (var file in report.Files.OrderBy(f => TakeoutStates.Order.ToList().IndexOf(f.State)).ThenBy(f => f.Name, StringComparer.Ordinal))
         {
-            TakeoutFiles.Add(new TakeoutFileRow(file));
+            TakeoutFiles.Add(new TakeoutFileRow(file, UploadsOn));
         }
         var parts = new List<string>();
         foreach (var state in TakeoutStates.Order)
@@ -828,17 +836,22 @@ public sealed partial class SourceRow : ObservableObject
         }
         TakeoutSummary = Loc.Commas(parts);
         HasTakeoutSummary = parts.Count > 0;
+        UpdateTakeoutJob(job);
+        UpdateUploadable();
+    }
+
+    private void UpdateTakeoutJob(SyncJob? job)
+    {
         HasTakeoutJob = job is not null;
         TakeoutJobActive = job?.IsActive ?? false;
         TakeoutJobStatus = job is null ? "" : Loc.KeepLastWords(job.Status switch
         {
             "queued" or "running" => Loc.Get("TakeoutJob_matching"),
             "retrying" => Loc.Get("TakeoutJob_retrying"),
-            "failed" => Loc.WithDetail(Loc.Get("TakeoutJob_failed"), job.LastError is { } e ? ReasonText(e, labelled: false) : null),
+            "failed" => Loc.WithDetail(Loc.Get(UploadsOn ? "TakeoutJob_failed" : "TakeoutJob_failedQuiet"), job.LastError is { } e ? ReasonText(e, labelled: false, uploadsOn: UploadsOn) : null),
             "cancelled" => job.CancelledBy is { Length: > 0 } by ? Loc.GetWithDetail("TakeoutJob_cancelledBy", by) : Loc.Get("TakeoutJob_cancelled"),
             _ => Loc.Get("TakeoutJob_done"),
         });
-        UpdateUploadable();
     }
 
     private void UpdateUploadable()
@@ -846,8 +859,8 @@ public sealed partial class SourceRow : ObservableObject
         var sendable = TakeoutFiles.Count(f => f.CanUpload && TakeoutPathOf(f) is not null);
         var waiting = TakeoutFiles.Count(f => f.CanUpload);
         CanUploadTakeout = sendable > 0 && !TakeoutBusy && UploadsOn;
-        // Matched files listed from another computer (or before the app restarted): choose the folder again to send them
-        UploadTakeoutHint = waiting > sendable ? Loc.Get("Takeout_ChooseAgainToUpload") : "";
+        // Matched files listed from another computer (or before the app restarted): choose the folder again to send them (only when uploads are on)
+        UploadTakeoutHint = UploadsOn && waiting > sendable ? Loc.Get("Takeout_ChooseAgainToUpload") : "";
         HasUploadTakeoutHint = UploadTakeoutHint.Length > 0;
     }
 
@@ -913,7 +926,7 @@ public sealed partial class SourceRow : ObservableObject
             SourcePhase.Syncing => Loc.Get("Social_StatusSyncing"),
             SourcePhase.Retrying when retryAt is { } r => Loc.Format("Social_StatusRetrying", SocialSourcesViewModel.When(r)),
             SourcePhase.Retrying => Loc.Get("Social_StatusRetryingSoon"),
-            SourcePhase.Failed => Loc.Get("Social_StatusFailed"),
+            SourcePhase.Failed => Loc.Get(UploadsOn ? "Social_StatusFailed" : "Social_StatusFailedQuiet"),
             SourcePhase.Cancelled when source.Schedule != SourceSchedules.Manual && source.NextSyncAt is { } next2 => Loc.Format("Social_StatusCancelledNext", SocialSourcesViewModel.When(next2)),
             SourcePhase.Cancelled => Loc.Get(UploadsOn ? "Social_StatusCancelled" : "Social_StatusCancelledQuiet"),
             SourcePhase.OffNotConnected => Loc.Get("Social_StatusOffNotConnected"),
@@ -923,7 +936,7 @@ public sealed partial class SourceRow : ObservableObject
         StatusTip = phase == SourcePhase.Scheduled && source.NextSyncAt is { } n2 ? Loc.UtcText(n2) : phase == SourcePhase.Retrying && retryAt is { } r2 ? Loc.UtcText(r2) : null;
         // Why the last sync failed: the server's code in the admin's words when the app knows it, else its own words
         var error = phase is SourcePhase.Failed or SourcePhase.Retrying ? job?.LastError ?? source.LastError : null;
-        Detail = error is null ? "" : ReasonText(error);
+        Detail = error is null ? "" : ReasonText(error, uploadsOn: UploadsOn);
         HasDetail = Detail.Length > 0;
         LastSync = source.LastSyncAt is { } last ? Loc.Format("Social_LastSync", SocialSourcesViewModel.When(last)) : Loc.Get("Social_NeverSynced");
         LastSyncTip = source.LastSyncAt is { } l2 ? Loc.UtcText(l2) : null;
@@ -939,12 +952,13 @@ public sealed partial class SourceRow : ObservableObject
     }
 
     /// <summary>The server's reason in the app's words when its code is known; the raw text on its own line otherwise.</summary>
-    internal static string ReasonText(string error, bool labelled = true)
+    internal static string ReasonText(string error, bool labelled = true, bool uploadsOn = true)
     {
         var reason = SourceText.Explain(error);
         if (reason.Code is { } code)
         {
-            var text = Loc.Get("SocialReason_" + code);
+            var key = !uploadsOn && code == "upload_incomplete" ? "SocialReason_upload_incompleteQuiet" : "SocialReason_" + code;
+            var text = Loc.Get(key);
             // The server's status, as a number in the admin's digits on its own line; its own words only for an unexpected failure
             if (reason.HttpStatus is { } status) text = Loc.WithDetail(text, Loc.Format("SocialReason_HttpStatus", status));
             return reason.Detail is { } d ? Loc.WithDetail(text, d) : text;
@@ -957,9 +971,9 @@ public sealed partial class SourceRow : ObservableObject
         HasJob = job is not null;
         CanCancelJob = job?.CanCancel ?? false;
         JobIsCancelled = job?.IsCancelled ?? false;
-        // A cancelled sync's Retry is a new sync (Sync now): not while uploads are off
+        // Retry runs a failed sync again or starts a new sync after Cancel: not offered while uploads are off
         _retryable = job?.CanRetry ?? false;
-        CanRetryJob = _retryable && (UploadsOn || !JobIsCancelled);
+        CanRetryJob = _retryable && UploadsOn;
         if (job is null)
         {
             JobStatus = "";
@@ -976,14 +990,14 @@ public sealed partial class SourceRow : ObservableObject
             "running" => Loc.Format("SocialJob_running", job.Attempts, max),
             "retrying" when job.NextRunAt is { } at => Loc.Format("SocialJob_retrying", job.Attempts, max, SocialSourcesViewModel.When(at)),
             "retrying" => Loc.Format("SocialJob_retryingSoon", job.Attempts, max),
-            "failed" => Loc.Format("SocialJob_failed", job.Attempts, max),
+            "failed" => Loc.Format(UploadsOn ? "SocialJob_failed" : "SocialJob_failedQuiet", job.Attempts, max),
             "succeeded" when job.FinishedAt is { } done => Loc.Format("SocialJob_succeededAt", SocialSourcesViewModel.When(done)),
             // Without its "Retry starts a new sync" while that Retry isn't offered (uploads off)
             "cancelled" => UploadsOn ? CancelledLine(job) : job.CancelledBy is { Length: > 0 } by ? Loc.GetWithDetail("SocialJob_cancelledByQuiet", by) : Loc.Get("SocialJob_cancelledQuiet"),
             _ => Loc.Get("SocialJob_succeeded"),
         });
         JobStatusTip = job.Status == "retrying" && job.NextRunAt is { } t ? Loc.UtcText(t) : job.FinishedAt is { } f ? Loc.UtcText(f) : null;
-        JobDetail = job.LastError is { } e && job.Status is "failed" or "retrying" ? ReasonText(e) : "";
+        JobDetail = job.LastError is { } e && job.Status is "failed" or "retrying" ? ReasonText(e, uploadsOn: UploadsOn) : "";
         HasJobDetail = JobDetail.Length > 0;
         JobEntries.Clear();
         foreach (var line in job.Log ?? Array.Empty<SyncJobLogLine>())
@@ -1023,6 +1037,7 @@ public sealed class SourceItemRow
     public bool IsProblem { get; }
     public string Original { get; }
     public bool HasOriginal { get; }
+    public Microsoft.UI.Xaml.TextAlignment OriginalAlignment => Loc.IsArabic ? Microsoft.UI.Xaml.TextAlignment.Right : Microsoft.UI.Xaml.TextAlignment.Left;
     public string When { get; }
     public bool HasWhen { get; }
 }
@@ -1030,19 +1045,13 @@ public sealed class SourceItemRow
 /// <summary>A Takeout file: its name, what became of it and why, the record it matched, or the records an admin picks from.</summary>
 public sealed partial class TakeoutFileRow : ObservableObject
 {
-    public TakeoutFileRow(TakeoutFile file)
+    public TakeoutFileRow(TakeoutFile file, bool uploadsOn = true)
     {
         File = file;
         Id = file.Id;
         Name = file.Name;
         // A title that may be Arabic: the extension (Latin) would split its line, so the name is shown without it
         DisplayName = System.IO.Path.GetFileNameWithoutExtension(file.Name);
-        var state = Loc.Get("TakeoutState_" + file.State);
-        StateText = file.MatchedBy is { } by && file.State is TakeoutStates.Matched or TakeoutStates.Uploading or TakeoutStates.Uploaded or TakeoutStates.Attached
-            ? Loc.Commas(new[] { state, Loc.Get("TakeoutMatchedBy_" + by) })
-            : state;
-        Note = file.Note is { } note ? Loc.KeepLastWords(Loc.Get("TakeoutNote_" + note)) : "";
-        HasNote = Note.Length > 0;
         IsProblem = file.State is TakeoutStates.Unmatched or TakeoutStates.Failed;
         IsAmbiguous = file.State == TakeoutStates.Ambiguous;
         IsDone = file.State == TakeoutStates.Attached;
@@ -1051,15 +1060,30 @@ public sealed partial class TakeoutFileRow : ObservableObject
         HasMatch = Match.Length > 0;
         foreach (var c in file.Candidates ?? Array.Empty<TakeoutCandidate>()) Candidates.Add(new TakeoutCandidateRow(c, this));
         CanUpload = file.CanUpload;
+        SetUploadsOn(uploadsOn);
+    }
+
+    internal void SetUploadsOn(bool uploadsOn)
+    {
+        var stateKey = !uploadsOn && File.State == TakeoutStates.Matched ? "TakeoutState_matchedQuiet" : "TakeoutState_" + File.State;
+        var state = Loc.Get(stateKey);
+        StateText = File.MatchedBy is { } by && File.State is TakeoutStates.Matched or TakeoutStates.Uploading or TakeoutStates.Uploaded or TakeoutStates.Attached
+            ? Loc.Commas(new[] { state, Loc.Get("TakeoutMatchedBy_" + by) })
+            : state;
+        var noteKey = File.Note is { } note
+            ? (!uploadsOn && note == "upload_incomplete" ? "TakeoutNote_upload_incompleteQuiet" : "TakeoutNote_" + note)
+            : null;
+        Note = noteKey is not null ? Loc.KeepLastWords(Loc.Get(noteKey)) : "";
+        HasNote = Note.Length > 0;
     }
 
     public TakeoutFile File { get; }
     public string Id { get; }
     public string Name { get; }
     public string DisplayName { get; }
-    public string StateText { get; }
-    public string Note { get; }
-    public bool HasNote { get; }
+    [ObservableProperty] private string _stateText = "";
+    [ObservableProperty] private string _note = "";
+    [ObservableProperty] private bool _hasNote;
     public bool IsProblem { get; }
     public bool IsAmbiguous { get; }
     public bool IsDone { get; }
@@ -1104,6 +1128,7 @@ public sealed class TakeoutCandidateRow
     public bool HasWhen { get; }
     public string Original { get; }
     public bool HasOriginal { get; }
+    public Microsoft.UI.Xaml.TextAlignment OriginalAlignment => Loc.IsArabic ? Microsoft.UI.Xaml.TextAlignment.Right : Microsoft.UI.Xaml.TextAlignment.Left;
 }
 
 /// <summary>An account the owner connected, offered as a source.</summary>

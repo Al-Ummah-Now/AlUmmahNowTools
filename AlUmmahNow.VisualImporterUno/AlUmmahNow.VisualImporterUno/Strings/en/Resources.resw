@@ -2601,6 +2601,9 @@
   <data name="Social_StatusFailed" xml:space="preserve">
     <value>The last sync failed. It is on the Errors page too, with “Retry”</value>
   </data>
+  <data name="Social_StatusFailedQuiet" xml:space="preserve">
+    <value>The last sync failed. It is on the Errors page too</value>
+  </data>
   <data name="Social_StatusOff" xml:space="preserve">
     <value>Off: nothing is imported until it is turned on</value>
   </data>
@@ -2690,6 +2693,9 @@
   </data>
   <data name="SocialJob_failed" xml:space="preserve">
     <value>Stopped after {0} of {1} attempts. “Retry” runs it once more</value>
+  </data>
+  <data name="SocialJob_failedQuiet" xml:space="preserve">
+    <value>Stopped after {0} of {1} attempts</value>
   </data>
   <data name="SocialJob_succeededAt" xml:space="preserve">
     <value>Finished {0}</value>
@@ -2834,6 +2840,9 @@
   </data>
   <data name="Social_Added" xml:space="preserve">
     <value>Source added. Sync it now, or it syncs on its schedule.</value>
+  </data>
+  <data name="Social_AddedQuiet" xml:space="preserve">
+    <value>Source added.</value>
   </data>
   <data name="Social_Hint_rss" xml:space="preserve">
     <value>The address of the feed (RSS, Atom or a podcast), for example:</value>
@@ -3075,6 +3084,9 @@
   <data name="TakeoutState_matched" xml:space="preserve">
     <value>Matched, ready to upload</value>
   </data>
+  <data name="TakeoutState_matchedQuiet" xml:space="preserve">
+    <value>Matched</value>
+  </data>
   <data name="TakeoutState_unmatched" xml:space="preserve">
     <value>Not matched</value>
   </data>
@@ -3120,6 +3132,9 @@
   <data name="TakeoutNote_upload_incomplete" xml:space="preserve">
     <value>Its upload hasn’t finished. Upload it again.</value>
   </data>
+  <data name="TakeoutNote_upload_incompleteQuiet" xml:space="preserve">
+    <value>Its upload hasn’t finished.</value>
+  </data>
   <data name="TakeoutNote_post_refused" xml:space="preserve">
     <value>The post or video was refused.</value>
   </data>
@@ -3131,6 +3146,9 @@
   </data>
   <data name="TakeoutJob_failed" xml:space="preserve">
     <value>Matching failed. It is on the Errors page, with “Retry”</value>
+  </data>
+  <data name="TakeoutJob_failedQuiet" xml:space="preserve">
+    <value>Matching failed. It is on the Errors page</value>
   </data>
   <data name="TakeoutJob_cancelled" xml:space="preserve">
     <value>Matching cancelled by an admin</value>
@@ -3185,6 +3203,9 @@
   </data>
   <data name="SocialReason_upload_incomplete" xml:space="preserve">
     <value>A file’s upload hadn’t finished. Upload it again, then press “Retry”.</value>
+  </data>
+  <data name="SocialReason_upload_incompleteQuiet" xml:space="preserve">
+    <value>A file’s upload hadn’t finished.</value>
   </data>
   <data name="SocialReason_HttpStatus" xml:space="preserve">
     <value>Server code {0}</value>

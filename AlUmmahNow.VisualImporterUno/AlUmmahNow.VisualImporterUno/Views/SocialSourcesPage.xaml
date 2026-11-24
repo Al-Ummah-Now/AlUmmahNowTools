@@ -156,7 +156,7 @@
                                             </StackPanel>
 
                                             <!-- The sync job: state, attempts, next try, reason, log; Try again once it gave up -->
-                                            <Border Style="{StaticResource ToolsInsetCard}" Visibility="{x:Bind ShowJob, Mode=OneWay}" Margin="0,4,0,0">
+                                            <Border Style="{StaticResource ToolsInsetCard}" Tag="JobCard" Visibility="{x:Bind ShowJob, Mode=OneWay}" Margin="0,4,0,0">
                                                 <StackPanel Spacing="10">
                                                     <TextBlock Text="{x:Bind JobStatus, Mode=OneWay}" Style="{StaticResource ToolsBody}" Foreground="{ThemeResource FanousTextPrimaryBrush}"
                                                                TextWrapping="Wrap" ToolTipService.ToolTip="{x:Bind JobStatusTip, Mode=OneWay}" />
@@ -219,7 +219,7 @@
                                                                         <TextBlock Text="{x:Bind Text}" Style="{StaticResource ToolsBody}" TextWrapping="Wrap" />
                                                                         <TextBlock Text="{x:Bind Note}" Style="{StaticResource ToolsMuted}" Foreground="{ThemeResource FanousAccentBrush}" TextWrapping="Wrap" Visibility="{x:Bind HasNote}" />
                                                                         <TextBlock Text="{x:Bind When}" Style="{StaticResource ToolsMuted}" TextWrapping="Wrap" Visibility="{x:Bind HasWhen}" />
-                                                                        <TextBlock Text="{x:Bind Original}" Style="{StaticResource ToolsMuted}" FlowDirection="LeftToRight" HorizontalAlignment="Left"
+                                                                        <TextBlock Text="{x:Bind Original}" Style="{StaticResource ToolsMuted}" FlowDirection="LeftToRight" HorizontalAlignment="Stretch" TextAlignment="{x:Bind OriginalAlignment}"
                                                                                    TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" IsTextSelectionEnabled="True" Visibility="{x:Bind HasOriginal}" ToolTipService.ToolTip="{x:Bind Original}" />
                                                                     </StackPanel>
                                                                 </Border>
@@ -231,7 +231,7 @@
 
                                             <!-- YouTube Takeout files: choose the export's folder, the server matches each video to a record waiting
                                                  for its file, the admin picks the record of an ambiguous one, then the matched files are uploaded -->
-                                            <Border Style="{StaticResource ToolsInsetCard}" Visibility="{x:Bind ShowTakeout, Mode=OneWay}" Margin="0,4,0,0">
+                                            <Border Style="{StaticResource ToolsInsetCard}" Tag="TakeoutCard" Visibility="{x:Bind ShowTakeout, Mode=OneWay}" Margin="0,4,0,0">
                                                 <StackPanel Spacing="10">
                                                     <TextBlock x:Uid="Takeout_Title" Text="YouTube Takeout files" Style="{StaticResource ToolsLabel}" />
                                                     <TextBlock x:Uid="Takeout_Body" Text="YouTube does not let us download videos, so each one comes from the owner’s Google Takeout export. Choose the export’s folder: the server matches each video to one waiting here, by its video id, else its title and length." Style="{StaticResource ToolsMuted}" TextWrapping="Wrap" />
@@ -273,12 +273,12 @@
                                                                 <Border BorderBrush="{ThemeResource FanousDividerBrush}" BorderThickness="0,1,0,0" Padding="0,8">
                                                                     <StackPanel Spacing="2">
                                                                         <shell:RightToLeftText Text="{x:Bind DisplayName}" TextStyle="{StaticResource ToolsBody}" Foreground="{ThemeResource FanousTextPrimaryBrush}" />
-                                                                        <TextBlock Text="{x:Bind StateText}" Style="{StaticResource ToolsMuted}" TextWrapping="Wrap" />
+                                                                        <TextBlock Text="{x:Bind StateText, Mode=OneWay}" Style="{StaticResource ToolsMuted}" TextWrapping="Wrap" />
                                                                         <StackPanel Spacing="2" Visibility="{x:Bind HasMatch}">
                                                                             <TextBlock x:Uid="Takeout_RecordLabel" Text="Matches:" Style="{StaticResource ToolsMuted}" />
                                                                             <shell:RightToLeftText Text="{x:Bind Match}" TextStyle="{StaticResource ToolsMuted}" />
                                                                         </StackPanel>
-                                                                        <TextBlock Text="{x:Bind Note}" Style="{StaticResource ToolsMuted}" Foreground="{ThemeResource FanousAccentBrush}" TextWrapping="Wrap" Visibility="{x:Bind HasNote}" />
+                                                                        <TextBlock Text="{x:Bind Note, Mode=OneWay}" Style="{StaticResource ToolsMuted}" Foreground="{ThemeResource FanousAccentBrush}" TextWrapping="Wrap" Visibility="{x:Bind HasNote, Mode=OneWay}" />
                                                                         <TextBlock Text="{x:Bind Progress, Mode=OneWay}" Style="{StaticResource ToolsMuted}" TextWrapping="Wrap" Visibility="{x:Bind HasProgress, Mode=OneWay}" />
                                                                         <TextBlock Text="{x:Bind Error, Mode=OneWay}" Style="{StaticResource ToolsMuted}" Foreground="{ThemeResource FanousErrorTextBrush}" TextWrapping="Wrap" Visibility="{x:Bind HasError, Mode=OneWay}" />
                                                                         <StackPanel Spacing="6" Margin="0,6,0,0" Visibility="{x:Bind IsAmbiguous}">
@@ -294,7 +294,7 @@
                                                                                             <StackPanel Spacing="2">
                                                                                                 <shell:RightToLeftText Text="{x:Bind Title}" TextStyle="{StaticResource ToolsBody}" Foreground="{ThemeResource FanousTextPrimaryBrush}" />
                                                                                                 <TextBlock Text="{x:Bind When}" Style="{StaticResource ToolsMuted}" TextWrapping="Wrap" Visibility="{x:Bind HasWhen}" />
-                                                                                                <TextBlock Text="{x:Bind Original}" Style="{StaticResource ToolsMuted}" FlowDirection="LeftToRight" HorizontalAlignment="Left"
+                                                                                                <TextBlock Text="{x:Bind Original}" Style="{StaticResource ToolsMuted}" FlowDirection="LeftToRight" HorizontalAlignment="Stretch" TextAlignment="{x:Bind OriginalAlignment}"
                                                                                                            TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" IsTextSelectionEnabled="True" Visibility="{x:Bind HasOriginal}" />
                                                                                             </StackPanel>
                                                                                             <Button Grid.Column="1" Style="{StaticResource ToolsSecondaryButton}" VerticalAlignment="Center" Tag="{x:Bind}" Click="PickCandidate_Click" IsEnabled="{x:Bind File.IsIdle, Mode=OneWay}">

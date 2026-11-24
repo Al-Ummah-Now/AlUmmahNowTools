@@ -68,6 +68,16 @@ public class SyncCancelTests
     }
 
     [Fact]
+    public async Task Retrying_a_failed_job_when_uploads_are_off_reports_feature_off()
+    {
+        var (api, _) = Client(_ => FakeHandler.Json(HttpStatusCode.NotFound, "{\"success\":false,\"code\":\"feature_off\",\"feature\":\"upload\",\"error\":\"Not Found\",\"message\":\"Uploads are off.\",\"lang\":\"en\"}"));
+        var error = await Assert.ThrowsAsync<ImportApiException>(() => api.RetryJobAsync(JobId));
+        Assert.True(error.IsFeatureOff);
+        Assert.Equal(404, error.Status);
+        Assert.Equal("feature_off", error.Code);
+    }
+
+    [Fact]
     public async Task Cancelling_another_sources_job_is_refused_with_its_code()
     {
         var (api, _) = Client(_ => FakeHandler.Json(HttpStatusCode.NotFound, "{\"success\":false,\"code\":\"job_not_found\",\"error\":\"No such job for this source\"}"));
@@ -390,6 +400,54 @@ public class ReasonTests
             {
                 Assert.True(values.TryGetValue(key, out var text) && text.Length > 0, $"{lang}: {key} is missing");
                 if (lang == "ar") Assert.DoesNotMatch("[A-Za-z]", text);
+            }
+        }
+    }
+
+    [Fact]
+    public void Quiet_uploads_off_strings_exist_in_English_and_Arabic_without_naming_hidden_actions()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !Directory.Exists(Path.Combine(dir.FullName, "AlUmmahNow.VisualImporterUno"))) dir = dir.Parent;
+        Assert.NotNull(dir);
+        var strings = Path.Combine(dir!.FullName, "AlUmmahNow.VisualImporterUno", "AlUmmahNow.VisualImporterUno", "Strings");
+        var quietKeys = new[]
+        {
+            "Social_StatusFailedQuiet",
+            "Social_StatusCancelledQuiet",
+            "SocialJob_failedQuiet",
+            "SocialJob_cancelledQuiet",
+            "SocialJob_cancelledByQuiet",
+            "Social_AddedQuiet",
+            "SocialReason_upload_incompleteQuiet",
+            "TakeoutState_matchedQuiet",
+            "TakeoutNote_upload_incompleteQuiet",
+            "TakeoutJob_failedQuiet",
+        };
+        foreach (var lang in new[] { "en", "ar" })
+        {
+            var resw = System.Xml.Linq.XDocument.Load(Path.Combine(strings, lang, "Resources.resw"));
+            var values = resw.Root!.Elements("data").ToDictionary(d => (string)d.Attribute("name")!, d => (string?)d.Element("value") ?? "");
+            foreach (var key in quietKeys)
+            {
+                Assert.True(values.TryGetValue(key, out var text) && text.Length > 0, $"{lang}: {key} is missing");
+                if (lang == "en")
+                {
+                    Assert.DoesNotContain("Retry", text, StringComparison.OrdinalIgnoreCase);
+                    Assert.DoesNotContain("Sync now", text, StringComparison.OrdinalIgnoreCase);
+                    Assert.DoesNotContain("ready to upload", text, StringComparison.OrdinalIgnoreCase);
+                    Assert.DoesNotContain("Upload it again", text, StringComparison.OrdinalIgnoreCase);
+                    Assert.DoesNotContain("Sync it now", text, StringComparison.OrdinalIgnoreCase);
+                }
+                else
+                {
+                    Assert.DoesNotMatch("[A-Za-z]", text);
+                    Assert.DoesNotContain("أعِد المحاولة", text, StringComparison.Ordinal);
+                    Assert.DoesNotContain("زامِن الآن", text, StringComparison.Ordinal);
+                    Assert.DoesNotContain("زامِنه الآن", text, StringComparison.Ordinal);
+                    Assert.DoesNotContain("جاهز للرفع", text, StringComparison.Ordinal);
+                    Assert.DoesNotContain("ارفعه مرة أخرى", text, StringComparison.Ordinal);
+                }
             }
         }
     }
