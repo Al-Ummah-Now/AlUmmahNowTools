@@ -19,6 +19,8 @@ public sealed partial class ForcedUpdateView : UserControl
     private readonly Button _update = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
     private readonly Button _quit = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
     private readonly ProgressBar _progress = new() { Visibility = Visibility.Collapsed };
+    /// <summary>The forced screen was shown: it stays up while that update downloads and waits for a restart</summary>
+    private bool _shown;
 
     public ForcedUpdateView(UpdateService service)
     {
@@ -51,12 +53,14 @@ public sealed partial class ForcedUpdateView : UserControl
         var panel = new StackPanel { Spacing = 16, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, Padding = new Thickness(24), Children = { icon, title, _body, _message, _progress, buttons } };
         Content = new Grid { Background = (Brush)Application.Current.Resources["FanousBackgroundBrush"], Children = { new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto } } };
         _service.Changed += v => DispatcherQueue.TryEnqueue(() => Render(v));
+        Visibility = Visibility.Collapsed;
         Render(_service.View);
     }
 
     private void Render(UpdateView v)
     {
-        var forced = v.Stage == UpdateStage.Forced || (v.Stage is UpdateStage.Downloading or UpdateStage.Ready && Visibility == Visibility.Visible);
+        var forced = v.Stage == UpdateStage.Forced || (_shown && v.Stage is UpdateStage.Downloading or UpdateStage.Ready);
+        _shown = forced;
         Visibility = forced ? Visibility.Visible : Visibility.Collapsed;
         if (!forced) return;
         FlowDirection = Loc.IsArabic ? FlowDirection.RightToLeft : FlowDirection.LeftToRight;
