@@ -3540,4 +3540,82 @@
   <data name="Takeout_CancelJob.Text" xml:space="preserve">
     <value>ألغِ المطابقة</value>
   </data>
+  <data name="Update_Available" xml:space="preserve">
+    <value>يتوفّر إصدار جديد، {0}.</value>
+  </data>
+  <data name="Update_Update" xml:space="preserve">
+    <value>تحديث</value>
+  </data>
+  <data name="Update_Download" xml:space="preserve">
+    <value>تنزيل</value>
+  </data>
+  <data name="Update_WhatsNew" xml:space="preserve">
+    <value>ما الجديد</value>
+  </data>
+  <data name="Update_Close" xml:space="preserve">
+    <value>إغلاق لهذا الإصدار</value>
+  </data>
+  <data name="Update_Downloading" xml:space="preserve">
+    <value>جارٍ تنزيل التحديث… {0}</value>
+  </data>
+  <data name="Update_Ready" xml:space="preserve">
+    <value>التحديث جاهز، ويُثبَّت عند إغلاق التطبيق.</value>
+  </data>
+  <data name="Update_ReadyBusy" xml:space="preserve">
+    <value>التحديث جاهز. أكمِل عمليات الاستيراد أو أوقِفها مؤقتًا أولًا.</value>
+  </data>
+  <data name="Update_RestartNow" xml:space="preserve">
+    <value>إعادة التشغيل الآن</value>
+  </data>
+  <data name="Update_RequiredSoon" xml:space="preserve">
+    <value>سيتوقف هذا الإصدار عن العمل قريبًا. حدِّثه عندما يتوفر إصدار جديد.</value>
+  </data>
+  <data name="Update_NotesTitle" xml:space="preserve">
+    <value>ما الجديد في {0}</value>
+  </data>
+  <data name="Update_NotesClose" xml:space="preserve">
+    <value>إغلاق</value>
+  </data>
+  <data name="Update_ForcedTitle" xml:space="preserve">
+    <value>لم يعد هذا الإصدار مدعومًا</value>
+  </data>
+  <data name="Update_ForcedBody" xml:space="preserve">
+    <value>لديك الإصدار {0}. حدِّث إلى {1} لتواصل استخدام الأدوات.</value>
+  </data>
+  <data name="Update_Quit" xml:space="preserve">
+    <value>إنهاء</value>
+  </data>
+  <data name="Update_SettingsTitle" xml:space="preserve">
+    <value>التحديثات</value>
+  </data>
+  <data name="Update_SettingsVersion" xml:space="preserve">
+    <value>الإصدار {0}</value>
+  </data>
+  <data name="Update_SettingsLastChecked" xml:space="preserve">
+    <value>آخر بحث: {0}</value>
+  </data>
+  <data name="Update_SettingsNeverChecked" xml:space="preserve">
+    <value>لم يُبحث بعد</value>
+  </data>
+  <data name="Update_SettingsAuto" xml:space="preserve">
+    <value>تثبيت التحديثات تلقائيًا</value>
+  </data>
+  <data name="Update_SettingsAutoHint" xml:space="preserve">
+    <value>تُنزَّل التحديثات في الخلفية وتُثبَّت عند إغلاق الأدوات. لا تُعاد الأدوات للتشغيل أثناء عملها.</value>
+  </data>
+  <data name="Update_SettingsCheckNow" xml:space="preserve">
+    <value>البحث الآن</value>
+  </data>
+  <data name="Update_SettingsChecking" xml:space="preserve">
+    <value>جارٍ البحث…</value>
+  </data>
+  <data name="Update_SettingsUpToDate" xml:space="preserve">
+    <value>لديك أحدث إصدار.</value>
+  </data>
+  <data name="Update_SettingsFound" xml:space="preserve">
+    <value>يتوفّر الإصدار {0}.</value>
+  </data>
+  <data name="Update_SettingsCheckFailed" xml:space="preserve">
+    <value>تعذّر البحث عن تحديثات. حاول مرة أخرى لاحقًا.</value>
+  </data>
 </root>

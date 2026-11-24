@@ -3225,4 +3225,82 @@
   <data name="Takeout_CancelJob.Text" xml:space="preserve">
     <value>Cancel matching</value>
   </data>
+  <data name="Update_Available" xml:space="preserve">
+    <value>A new version, {0}, is available.</value>
+  </data>
+  <data name="Update_Update" xml:space="preserve">
+    <value>Update</value>
+  </data>
+  <data name="Update_Download" xml:space="preserve">
+    <value>Download</value>
+  </data>
+  <data name="Update_WhatsNew" xml:space="preserve">
+    <value>What's new</value>
+  </data>
+  <data name="Update_Close" xml:space="preserve">
+    <value>Close for this version</value>
+  </data>
+  <data name="Update_Downloading" xml:space="preserve">
+    <value>Downloading the update… {0}</value>
+  </data>
+  <data name="Update_Ready" xml:space="preserve">
+    <value>Update ready. It installs when you close the app.</value>
+  </data>
+  <data name="Update_ReadyBusy" xml:space="preserve">
+    <value>Update ready. Finish or pause your imports first.</value>
+  </data>
+  <data name="Update_RestartNow" xml:space="preserve">
+    <value>Restart now</value>
+  </data>
+  <data name="Update_RequiredSoon" xml:space="preserve">
+    <value>This version will stop working soon. Update when a new version is offered.</value>
+  </data>
+  <data name="Update_NotesTitle" xml:space="preserve">
+    <value>What's new in {0}</value>
+  </data>
+  <data name="Update_NotesClose" xml:space="preserve">
+    <value>Close</value>
+  </data>
+  <data name="Update_ForcedTitle" xml:space="preserve">
+    <value>This version is no longer supported</value>
+  </data>
+  <data name="Update_ForcedBody" xml:space="preserve">
+    <value>You have {0}. Update to {1} to keep using Tools.</value>
+  </data>
+  <data name="Update_Quit" xml:space="preserve">
+    <value>Quit</value>
+  </data>
+  <data name="Update_SettingsTitle" xml:space="preserve">
+    <value>Updates</value>
+  </data>
+  <data name="Update_SettingsVersion" xml:space="preserve">
+    <value>Version {0}</value>
+  </data>
+  <data name="Update_SettingsLastChecked" xml:space="preserve">
+    <value>Last checked: {0}</value>
+  </data>
+  <data name="Update_SettingsNeverChecked" xml:space="preserve">
+    <value>Not checked yet</value>
+  </data>
+  <data name="Update_SettingsAuto" xml:space="preserve">
+    <value>Install updates automatically</value>
+  </data>
+  <data name="Update_SettingsAutoHint" xml:space="preserve">
+    <value>Updates download in the background and install when you close Tools. Tools never restarts while it works.</value>
+  </data>
+  <data name="Update_SettingsCheckNow" xml:space="preserve">
+    <value>Check now</value>
+  </data>
+  <data name="Update_SettingsChecking" xml:space="preserve">
+    <value>Checking…</value>
+  </data>
+  <data name="Update_SettingsUpToDate" xml:space="preserve">
+    <value>You have the latest version.</value>
+  </data>
+  <data name="Update_SettingsFound" xml:space="preserve">
+    <value>Version {0} is available.</value>
+  </data>
+  <data name="Update_SettingsCheckFailed" xml:space="preserve">
+    <value>Couldn't check for updates. Try again later.</value>
+  </data>
 </root>

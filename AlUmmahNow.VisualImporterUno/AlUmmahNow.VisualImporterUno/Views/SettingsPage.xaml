@@ -14,6 +14,23 @@
     <ScrollViewer HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled">
         <StackPanel Spacing="16" Padding="24,8,24,24" MaxWidth="1200" HorizontalAlignment="Stretch">
 
+            <!-- Updates (wiki AUN-APP-UPDATES §5.3): only for builds that update themselves, while updates are on -->
+            <Border x:Name="UpdatesCard" Style="{StaticResource ToolsCard}" Visibility="Collapsed">
+                <StackPanel Spacing="12">
+                    <TextBlock x:Name="UpdatesTitle" Style="{StaticResource ToolsCardTitle}" />
+                    <StackPanel Spacing="2">
+                        <TextBlock x:Name="UpdatesVersion" Style="{StaticResource ToolsBody}" Foreground="{ThemeResource FanousTextPrimaryBrush}" FontWeight="SemiBold" />
+                        <TextBlock x:Name="UpdatesLastChecked" Style="{StaticResource ToolsMuted}" />
+                    </StackPanel>
+                    <ToggleSwitch x:Name="UpdatesAuto" Toggled="UpdatesAuto_Toggled" />
+                    <TextBlock x:Name="UpdatesAutoHint" Style="{StaticResource ToolsMuted}" TextWrapping="Wrap" />
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <Button x:Name="UpdatesCheckNow" Style="{StaticResource ToolsSecondaryButton}" HorizontalAlignment="Left" Click="UpdatesCheckNow_Click" />
+                        <TextBlock x:Name="UpdatesStatus" Style="{StaticResource ToolsBody}" VerticalAlignment="Center" TextWrapping="Wrap" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
             <!-- Folder scanner: where it listens -->
             <Border Style="{StaticResource ToolsCard}">
                 <StackPanel Spacing="12">

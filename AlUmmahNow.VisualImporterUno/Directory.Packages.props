@@ -10,6 +10,8 @@
     <PackageVersion Include="SkiaSharp.NativeAssets.Linux" Version="3.119.0" />
     <PackageVersion Include="System.Diagnostics.PerformanceCounter" Version="9.0.9" />
     <PackageVersion Include="Uno.Toolkit.WinUI" Version="8.2.4" />
+    <!-- In-app updates for builds installed by Velopack (wiki AUN-APP-UPDATES §5) -->
+    <PackageVersion Include="Velopack" Version="1.2.161" />
 
     <!-- Splunk Logging Dependencies -->
     <PackageVersion Include="Serilog.Sinks.Splunk" Version="4.0.0" />

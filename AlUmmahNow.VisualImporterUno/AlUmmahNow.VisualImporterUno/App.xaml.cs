@@ -360,6 +360,13 @@ public partial class App : Application
             var shellState = Shell.ShellState.Start(AlUmmahNow.ToolsCore.ToolsPreferences.DefaultPath, demo);
             Shell.ShellState.ApplyLanguage(shellState.Preferences.Language);
 
+            // Update checks (wiki AUN-APP-UPDATES §5): before the window, so every shell it builds shows the notice
+#if WINDOWS
+            Shell.AppUpdates.Start(shellState, new NoSelfUpdate());
+#else
+            Shell.AppUpdates.Start(shellState, new Services.VelopackInstaller());
+#endif
+
             MainWindow = new MainWindow(shellState);
             MainWindow.Activate();
             _ = demo != null ? demo.DriveAsync(shellState.Session) : shellState.Session.RestoreAsync();

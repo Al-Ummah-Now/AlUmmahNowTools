@@ -96,6 +96,7 @@
     <Grid x:Name="Root" Background="{ThemeResource FanousBackgroundBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
@@ -164,8 +165,11 @@
             <Rectangle Grid.ColumnSpan="2" Height="1" VerticalAlignment="Bottom" Margin="-16,0,-16,0" Fill="{StaticResource ShellHeaderRuleBrush}" />
         </Grid>
 
+        <!-- The update notice, under the header (wiki AUN-APP-UPDATES §12) -->
+        <ContentControl x:Name="UpdateBarHost" Grid.Row="1" HorizontalContentAlignment="Stretch" />
+
         <!-- Content -->
-        <Grid Grid.Row="1">
+        <Grid Grid.Row="2">
             <Grid.Background>
                 <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
                     <GradientStop Color="{ThemeResource FanousHeroStartColor}" Offset="0" />
@@ -279,5 +283,8 @@
             <!-- The app itself, once the account is staff -->
             <ContentControl x:Name="WorkspaceHost" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Visibility="Collapsed" />
         </Grid>
+
+        <!-- Below the minimum version: the whole window (wiki AUN-APP-UPDATES §3.7, §12) -->
+        <ContentControl x:Name="ForcedUpdateHost" Grid.Row="1" Grid.RowSpan="2" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" />
     </Grid>
 </UserControl>

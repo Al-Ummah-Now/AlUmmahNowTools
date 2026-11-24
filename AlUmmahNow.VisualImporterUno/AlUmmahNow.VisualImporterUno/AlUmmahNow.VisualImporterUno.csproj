@@ -69,6 +69,8 @@
   <!-- Skia Desktop support for Linux -->
   <ItemGroup Condition="'$(TargetFramework)' == 'net9.0-desktop'">
     <PackageReference Include="SkiaSharp.NativeAssets.Linux" />
+    <!-- Released builds are net9.0-desktop; Velopack installs their updates (wiki AUN-APP-UPDATES §5) -->
+    <PackageReference Include="Velopack" />
   </ItemGroup>
 
 </Project>
