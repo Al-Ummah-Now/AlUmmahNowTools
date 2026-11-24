@@ -126,10 +126,18 @@ public static class Loc
 
     /// <summary>
     /// An app version: "2026.11.23" / «٢٠٢٦.١١.٢٣» (wiki AUN-APP-UPDATES §12). The dots stay dots (a version is not a
-    /// decimal number) and the parts stay in reading order inside Arabic text (a left-to-right isolate).
+    /// decimal number). No bidi isolate marks: Uno's Skia text draws them as boxes; Arabic-Indic digits joined by dots
+    /// already read as one number in an Arabic line.
     /// </summary>
-    public static string Version(string? version) =>
-        string.IsNullOrEmpty(version) ? string.Empty : IsArabic ? "\u2066" + ToArabicDigits(version) + "\u2069" : version;
+    public static string Version(string? version)
+    {
+        if (string.IsNullOrEmpty(version) || !IsArabic) return version ?? string.Empty;
+#if HAS_UNO
+        // Uno's Skia text flips an Arabic line part by part, so the parts go in reversed (as ToArabicDigits does for digits)
+        version = string.Join('.', version.Split('.').Reverse());
+#endif
+        return ToArabicDigits(version);
+    }
 
     /// <summary>A percentage of 0 to 100: "42%" / «٤٢٪».</summary>
     public static string Percent(double value) => IsArabic ? Decimal(value, 0) + "٪" : Decimal(value, 0) + "%";
