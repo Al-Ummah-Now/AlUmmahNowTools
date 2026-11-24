@@ -2535,6 +2535,12 @@
   <data name="Social_SourcesTitle.Text" xml:space="preserve">
     <value>Sources</value>
   </data>
+  <data name="Social_NotOnServerTitle.Text" xml:space="preserve">
+    <value>Social sources aren’t on this server yet</value>
+  </data>
+  <data name="Social_NotOnServerBody.Text" xml:space="preserve">
+    <value>This environment runs an earlier release. Social sources appear here once it is updated.</value>
+  </data>
   <data name="Social_Refresh.Text" xml:space="preserve">
     <value>Refresh</value>
   </data>
@@ -2936,6 +2942,9 @@
   </data>
   <data name="SocialError_server" xml:space="preserve">
     <value>The server ran into a problem. Try again in a moment; it is on the Errors page.</value>
+  </data>
+  <data name="SocialError_http_404" xml:space="preserve">
+    <value>This server doesn’t have this yet. It needs a newer release.</value>
   </data>
   <data name="SocialError_refused" xml:space="preserve">
     <value>The server refused this</value>

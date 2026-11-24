@@ -1,4 +1,5 @@
 using System.Globalization;
+using AlUmmahNow.ToolsCore.Import;
 using AlUmmahNow.ToolsCore.Social;
 using AlUmmahNow.VisualImporterUno.Shell;
 using AlUmmahNow.VisualImporterUno.ViewModels;
@@ -265,6 +266,36 @@ public sealed class SocialSourcesViewModelTests
 
             vm.FormMessage.Should().Be(Loc.GetWithDetail("Social_Added", "Podcast"));
             row.CanRetryJob.Should().BeTrue();
+        });
+    }
+
+    [Fact]
+    public void A_server_without_social_sources_shows_the_plain_card_until_it_has_them()
+    {
+        WithCulture("en-US", () =>
+        {
+            using var vm = new SocialSourcesViewModel(workspace: null);
+            var changed = new List<string?>();
+            vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+            vm.ShowListFailure(new ImportApiException(404, ImportApiException.RouteMissing, "Not Found"));
+
+            vm.NotOnServer.Should().BeTrue();
+            vm.ShowPage.Should().BeFalse();
+            vm.ListError.Should().BeEmpty();
+            changed.Should().Contain(nameof(SocialSourcesViewModel.ShowPage));
+
+            // After the release, Refresh reads the list: the page is back
+            vm.ShowSources(Array.Empty<ImportSource>());
+
+            vm.NotOnServer.Should().BeFalse();
+            vm.ShowNoSources.Should().BeTrue();
+
+            // Any other refusal is said above the list, as before
+            vm.ShowListFailure(new ImportApiException(403, "forbidden", "The import_sources:manage permission is required"));
+
+            vm.NotOnServer.Should().BeFalse();
+            vm.ListError.Should().NotBeEmpty();
         });
     }
 }
