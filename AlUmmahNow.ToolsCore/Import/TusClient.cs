@@ -6,6 +6,29 @@ using System.Text;
 
 namespace AlUmmahNow.ToolsCore.Import;
 
+/// <summary>A file's SHA-256 as far as it has been read, so a failed attempt or a pause goes on from there.</summary>
+internal sealed class HashSoFar : IDisposable
+{
+    public HashSoFar(long size, long modifiedMs)
+    {
+        Size = size;
+        ModifiedMs = modifiedMs;
+    }
+
+    public long Size { get; }
+    public long ModifiedMs { get; }
+    public long Offset { get; private set; }
+    public IncrementalHash Hash { get; } = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+
+    public void Append(byte[] buffer, int count)
+    {
+        Hash.AppendData(buffer, 0, count);
+        Offset += count;
+    }
+
+    public void Dispose() => Hash.Dispose();
+}
+
 /// <summary>The file's SHA-256 (admin-api dedupes a channel's files on it) and its upload fingerprint.</summary>
 public static class FileHasher
 {
@@ -15,18 +38,23 @@ public static class FileHasher
     public static async Task<(string Sha256, string FingerprintHash)> HashAsync(string path, IProgress<double>? progress, CancellationToken ct)
     {
         await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 20, FileOptions.Asynchronous | FileOptions.SequentialScan);
-        var length = stream.Length;
-        using var full = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        using var state = new HashSoFar(stream.Length, 0);
+        return await HashAsync(stream, state, progress, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>Goes on from <paramref name="state"/>, which keeps what was read when this throws.</summary>
+    internal static async Task<(string Sha256, string FingerprintHash)> HashAsync(Stream stream, HashSoFar state, IProgress<double>? progress, CancellationToken ct)
+    {
+        var length = state.Size;
+        stream.Position = state.Offset;
         var buffer = ArrayPool<byte>.Shared.Rent(1 << 20);
         try
         {
-            long read = 0;
             int n;
             while ((n = await stream.ReadAsync(buffer.AsMemory(0, 1 << 20), ct).ConfigureAwait(false)) > 0)
             {
-                full.AppendData(buffer, 0, n);
-                read += n;
-                progress?.Report(length == 0 ? 1 : (double)read / length);
+                state.Append(buffer, n);
+                progress?.Report(length == 0 ? 1 : (double)state.Offset / length);
             }
         }
         finally
@@ -53,7 +81,7 @@ public static class FileHasher
             await stream.ReadExactlyAsync(edge, ct).ConfigureAwait(false);
             edges.AppendData(edge);
         }
-        return (Convert.ToHexString(full.GetHashAndReset()).ToLowerInvariant(), Convert.ToHexString(edges.GetHashAndReset()).ToLowerInvariant());
+        return (Convert.ToHexString(state.Hash.GetHashAndReset()).ToLowerInvariant(), Convert.ToHexString(edges.GetHashAndReset()).ToLowerInvariant());
     }
 }
 

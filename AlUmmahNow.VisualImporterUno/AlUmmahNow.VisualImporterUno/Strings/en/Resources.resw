@@ -1959,6 +1959,78 @@
   <data name="ImportError_file_read" xml:space="preserve">
     <value>The file couldn’t be read.</value>
   </data>
+  <data name="ImportError_share_lost" xml:space="preserve">
+    <value>The network share stopped answering while the file was read. If it stops at the same place every time, the file may be damaged on the server.</value>
+  </data>
+  <data name="ImportError_share_not_found" xml:space="preserve">
+    <value>The network share can’t be reached. Check that the server is on and connected.</value>
+  </data>
+  <data name="ImportError_share_credentials" xml:space="preserve">
+    <value>The network share didn’t accept this computer’s sign-in. Open the share in the file manager, sign in, then press Retry.</value>
+  </data>
+  <data name="ImportError_share_damaged" xml:space="preserve">
+    <value>Reading the file stops at the same place every time. It may be damaged on the server.</value>
+  </data>
+  <data name="ImportError_file_in_use" xml:space="preserve">
+    <value>Another app is using the file. Close it there.</value>
+  </data>
+  <data name="ImportError_file_writing" xml:space="preserve">
+    <value>Another app is still writing the file. Scan the folder again once it’s finished.</value>
+  </data>
+  <data name="ImportError_disk_read" xml:space="preserve">
+    <value>The disk couldn’t read the file.</value>
+  </data>
+  <data name="ImportError_drive_gone" xml:space="preserve">
+    <value>The drive or network share the file is on isn’t connected.</value>
+  </data>
+  <data name="ImportError_cloud_offline" xml:space="preserve">
+    <value>The file is in your cloud storage and couldn’t be downloaded. Check the connection and the cloud app.</value>
+  </data>
+  <data name="ImportError_name_too_long" xml:space="preserve">
+    <value>The file’s name or path is too long. Shorten it, then scan the folder again.</value>
+  </data>
+  <data name="ImportRead_Windows" xml:space="preserve">
+    <value>Windows error {0}</value>
+  </data>
+  <data name="ImportRead_macOS" xml:space="preserve">
+    <value>macOS error {0}</value>
+  </data>
+  <data name="ImportRead_Linux" xml:space="preserve">
+    <value>Linux error {0}</value>
+  </data>
+  <data name="ImportRead_offset" xml:space="preserve">
+    <value>Stopped at byte {0}</value>
+  </data>
+  <data name="ImportPhase_WaitingShare" xml:space="preserve">
+    <value>Waiting for the network share…</value>
+  </data>
+  <data name="ImportPhase_WaitingCloud" xml:space="preserve">
+    <value>Downloading from your cloud storage first…</value>
+  </data>
+  <data name="ImportLog_share_path" xml:space="preserve">
+    <value>Reading through the network path</value>
+  </data>
+  <data name="ImportLog_share_chosen" xml:space="preserve">
+    <value>Reading through the folder that was chosen</value>
+  </data>
+  <data name="ImportLog_share_back" xml:space="preserve">
+    <value>The network share answers again; going on from byte {0}</value>
+  </data>
+  <data name="ImportLog_share_tool" xml:space="preserve">
+    <value>The video tools couldn’t read the file to its end; trying again</value>
+  </data>
+  <data name="ImportLog_hash_resumed" xml:space="preserve">
+    <value>The check goes on from byte {0}</value>
+  </data>
+  <data name="ImportLog_cloud_download" xml:space="preserve">
+    <value>Downloading from your cloud storage first</value>
+  </data>
+  <data name="ImportEncodeError_source_read" xml:space="preserve">
+    <value>The video tools couldn’t read the file to its end.</value>
+  </data>
+  <data name="ImportTranscribeError_source_read" xml:space="preserve">
+    <value>The video tools couldn’t read the file to its end.</value>
+  </data>
   <data name="ImportError_not_hashed" xml:space="preserve">
     <value>The file wasn’t checked first. Try again.</value>
   </data>

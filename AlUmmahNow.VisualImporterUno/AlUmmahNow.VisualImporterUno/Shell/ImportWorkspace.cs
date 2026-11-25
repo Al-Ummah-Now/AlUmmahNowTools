@@ -124,7 +124,7 @@ public sealed class ImportWorkspace : IDisposable
 
     /// <summary>A local encode that failed goes to the Errors page; the file itself carries on, encoded by the server.</summary>
     private void ReportEncodeFailure(Exception error, QueueItem item) =>
-        Reporter.Report("caught", error, "Import Encode on this computer failed; the server encodes the file: " + error.Message, "/import/encode", new Dictionary<string, object?>
+        Reporter.Report("caught", error, "Import Encode on this computer failed; the server encodes the file: " + ImportQueue.Describe(error), "/import/encode", new Dictionary<string, object?>
         {
             ["step"] = nameof(ImportStepKind.Encode),
             ["code"] = (error as LocalEncodeException)?.Code ?? "disk",
@@ -135,7 +135,7 @@ public sealed class ImportWorkspace : IDisposable
 
     /// <summary>A local transcription that failed goes to the Errors page; the file itself carries on without a transcript.</summary>
     private void ReportTranscribeFailure(Exception error, QueueItem item) =>
-        Reporter.Report("caught", error, "Import Transcribe on this computer failed; the file is imported without a transcript: " + error.Message, "/import/transcribe", new Dictionary<string, object?>
+        Reporter.Report("caught", error, "Import Transcribe on this computer failed; the file is imported without a transcript: " + ImportQueue.Describe(error), "/import/transcribe", new Dictionary<string, object?>
         {
             ["step"] = nameof(ImportStepKind.Transcribe),
             ["code"] = error switch { TranscribeException t => t.Code, LocalEncodeException l => l.Code, ImportApiException a => a.Code, _ => "disk" },
