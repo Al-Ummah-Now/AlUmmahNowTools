@@ -1,4 +1,1 @@
-Encoding on this computer works again.
-The paths set on the Video tools page and what the Settings page saves are kept.
-A file with no picture, one cut off or never filled isn’t uploaded; the list says why, and lets it be tried again once the file is replaced.
-What is uploaded is checked against the file before the upload ends.
+Approve all and Reject all work with any filter and decide exactly the videos listed. If the scanner stops half way, the page says how many were decided and lists the rest.
