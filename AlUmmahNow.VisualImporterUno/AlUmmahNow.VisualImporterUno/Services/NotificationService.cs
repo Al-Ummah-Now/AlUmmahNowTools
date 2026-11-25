@@ -413,14 +413,20 @@ public class NotificationService : INotificationService, IDisposable
             {
                 try
                 {
+                    var lines = new StackPanel { Spacing = 6 };
+                    foreach (var line in (notification.Message ?? string.Empty).Split('\n').Where(l => l.Length > 0))
+                        lines.Children.Add(new TextBlock { Text = Shell.Loc.PopupLine(Shell.Loc.KeepLastWords(line)), TextWrapping = TextWrapping.Wrap });
                     var dialog = new ContentDialog
                     {
-                        Title = GetIconForNotificationType(notification.Type) + " " + notification.Title,
-                        Content = notification.Message,
+                        Title = notification.Title,
+                        Content = lines.Children.Count > 0 ? lines : null,
                         CloseButtonText = Shell.Loc.Get("Notify_Ok"),
+                        DefaultButton = ContentDialogButton.Close,
                         FlowDirection = Shell.Loc.IsArabic ? FlowDirection.RightToLeft : FlowDirection.LeftToRight,
                         XamlRoot = App.Current.MainWindow?.Content?.XamlRoot
                     };
+
+                    Shell.DialogLook.Apply(dialog);
 
                     // Show dialog with timeout (auto-dismiss after 5 seconds for non-error notifications)
                     if (notification.Type != NotificationType.Error)
@@ -456,18 +462,6 @@ public class NotificationService : INotificationService, IDisposable
         {
             _logger.LogError(ex, "Failed to dispatch ContentDialog notification to UI thread");
         }
-    }
-
-    private static string GetIconForNotificationType(NotificationType type)
-    {
-        return type switch
-        {
-            NotificationType.Success => "✓",
-            NotificationType.Warning => "⚠",
-            NotificationType.Error => "✗",
-            NotificationType.Info => "ℹ",
-            _ => "•"
-        };
     }
 
     private static string FormatFileSize(long bytes)
