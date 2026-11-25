@@ -65,6 +65,75 @@ public sealed class SettingsFileTests : IDisposable
         Assert.Equal("new", file.Read());
     }
 
+    [Fact]
+    public async Task Taking_over_the_old_file_never_writes_over_a_newer_save()
+    {
+        for (var round = 0; round < 40; round++)
+        {
+            var root = Path.Combine(_dir, "r" + round);
+            var old = Path.Combine(root, "AlUmmahNow", "VisualImporter", "settings.json");
+            Directory.CreateDirectory(Path.GetDirectoryName(old)!);
+            File.WriteAllText(old, "old");
+            // One copy of the app saves, others (with no lock of its own in common) read
+            var readers = Enumerable.Range(0, 4).Select(_ => new UserSettingsFile(root)).ToArray();
+            var writer = new UserSettingsFile(root);
+            using var start = new Barrier(readers.Length + 1);
+            var reading = readers.Select(r => Task.Factory.StartNew(() => { start.SignalAndWait(); return r.Read(); }, TaskCreationOptions.LongRunning)).ToArray();
+            var writing = Task.Factory.StartNew(() =>
+            {
+                start.SignalAndWait();
+                // Held by a reader for a moment (Windows): the page says it was not saved, and the person saves again
+                for (var i = 0; ; i++)
+                {
+                    try { writer.Write("new"); return; }
+                    catch (Exception ex) when (i < 50 && ex is IOException or UnauthorizedAccessException) { Thread.Sleep(10); }
+                }
+            }, TaskCreationOptions.LongRunning);
+            await writing;
+            foreach (var read in reading)
+            {
+                try { Assert.Contains(await read, new[] { "old", "new" }); }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+            }
+            Assert.Equal("new", new UserSettingsFile(root).Read());
+        }
+    }
+
+    [Fact]
+    public void A_settings_file_that_cannot_be_read_now_is_not_written_over()
+    {
+        var store = new SettingsFile(FilePath);
+        store.Set("A", new Dictionary<string, string> { ["k"] = "1" });
+        // Something else holds it
+        using (new FileStream(FilePath, FileMode.Open, FileAccess.Read, FileShare.None))
+        {
+            Assert.Null(store.Get("A", "k"));
+            Assert.ThrowsAny<IOException>(() => store.Set("B", new Dictionary<string, string> { ["k"] = "2" }));
+        }
+        store.Set("B", new Dictionary<string, string> { ["k"] = "2" });
+        Assert.Equal(("1", "2"), (store.Get("A", "k"), store.Get("B", "k")));
+    }
+
+    [Fact]
+    public void The_notification_switches_are_taken_over_once_and_saved_in_one_place()
+    {
+        var page = new UserSettingsFile(_dir);
+        page.Write("{\"Notifications\":{\"Enabled\":false,\"SoundEnabled\":true}}");
+        var store = new SettingsFile(FilePath);
+        var switches = new NotificationSwitches(store, page);
+        Assert.Equal((false, true), (switches.Enabled, switches.Sound));
+        switches.Save(true, false);
+        // The page's old copy has no say any more
+        var restarted = new NotificationSwitches(new SettingsFile(FilePath), page);
+        Assert.Equal((true, false), (restarted.Enabled, restarted.Sound));
+        foreach (var text in new[] { "{ broken", "[]", "{\"Notifications\":1}", "{\"Notifications\":{\"Enabled\":\"x\"}}" })
+        {
+            page.Write(text);
+            var fresh = new NotificationSwitches(new SettingsFile(Path.Combine(_dir, Guid.NewGuid().ToString("N") + ".json")), page);
+            Assert.Equal((true, true), (fresh.Enabled, fresh.Sound));
+        }
+    }
+
     private sealed class Throws(Exception error) : ISettingsStore
     {
         public string? Get(string section, string key) => throw error;

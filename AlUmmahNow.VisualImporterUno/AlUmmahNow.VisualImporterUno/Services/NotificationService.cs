@@ -83,6 +83,7 @@ public class NotificationService : INotificationService, IDisposable
     // Settings
     private bool _isEnabled = true;
     private bool _isSoundEnabled = true;
+    private AlUmmahNow.ToolsCore.NotificationSwitches? _switches;
 
 #if WINDOWS
     private AppNotificationManager? _notificationManager;
@@ -154,9 +155,8 @@ public class NotificationService : INotificationService, IDisposable
     {
         try
         {
-            var settings = AlUmmahNow.ToolsCore.SettingsFile.Default;
-            if (bool.TryParse(settings.Get("Notifications", "IsEnabled"), out var enabled)) _isEnabled = enabled;
-            if (bool.TryParse(settings.Get("Notifications", "IsSoundEnabled"), out var sound)) _isSoundEnabled = sound;
+            _switches = new AlUmmahNow.ToolsCore.NotificationSwitches(AlUmmahNow.ToolsCore.SettingsFile.Default, AlUmmahNow.ToolsCore.UserSettingsFile.Default);
+            (_isEnabled, _isSoundEnabled) = (_switches.Enabled, _switches.Sound);
 
             _logger.LogInformation("Notification settings loaded: Enabled={IsEnabled}, Sound={IsSoundEnabled}",
                 _isEnabled, _isSoundEnabled);
@@ -171,7 +171,7 @@ public class NotificationService : INotificationService, IDisposable
     {
         try
         {
-            AlUmmahNow.ToolsCore.SettingsFile.Default.Set("Notifications", new Dictionary<string, string> { ["IsEnabled"] = _isEnabled.ToString(), ["IsSoundEnabled"] = _isSoundEnabled.ToString() });
+            _switches?.Save(_isEnabled, _isSoundEnabled);
 
             _logger.LogDebug("Notification settings saved");
         }

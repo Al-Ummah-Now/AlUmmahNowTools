@@ -53,6 +53,21 @@ public sealed class SettingsViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task NotificationSwitches_AreTheServices_AndSavingThePageDoesNotKeepASecondCopy()
+    {
+        new UserSettingsFile(_dir).Write("{\"Notifications\":{\"Enabled\":true,\"SoundEnabled\":true}}");
+        var notifications = new Mock<INotificationService>();
+        notifications.SetupProperty(n => n.IsEnabled, false);
+        notifications.SetupProperty(n => n.IsSoundEnabled, true);
+        var vm = CreateViewModel(notifications: notifications);
+        vm.EnableNotifications.Should().BeFalse();
+        vm.EnableNotificationSound.Should().BeTrue();
+        notifications.Object.IsEnabled.Should().BeFalse();
+        (await vm.SaveSettingsAsync()).Should().BeTrue();
+        new UserSettingsFile(_dir).Read().Should().NotContain("Notifications");
+    }
+
+    [Fact]
     public void ScannerLocationText_DistinguishesLoopbackFromRemoteHost_AndNotifiesOnUrlChange()
     {
         var vm = CreateViewModel();

@@ -11,6 +11,9 @@ namespace AlUmmahNow.VisualImporterUno.Tests;
 
 public sealed class FFmpegSettingsViewModelTests
 {
+    /// <summary>Nothing saved: never this computer's own settings.</summary>
+    private static ISettingsStore Nothing => new Mock<ISettingsStore>().Object;
+
     private static async Task WaitUntilIdleAsync(FFmpegSettingsViewModel vm)
     {
         var deadline = DateTime.UtcNow.AddSeconds(3);
@@ -37,7 +40,7 @@ public sealed class FFmpegSettingsViewModelTests
             FFprobePath = "/usr/bin/ffprobe",
         });
 
-        var vm = new FFmpegSettingsViewModel(NullLogger<FFmpegSettingsViewModel>.Instance, manager.Object);
+        var vm = new FFmpegSettingsViewModel(NullLogger<FFmpegSettingsViewModel>.Instance, manager.Object, Nothing);
         await WaitUntilIdleAsync(vm);
         await vm.VerifyInstallationAsync();
 
@@ -68,7 +71,7 @@ public sealed class FFmpegSettingsViewModelTests
             ErrorMessage = "ffprobe exited with code 127",
         });
 
-        var vm = new FFmpegSettingsViewModel(NullLogger<FFmpegSettingsViewModel>.Instance, manager.Object);
+        var vm = new FFmpegSettingsViewModel(NullLogger<FFmpegSettingsViewModel>.Instance, manager.Object, Nothing);
         await WaitUntilIdleAsync(vm);
         await vm.VerifyInstallationAsync();
 
@@ -83,7 +86,7 @@ public sealed class FFmpegSettingsViewModelTests
         manager.Setup(m => m.VerifyFFmpegInstallationAsync()).ReturnsAsync(new FFmpegStatus());
         manager.Setup(m => m.AutoDetectFFmpegAsync()).ReturnsAsync(false);
 
-        var vm = new FFmpegSettingsViewModel(NullLogger<FFmpegSettingsViewModel>.Instance, manager.Object);
+        var vm = new FFmpegSettingsViewModel(NullLogger<FFmpegSettingsViewModel>.Instance, manager.Object, Nothing);
         await WaitUntilIdleAsync(vm);
 
         await vm.AutoDetectAsync();
@@ -118,7 +121,7 @@ public sealed class FFmpegSettingsViewModelTests
         var manager = new Mock<IFFmpegManagerService>();
         manager.Setup(m => m.VerifyFFmpegInstallationAsync()).ReturnsAsync(new FFmpegStatus());
 
-        var vm = new FFmpegSettingsViewModel(NullLogger<FFmpegSettingsViewModel>.Instance, manager.Object);
+        var vm = new FFmpegSettingsViewModel(NullLogger<FFmpegSettingsViewModel>.Instance, manager.Object, Nothing);
         await WaitUntilIdleAsync(vm);
 
         vm.FFmpegPath = "";
