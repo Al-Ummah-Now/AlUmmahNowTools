@@ -406,8 +406,8 @@ public sealed class FfmpegMediaTools : IMediaTools
 }
 
 /// <summary>
-/// Encodes the server's HLS ladder on this computer (wiki TOOLS-ADMIN TA-12), unless the batch chose "Let the server
-/// encode" or the server does not take renditions for the file (its delivery target is not R2). Opens the file on
+/// Encodes the server's HLS ladder on this computer (wiki TOOLS-ADMIN TA-12), unless the file was left to the
+/// server ("Encode on this computer" off) or the server does not take renditions for the file (its delivery target is not R2). Opens the file on
 /// admin-api first, so a file the channel already has is never encoded. A local failure is not the file's failure:
 /// the step logs why, reports it, and the server encodes the file as it would any upload.
 /// </summary>
@@ -444,7 +444,8 @@ public sealed class EncodeStep : IImportStep
 
     public async Task<StepResult> RunAsync(QueueItem item, IStepContext context, CancellationToken ct)
     {
-        // Of another file that was in this one's place
+        // Left to the server after all, or of another file that was in this one's place
+        if (item.ServerEncodes) item.Renditions = null;
         if (item.Renditions is null) WorkFiles.DeleteFolder(Path.Combine(_workRoot, item.Id), _workRoot, item.Id);
         if (item.ServerEncodes)
         {

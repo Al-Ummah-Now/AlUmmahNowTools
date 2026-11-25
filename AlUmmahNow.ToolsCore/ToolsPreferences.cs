@@ -10,7 +10,7 @@ public enum ToolsTheme
 }
 
 /// <summary>
-/// What the app remembers between runs: language (en/ar), theme, environment and the speech model. A small JSON file
+/// What the app remembers between runs: language (en/ar), theme, environment, the speech model and where videos are encoded. A small JSON file
 /// next to the app's other data. Theme is Light or Dark, never "System" (wiki Theming, owner
 /// 2026-11-13): until the first click nothing is saved and the app follows the device.
 /// </summary>
@@ -24,6 +24,8 @@ public sealed class ToolsPreferences
     public ToolsEnvironmentKind Environment { get; set; } = ToolsEnvironmentKind.Production;
     /// <summary>The whisper model for transcription on this computer (TA-13); null: the default</summary>
     public string? SpeechModel { get; set; }
+    /// <summary>Videos are encoded on this computer before their upload (TA-12); off: the server encodes them after it</summary>
+    public bool EncodeHere { get; set; } = true;
 
     [JsonIgnore] public bool IsRightToLeft => Language == "ar";
 

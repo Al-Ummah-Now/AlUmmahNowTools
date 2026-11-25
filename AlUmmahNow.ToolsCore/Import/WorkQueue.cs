@@ -150,7 +150,7 @@ public sealed class QueueItem
     public string? AttachJobId { get; set; }
     /// <summary>The channel already had this file: nothing was uploaded</summary>
     public bool AlreadyImported { get; set; }
-    /// <summary>"Let the server encode" was chosen for the file's batch: no local encode</summary>
+    /// <summary>The server encodes the file: chosen on the page ("Encode on this computer" off) or on the file's row</summary>
     public bool ServerEncodes { get; set; }
     /// <summary>The renditions encoded here, waiting to be sent (deleted once the server has them)</summary>
     public RenditionSet? Renditions { get; set; }
@@ -203,6 +203,34 @@ public sealed class QueueItem
             if (step.WaitingOnServer) return ItemPhase.ServerWorking;
             return step.NextAttemptAt is not null ? ItemPhase.RetryWaiting : ItemPhase.Waiting;
         }
+    }
+
+    /// <summary>Its encode here is still to come or running: the row offers to leave it to the server.</summary>
+    [JsonIgnore] public bool CanLeaveToServer => !ServerEncodes && Phase != ItemPhase.Failed && EncodeStep is { Status: StepStatus.Pending or StepStatus.Running } && !UploadBegun;
+
+    [JsonIgnore] private StepState? EncodeStep => Steps.FirstOrDefault(s => s.Kind == ImportStepKind.Encode);
+
+    [JsonIgnore] private bool UploadBegun => Steps.FirstOrDefault(s => s.Kind == ImportStepKind.Upload) is not { Status: StepStatus.Pending };
+
+    /// <summary>
+    /// Who encodes the file, changed before its upload: to the server, what its encode here had not finished is dropped; to this
+    /// computer, the encode is put back in front of the upload.
+    /// </summary>
+    /// <returns>Null: nothing to change. Else the step to start again or to stop</returns>
+    internal StepState? SetServerEncodes(bool server)
+    {
+        if (ServerEncodes == server || UploadBegun || EncodeStep is not { } encode) return null;
+        if (server)
+        {
+            // Encoded already: it goes with the upload. A failure trying again cannot fix is the file's own
+            if (encode.Status is StepStatus.Done or StepStatus.Skipped || encode is { Status: StepStatus.Failed, CanTryAgain: false }) return null;
+        }
+        else if (encode.Status is not (StepStatus.Pending or StepStatus.Skipped))
+        {
+            return null;
+        }
+        ServerEncodes = server;
+        return encode;
     }
 
     /// <summary>What the row offers: exactly one of Pause and Resume for a file that is neither done nor failed.</summary>
@@ -524,6 +552,43 @@ public sealed class ImportQueue : IDisposable
         }
         Notify(null);
         _wake.Release();
+    }
+
+    /// <summary>
+    /// The server encodes the files that are not uploaded yet, or this computer does (one file, or every one). An encode that is
+    /// running stops, deletes what it made and the file goes on with its upload.
+    /// </summary>
+    /// <returns>How many files it changed</returns>
+    public int SetServerEncodes(bool server, string? id = null)
+    {
+        var changed = 0;
+        lock (_gate)
+        {
+            foreach (var item in _items.Where(i => id is null || i.Id == id))
+            {
+                if (item.SetServerEncodes(server) is not { } encode) continue;
+                changed++;
+                // The step itself says when it leaves the file to the server
+                if (!server) AppendLog(item, LogLevel.Info, "encode_here_chosen", "Encode on this computer was chosen");
+                if (encode.Status == StepStatus.Running)
+                {
+                    // It runs again at once, as nothing to do
+                    if (_running.TryGetValue(item.Id, out var cts)) Cancel(cts);
+                }
+                else
+                {
+                    encode.Status = StepStatus.Pending;
+                    encode.Attempts = 0;
+                    (encode.LastError, encode.LastErrorCode, encode.ReadError, encode.Retryable, encode.NextAttemptAt) = (null, null, null, null, null);
+                    encode.WaitingOnServer = false;
+                }
+            }
+            if (changed > 0) SaveLocked();
+        }
+        if (changed == 0) return 0;
+        Notify(id);
+        _wake.Release();
+        return changed;
     }
 
     private void PauseLocked(QueueItem item)

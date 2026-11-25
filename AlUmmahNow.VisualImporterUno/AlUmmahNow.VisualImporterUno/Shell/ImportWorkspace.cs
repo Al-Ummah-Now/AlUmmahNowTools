@@ -64,6 +64,8 @@ public sealed class ImportWorkspace : IDisposable
         }
         else if (AppInstance.OwnsQueue)
         {
+            // Whatever the app was closed in the middle of, the switch on the page holds for the whole queue
+            if (!shell.Preferences.EncodeHere) Queue.SetServerEncodes(true);
             Queue.Start();
         }
 #if UPDATE_TEST
