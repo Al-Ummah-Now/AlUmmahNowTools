@@ -19,4 +19,4 @@ Keep this table current: a Tools PR that needs a new server route adds its row (
 | Social sources: Cancel sync, YouTube Takeout files (TA-13) | AlUmmahNow #1752 (`/sources/:id/cancel`, `/sources/:id/takeout`) | `v2026.11.24` |
 | Social sources: sync job state, log and Retry (TA-13) | `GET /api/content/jobs/:id` and its `/retry`; the attempts and log in them are AlUmmahNow #1738 | `v2026.11.22.6` |
 | Social sources: Sync now and uploads hidden while uploads are off (TA-13) | AlUmmahNow #1755 (`GET /api/features`), #1756 (`404 feature_off`); without them uploads count as on | `v2026.11.24` |
-| Update notice and self-update (AUN-APP-UPDATES) | `GET /api/v1/app-config` with the Tools release (AlUmmahNow #1860, Features → app updates on); without it no update is offered | after `v2026.11.25` |
+| Update notice and self-update (AUN-APP-UPDATES) | AlUmmahNow #1797, #1806, #1969, #1971 (`GET /api/v1/app-config`) with the app updates switch on; without it no update is offered | `v2026.11.24.8` |
