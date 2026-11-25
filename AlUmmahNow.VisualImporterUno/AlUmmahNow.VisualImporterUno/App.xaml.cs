@@ -5,6 +5,7 @@ using AlUmmahNow.Data.Video;
 using AlUmmahNow.Data.Services;
 using AlUmmahNow.Importer;
 using AlUmmahNow.Importer.Core;
+using AlUmmahNow.ToolsCore.Import;
 using AlUmmahNow.VisualImporterUno.Services;
 using AlUmmahNow.VisualImporterUno.Services.Logging;
 using AlUmmahNow.VisualImporterUno.ViewModels;
@@ -472,10 +473,12 @@ public partial class App : Application
         }
     }
 
-    internal async Task ShutdownServicesAsync()
+    /// <returns>The folder scanner does not run any more</returns>
+    internal async Task<bool> ShutdownServicesAsync()
     {
-        if (_isShuttingDown) return;
+        if (_isShuttingDown) return false;
         _isShuttingDown = true;
+        var ended = true;
 
         try
         {
@@ -489,19 +492,17 @@ public partial class App : Application
                 {
                     Log.Information("Stopping FileScan service...");
 
-                    using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(5));
-                    await serviceManager.StopServiceAsync().WaitAsync(cts.Token);
+                    // One that is being started meanwhile does not start
+                    serviceManager.Close();
+                    ended = await serviceManager.StopServiceAsync(EndLimits.ScannerAsked, EndLimits.ScannerKilled);
 
-                    Log.Information("FileScan service stopped successfully");
+                    Log.Information("FileScan service stopped: {Ended}", ended);
                     serviceManager.Dispose();
                 }
             }
-            catch (OperationCanceledException)
-            {
-                Log.Warning("FileScan service stop operation timed out");
-            }
             catch (Exception serviceEx)
             {
+                ended = false;
                 Log.Warning(serviceEx, "Error stopping FileScan service");
             }
 
@@ -512,7 +513,7 @@ public partial class App : Application
                 if (signalRClient != null)
                 {
                     Log.Information("Disconnecting SignalR client...");
-                    await signalRClient.DisposeAsync();
+                    await signalRClient.DisposeAsync().AsTask().WaitAsync(EndLimits.Connection);
                     Log.Information("SignalR client disconnected");
                 }
             }
@@ -534,13 +535,14 @@ public partial class App : Application
         {
             try
             {
+                // The log is closed as the process ends (AppQuit, Program): the hand-over comes after this
                 CrashHandler.Cleanup();
-                Log.CloseAndFlush();
             }
             catch (Exception cleanupEx)
             {
                 System.Diagnostics.Debug.WriteLine($"Error during final cleanup: {cleanupEx.Message}");
             }
         }
+        return ended;
     }
 }

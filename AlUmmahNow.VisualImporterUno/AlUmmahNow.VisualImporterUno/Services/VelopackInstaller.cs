@@ -89,7 +89,8 @@ public sealed class VelopackInstaller : IUpdateInstaller
 #if UPDATE_TEST
         Shell.UpdateTestHandler.Log($"handed over {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}");
 #endif
-        _manager.ApplyUpdatesAndRestart(_staged.TargetFullRelease);
+        // Not Velopack's own "and restart", which ends this process at once: the quit has stopped the work, and ends it
+        _manager.WaitExitThenApplyUpdates(_staged.TargetFullRelease, silent: false, restart: true);
     }
 
     /// <summary>Velopack's update source: one release, the file <see cref="UpdateService"/> verified.</summary>

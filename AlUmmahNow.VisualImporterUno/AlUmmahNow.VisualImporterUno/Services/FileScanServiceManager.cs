@@ -26,6 +26,7 @@ namespace AlUmmahNow.VisualImporterUno.Services
         private Process? _serviceProcess;
         private bool _isServiceManaged = false;
         private bool _isDisposed = false;
+        private bool _closed;
         private ServiceHealthStatus _currentStatus = ServiceHealthStatus.Unknown;
 
         public event EventHandler<ServiceStatusChangedEventArgs>? ServiceStatusChanged;
@@ -187,6 +188,7 @@ namespace AlUmmahNow.VisualImporterUno.Services
 
                 lock (_lockObject)
                 {
+                    if (_closed) return false;
                     _serviceProcess = new Process { StartInfo = processStartInfo };
                     _serviceProcess.EnableRaisingEvents = true;
                     
@@ -295,22 +297,37 @@ namespace AlUmmahNow.VisualImporterUno.Services
         /// Stops the managed FileScanService if it's running
         /// </summary>
         /// <returns>True if service was stopped successfully, false otherwise</returns>
-        public async Task<bool> StopServiceAsync()
+        /// <summary>The app is ending: the service is not started any more.</summary>
+        public void Close()
         {
+            lock (_lockObject) _closed = true;
+        }
+
+        public Task<bool> StopServiceAsync() => StopServiceAsync(TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(5));
+
+        /// <param name="asked">How long it may take to end once it is told to; then it is killed, with what it started</param>
+        /// <param name="killed">How long the kill may take</param>
+        public async Task<bool> StopServiceAsync(TimeSpan asked, TimeSpan killed)
+        {
+            Process process;
             lock (_lockObject)
             {
-                if (!_isServiceManaged || _serviceProcess == null)
+                // One that is still starting is stopped too
+                if (_serviceProcess is not { } started)
                 {
                     _logger.LogInformation("No managed FileScanService to stop");
                     return true;
                 }
 
-                if (_serviceProcess.HasExited)
+                if (started.HasExited)
                 {
                     _logger.LogInformation("FileScanService process has already exited");
                     CleanupProcess();
                     return true;
                 }
+                process = started;
+                // Its end is this stop's, which waits on the process: nothing disposes it meanwhile
+                process.Exited -= OnServiceExited;
             }
 
             try
@@ -321,10 +338,14 @@ namespace AlUmmahNow.VisualImporterUno.Services
                 // Try graceful shutdown first
                 try
                 {
-                    _serviceProcess.StandardInput.WriteLine("exit");
-                    _serviceProcess.StandardInput.Close();
+                    // Not on this thread: a process that does not read could block the write
+                    await Task.Run(() =>
+                    {
+                        process.StandardInput.WriteLine("exit");
+                        process.StandardInput.Close();
+                    }).WaitAsync(asked);
 
-                    if (await WaitForProcessExitAsync(_serviceProcess, TimeSpan.FromSeconds(10)))
+                    if (await WaitForProcessExitAsync(process, asked))
                     {
                         _logger.LogInformation("FileScanService stopped gracefully");
                         UpdateServiceStatus(ServiceHealthStatus.Stopped);
@@ -339,8 +360,8 @@ namespace AlUmmahNow.VisualImporterUno.Services
                 // Force kill if graceful shutdown failed
                 try
                 {
-                    _serviceProcess.Kill();
-                    if (await WaitForProcessExitAsync(_serviceProcess, TimeSpan.FromSeconds(5)))
+                    process.Kill(entireProcessTree: true);
+                    if (await WaitForProcessExitAsync(process, killed))
                     {
                         _logger.LogInformation("FileScanService stopped forcefully");
                         UpdateServiceStatus(ServiceHealthStatus.Stopped);

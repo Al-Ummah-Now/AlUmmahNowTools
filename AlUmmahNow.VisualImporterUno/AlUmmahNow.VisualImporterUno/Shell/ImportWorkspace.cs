@@ -211,16 +211,18 @@ public sealed class ImportWorkspace : IDisposable
     /// Stops the queue for good: running steps stop (ffmpeg and the other child processes with them), the queue is saved so
     /// every file carries on from where it was at the next start, and the error reports waiting are sent (a few seconds at most).
     /// </summary>
-    public static async Task StopForQuitAsync()
+    /// <returns>Nothing of it runs any more</returns>
+    public static async Task<bool> StopForQuitAsync()
     {
         ImportWorkspace? workspace;
         lock (Gate) workspace = _current;
-        if (workspace is null) return;
+        if (workspace is null) return true;
         workspace._disposed = true;
-        await workspace.Queue.StopAsync().ConfigureAwait(false);
-        try { await workspace.Reporter.FlushAsync().WaitAsync(TimeSpan.FromSeconds(3)).ConfigureAwait(false); }
+        var ended = await workspace.Queue.StopAsync(EndLimits.Queue).ConfigureAwait(false);
+        try { await workspace.Reporter.FlushAsync().WaitAsync(EndLimits.Reports).ConfigureAwait(false); }
         catch (Exception ex) when (ex is TimeoutException or OperationCanceledException) { }
         workspace.Reporter.Dispose();
+        return ended;
     }
 }
 

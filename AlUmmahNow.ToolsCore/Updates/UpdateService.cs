@@ -82,7 +82,7 @@ public interface IUpdateInstaller
     void Discard();
     /// <summary>The app is exiting: installs the staged update once it has. Only right after <see cref="VerifyStaged"/></summary>
     void ApplyOnExit();
-    /// <summary>Applies the staged update now and restarts the app. Only right after <see cref="VerifyStaged"/></summary>
+    /// <summary>The same, and the app is started again after it. Only right after <see cref="VerifyStaged"/></summary>
     void ApplyAndRestart();
 }
 
@@ -118,6 +118,8 @@ public sealed class UpdateService : IDisposable
     private CorePrompt? _lastPrompt;
     private Staged? _staged;
     private int _applying;
+    private int _restarting;
+    private readonly Func<Task<bool>>? _quit;
     private bool _autoInstallDefault = true;
     /// <summary>The release the last answer offers to install, whether or not its notice was closed</summary>
     private string? _offeredTag;
@@ -129,7 +131,7 @@ public sealed class UpdateService : IDisposable
     /// <param name="busy">true while an import, upload or encode runs: never restart then</param>
     /// <param name="otherCopy">true while another copy runs from the same install: the updater would end it, so nothing is installed then</param>
     public UpdateService(HttpMessageHandler handler, Func<Uri> videosApi, IUpdateCore core, IUpdateInstaller installer, string statePath, string downloadDir,
-        string installedVersion, string platform, string arch, Func<bool> busy, bool hasRootKey, TimeProvider? clock = null, Func<bool>? otherCopy = null)
+        string installedVersion, string platform, string arch, Func<bool> busy, bool hasRootKey, TimeProvider? clock = null, Func<bool>? otherCopy = null, Func<Task<bool>>? quit = null)
     {
         // Every redirect hop is checked here, so the handler must never follow one by itself
         if (handler is SocketsHttpHandler { AllowAutoRedirect: true } or HttpClientHandler { AllowAutoRedirect: true })
@@ -146,6 +148,7 @@ public sealed class UpdateService : IDisposable
         _busy = busy;
         _hasRootKey = hasRootKey;
         _otherCopy = otherCopy ?? (() => false);
+        _quit = quit;
         _clock = clock ?? TimeProvider.System;
     }
 
@@ -315,34 +318,39 @@ public sealed class UpdateService : IDisposable
     /// <summary>Another copy of the app runs from the same install: the staged update waits until it has closed.</summary>
     public bool OtherCopyRunning => _otherCopy();
 
-    /// <summary>Restart now: refused while work is running (the bar says "Finish or pause your uploads first.") or another copy is open.</summary>
+    /// <summary>
+    /// Restart now: refused while work is running (the bar says "Finish or pause your uploads first.") or another copy is open.
+    /// Then the app quits: the work stops, and the end (<see cref="OnExit"/>) starts the updater, which starts the app again.
+    /// </summary>
     public async Task<bool> RestartNowAsync(CancellationToken cancel = default)
     {
         if (_view.Stage != UpdateStage.Ready || _busy() || _otherCopy()) return false;
-        if (!TryBeginApply()) return false;
-        var handedOver = false;
+        if (Interlocked.CompareExchange(ref _restarting, 1, 0) != 0) return false;
+        var quitting = false;
         try
         {
-            if (!await StillGoodAsync(cancel).ConfigureAwait(false))
+            if (!TryBeginApply()) return false;
+            try
             {
-                Publish(_view.Required ? new UpdateView(UpdateStage.RequiredSoon, MessageEn: _view.MessageEn, MessageAr: _view.MessageAr) : UpdateView.None);
-                return false;
+                if (!await StillGoodAsync(cancel).ConfigureAwait(false))
+                {
+                    Publish(_view.Required ? new UpdateView(UpdateStage.RequiredSoon, MessageEn: _view.MessageEn, MessageAr: _view.MessageAr) : UpdateView.None);
+                    return false;
+                }
+                // Once more, after the check of the file: work or a copy may have started meanwhile
+                if (_busy() || _otherCopy()) return false;
             }
-            // Once more, after the check of the file: work or a copy may have started meanwhile
-            if (_busy() || _otherCopy()) return false;
-            handedOver = true;
-            _installer.ApplyAndRestart();
-            return true;
-        }
-        catch when (handedOver)
-        {
-            // The updater did not start: the app goes on, and can try again
-            handedOver = false;
-            throw;
+            finally
+            {
+                EndApply();
+            }
+            quitting = _quit is null ? OnExit() : await _quit().ConfigureAwait(false);
+            return quitting;
         }
         finally
         {
-            if (!handedOver) EndApply();
+            // The app goes on, and can try again
+            if (!quitting) Interlocked.Exchange(ref _restarting, 0);
         }
     }
 
@@ -361,18 +369,25 @@ public sealed class UpdateService : IDisposable
         Publish(UpdateView.None);
     }
 
-    /// <summary>Every window is closed: install the staged update as the app goes.</summary>
-    public void OnExit()
+    /// <summary>The work has ended: the staged update is handed to the updater, which installs it as the app goes. False: nothing was.</summary>
+    public bool OnExit()
     {
-        // Restart now has started the updater already
-        if (_staged is null || _otherCopy() || !TryBeginApply()) return;
+        if (_staged is null || _otherCopy() || !TryBeginApply()) return false;
         var handedOver = false;
         try
         {
             // A copy that started during the check counts: the update is staged again at the next start
-            if (!StillGoodAsync(CancellationToken.None, report: false).GetAwaiter().GetResult() || _otherCopy()) return;
-            _installer.ApplyOnExit();
+            if (!StillGoodAsync(CancellationToken.None, report: false).GetAwaiter().GetResult() || _otherCopy()) return false;
             handedOver = true;
+            if (_restarting == 1) _installer.ApplyAndRestart();
+            else _installer.ApplyOnExit();
+            return true;
+        }
+        catch when (handedOver)
+        {
+            // The updater did not start
+            handedOver = false;
+            throw;
         }
         finally
         {
