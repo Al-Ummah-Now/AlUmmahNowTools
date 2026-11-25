@@ -60,7 +60,7 @@ internal static class UpdateTestClose
         new ButtonAutomationPeer(button).Invoke();
     }
 
-    private static T? Find<T>(DependencyObject root, Func<T, bool> matches) where T : DependencyObject
+    private static T? Find<T>(DependencyObject root, Func<T, bool> matches) where T : class, DependencyObject
     {
         if (root is T found && matches(found)) return found;
         for (var i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
