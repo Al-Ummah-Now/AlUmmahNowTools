@@ -17,7 +17,8 @@ public class ColourTests
     {
         var vectors = JsonNode.Parse(File.ReadAllText(Fixture("colour-vectors.json")))!.AsArray();
         Assert.True(vectors.Count > 400);
-        Assert.Equal(File.ReadAllText(Fixture("colour-rung-end.txt")).Trim(), SdrPlan.End);
+        var end = SdrPlan.End;
+        Assert.Equal(File.ReadAllText(Fixture("colour-rung-end.txt")).Trim(), end);
         foreach (var vector in vectors)
         {
             var stream = vector!["stream"]!;
