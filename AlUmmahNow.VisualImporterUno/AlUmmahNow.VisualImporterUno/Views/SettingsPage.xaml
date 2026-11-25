@@ -14,7 +14,7 @@
     <ScrollViewer HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled">
         <StackPanel Spacing="16" Padding="24,8,24,24" MaxWidth="1200" HorizontalAlignment="Stretch">
 
-            <!-- Updates (wiki AUN-APP-UPDATES §5.3): only for builds that update themselves, while updates are on -->
+            <!-- Updates (wiki AUN-APP-UPDATES §5.3): while updates are on; the automatic switch only where the build can install them -->
             <Border x:Name="UpdatesCard" Style="{StaticResource ToolsCard}" Visibility="Collapsed">
                 <StackPanel Spacing="12">
                     <TextBlock x:Name="UpdatesTitle" Style="{StaticResource ToolsCardTitle}" />

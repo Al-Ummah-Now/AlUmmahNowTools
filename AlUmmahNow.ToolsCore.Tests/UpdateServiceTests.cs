@@ -55,6 +55,8 @@ public sealed class UpdateServiceTests : IDisposable
             Staged = packagePath;
             return Task.CompletedTask;
         }
+        public int Exits;
+        public void ApplyOnExit() => Exits++;
         public void ApplyAndRestart() => Restarts++;
     }
 
@@ -85,7 +87,7 @@ public sealed class UpdateServiceTests : IDisposable
         return r;
     }
 
-    private (UpdateService, FakeCore, FakeInstaller, FakeHttp) Make(bool busy = false)
+    private (UpdateService, FakeCore, FakeInstaller, FakeHttp) Make(bool busy = false, bool rootKey = true)
     {
         var core = new FakeCore();
         var installer = new FakeInstaller();
@@ -94,7 +96,7 @@ public sealed class UpdateServiceTests : IDisposable
         http.Routes[ManifestUrl + ".sig"] = () => Ok(Encoding.UTF8.GetBytes("{\"signatures\":[]}"));
         http.Routes[PackageUrl] = () => Redirect(AssetUrl);
         http.Routes[AssetUrl] = () => Ok(Package);
-        var service = new UpdateService(http, () => new Uri("https://videos.api.alummahnow.net"), core, installer, Path.Combine(_dir, "updates.json"), Path.Combine(_dir, "dl"), "2026.11.22", "windows", "x64", () => busy);
+        var service = new UpdateService(http, () => new Uri("https://videos.api.alummahnow.net"), core, installer, Path.Combine(_dir, "updates.json"), Path.Combine(_dir, "dl"), "2026.11.22", "windows", "x64", () => busy, rootKey);
         return (service, core, installer, http);
     }
 
@@ -131,7 +133,6 @@ public sealed class UpdateServiceTests : IDisposable
         core.Sha = new string('0', 64);
         await service.CheckAsync(userAsked: false);
         Assert.Equal(UpdateStage.Hidden, service.View.Stage);
-        Assert.Null(service.View.Url);
         Assert.Null(installer.Staged);
         Assert.Contains("\"reason\":\"hash\"", http.Reported);
         Assert.Empty(Directory.Exists(Path.Combine(_dir, "dl")) ? Directory.GetFiles(Path.Combine(_dir, "dl")) : Array.Empty<string>());
@@ -180,15 +181,15 @@ public sealed class UpdateServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task Download_only_builds_open_the_page_and_the_bar_closes_per_version()
+    public async Task Download_only_builds_open_the_fixed_page_never_the_answers_and_the_bar_closes_per_version()
     {
         var (service, core, installer, _) = Make();
         installer.CanSelfUpdate = false;
-        core.Prompt = core.Prompt with { Action = "download", ManifestUrl = null };
+        core.Prompt = core.Prompt with { Action = "download", ManifestUrl = null, Url = "https://example.com/elsewhere" };
         await service.CheckAsync(userAsked: false);
         Assert.Equal(UpdateStage.Available, service.View.Stage);
         Assert.True(service.View.DownloadOnly);
-        Assert.Equal(core.Prompt.Url, await service.UpdateNowAsync());
+        Assert.Equal("https://github.com/Al-Ummah-Now/AlUmmahNowTools/releases", await service.UpdateNowAsync());
         service.Dismiss();
         Assert.Equal(new[] { "2026.11.23" }, core.Dismissed);
         Assert.Equal(UpdateStage.Hidden, service.View.Stage);
@@ -223,9 +224,89 @@ public sealed class UpdateServiceTests : IDisposable
         Assert.Equal(1, idleInstaller.Restarts);
     }
 
+    [Theory]
+    [InlineData("install")]
+    [InlineData("download")]
+    [InlineData("notice")]
+    public async Task Without_a_root_key_every_update_is_the_notice_with_the_fixed_page(string action)
+    {
+        var (service, core, installer, http) = Make(rootKey: false);
+        core.Prompt = core.Prompt with { Action = action, Url = "https://example.com/elsewhere" };
+        await service.CheckAsync(userAsked: true);
+        Assert.Equal(UpdateStage.Available, service.View.Stage);
+        Assert.True(service.View.DownloadOnly);
+        Assert.False(service.CanSelfUpdate);
+        Assert.Equal(UpdateService.DownloadPage, await service.UpdateNowAsync());
+        core.Prompt = core.Prompt with { Kind = "Forced" };
+        await service.CheckAsync(userAsked: true);
+        Assert.Equal(UpdateStage.Forced, service.View.Stage);
+        Assert.True(service.View.DownloadOnly);
+        Assert.Equal(UpdateService.DownloadPage, await service.UpdateNowAsync());
+        Assert.Null(installer.Staged);
+        Assert.All(http.Calls, u => Assert.Contains("/api/v1/app-config?", u));
+        Assert.All(http.Calls, u => Assert.Contains("source=managed", u));
+    }
+
+    [Fact]
+    public async Task With_a_root_key_a_notice_answer_is_nothing_and_never_forces()
+    {
+        var (service, core, _, http) = Make();
+        core.Prompt = core.Prompt with { Action = "notice" };
+        await service.CheckAsync(userAsked: true);
+        Assert.Equal(UpdateStage.Hidden, service.View.Stage);
+        core.Prompt = core.Prompt with { Kind = "Forced" };
+        await service.CheckAsync(userAsked: true);
+        Assert.Equal(UpdateStage.RequiredSoon, service.View.Stage);
+        Assert.Null(await service.UpdateNowAsync());
+        Assert.Equal(2, http.Calls.Count);
+    }
+
+    [Fact]
+    public async Task The_forced_screen_needs_a_verified_manifest_and_stays_through_the_update()
+    {
+        var (service, core, _, http) = Make();
+        core.Prompt = core.Prompt with { Kind = "Forced" };
+        core.Refuse = "bad_signature";
+        await service.CheckAsync(userAsked: true);
+        Assert.Equal(UpdateStage.RequiredSoon, service.View.Stage);
+        Assert.Contains("\"reason\":\"bad_signature\"", http.Reported);
+        core.Refuse = null;
+        await service.CheckAsync(userAsked: true);
+        Assert.Equal(UpdateStage.Forced, service.View.Stage);
+        var stages = new List<UpdateView>();
+        service.Changed += stages.Add;
+        await service.UpdateNowAsync();
+        Assert.All(stages, v => Assert.True(v.Required));
+        Assert.Equal(UpdateStage.Ready, service.View.Stage);
+        await service.CheckAsync(userAsked: true);
+        Assert.True(service.View is { Stage: UpdateStage.Ready, Required: true });
+    }
+
+    [Fact]
+    public async Task A_signed_manifest_for_another_version_than_the_answers_is_refused()
+    {
+        var (service, core, installer, http) = Make();
+        core.Prompt = core.Prompt with { Version = "2026.11.24" };
+        await service.CheckAsync(userAsked: true);
+        Assert.Null(installer.Staged);
+        Assert.Contains("\"reason\":\"wrong_tag\"", http.Reported);
+    }
+
+    [Fact]
+    public async Task A_staged_update_installs_as_the_app_exits_and_not_before()
+    {
+        var (service, _, installer, _) = Make();
+        service.OnExit();
+        Assert.Equal(0, installer.Exits);
+        await service.CheckAsync(userAsked: false);
+        Assert.Equal(0, installer.Exits);
+        service.OnExit();
+        Assert.Equal(1, installer.Exits);
+    }
+
     [Fact]
     public void A_handler_that_follows_redirects_by_itself_is_refused()
     {
-        Assert.Throws<ArgumentException>(() => new UpdateService(new SocketsHttpHandler(), () => new Uri("https://x"), new FakeCore(), new FakeInstaller(), Path.Combine(_dir, "s.json"), _dir, "1.0.0", "windows", "x64", () => false));
+        Assert.Throws<ArgumentException>(() => new UpdateService(new SocketsHttpHandler(), () => new Uri("https://x"), new FakeCore(), new FakeInstaller(), Path.Combine(_dir, "s.json"), _dir, "1.0.0", "windows", "x64", () => false, true));
     }
 }

@@ -13,4 +13,9 @@
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="9.0.0" />
     <InternalsVisibleTo Include="AlUmmahNow.ToolsCore.Tests" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- The root-signed update key list, byte for byte (its signature covers the exact bytes; .gitattributes) -->
+    <EmbeddedResource Include="Updates/keys/update-keys.json" LogicalName="update-keys.json" />
+    <EmbeddedResource Include="Updates/keys/update-keys.json.sig" LogicalName="update-keys.json.sig" />
+  </ItemGroup>
 </Project>

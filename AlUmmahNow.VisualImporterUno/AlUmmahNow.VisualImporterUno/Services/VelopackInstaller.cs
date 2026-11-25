@@ -39,11 +39,19 @@ public sealed class VelopackInstaller : IUpdateInstaller
         if (_manager is null) throw new InvalidOperationException("not a self-updating install");
         VerifiedFileSource.Offer(packagePath, release.Version, artifact);
         var info = await _manager.CheckForUpdatesAsync().ConfigureAwait(false)
-            ?? throw new UpdateVerificationException("no_package");
+            ?? throw new UpdateVerificationException("bad_manifest");
         await _manager.DownloadUpdatesAsync(info, cancelToken: cancel).ConfigureAwait(false);
         _staged = info;
-        // Installs when the app closes; Restart now applies it at once
-        _manager.WaitExitThenApplyUpdates(info.TargetFullRelease, silent: true, restart: false);
+    }
+
+    /// <summary>
+    /// Called as the app exits, never earlier: Velopack's updater gives up 60 seconds after it starts waiting. If it
+    /// can't run, the next start installs the staged package (VelopackApp's default).
+    /// </summary>
+    public void ApplyOnExit()
+    {
+        if (_manager is null || _staged is null) return;
+        _manager.WaitExitThenApplyUpdates(_staged.TargetFullRelease, silent: true, restart: false);
     }
 
     public void ApplyAndRestart()

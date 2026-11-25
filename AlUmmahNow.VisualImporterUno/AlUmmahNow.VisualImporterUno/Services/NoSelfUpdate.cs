@@ -7,5 +7,6 @@ public sealed class NoSelfUpdate : IUpdateInstaller
 {
     public bool CanSelfUpdate => false;
     public Task StageAsync(string packagePath, CoreRelease release, CoreArtifact artifact, CancellationToken cancel) => Task.CompletedTask;
+    public void ApplyOnExit() { }
     public void ApplyAndRestart() { }
 }

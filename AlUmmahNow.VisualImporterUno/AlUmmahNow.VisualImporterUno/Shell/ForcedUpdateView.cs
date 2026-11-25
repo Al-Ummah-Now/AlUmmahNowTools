@@ -19,9 +19,6 @@ public sealed partial class ForcedUpdateView : UserControl
     private readonly Button _update = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
     private readonly Button _quit = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
     private readonly ProgressBar _progress = new() { Visibility = Visibility.Collapsed };
-    /// <summary>The forced screen was shown: it stays up while that update downloads and waits for a restart</summary>
-    private bool _shown;
-
     public ForcedUpdateView(UpdateService service)
     {
         _service = service;
@@ -62,8 +59,7 @@ public sealed partial class ForcedUpdateView : UserControl
 
     private void Render(UpdateView v)
     {
-        var forced = v.Stage == UpdateStage.Forced || (_shown && v.Stage is UpdateStage.Downloading or UpdateStage.Ready);
-        _shown = forced;
+        var forced = v.Stage == UpdateStage.Forced || (v.Required && v.Stage is UpdateStage.Downloading or UpdateStage.Ready);
         Visibility = forced ? Visibility.Visible : Visibility.Collapsed;
         if (!forced) return;
         FlowDirection = Loc.IsArabic ? FlowDirection.RightToLeft : FlowDirection.LeftToRight;

@@ -3,23 +3,25 @@ using AlUmmahNow.Core;
 namespace AlUmmahNow.ToolsCore.Updates;
 
 /// <summary>
-/// The trust anchors this build carries (wiki AUN-APP-UPDATES §3.5): the repo's offline root public keys and the
-/// root-signed key list current at build time. Empty until the owner provides the Tools root key (K-R); with no root
-/// key the app trusts no release and shows no update notice (fail closed, §5.5).
+/// The trust anchors this build carries (wiki AUN-APP-UPDATES §3.5): the repo's offline root public key and the
+/// root-signed key list current at build time, both compiled in. With no root key a build trusts no release and only
+/// shows the notice with its fixed link (§5.5).
 /// </summary>
 public static class ToolsUpdateKeys
 {
-    /// <summary>Base64 raw ed25519 root public keys (not secret); the release workflow never changes these.</summary>
-    public static readonly string[] RootKeys = Array.Empty<string>();
+    /// <summary>Base64 raw ed25519 root public keys (not secret). The private key is offline with the owner.</summary>
+    public static readonly string[] RootKeys = { "WDF0ms+fkqEYaNE9+4ouJJUzdja9NV+sZkoitP8P2kg=" };
 
-    /// <summary>The key list and its root signature as of this build, or null (written by the release workflow).</summary>
-    public static string? BundledKeyList => Read("update-keys.json");
-    public static string? BundledKeyListSig => Read("update-keys.json.sig");
+    /// <summary>The key list and its root signature as of this build.</summary>
+    public static string BundledKeyList => Read("update-keys.json");
+    public static string BundledKeyListSig => Read("update-keys.json.sig");
 
-    private static string? Read(string name)
+    private static string Read(string name)
     {
-        var path = Path.Combine(AppContext.BaseDirectory, name);
-        return File.Exists(path) ? File.ReadAllText(path) : null;
+        using var stream = typeof(ToolsUpdateKeys).Assembly.GetManifestResourceStream(name)
+            ?? throw new InvalidOperationException($"{name} is not in the build");
+        using var reader = new StreamReader(stream, new System.Text.UTF8Encoding(false));
+        return reader.ReadToEnd();
     }
 }
 
@@ -30,14 +32,13 @@ public sealed class CoreUpdateChecker : IUpdateCore, IDisposable
 
     public CoreUpdateChecker(string installedVersion, string? stateJson)
     {
-        string? list = ToolsUpdateKeys.BundledKeyList, sig = ToolsUpdateKeys.BundledKeyListSig;
         try
         {
-            _checker = new UpdateChecker(UpdateService.Repo, ToolsUpdateKeys.RootKeys, installedVersion, false, stateJson, list, sig);
+            _checker = new UpdateChecker(UpdateService.Repo, ToolsUpdateKeys.RootKeys, installedVersion, false, stateJson, ToolsUpdateKeys.BundledKeyList, ToolsUpdateKeys.BundledKeyListSig);
         }
         catch (AunException)
         {
-            // A bundled list that doesn't verify is ignored rather than stopping the app: nothing is trusted then
+            // A bundled list that doesn't verify (a test refuses such a build) must not stop the app: nothing is trusted then
             _checker = new UpdateChecker(UpdateService.Repo, ToolsUpdateKeys.RootKeys, installedVersion, false, stateJson, null, null);
         }
     }

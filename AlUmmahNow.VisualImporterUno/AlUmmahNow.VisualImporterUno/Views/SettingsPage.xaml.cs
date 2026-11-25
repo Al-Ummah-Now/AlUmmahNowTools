@@ -24,11 +24,12 @@ namespace AlUmmahNow.VisualImporterUno.Views
         /// <summary>Settings → Updates (wiki AUN-APP-UPDATES §5.3): version, last check, install automatically, Check now.</summary>
         private void ShowUpdates()
         {
-            if (AppUpdates.Service is not { CanSelfUpdate: true, Enabled: true } updates) return;
+            if (AppUpdates.Service is not { Enabled: true } updates) return;
             UpdatesCard.Visibility = Visibility.Visible;
             UpdatesTitle.Text = Loc.Get("Update_SettingsTitle");
             UpdatesVersion.Text = Loc.Format("Update_SettingsVersion", Loc.Version(updates.InstalledVersion));
             UpdatesLastChecked.Text = updates.LastChecked is { } at ? Loc.Format("Update_SettingsLastChecked", Loc.When(at.LocalDateTime)) : Loc.Get("Update_SettingsNeverChecked");
+            UpdatesAuto.Visibility = UpdatesAutoHint.Visibility = updates.CanSelfUpdate ? Visibility.Visible : Visibility.Collapsed;
             UpdatesAuto.Header = Loc.Get("Update_SettingsAuto");
             UpdatesAuto.IsOn = updates.AutoInstall;
             UpdatesAutoHint.Text = Loc.Get("Update_SettingsAutoHint");

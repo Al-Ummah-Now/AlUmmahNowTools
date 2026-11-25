@@ -26,7 +26,7 @@ public static class AppUpdates
 
     public static string Platform => OperatingSystem.IsWindows() ? "windows" : OperatingSystem.IsMacOS() ? "macos" : "linux";
 
-    public static string Arch => System.Runtime.InteropServices.RuntimeInformation.OSArchitecture == System.Runtime.InteropServices.Architecture.Arm64 ? "arm64" : "x64";
+    public static string Arch => System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture == System.Runtime.InteropServices.Architecture.Arm64 ? "arm64" : "x64";
 
     public static void Start(ShellState state, IUpdateInstaller installer)
     {
@@ -42,7 +42,9 @@ public static class AppUpdates
             demo is { Length: > 0 } ? "2026.11.22" : InstalledVersion,
             Platform,
             Arch,
-            IsBusy);
+            IsBusy,
+            ToolsUpdateKeys.RootKeys.Length > 0);
+        AppDomain.CurrentDomain.ProcessExit += (_, _) => Service?.OnExit();
         if (demo is { Length: > 0 }) Service.Preview(DemoView(demo));
         else Service.Start();
     }
@@ -54,11 +56,14 @@ public static class AppUpdates
         return state switch
         {
             "available" => new UpdateView(UpdateStage.Available, "2026.11.23", notesEn, notesAr),
-            "download" => new UpdateView(UpdateStage.Available, "2026.11.23", notesEn, notesAr, DownloadOnly: true, Url: "https://github.com/Al-Ummah-Now/AlUmmahNowTools/releases/tag/v2026.11.23"),
+            "download" => new UpdateView(UpdateStage.Available, "2026.11.23", notesEn, notesAr, DownloadOnly: true),
+            // A build with no root key (wiki §5.5): the version, no notes, the fixed page
+            "notice" => new UpdateView(UpdateStage.Available, "2026.11.23", DownloadOnly: true),
             "downloading" => new UpdateView(UpdateStage.Downloading, "2026.11.23", notesEn, notesAr, Progress: 0.42),
             "ready" => new UpdateView(UpdateStage.Ready, "2026.11.23", notesEn, notesAr),
             "required-soon" => new UpdateView(UpdateStage.RequiredSoon),
-            "forced" => new UpdateView(UpdateStage.Forced, "2026.11.23", notesEn, notesAr, "Sign-in changed. This version can no longer reach the server.", "تغيّر تسجيل الدخول. لم يعد هذا الإصدار يصل إلى الخادم."),
+            "forced" => new UpdateView(UpdateStage.Forced, "2026.11.23", notesEn, notesAr, "Sign-in changed. This version can no longer reach the server.", "تغيّر تسجيل الدخول. لم يعد هذا الإصدار يصل إلى الخادم.", Required: true),
+            "forced-notice" => new UpdateView(UpdateStage.Forced, "2026.11.23", DownloadOnly: true, Required: true),
             _ => UpdateView.None,
         };
     }
@@ -78,8 +83,10 @@ public static class AppUpdates
 
     private sealed class DemoInstaller : IUpdateInstaller
     {
-        public bool CanSelfUpdate => true;
+        // The notice states are builds that can't install an update: Settings has no automatic switch
+        public bool CanSelfUpdate => Environment.GetEnvironmentVariable("TOOLS_DEMO_UPDATE") is not ("notice" or "forced-notice" or "download");
         public Task StageAsync(string packagePath, CoreRelease release, CoreArtifact artifact, CancellationToken cancel) => Task.CompletedTask;
+        public void ApplyOnExit() { }
         public void ApplyAndRestart() { }
     }
 }
