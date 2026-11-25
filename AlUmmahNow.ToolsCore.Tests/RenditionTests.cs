@@ -116,7 +116,7 @@ internal sealed class FakeMedia : IMediaTools
     /// <summary>How long what was encoded is, when not as long as the file</summary>
     public double? Encoded;
 
-    public Task<SourceInfo> ProbeAsync(string path, CancellationToken ct) => Fail is LocalEncodeException { Code: "probe_failed" or "no_video" } ? throw Fail
+    public Task<SourceInfo> ProbeAsync(string path, CancellationToken ct) => Fail is LocalEncodeException { Code: "probe_failed" or "no_video" or "no_media" } ? throw Fail
         : Task.FromResult(Encoded is { } seconds && Encodes > 0 ? Info with { DurationSeconds = seconds } : Info);
 
     public Task<string?> PickEncoderAsync(CancellationToken ct) => Task.FromResult(Encoder);

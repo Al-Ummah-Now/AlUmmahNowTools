@@ -550,7 +550,8 @@ public sealed class ServerFailureSink : IImportFailureSink
                 ["fileSize"] = item.Video.Size,
             },
             reference: reference);
-        if (step.Kind == ImportStepKind.Upload && item.ServerItemId is not null && !item.AlreadyImported)
+        // The encode opens the file's video on the server before its upload
+        if (step.Kind is ImportStepKind.Upload or ImportStepKind.Encode && item.ServerItemId is not null && !item.AlreadyImported)
         {
             await _api.MarkFailedAsync(item.ServerItemId, answer ? message : $"{message} (reference {reference})", ct).ConfigureAwait(false);
         }

@@ -536,6 +536,14 @@ public sealed class EncodeStep : IImportStep
             WorkFiles.DeleteFolder(directory, _workRoot, item.Id);
             throw;
         }
+        catch (LocalEncodeException ex) when (ex.Code is "no_video" or "no_media")
+        {
+            // The server would find the same once everything was sent: refused as when it is checked
+            WorkFiles.DeleteFolder(directory, _workRoot, item.Id);
+            throw ex.Code == "no_video"
+                ? new StepFailedException("no_video", "The file has sound and no video", retryable: false, ex)
+                : new StepFailedException("not_video", "The file cannot be read as a video: it may have been cut off while it was copied", retryable: false, ex);
+        }
         catch (Exception ex) when (ex is LocalEncodeException or IOException or UnauthorizedAccessException)
         {
             // Not the file's failure: the server encodes it as any upload

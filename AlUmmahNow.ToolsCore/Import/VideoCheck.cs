@@ -79,7 +79,8 @@ public static class Mp4Index
         }
         // No index, or nothing it could be about
         if (!index || (data.Count == 0 && (fragments || !tracks.Elsewhere))) return VideoContent.Damaged;
-        if (!tracks.Video) return tracks.Sound ? VideoContent.NoVideo : VideoContent.Damaged;
+        // The pictures of a sound's chapters are no video (ffprobe's attached pictures)
+        if (!tracks.Videos.Exists(id => !tracks.Chapters.Contains(id))) return tracks.Sound ? VideoContent.NoVideo : VideoContent.Damaged;
         return await EmptyAsync(reader, data, ct).ConfigureAwait(false) ? VideoContent.Damaged : VideoContent.Video;
     }
 
@@ -108,7 +109,10 @@ public static class Mp4Index
 
     private sealed class Tracks
     {
-        public bool Video, Sound;
+        public bool Sound;
+        /// <summary>The ids of the video tracks, and of every track that holds another one's chapters</summary>
+        public readonly List<uint> Videos = [];
+        public readonly HashSet<uint> Chapters = [];
         /// <summary>The index is compressed (old QuickTime)</summary>
         public bool Packed;
         /// <summary>The data may be in another file (a reference movie)</summary>
@@ -119,6 +123,8 @@ public static class Mp4Index
     {
         public string Handler = "", Codec = "";
         public long Samples = -1;
+        public uint Id;
+        public readonly List<uint> Chapters = [];
     }
 
     /// <summary>False when the index itself cannot be read.</summary>
@@ -136,7 +142,8 @@ public static class Mp4Index
                 if (!await TrackAsync(reader, box, track, ct).ConfigureAwait(false)) return false;
                 if (track.Handler == "soun") tracks.Sound = true;
                 // A cover is one still picture
-                else if (track.Handler == "vide" && !(track.Samples == 1 && Stills.Contains(track.Codec))) tracks.Video = true;
+                else if (track.Handler == "vide" && !(track.Samples == 1 && Stills.Contains(track.Codec))) tracks.Videos.Add(track.Id);
+                tracks.Chapters.UnionWith(track.Chapters);
             }
             at = box.End;
         }
@@ -152,7 +159,16 @@ public static class Mp4Index
             var length = box.End - box.Content;
             switch (box.Type)
             {
-                case "mdia" or "minf" or "stbl":
+                // Version and flags, when it was made and changed (8 bytes each from version 1 on), then its number
+                case "tkhd" when length >= 24:
+                    var version = (await reader.ReadAsync(box.Content, 1, ct).ConfigureAwait(false)).Span[0];
+                    track.Id = BinaryPrimitives.ReadUInt32BigEndian((await reader.ReadAsync(box.Content + (version == 0 ? 12 : 20), 4, ct).ConfigureAwait(false)).Span);
+                    break;
+                case "chap" when parent.Type == "tref":
+                    for (var i = 0; i < Math.Min(length / 4, 16); i++)
+                        track.Chapters.Add(BinaryPrimitives.ReadUInt32BigEndian((await reader.ReadAsync(box.Content + (i * 4), 4, ct).ConfigureAwait(false)).Span));
+                    break;
+                case "tref" or "mdia" or "minf" or "stbl":
                     if (!await TrackAsync(reader, box, track, ct).ConfigureAwait(false)) return false;
                     break;
                 // Version and flags, the reserved type, then what the track is. The first: QuickTime has another in its minf
@@ -227,8 +243,9 @@ public static class Mp4Index
 
 /// <summary>
 /// A file goes up only when it has a video in it: the server takes no sound alone, and finds out only once everything was
-/// sent. MP4 and MOV files are read here; the rest by ffprobe, when this computer has it. What cannot be told is no reason to
-/// refuse a file.
+/// sent. MP4 and MOV files are read here, the rest by ffprobe, when this computer has it. ffprobe, which is what the server
+/// looks with, is also asked whether it finds a video in what is one by its index: its "sound alone" holds. What cannot be told
+/// is no reason to refuse a file.
 /// </summary>
 internal static class VideoCheck
 {
@@ -237,28 +254,12 @@ internal static class VideoCheck
 
     public static async Task RunAsync(QueueItem item, SourceAccess source, IMediaTools? media, IStepContext context, CancellationToken ct, TimeSpan? limit = null)
     {
-        if (item.VideoChecked) return;
+        if (item.VideoChecked && item.VideoProbed) return;
         var video = item.Video;
-        VideoContent content;
-        using (var time = CancellationTokenSource.CreateLinkedTokenSource(ct))
-        {
-            var allowed = limit ?? Limit;
-            if (allowed > TimeSpan.Zero) time.CancelAfter(allowed);
-            else await time.CancelAsync().ConfigureAwait(false);
-            try
-            {
-                var stream = source.Open(video.Path, video.Size, video.LastModifiedMs, context);
-                await using (stream.ConfigureAwait(false))
-                {
-                    content = await Mp4Index.ReadAsync(stream, video.Size, time.Token).ConfigureAwait(false);
-                }
-            }
-            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
-            {
-                content = VideoContent.Undecided;
-            }
-        }
+        var content = VideoContent.Video;
+        if (!item.VideoChecked) content = await IndexAsync(video, source, context, limit ?? Limit, ct).ConfigureAwait(false);
         if (content == VideoContent.Unknown) content = await ProbeAsync(video.Path, source, media, context, ct).ConfigureAwait(false);
+        else if (content is VideoContent.Video or VideoContent.Undecided && await HasNoVideoAsync(video.Path, source, media, context, ct).ConfigureAwait(false)) content = VideoContent.NoVideo;
         switch (content)
         {
             case VideoContent.NoVideo:
@@ -272,8 +273,53 @@ internal static class VideoCheck
                 context.Log(LogLevel.Warning, "video_undecided", "Whether the file has a video in it could not be told; it goes up");
                 break;
         }
-        item.VideoChecked = true;
+        item.VideoChecked = item.VideoProbed = true;
         context.Save();
+    }
+
+    private static async Task<VideoContent> IndexAsync(ScannedVideo video, SourceAccess source, IStepContext context, TimeSpan allowed, CancellationToken ct)
+    {
+        using (var time = CancellationTokenSource.CreateLinkedTokenSource(ct))
+        {
+            if (allowed > TimeSpan.Zero) time.CancelAfter(allowed);
+            else await time.CancelAsync().ConfigureAwait(false);
+            try
+            {
+                var stream = source.Open(video.Path, video.Size, video.LastModifiedMs, context);
+                await using (stream.ConfigureAwait(false))
+                {
+                    return await Mp4Index.ReadAsync(stream, video.Size, time.Token).ConfigureAwait(false);
+                }
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                return VideoContent.Undecided;
+            }
+        }
+    }
+
+    /// <summary>How long ffprobe may look at a file whose index was read (a slow share)</summary>
+    private static readonly TimeSpan ProbeLimit = TimeSpan.FromMinutes(1);
+
+    /// <summary>ffprobe found sound and no video; anything else it says, or cannot say, leaves what the index said.</summary>
+    private static async Task<bool> HasNoVideoAsync(string path, SourceAccess source, IMediaTools? media, IStepContext context, CancellationToken ct)
+    {
+        if (media is null) return false;
+        using var time = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        time.CancelAfter(ProbeLimit);
+        try
+        {
+            await source.WithPathAsync(path, context, p => media.ProbeAsync(p, time.Token), time.Token).ConfigureAwait(false);
+            return false;
+        }
+        catch (LocalEncodeException probe)
+        {
+            return probe.Code == "no_video";
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            return false;
+        }
     }
 
     private static async Task<VideoContent> ProbeAsync(string path, SourceAccess source, IMediaTools? media, IStepContext context, CancellationToken ct)
