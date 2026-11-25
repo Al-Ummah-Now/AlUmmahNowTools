@@ -142,6 +142,7 @@ public class LocalPathsTests
     [InlineData("file:///Users/someone/a.mp4")]
     [InlineData("file:%2F%2FUsers%2Fsomeone")]
     [InlineData("~/Movies/a.mp4")]
+    [InlineData("~someone/Movies/a.mp4")]
     [InlineData("//nas/media/a.mp4")]
     [InlineData("in ../Lessons/a.mp4")]
     [InlineData("(/data/x)")]
@@ -156,7 +157,7 @@ public class LocalPathsTests
     [Theory]
     [InlineData("[in#0/mov @ 0x1] [error] Error during demuxing: Invalid argument")]
     [InlineData("POST https://admin.api.example/api/admin/import/items (500)")]
-    [InlineData("kb/s and/or 10 s, 3 / 4, a: b")]
+    [InlineData("kb/s and/or 10 s, 3 / 4, a: b, ~10/20")]
     [InlineData("الملف و/أو الصوت: تعذّرت القراءة")]
     [InlineData("no path at all")]
     [InlineData("")]
@@ -170,6 +171,17 @@ public class LocalPathsTests
         if (Path.IsPathRooted(EncodeStep.DefaultWorkRoot)) Assert.Equal(Instead, Clean("full: " + Path.Combine(EncodeStep.DefaultWorkRoot, "x", "360p.mp4")));
         // Not a drive: a word before a colon stays
         Assert.Equal("the doc: gone, etc:", Clean("the doc: gone, etc:", @"C:\a b\c.mp4"));
+    }
+
+    [Fact]
+    public void Nothing_and_slashes_alone_are_no_trouble()
+    {
+        Assert.Equal("", LocalPaths.Clean(null, Instead));
+        Assert.Equal("gone", LocalPaths.Clean("gone", Instead, ["/", "\\\\", ""]));
+        var slashes = new string('/', 50_000) + "x";
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        Assert.Equal(Instead, LocalPaths.Clean(slashes, Instead, ["/Volumes/Media/a.mp4", @"\\nas\media\a.mp4"]));
+        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(10), clock.Elapsed.ToString());
     }
 
     [Fact]

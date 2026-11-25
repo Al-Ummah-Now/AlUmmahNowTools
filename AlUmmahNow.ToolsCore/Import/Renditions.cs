@@ -506,7 +506,7 @@ public sealed class FfmpegMediaTools : IMediaTools
         try { File.Delete(wavPath); } catch (IOException) { } catch (UnauthorizedAccessException) { }
         if (stopped is not null) throw stopped;
         // "-map 0:a:0" matches nothing in a file without sound
-        throw new LocalEncodeException(error.Contains("matches no streams", StringComparison.Ordinal) ? "no_audio" : "ffmpeg_failed", "ffmpeg could not read the file's sound: " + Why(error, source));
+        throw new LocalEncodeException(error.Contains("matches no streams", StringComparison.Ordinal) ? "no_audio" : "ffmpeg_failed", "ffmpeg could not read the file's sound: " + Why(error, source)) { ExitCode = code };
     }
 
     private static async Task<(int Code, string Output, string Error)> RunAsync(string exe, IEnumerable<string> args, Action<string>? onLine, CancellationToken ct, string? folder = null)
@@ -901,7 +901,7 @@ public sealed class EncodeStep : IImportStep
                 catch (LocalEncodeException unreadable)
                 {
                     // That is what was made, not the file
-                    throw new LocalEncodeException("ffmpeg_failed", "The encoded video cannot be read: " + unreadable.Message, unreadable);
+                    throw new LocalEncodeException("ffmpeg_failed", "The encoded video cannot be read: " + unreadable.Message, unreadable) { ExitCode = unreadable.ExitCode };
                 }
                 if (plan.Info.Missing(made) is { } missing) throw new LocalEncodeException("too_short", missing);
                 if (made.Colour is { } colours && SdrPlan.For(plan.Info.Colour).Wrong(colours) is { } wrong) throw new LocalEncodeException("colour_tags", wrong);
