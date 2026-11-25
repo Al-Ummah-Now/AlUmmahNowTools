@@ -6,7 +6,7 @@ name: Review frames
 #
 # states: one state per line, `name: VAR=value VAR=value`. The variables are the app's demo switches, for example
 #   import-paused: TOOLS_DEMO_PAGE=import TOOLS_DEMO_IMPORT=paused
-#   quit-question: TOOLS_DEMO_PAGE=import TOOLS_SCREENSHOT_QUIT=1
+#   import-paused: TOOLS_DEMO_PAGE=import TOOLS_DEMO_IMPORT=paused
 # variants: any of en-dark, en-light, ar-dark, ar-light (space or comma separated).
 on:
   workflow_dispatch:
@@ -14,7 +14,7 @@ on:
       states:
         description: 'One per line: name: VAR=value VAR=value'
         required: true
-        default: 'quit-question: TOOLS_DEMO_PAGE=import TOOLS_SCREENSHOT_QUIT=1'
+        default: 'import-paused: TOOLS_DEMO_PAGE=import TOOLS_DEMO_IMPORT=paused'
       variants:
         description: Languages and themes
         required: false
@@ -48,30 +48,47 @@ jobs:
           VARIANTS: ${{ inputs.variants }}
           SIZE: ${{ inputs.size }}
         run: |
+          set -f # nothing from the inputs is ever a glob
           exe="$PWD/AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno/bin/Release/net9.0-desktop/AlUmmahNow.VisualImporterUno"
           mkdir -p frames
           failed=0
+          frames=0
           [[ "$SIZE" =~ ^[0-9]{3,4}x[0-9]{3,4}$ ]] || { echo "::error::bad size '$SIZE'"; exit 1; }
+          variants=${VARIANTS//,/ }
+          for variant in $variants; do
+            [[ "$variant" =~ ^(en|ar)-(dark|light)$ ]] || { echo "::error::bad variant '$variant'"; exit 1; }
+          done
+          [ -n "${variants// /}" ] || { echo "::error::no variants"; exit 1; }
           while IFS= read -r line; do
             line=$(echo "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
             [ -n "$line" ] || continue
             name=${line%%:*}; vars=${line#*:}
             [[ "$name" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "::error::bad state name '$name'"; exit 1; }
-            # Only demo switches (UPPER_CASE=value) are taken from the input: never another word, so it cannot become a command
-            for word in $vars; do [[ "$word" =~ ^TOOLS_[A-Z0-9_]+=[A-Za-z0-9._/:-]*$ ]] || { echo "::error::'$word' is not a TOOLS_* demo switch"; exit 1; }; done
-            for variant in ${VARIANTS//,/ }; do
-              [[ "$variant" =~ ^(en|ar)-(dark|light)$ ]] || { echo "::error::bad variant '$variant'"; exit 1; }
+            # Only demo switches are taken from a state, never another word (it would run as a command), and never the ones
+            # the run fixes below (the demo mode that keeps the app off every server, where the frame goes, how long it waits)
+            for word in $vars; do
+              [[ "$word" =~ ^TOOLS_[A-Z0-9_]+=[A-Za-z0-9._:-]+$ ]] || { echo "::error::'$word' is not a TOOLS_NAME=value demo switch with a value"; exit 1; }
+              case "${word%%=*}" in
+                TOOLS_DEMO|TOOLS_DEMO_LANG|TOOLS_DEMO_THEME|TOOLS_SCREENSHOT|TOOLS_SCREENSHOT_SIZE|TOOLS_SCREENSHOT_DELAY_MS|TOOLS_SCREENSHOT_CROP|TOOLS_SMOKE_CLOSE|TOOLS_SMOKE_READY|TOOLS_SMOKE_CLOSE_DELAY_MS)
+                  echo "::error::$word is set by the run, not by a state"; exit 1;;
+              esac
+            done
+            for variant in $variants; do
               lang=${variant%%-*}; theme=${variant##*-}
               png="$PWD/frames/$name-$variant.png"
-              # shellcheck disable=SC2086 # the state's variables are separate words
-              env TOOLS_DEMO=1 TOOLS_DEMO_LANG="$lang" TOOLS_DEMO_THEME="$theme" TOOLS_SCREENSHOT="$png" TOOLS_SCREENSHOT_SIZE="$SIZE" TOOLS_SCREENSHOT_DELAY_MS=4000 TOOLS_SCREENSHOT_CROP=0 $vars \
+              # TOOLS_DEMO_UPDATE=none first (a state may give another value): without it the app asks the production server
+              # for updates after 30 s. The fixed switches come last, so nothing in a state can override them.
+              # shellcheck disable=SC2086 # the state's switches are separate words, checked above
+              env TOOLS_DEMO_UPDATE=none $vars TOOLS_DEMO=1 TOOLS_DEMO_LANG="$lang" TOOLS_DEMO_THEME="$theme" TOOLS_SCREENSHOT="$png" TOOLS_SCREENSHOT_SIZE="$SIZE" TOOLS_SCREENSHOT_DELAY_MS=4000 TOOLS_SCREENSHOT_CROP=0 \
                 "$exe" > "frames/$name-$variant.log" 2>&1 &
               pid=$!
-              for _ in $(seq 90); do kill -0 $pid 2>/dev/null || break; sleep 1; done
+              # The frame is written about 5 s after the start; 25 s is far inside the app's first update check (30 s)
+              for _ in $(seq 25); do kill -0 $pid 2>/dev/null || break; sleep 1; done
               kill -9 $pid 2>/dev/null || true
-              if [ -s "$png" ]; then echo "frame $name-$variant: $(wc -c < "$png") bytes"; else echo "::error::no frame for $name-$variant"; tail -n 30 "frames/$name-$variant.log"; failed=1; fi
+              if [ -s "$png" ]; then echo "frame $name-$variant: $(wc -c < "$png") bytes"; frames=$((frames + 1)); else echo "::error::no frame for $name-$variant"; tail -n 30 "frames/$name-$variant.log"; failed=1; fi
             done
           done <<< "$STATES"
+          [ "$frames" -gt 0 ] || { echo "::error::no state given"; exit 1; }
           exit $failed
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
