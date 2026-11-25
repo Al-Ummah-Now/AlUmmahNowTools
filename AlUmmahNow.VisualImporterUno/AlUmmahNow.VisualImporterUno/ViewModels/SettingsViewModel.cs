@@ -33,6 +33,7 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
         private bool _enableNotifications = true;
         private bool _enableNotificationSound = true;
         private readonly AlUmmahNow.ToolsCore.UserSettingsFile _file;
+        private bool _unread;
 
         public SettingsViewModel(IConfiguration configuration, ILogger<SettingsViewModel> logger, FileScanServiceManager serviceManager, INotificationService notificationService, AlUmmahNow.ToolsCore.UserSettingsFile? file = null)
         {
@@ -196,6 +197,12 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
             IsSaving = true;
             try
             {
+                // What was saved could not be read: what the page shows is not it, and is not written over it
+                if (_unread)
+                {
+                    LoadSettings();
+                    return false;
+                }
                 var settings = new
                 {
                     FileScanService = new { Url = FileScanServiceUrl },
@@ -230,12 +237,17 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
 
         public void ResetToDefaults()
         {
+            ResetScannerToDefaults();
+            EnableNotifications = true;
+            EnableNotificationSound = true;
+        }
+
+        private void ResetScannerToDefaults()
+        {
             FileScanServiceUrl = "http://localhost:5000";
             DatabaseConnectionString = "Server=(localdb)\\MSSQLLocalDB;Database=AlUmmahNowFileScan;Trusted_Connection=true;MultipleActiveResultSets=true;TrustServerCertificate=true";
             ServiceExecutablePath = "";
             AutoStartService = true;
-            EnableNotifications = true;
-            EnableNotificationSound = true;
             TestResults = "";
         }
 
@@ -244,6 +256,7 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
             try
             {
                 // The user settings file
+                _unread = false;
                 if (_file.Read() is { } json)
                 {
                     var settings = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(json);
@@ -288,7 +301,9 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Error loading settings, using defaults");
-                ResetToDefaults();
+                _unread = ex is IOException or UnauthorizedAccessException;
+                // Not the notification switches: they are saved as they are set, and elsewhere
+                ResetScannerToDefaults();
             }
         }
 

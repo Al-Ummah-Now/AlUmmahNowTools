@@ -2,21 +2,36 @@ using System.Text.Json;
 
 namespace AlUmmahNow.ToolsCore;
 
-/// <summary>The two notification switches: one place they are saved in, and both are on until they were changed.</summary>
+/// <summary>
+/// The two notification switches: one place they are saved in, and both are on until they were changed. A place that cannot be
+/// read or written now leaves them working, and only what was changed is saved later.
+/// </summary>
 public sealed class NotificationSwitches
 {
     private const string Section = "Notifications";
     private readonly ISettingsStore _store;
+    // What is to be saved with the next change: what was taken over and could not be saved
+    private readonly Dictionary<string, string> _unsaved = new();
 
     /// <param name="old">The Settings page's file, where they were saved too: taken over once</param>
     public NotificationSwitches(ISettingsStore store, UserSettingsFile? old = null)
     {
         _store = store;
-        var (enabled, sound) = (Saved("IsEnabled"), Saved("IsSoundEnabled"));
-        if (enabled is null && sound is null && Old(old) is { } before)
+        bool? enabled = null, sound = null;
+        try
         {
-            (enabled, sound) = before;
-            Save(enabled ?? true, sound ?? true);
+            (enabled, sound) = (Saved("IsEnabled"), Saved("IsSoundEnabled"));
+            if (enabled is null && sound is null && Old(old) is { } before)
+            {
+                (enabled, sound) = before;
+                if (enabled is { } e) _unsaved["IsEnabled"] = e.ToString();
+                if (sound is { } s) _unsaved["IsSoundEnabled"] = s.ToString();
+                Save();
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Not readable: nothing is written over it
         }
         (Enabled, Sound) = (enabled ?? true, sound ?? true);
     }
@@ -25,10 +40,27 @@ public sealed class NotificationSwitches
 
     public bool Sound { get; private set; }
 
-    public void Save(bool enabled, bool sound)
+    /// <exception cref="IOException">Changed, and not saved yet: saved with the next change (<see cref="UnauthorizedAccessException"/> too)</exception>
+    public void SetEnabled(bool value)
     {
-        (Enabled, Sound) = (enabled, sound);
-        _store.Set(Section, new Dictionary<string, string> { ["IsEnabled"] = enabled.ToString(), ["IsSoundEnabled"] = sound.ToString() });
+        Enabled = value;
+        _unsaved["IsEnabled"] = value.ToString();
+        Save();
+    }
+
+    /// <inheritdoc cref="SetEnabled"/>
+    public void SetSound(bool value)
+    {
+        Sound = value;
+        _unsaved["IsSoundEnabled"] = value.ToString();
+        Save();
+    }
+
+    private void Save()
+    {
+        if (_unsaved.Count == 0) return;
+        _store.Set(Section, new Dictionary<string, string>(_unsaved));
+        _unsaved.Clear();
     }
 
     private bool? Saved(string key) => bool.TryParse(_store.Get(Section, key), out var value) ? value : null;

@@ -67,6 +67,34 @@ public sealed class SettingsViewModelTests : IDisposable
         new UserSettingsFile(_dir).Read().Should().NotContain("Notifications");
     }
 
+    [Theory]
+    [InlineData("{ broken")]
+    [InlineData(null)]
+    public async Task SettingsThatCannotBeLoaded_ChangeNoNotificationSwitch_AndUnreadOnesAreNotWrittenOver(string? damaged)
+    {
+        var file = new UserSettingsFile(_dir);
+        file.Write(damaged ?? "{\"FileScanService\":{\"Url\":\"http://10.0.0.42:5000\"}}");
+        var notifications = new Mock<INotificationService>();
+        notifications.SetupProperty(n => n.IsEnabled, false);
+        notifications.SetupProperty(n => n.IsSoundEnabled, false);
+        SettingsViewModel vm;
+        using (damaged is null ? new FileStream(file.Path, FileMode.Open, FileAccess.Read, FileShare.None) : null)
+        {
+            vm = CreateViewModel(notifications: notifications);
+            notifications.Object.IsEnabled.Should().BeFalse();
+            notifications.Object.IsSoundEnabled.Should().BeFalse();
+            if (damaged is null) (await vm.SaveSettingsAsync()).Should().BeFalse();
+        }
+        if (damaged is null)
+        {
+            // Readable again: shown first, saved over only after that
+            (await vm.SaveSettingsAsync()).Should().BeFalse();
+            vm.FileScanServiceUrl.Should().Be("http://10.0.0.42:5000");
+            new UserSettingsFile(_dir).Read().Should().Contain("10.0.0.42");
+        }
+        (await vm.SaveSettingsAsync()).Should().BeTrue();
+    }
+
     [Fact]
     public void ScannerLocationText_DistinguishesLoopbackFromRemoteHost_AndNotifiesOnUrlChange()
     {

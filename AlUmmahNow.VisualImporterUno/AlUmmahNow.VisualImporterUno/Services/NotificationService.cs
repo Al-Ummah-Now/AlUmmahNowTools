@@ -113,7 +113,7 @@ public class NotificationService : INotificationService, IDisposable
         set
         {
             _isEnabled = value;
-            SaveSettings();
+            SaveSettings(switches => switches.SetEnabled(value));
         }
     }
 
@@ -123,7 +123,7 @@ public class NotificationService : INotificationService, IDisposable
         set
         {
             _isSoundEnabled = value;
-            SaveSettings();
+            SaveSettings(switches => switches.SetSound(value));
         }
     }
 
@@ -167,11 +167,12 @@ public class NotificationService : INotificationService, IDisposable
         }
     }
 
-    private void SaveSettings()
+    private void SaveSettings(Action<AlUmmahNow.ToolsCore.NotificationSwitches> save)
     {
         try
         {
-            _switches?.Save(_isEnabled, _isSoundEnabled);
+            if (_switches is null) return;
+            save(_switches);
 
             _logger.LogDebug("Notification settings saved");
         }
