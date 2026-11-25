@@ -125,7 +125,8 @@ public sealed record SdrPlan(string Kind, string Matrix = "bt709", string Primar
         }
         if (Kind != Convert) return "";
         string ColorSpace(string from, bool full) => $"colorspace=ispace={from}:iprimaries={Primaries}:itrc=bt709:irange={(full ? "pc" : "tv")}:space=bt709:primaries=bt709:trc=bt709:range=tv:format=yuv420p";
-        if (!Rgb) return $"scale={Even}:{Fine},{ColorSpace(Matrix, Full)},{Tags}";
+        // A crop, not a scale: swscale reads no YCgCo (a no-op at even sizes)
+        if (!Rgb) return $"crop=trunc(iw/2)*2:trunc(ih/2)*2:0:0,{ColorSpace(Matrix, Full)},{Tags}";
         var rgb = $"scale={Even}:{Fine}:out_color_matrix=bt709:out_range=tv";
         return Wide.Contains(Primaries) ? $"{rgb},format=yuv444p,{ColorSpace("bt709", false)},{Tags}" : $"{rgb},format=yuv420p,{Tags}";
     }
