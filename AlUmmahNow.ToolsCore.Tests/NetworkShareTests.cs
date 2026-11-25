@@ -170,6 +170,53 @@ public class NetworkSharePathTests
         Assert.False(paths.IsNetwork(@"C:\a.mp4"));
     }
 
+    /// <summary>The real calls, against a drive mapped to this computer's own share (the CI runner is an administrator).</summary>
+    [Fact]
+    public async Task Windows_itself_resolves_a_mapped_drive_and_a_subst_of_it()
+    {
+        if (!OperatingSystem.IsWindows() || Environment.GetEnvironmentVariable("GITHUB_ACTIONS") != "true") return;
+        static (int Code, string Output) Run(string exe, string args)
+        {
+            using var p = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(exe, args) { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false })!;
+            var output = p.StandardOutput.ReadToEnd() + p.StandardError.ReadToEnd();
+            p.WaitForExit();
+            return (p.ExitCode, output);
+        }
+        var folder = @"C:\aun-share-" + Guid.NewGuid().ToString("N");
+        Directory.CreateDirectory(Path.Combine(folder, "lessons"));
+        var bytes = new byte[100_000];
+        new Random(1).NextBytes(bytes);
+        File.WriteAllBytes(Path.Combine(folder, "lessons", "a.mp4"), bytes);
+        var share = @"\\localhost\C$\" + Path.GetFileName(folder);
+        try
+        {
+            var mapped = Run("net", $"use V: {share} /persistent:no");
+            Assert.True(mapped.Code == 0, mapped.Output);
+            Assert.Equal(0, Run("subst", @"W: V:\lessons").Code);
+            Assert.Equal(0, Run("subst", $@"X: {folder}\lessons").Code);
+            var access = SourceAccess.Default;
+            Assert.Equal(new[] { share + @"\lessons\a.mp4", @"V:\lessons\a.mp4" }, access.Candidates(@"V:\lessons\a.mp4"));
+            Assert.Equal(new[] { share + @"\lessons\a.mp4", @"W:\a.mp4" }, access.Candidates(@"W:\a.mp4"));
+            Assert.Equal(new[] { @"X:\a.mp4" }, access.Candidates(@"X:\a.mp4"));
+            Assert.True(access.IsNetwork(@"V:\lessons\a.mp4"));
+            Assert.False(access.IsNetwork(@"X:\a.mp4"));
+            Assert.Equal(bytes, await access.ReadAllBytesAsync(@"V:\lessons\a.mp4", null, default));
+            var scan = FolderScanner.Scan(@"W:\", false, null);
+            var video = Assert.Single(scan.Videos);
+            Assert.Equal(@"W:\a.mp4", video.Path);
+            await access.CheckUnchangedAsync(video, null, default, read: true);
+            var missing = await Assert.ThrowsAsync<SourceReadException>(() => access.StatAsync(@"V:\lessons\none.mp4", null, default));
+            Assert.Equal("file_missing", missing.Failure.Code);
+        }
+        finally
+        {
+            Run("subst", "W: /d");
+            Run("subst", "X: /d");
+            Run("net", "use V: /delete /y");
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
     [Fact]
     public void A_network_path_is_read_as_it_is()
     {
