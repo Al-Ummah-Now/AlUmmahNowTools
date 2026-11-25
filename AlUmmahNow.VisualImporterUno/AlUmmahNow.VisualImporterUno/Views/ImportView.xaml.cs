@@ -272,19 +272,17 @@ public sealed partial class ImportView : Page
                 case "errors-validation":
                     namePair.SetValues("Fiqh Academy", "");
                     descriptionPair.SetValues("Weekly lessons on the jurisprudence of worship.", "");
-                    namePair.SetErrors(
-                        ChannelFieldErrorText("NameEn", "too_long"),
-                        ChannelFieldErrorText("NameAr", "required"));
-                    descriptionPair.SetErrors(
-                        ChannelFieldErrorText("DescEn", "too_long"),
-                        ChannelFieldErrorText("DescAr", "required_pair"));
+                    // What Create answers for these texts: one language is missing in each pair
+                    namePair.SetErrors(null, ChannelFieldErrorText("NameAr", "required"));
+                    descriptionPair.SetErrors(null, ChannelFieldErrorText("DescAr", "required_pair"));
                     break;
             }
         }
 
         var error = new TextBlock { Style = (Style)Application.Current.Resources["ToolsMuted"], Visibility = Visibility.Collapsed };
         error.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["FanousErrorTextBrush"];
-        var panel = new StackPanel { Spacing = 14, MinWidth = 520 };
+        // The window has no smallest size: the dialog's content never asks for more than the window has
+        var panel = new StackPanel { Spacing = 14, MinWidth = Math.Min(520, Math.Max(0, XamlRoot.Size.Width - 96)) };
         panel.Children.Add(DialogText(Loc.Get("Import_NewChannelBody")));
         panel.Children.Add(namePair.Element);
         panel.Children.Add(handleLabel);
