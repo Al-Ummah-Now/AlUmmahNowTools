@@ -186,7 +186,7 @@ public partial class App : Application
             Log.Information("Application starting with temporary logger configuration");
 
             // Not Application.CreateBuilder: it makes a window of its own, which macOS shows, empty, under the app's
-            var builder = UnoHost.CreateDefaultBuilder(typeof(App).Assembly);
+            var builder = UnoHost.CreateDefaultBuilder();
             builder
 #if DEBUG
                     // Switch to Development environment when running in DEBUG
