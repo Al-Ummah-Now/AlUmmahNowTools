@@ -35,6 +35,36 @@ public sealed partial class PathText : Grid
         Children.Add(_rest);
     }
 
+    /// <summary>A long path goes on under itself instead of ending in dots, and can be selected.</summary>
+    public bool Wrap
+    {
+        get => _rest.TextWrapping != TextWrapping.NoWrap;
+        set
+        {
+            _rest.TextWrapping = value ? TextWrapping.Wrap : TextWrapping.NoWrap;
+            _rest.TextTrimming = value ? TextTrimming.None : TextTrimming.CharacterEllipsis;
+            _rest.IsTextSelectionEnabled = value;
+        }
+    }
+
+    /// <summary>The text's style, by its key; <c>ToolsMuted</c> unless given.</summary>
+    public string TextStyle
+    {
+        get => _textStyle;
+        set
+        {
+            _textStyle = value;
+            if (!Application.Current.Resources.TryGetValue(value, out var style) || style is not Style given) return;
+            // The style's own wrapping must not undo Wrap
+            var wrap = Wrap;
+            _lead.Style = given;
+            _rest.Style = given;
+            Wrap = wrap;
+        }
+    }
+
+    private string _textStyle = "ToolsMuted";
+
     public string? Path
     {
         get => (string?)GetValue(PathProperty);
