@@ -218,7 +218,7 @@ public sealed class ImportWorkspace : IDisposable
 
 /// <summary>The import's demo data for screenshots (<c>TOOLS_DEMO=1</c>; <c>TOOLS_DEMO_IMPORT=empty</c> for a fresh page, 
 /// <c>paused</c> for the queue after Pause all, <c>resumed</c> with one file resumed after it, <c>remove-all</c> for its dialog,
-/// <c>share-waiting</c>, <c>share-failed</c> and <c>damaged</c> for a file on a network share, in the fourth row).</summary>
+/// <c>share-waiting</c>, <c>share-failed</c> and <c>damaged</c> for a file on a network share, in the fourth row, <c>content</c> for files that are not sent).</summary>
 internal static class DemoImport
 {
     public static bool Empty => System.Environment.GetEnvironmentVariable("TOOLS_DEMO_IMPORT") == "empty";
@@ -319,6 +319,7 @@ internal static class DemoImport
         if (State is "paused" or "resumed") queue.PauseAll();
         // Queued: it goes on as queued, beside the others, all paused
         if (State == "resumed") queue.Resume(items[8].Id);
+        if (State == "content") SettleContent(items);
         if (State is not ("share-waiting" or "share-failed" or "damaged")) return;
 
         // The fourth file (or TOOLS_DEMO_IMPORT_ROW), on a share: checked as far as 41%
@@ -357,6 +358,43 @@ internal static class DemoImport
         step.LastError = text;
         step.ReadError = new ReadError("Windows", 59, text, 440401920);
         item.Log.Add(new LogLine(at.AddMinutes(7), LogLevel.Error, "Hash: failed", "failed", new[] { "Hash", "1", step.LastErrorCode, "ERR-7K2M-Q9XD", text, "Windows", "59", text, offset }));
+    }
+
+    /// <summary>The first four files: no video in it, not a whole video, not what was checked, and the stopped upload still on the server.</summary>
+    private static void SettleContent(IReadOnlyList<QueueItem> items)
+    {
+        var codes = new[] { (ImportStepKind.Hash, "no_video", "The file has no video in it"), (ImportStepKind.Hash, "not_video", "The file is not a whole video"), (ImportStepKind.Upload, "content_changed", "What was read to be sent is not what was checked before"), (ImportStepKind.Upload, "upload_left", "The server still has the upload that was given up") };
+        for (var i = 0; i < codes.Length; i++)
+        {
+            var (kind, code, text) = codes[i];
+            var item = items[i];
+            item.Verdict = null;
+            item.VideoId = null;
+            foreach (var s in item.Steps)
+            {
+                s.Status = s.Kind < kind ? StepStatus.Done : StepStatus.Pending;
+                s.Attempts = 0;
+                s.NextAttemptAt = null;
+                s.WaitingOnServer = false;
+                s.LastError = s.LastErrorCode = null;
+            }
+            item.Log.RemoveRange(1, item.Log.Count - 1);
+            var step = item.Steps.First(s => s.Kind == kind);
+            step.Attempts = 1;
+            step.LastErrorCode = code;
+            step.LastError = text;
+            var at = Now.AddMinutes(-8);
+            item.Log.Add(new LogLine(at, LogLevel.Info, $"{kind}: started", "started", new[] { kind.ToString() }));
+            if (kind == ImportStepKind.Upload) item.Log.Add(new LogLine(at.AddSeconds(2), LogLevel.Info, "Checked again", "sent_check", new[] { "440401920" }));
+            if (code == "upload_left")
+            {
+                step.NextAttemptAt = Now.AddSeconds(40);
+                item.Log.Add(new LogLine(at.AddMinutes(1), LogLevel.Warning, $"{kind}: attempt 1 failed", "attempt_failed", new[] { kind.ToString(), "1", code, "40", text }));
+                continue;
+            }
+            step.Status = StepStatus.Failed;
+            item.Log.Add(new LogLine(at.AddMinutes(1), LogLevel.Error, $"{kind}: failed", "failed", new[] { kind.ToString(), "1", code, "ERR-7K2M-Q9XD", text }));
+        }
     }
 
     /// <summary>
