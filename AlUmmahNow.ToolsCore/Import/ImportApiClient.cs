@@ -167,6 +167,15 @@ public sealed record EncodeVideoSettings(
     [property: JsonPropertyName("fpsCap")] EncodeFpsCap FpsCap,
     [property: JsonPropertyName("profile")] EncodeProfileRule? Profile = null);
 
+/// <summary>The SHA-256 of the server's tone-mapping tables.</summary>
+public sealed record EncodeCubes(
+    [property: JsonPropertyName("hlg")] string? Hlg,
+    [property: JsonPropertyName("pq")] string? Pq);
+
+/// <summary>Every rung is SDR BT.709 and tagged so; HDR goes through these tables. Absent on a server that does not say.</summary>
+public sealed record EncodeColourSettings(
+    [property: JsonPropertyName("cubes")] EncodeCubes? Cubes);
+
 /// <summary>The server's HLS encode settings (<c>GET /api/admin/import/encoding</c>), the same the media container uses.</summary>
 public sealed record EncodeLadderSettings(
     [property: JsonPropertyName("version")] int Version,
@@ -174,7 +183,8 @@ public sealed record EncodeLadderSettings(
     [property: JsonPropertyName("shortSideTolerance")] int ShortSideTolerance,
     [property: JsonPropertyName("segmentSeconds")] int SegmentSeconds,
     [property: JsonPropertyName("gopSeconds")] int GopSeconds,
-    [property: JsonPropertyName("video")] EncodeVideoSettings Video);
+    [property: JsonPropertyName("video")] EncodeVideoSettings Video,
+    [property: JsonPropertyName("colour")] EncodeColourSettings? Colour = null);
 
 public sealed record PrebuiltLimits(
     [property: JsonPropertyName("maxFiles")] int MaxFiles,

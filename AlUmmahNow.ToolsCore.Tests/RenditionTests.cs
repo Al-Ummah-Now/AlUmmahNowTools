@@ -14,7 +14,9 @@ internal static class Ladder
         {"ladder":{"version":1,"rungs":[{"name":"360p","short":360,"maxrate":800000,"audio":96000},{"name":"480p","short":480,"maxrate":1400000,"audio":128000},{"name":"720p","short":720,"maxrate":2800000,"audio":128000},{"name":"1080p","short":1080,"maxrate":5000000,"audio":128000}],
         "shortSideTolerance":8,"segmentSeconds":6,"gopSeconds":2,
         "video":{"codec":"h264","pixelFormat":"yuv420p","crf":23,"bufsizeFactor":2,"profile":{"high":{"minHeight":720,"minWidth":1280},"otherwise":"main"},"fpsCap":{"aboveFps":31,"fps":30},"scaler":"bicubic","evenDimensions":true},
-        "audio":{"codec":"aac","channels":2},"hls":{"segmentType":"fmp4"}},
+        "audio":{"codec":"aac","channels":2},
+        "colour":{"output":"bt709","range":"tv","version":1,"cubes":{"hlg":"7e848ffd9f28621c3c38736ac96da2533ed0d311dd0d5f950cb4a1526624bd42","pq":"689cea89150f9590ffa0defb4232720875588830873f7bb57e26d56913b01d64"}},
+        "hls":{"segmentType":"fmp4"}},
         "prebuiltLimits":{"maxFiles":16000,"maxFileBytes":33554432,"maxTotalBytes":42949672960,"staleAfterMs":172800000}}
         """;
 
@@ -78,7 +80,7 @@ public class EncodeLadderTests
         var rungs = EncodeLadder.For(info, settings).Take(2).ToList();
         var args = (List<string>)FfmpegMediaTools.Arguments("/in.mov", info, rungs, new[] { "/w/360p.mp4", "/w/480p.mp4" }, "libx264", settings);
         var text = string.Join(" ", args);
-        Assert.Contains("[0:v]split=2[v0][v1];[v0]scale=w=640:h=360:flags=bicubic,format=yuv420p[v0o];[v1]scale=w=854:h=480:flags=bicubic,format=yuv420p[v1o]", text);
+        Assert.Contains("[0:v]split=2[v0][v1];[v0]scale=w=640:h=360:flags=bicubic,format=yuv420p," + SdrPlan.End + "[v0o];[v1]scale=w=854:h=480:flags=bicubic,format=yuv420p," + SdrPlan.End + "[v1o]", text);
         Assert.Equal(2, args.Count(a => a == "expr:gte(t,n_forced*2)"));
         Assert.Contains("-crf:v:0 23 -maxrate:v:0 800000 -bufsize:v:0 1600000 -preset:v:0 veryfast -sc_threshold:v:0 0", text);
         Assert.Contains("-r:v:0 30", text);
@@ -100,7 +102,7 @@ public class EncodeLadderTests
         var info = FfmpegMediaTools.ParseProbe("""
             {"streams":[{"codec_type":"video","width":1920,"height":1080,"avg_frame_rate":"30000/1001","side_data_list":[{"rotation":-90}]},{"codec_type":"audio"}],"format":{"duration":"125.5"}}
             """);
-        Assert.Equal(new SourceInfo(1920, 1080, -90, 30000 / 1001.0, true, 125.5), info);
+        Assert.Equal(new SourceInfo(1920, 1080, -90, 30000 / 1001.0, true, 125.5), info with { Colour = null });
         Assert.Equal("no_video", Assert.Throws<LocalEncodeException>(() => FfmpegMediaTools.ParseProbe("""{"streams":[{"codec_type":"audio"}],"format":{}}""")).Code);
     }
 }

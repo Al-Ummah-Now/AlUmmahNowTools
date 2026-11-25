@@ -2892,6 +2892,12 @@
   <data name="ImportReason_decode" xml:space="preserve">
     <value>أحد الملفات لم يُشغَّل حتى آخره</value>
   </data>
+  <data name="ImportReason_hdr" xml:space="preserve">
+    <value>ما زال موسومًا بألوان عالية المدى</value>
+  </data>
+  <data name="ImportReason_colour" xml:space="preserve">
+    <value>ألوانه ليست الألوان العادية</value>
+  </data>
   <data name="ImportReason_content_mismatch" xml:space="preserve">
     <value>الصورة لا تطابق الأصل</value>
   </data>
@@ -2930,6 +2936,15 @@
   </data>
   <data name="ImportEncodeError_took_too_long" xml:space="preserve">
     <value>استغرق الترميز وقتًا طويلًا</value>
+  </data>
+  <data name="ImportEncodeError_colour_unsupported" xml:space="preserve">
+    <value>صيغة ألوانه عالية المدى لا يحوّلها هذا التطبيق</value>
+  </data>
+  <data name="ImportEncodeError_hdr_settings" xml:space="preserve">
+    <value>ألوانه عالية المدى، والخادم يحوّلها بطريقة أحدث من هذا التطبيق</value>
+  </data>
+  <data name="ImportEncodeError_colour_tags" xml:space="preserve">
+    <value>كتبت أداة الترميز ألوانًا غير صحيحة</value>
   </data>
   <data name="ImportEncodeError_too_short" xml:space="preserve">
     <value>المرئي المرمّز أقصر من الملف</value>
@@ -2972,6 +2987,9 @@
   </data>
   <data name="ImportLog_encode_plan" xml:space="preserve">
     <value>يُرمَّز هنا بالدقات {0}، باستخدام {1}</value>
+  </data>
+  <data name="ImportLog_encode_hdr" xml:space="preserve">
+    <value>مرئي عالي المدى (HDR)، حُوِّل إلى الألوان العادية:</value>
   </data>
   <data name="ImportLog_encoded" xml:space="preserve">
     <value>رُمِّز هنا، {0} إجمالًا، ويُرسل مع الرفع</value>

@@ -647,6 +647,7 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
             // Encoding here and the server's verdict (TA-12); sizes, encoder names and the server's raw words on their own lines
             "server_encode_chosen" or "encode_here_chosen" or "server_encodes_target" or "server_encodes_started" or "renditions_sent" or "renditions_used" or "check_gave_up" => Loc.Get("ImportLog_" + line.Code),
             "encode_plan" => Loc.Format("ImportLog_encode_plan", RungList(Arg(1)), EncoderName(Arg(0))),
+            "encode_hdr" => Loc.WithDetail(Loc.Get("ImportLog_encode_hdr"), Arg(0)),
             "encoded" => Arg(2).Length > 0
                 ? Loc.Format("ImportLog_encoded_from", Bytes(Arg(1)), Bytes(Arg(2)))
                 : Loc.Format("ImportLog_encoded", Bytes(Arg(1))),

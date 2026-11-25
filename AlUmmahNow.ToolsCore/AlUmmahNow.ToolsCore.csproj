@@ -22,5 +22,8 @@
     <!-- The root-signed update key list, byte for byte (its signature covers the exact bytes; .gitattributes) -->
     <EmbeddedResource Include="Updates/keys/update-keys.json" LogicalName="update-keys.json" />
     <EmbeddedResource Include="Updates/keys/update-keys.json.sig" LogicalName="update-keys.json.sig" />
+    <!-- The media container's HDR tables (apps/media/container/colour.mjs cubeText), checked by SHA-256 -->
+    <EmbeddedResource Include="Import/Cubes/hlg.cube.gz" LogicalName="hlg.cube.gz" />
+    <EmbeddedResource Include="Import/Cubes/pq.cube.gz" LogicalName="pq.cube.gz" />
   </ItemGroup>
 </Project>

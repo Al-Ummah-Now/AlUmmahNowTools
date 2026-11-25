@@ -2508,6 +2508,12 @@ Try again.</value>
   <data name="ImportReason_decode" xml:space="preserve">
     <value>a file didn’t play through</value>
   </data>
+  <data name="ImportReason_hdr" xml:space="preserve">
+    <value>it still says it is HDR</value>
+  </data>
+  <data name="ImportReason_colour" xml:space="preserve">
+    <value>its colors aren’t standard (BT.709)</value>
+  </data>
   <data name="ImportReason_content_mismatch" xml:space="preserve">
     <value>the picture doesn’t match the original</value>
   </data>
@@ -2546,6 +2552,15 @@ Try again.</value>
   </data>
   <data name="ImportEncodeError_took_too_long" xml:space="preserve">
     <value>it took too long</value>
+  </data>
+  <data name="ImportEncodeError_colour_unsupported" xml:space="preserve">
+    <value>it uses an HDR format this app can’t convert</value>
+  </data>
+  <data name="ImportEncodeError_hdr_settings" xml:space="preserve">
+    <value>it is HDR, and the server converts HDR in a newer way than this app</value>
+  </data>
+  <data name="ImportEncodeError_colour_tags" xml:space="preserve">
+    <value>the encoder wrote the wrong colors</value>
   </data>
   <data name="ImportEncodeError_too_short" xml:space="preserve">
     <value>the encoded video is shorter than the file</value>
@@ -2588,6 +2603,9 @@ Try again.</value>
   </data>
   <data name="ImportLog_encode_plan" xml:space="preserve">
     <value>Encoding here at {0}, with {1}</value>
+  </data>
+  <data name="ImportLog_encode_hdr" xml:space="preserve">
+    <value>HDR video, converted to standard colors:</value>
   </data>
   <data name="ImportLog_encoded" xml:space="preserve">
     <value>Encoded here, {0} in all; it goes with the upload</value>

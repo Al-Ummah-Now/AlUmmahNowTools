@@ -64,3 +64,5 @@
 
 # Signed files: the signature covers the exact bytes
 AlUmmahNow.ToolsCore/Updates/keys/* -text
+# The server's HDR tables, byte for byte
+*.cube.gz binary
