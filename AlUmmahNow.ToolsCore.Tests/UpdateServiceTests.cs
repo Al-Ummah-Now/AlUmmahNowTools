@@ -261,6 +261,34 @@ public sealed class UpdateServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task The_app_closing_while_a_Restart_now_that_is_refused_checks_the_file_installs_without_starting_again()
+    {
+        var (first, core, installer, http) = Make();
+        first.Dispose();
+        for (var round = 0; round < 20; round++)
+        {
+            var busy = false;
+            var service = new UpdateService(http, () => new Uri("https://videos.api.example.com"), core, installer, Path.Combine(_dir, "updates.json"), Path.Combine(_dir, "dl"), "2026.11.22", "windows", "x64", () => busy, true, quit: () => throw new InvalidOperationException("no quit"));
+            await service.CheckAsync(userAsked: true);
+            var checking = new SemaphoreSlim(0);
+            using var goOn = new ManualResetEventSlim();
+            installer.OnVerify = () => { checking.Release(); goOn.Wait(TimeSpan.FromSeconds(20)); };
+            var restart = Task.Run(() => service.RestartNowAsync());
+            Assert.True(await checking.WaitAsync(TimeSpan.FromSeconds(20)));
+            var exit = Task.Run(service.OnExit);
+            // Work started during the check: Restart now is refused
+            busy = true;
+            await Task.Delay(20);
+            goOn.Set();
+            Assert.False(await restart);
+            Assert.True(await exit);
+            Assert.False(service.RestartAsked);
+            Assert.Equal((0, round + 1), (installer.Restarts, installer.Exits));
+            installer.OnVerify = null;
+        }
+    }
+
+    [Fact]
     public async Task An_updater_that_does_not_start_can_be_tried_again()
     {
         var (service, _, installer, _) = Make();
