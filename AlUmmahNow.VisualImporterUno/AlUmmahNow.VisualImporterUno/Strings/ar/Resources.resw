@@ -2064,7 +2064,7 @@
     <value>الترجمات والملحقات</value>
   </data>
   <data name="Channel_Searching" xml:space="preserve">
-    <value>جارٍ البحث</value>
+    <value>جارٍ البحث…</value>
   </data>
   <data name="Import_ChannelNone" xml:space="preserve">
     <value>لا توجد قناة مطابقة.</value>

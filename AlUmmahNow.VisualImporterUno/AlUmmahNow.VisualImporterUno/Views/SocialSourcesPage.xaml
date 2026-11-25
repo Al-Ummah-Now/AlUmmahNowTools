@@ -50,7 +50,7 @@
                         <AutoSuggestBox.ItemTemplate>
                             <DataTemplate x:DataType="vm:ChannelSuggestion">
                                 <StackPanel Padding="0,6" Spacing="2">
-                                    <TextBlock Text="{x:Bind Title}" Style="{StaticResource ToolsBody}" Foreground="{ThemeResource FanousTextPrimaryBrush}" />
+                                    <TextBlock Text="{x:Bind Shown}" Style="{StaticResource ToolsBody}" Foreground="{ThemeResource FanousTextPrimaryBrush}" />
                                     <TextBlock Text="{x:Bind Detail}" Style="{StaticResource ToolsMuted}" FlowDirection="LeftToRight" HorizontalAlignment="Left" Visibility="{x:Bind DetailShown}" />
                                 </StackPanel>
                             </DataTemplate>

@@ -58,9 +58,11 @@ public sealed class ChannelSearchTests
         Titles.Should().Equal("none");
         _search.Rows[0].Channel.Should().BeNull();
         _search.Found.Should().BeEmpty();
+        _rows.Clear();
         await Search("ab", "two");
-        Titles.Should().Equal("two");
-        _rows.Should().OnlyContain(rows => rows.Count > 0);
+        _rows.Select(rows => rows.Single()).Should().SatisfyRespectively(
+            searching => { searching.Channel.Should().BeNull(); searching.Title.Should().Be("Channel_Searching"); },
+            found => found.Title.Should().Be("two"));
     }
 
     [Fact]
@@ -98,6 +100,32 @@ public sealed class ChannelSearchTests
         await search;
         Titles.Should().Equal("one");
     }
+
+    [Fact]
+    public async Task ChannelsShownByThePage_EndTheSearchUnderWay()
+    {
+        var search = _search.SearchAsync("a");
+        await Task.Delay(50);
+        _search.Show([Channel("new")]);
+        Answer("a").SetResult([Channel("late")]);
+        await search;
+        Titles.Should().Equal("new");
+        _search.Answers("a").Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task WhatWasFound_BelongsToTheTextItWasSearchedFor()
+    {
+        await Search("a", "one");
+        _search.Answers("a").Should().BeTrue();
+        _search.Answers("").Should().BeFalse();
+        await Search("zz");
+        _search.Answers("zz").Should().BeFalse("nothing was found");
+        _search.Answers("a").Should().BeFalse();
+    }
+
+    [Fact]
+    public void ARowIsReadAsItIsWritten() => new ChannelSuggestion(null, "لا توجد قناة مطابقة.").ToString().Should().Be("لا توجد قناة مطابقة.");
 
     [Fact]
     public async Task AFailedSearch_SaysWhy_AndKeepsWhatWasShown()
