@@ -372,6 +372,8 @@ public partial class App : Application
             MainWindow = new MainWindow(shellState);
             MainWindow.Activate();
             _ = demo != null ? demo.DriveAsync(shellState.Session) : shellState.Session.RestoreAsync();
+            // The launch check closes the window by itself (docs/RELEASE.md): TOOLS_SMOKE_CLOSE=close|quit|terminate
+            if (Environment.GetEnvironmentVariable("TOOLS_SMOKE_CLOSE") is { Length: > 0 } smokeClose) _ = Shell.QuitSmoke.RunAsync(MainWindow, smokeClose);
 #if !WINDOWS
             if (Environment.GetEnvironmentVariable("TOOLS_SCREENSHOT") is { Length: > 0 } shot)
             {
@@ -449,7 +451,7 @@ public partial class App : Application
         }
     }
 
-    private async Task ShutdownServicesAsync()
+    internal async Task ShutdownServicesAsync()
     {
         if (_isShuttingDown) return;
         _isShuttingDown = true;
@@ -498,17 +500,8 @@ public partial class App : Application
                 Log.Warning(signalREx, "Error disposing SignalR client");
             }
 
-            // Dispose the host
-            try
-            {
-                Log.Information("Disposing application host...");
-                Host?.Dispose();
-                Log.Information("Application host disposed");
-            }
-            catch (Exception hostEx)
-            {
-                Log.Warning(hostEx, "Error disposing application host");
-            }
+            // The host is not disposed here: Uno's dispatcher and its logging keep using the host's logger factory until the
+            // process ends, and disposing it under them aborts the process (ObjectDisposedException 'LoggerFactory', seen on Linux)
 
             Log.Information("Application shutdown completed successfully");
         }

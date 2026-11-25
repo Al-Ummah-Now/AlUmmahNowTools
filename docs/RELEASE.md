@@ -33,6 +33,12 @@ The launch check starts the installed app in demo mode (`TOOLS_DEMO=1`, no netwo
 `TOOLS_SCREENSHOT`, which renders the window to a PNG and exits; no PNG within 120 s fails the run. The PNGs are
 the `smoke-*` artifacts.
 
+Then the run closes the app to check that closing quits it (Tools #78): `scripts/smoke-close.sh` (Windows:
+`smoke-close.ps1`) starts the app in demo mode with an empty queue and `TOOLS_SMOKE_CLOSE`, so the app closes itself
+after eight seconds (`close`: `Window.Close()`; `quit`: the request the close button, Cmd+Q and Dock > Quit make;
+`terminate`, macOS only: the system's own terminate). The run fails unless the process ends within 8 s of the close (the app's own last-resort exit, 10 s after a clean stop, counts as a failure) and
+no child process it started (the FileScan service, ffmpeg) is still alive.
+
 A pull request that changes `release.yml`, `packaging/**` or the release scripts runs the same jobs as a dry
 run (version `vYYYY.MM.DD.0`, no release); so does **Run workflow** on the Actions page.
 

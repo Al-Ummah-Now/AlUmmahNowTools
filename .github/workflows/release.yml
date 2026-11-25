@@ -33,6 +33,8 @@ on:
       - scripts/no-test-hooks.mjs
       - scripts/vpk-pack.sh
       - scripts/mac-bundle.sh
+      - scripts/smoke-close.sh
+      - scripts/smoke-close.ps1
   workflow_dispatch:
 concurrency:
   group: release-${{ github.ref }}
@@ -215,6 +217,8 @@ jobs:
           if (-not $app.WaitForExit(120000)) { Stop-Process -Id $app.Id -Force; Write-Output "::warning::the app was still running after 120 s" }
           if (-not (Test-Path $png) -or (Get-Item $png).Length -eq 0) { Get-Content smoke/windows.log, smoke/windows.err -Tail 40 -ErrorAction SilentlyContinue; throw "the installed app did not start (no screenshot)" }
           Write-Output "smoke launch passed: $((Get-Item $png).Length) byte screenshot"
+          # Closing the app quits it, and nothing it started stays behind (Tools #78)
+          foreach ($mode in 'close', 'quit') { .\scripts\smoke-close.ps1 -Exe $exe -Mode $mode -Seconds 8 }
           $p = Start-Process msiexec -ArgumentList "/x `"$msi`" /qn" -Wait -PassThru
           if ($p.ExitCode -ne 0) { throw "uninstall failed: $($p.ExitCode)" }
           if (Test-Path $exe) { throw "uninstall left the app behind" }
@@ -346,6 +350,11 @@ jobs:
         run: |
           exe=$(/usr/libexec/PlistBuddy -c 'Print CFBundleExecutable' "$APP_BUNDLE/Contents/Info.plist")
           scripts/smoke-launch.sh "$PWD/smoke/macos-packed.png" 120 "$APP_BUNDLE/Contents/MacOS/$exe"
+          # Closing the app quits it, and nothing it started stays behind (Tools #78): the window's close, the request the
+          # close button, Cmd+Q and Dock > Quit make, and the system's own terminate
+          for mode in close quit terminate; do
+            scripts/smoke-close.sh "$mode" 8 "$APP_BUNDLE/Contents/MacOS/$exe"
+          done
       - name: Disk image
         env:
           IDENTITY: ${{ steps.keychain.outputs.identity }}
@@ -425,6 +434,10 @@ jobs:
           XDG_CONFIG_HOME=$(mktemp -d); XDG_DATA_HOME=$(mktemp -d); XDG_STATE_HOME=$(mktemp -d)
           export XDG_CONFIG_HOME XDG_DATA_HOME XDG_STATE_HOME
           scripts/smoke-launch.sh "$PWD/smoke/linux.png" 120 xvfb-run -a -s "-screen 0 1280x800x24" /usr/bin/alummahnow-tools
+          # Closing the app quits it, and nothing it started stays behind (Tools #78)
+          for mode in close quit; do
+            scripts/smoke-close.sh "$mode" 8 xvfb-run -a -s "-screen 0 1280x800x24" /usr/bin/alummahnow-tools
+          done
           sudo dpkg --remove alummahnow-tools
           test ! -e /usr/bin/alummahnow-tools
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

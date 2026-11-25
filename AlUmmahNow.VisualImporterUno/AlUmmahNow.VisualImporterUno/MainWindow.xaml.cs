@@ -22,6 +22,8 @@ namespace AlUmmahNow.VisualImporterUno
             _state.LanguageChanged += (_, _) => DispatcherQueue.TryEnqueue(BuildShell);
             _state.Changed += (_, _) => DispatcherQueue.TryEnqueue(UpdateTitle);
             Closed += (_, _) => (_shell?.Workspace as IDisposable)?.Dispose();
+            // Closing the window quits the app, asking first when imports are running (Tools #78)
+            AppQuit.Attach(this, () => _state.Preferences.IsRightToLeft ? FlowDirection.RightToLeft : FlowDirection.LeftToRight);
         }
 
         public ToolsShell? Shell => _shell;

@@ -342,6 +342,7 @@ public sealed class ImportQueue : IDisposable
     private readonly Func<int, TimeSpan> _backoff;
     private readonly List<QueueItem> _items = new();
     private readonly Dictionary<string, CancellationTokenSource> _running = new();
+    private readonly List<Task> _stepTasks = new();
     private readonly SemaphoreSlim _wake = new(0);
     private CancellationTokenSource? _loop;
     private Task? _loopTask;
@@ -350,6 +351,7 @@ public sealed class ImportQueue : IDisposable
     private readonly WorkFolders _work;
     private readonly object _cleanGate = new();
     private Task _cleaning = Task.CompletedTask;
+    private bool _stopped;
 
     public ImportQueue(string path, IEnumerable<IImportStep> steps, IImportFailureSink? sink = null, TimeProvider? time = null, Func<int, TimeSpan>? backoff = null, WorkFolders? work = null)
     {
@@ -631,32 +633,65 @@ public sealed class ImportQueue : IDisposable
         lock (_gate)
         {
             if (_loop is not null) return;
+            _stopped = false;
             _loop = new CancellationTokenSource();
             var ct = _loop.Token;
             _loopTask = Task.Run(() => LoopAsync(ct));
         }
     }
 
-    public async Task StopAsync()
+    /// <summary>
+    /// How long <see cref="StopAsync"/> waits in all: for running steps to stop (a step kills its ffmpeg when it is cancelled) and
+    /// for what is being deleted to be deleted. Under the 8 s the process-exit handler gives the whole quit.
+    /// </summary>
+    public static readonly TimeSpan StepStopGrace = TimeSpan.FromSeconds(6);
+
+    /// <summary>
+    /// Stops the loop and every running step, waits (up to <see cref="StepStopGrace"/>) until each has stopped, so its child
+    /// processes are gone and its step is back to waiting, then saves the queue. A step that is still running when the wait
+    /// ends is saved as running; the next start runs it again, as after a crash.
+    /// </summary>
+    public async Task StopAsync(TimeSpan? grace = null)
     {
         Task? loop;
         lock (_gate)
         {
+            // Nothing starts from here on, so what is awaited below is all there will be
+            _stopped = true;
             _loop?.Cancel();
             foreach (var cts in _running.Values.ToList()) Cancel(cts);
             loop = _loopTask;
             _loop = null;
             _loopTask = null;
         }
-        if (loop is not null)
+        // One grace for all of it: the loop ending, and every step (one a Pump started a moment ago included) ending
+        var settled = Task.Run(async () =>
         {
-            try { await loop.ConfigureAwait(false); } catch (OperationCanceledException) { }
-        }
+            if (loop is not null)
+            {
+                try { await loop.ConfigureAwait(false); } catch (OperationCanceledException) { }
+            }
+            while (true)
+            {
+                Task[] steps;
+                lock (_gate)
+                {
+                    _stepTasks.RemoveAll(t => t.IsCompleted);
+                    steps = _stepTasks.ToArray();
+                }
+                if (steps.Length == 0) break;
+                try { await Task.WhenAll(steps).ConfigureAwait(false); }
+                catch (Exception) { /* a step's own failure was handled by the step */ }
+            }
+            // What is being deleted (a removed file's renditions) is deleted whole, within the same grace; a step that was
+            // stopping may have queued some just now, so this comes after them
+            Task cleaning;
+            lock (_cleanGate) cleaning = _cleaning;
+            await cleaning.ConfigureAwait(false);
+        });
+        try { await settled.WaitAsync(grace ?? StepStopGrace).ConfigureAwait(false); }
+        catch (Exception ex) when (ex is TimeoutException or OperationCanceledException) { }
         lock (_gate) SaveLocked();
-        // What is being deleted is deleted whole, within reason
-        Task cleaning;
-        lock (_cleanGate) cleaning = _cleaning;
-        await Task.WhenAny(cleaning, Task.Delay(TimeSpan.FromSeconds(5))).ConfigureAwait(false);
     }
 
     public void Dispose()
@@ -671,6 +706,7 @@ public sealed class ImportQueue : IDisposable
         var started = new List<(QueueItem Item, StepState Step, CancellationTokenSource Cts)>();
         lock (_gate)
         {
+            if (_stopped) return 0;
             var now = _time.GetUtcNow();
             var busy = Enum.GetValues<ImportStepKind>().ToDictionary(k => k, k => _items.Count(i => i.CurrentStep is { Status: StepStatus.Running } s && s.Kind == k));
             foreach (var item in _items.OrderBy(i => i.CreatedAt))
@@ -698,7 +734,12 @@ public sealed class ImportQueue : IDisposable
         foreach (var (item, step, cts) in started)
         {
             Notify(item.Id);
-            _ = Task.Run(() => RunStepAsync(item, step, cts));
+            var task = Task.Run(() => RunStepAsync(item, step, cts));
+            lock (_gate)
+            {
+                _stepTasks.RemoveAll(t => t.IsCompleted);
+                _stepTasks.Add(task);
+            }
         }
         return started.Count;
     }
