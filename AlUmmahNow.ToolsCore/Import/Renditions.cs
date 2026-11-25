@@ -393,7 +393,7 @@ public sealed class FfmpegMediaTools : IMediaTools
     {
         var format = H264Encoders.InputFormat(encoder);
         // Every rung is SDR BT.709 and says so, whatever the source (Colour.cs)
-        var sdr = SdrPlan.For(info.Colour).Filters(rungs[^1].Width, rungs[^1].Height, HdrCubes.FileName);
+        var sdr = rungs.Count == 0 ? "" : SdrPlan.For(info.Colour).Filters(rungs[^1].Width, rungs[^1].Height, HdrCubes.FileName);
         var split = $"[0:v]{sdr}{(sdr.Length > 0 ? "," : "")}split={rungs.Count}" + string.Concat(rungs.Select((_, i) => $"[v{i}]"));
         var scales = rungs.Select((r, i) => $"[v{i}]scale=w={r.Width}:h={r.Height}:flags=bicubic,format={format},{SdrPlan.End}[v{i}o]");
         // Its warnings and errors, each with its level: the encoders' closing figures are no reason for anything
