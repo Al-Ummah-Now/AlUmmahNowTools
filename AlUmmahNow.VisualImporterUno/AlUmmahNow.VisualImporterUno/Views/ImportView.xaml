@@ -115,6 +115,35 @@
                     </StackPanel>
                     <TextBlock Text="{x:Bind ViewModel.ScanMessage, Mode=OneWay}" Style="{StaticResource ToolsMuted}"
                                Visibility="{x:Bind ViewModel.ScanMessage, Mode=OneWay, Converter={StaticResource StringToVisibility}}" />
+                    <!-- Unfinished downloads: left out, and added one by one when someone knows better -->
+                    <StackPanel Spacing="4" Visibility="{x:Bind ViewModel.HasUnfinished, Mode=OneWay}">
+                        <TextBlock Text="{x:Bind ViewModel.UnfinishedText, Mode=OneWay}" Style="{StaticResource ToolsMuted}" Foreground="{ThemeResource FanousAccentBrush}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" />
+                        <HyperlinkButton x:Name="UnfinishedButton" Style="{StaticResource ToolsLinkButton}" Padding="8,4" Margin="-8,0,0,0" Click="Unfinished_Click">
+                            <TextBlock Text="{x:Bind ViewModel.UnfinishedToggle, Mode=OneWay}" />
+                        </HyperlinkButton>
+                        <ItemsControl ItemsSource="{x:Bind ViewModel.UnfinishedRows}" Visibility="{x:Bind ViewModel.UnfinishedShown, Mode=OneWay}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:UnfinishedRow">
+                                    <Border BorderBrush="{ThemeResource FanousDividerBrush}" BorderThickness="0,0,0,1" Padding="0,8">
+                                        <Grid ColumnSpacing="12">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                                <TextBlock Text="{x:Bind FileName}" Style="{StaticResource ToolsMuted}" FlowDirection="LeftToRight" HorizontalAlignment="Left"
+                                                           TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind FileName}" />
+                                                <TextBlock Text="{x:Bind Size}" Style="{StaticResource ToolsMuted}" TextWrapping="NoWrap" />
+                                            </StackPanel>
+                                            <HyperlinkButton Grid.Column="1" Style="{StaticResource ToolsLinkButton}" Padding="8,4" VerticalAlignment="Center" Tag="{x:Bind}" Click="AddUnfinished_Click" AutomationProperties.Name="{x:Bind AddName}">
+                                                <TextBlock x:Uid="Import_UnfinishedAddText" Text="Add anyway" />
+                                            </HyperlinkButton>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
                 </StackPanel>
             </Border>
 

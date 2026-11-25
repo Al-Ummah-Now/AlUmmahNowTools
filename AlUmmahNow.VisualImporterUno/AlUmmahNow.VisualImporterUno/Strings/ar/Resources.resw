@@ -2064,6 +2064,42 @@
   <data name="Import_FoundSummary" xml:space="preserve">
     <value>{0}، {1} إجمالًا</value>
   </data>
+  <data name="Import_Unfinished_Zero" xml:space="preserve">
+    <value>لم يُستبعد أي تنزيل</value>
+  </data>
+  <data name="Import_Unfinished_One" xml:space="preserve">
+    <value>استُبعد تنزيل واحد لم يكتمل</value>
+  </data>
+  <data name="Import_Unfinished_Two" xml:space="preserve">
+    <value>استُبعد تنزيلان لم يكتملا</value>
+  </data>
+  <data name="Import_Unfinished_Few" xml:space="preserve">
+    <value>استُبعدت {0} تنزيلات لم تكتمل</value>
+  </data>
+  <data name="Import_Unfinished_Many" xml:space="preserve">
+    <value>استُبعد {0} تنزيلًا لم يكتمل</value>
+  </data>
+  <data name="Import_Unfinished_Other" xml:space="preserve">
+    <value>استُبعد {0} تنزيل لم يكتمل</value>
+  </data>
+  <data name="Import_UnfinishedShow" xml:space="preserve">
+    <value>عرض القائمة</value>
+  </data>
+  <data name="Import_UnfinishedHide" xml:space="preserve">
+    <value>إخفاء القائمة</value>
+  </data>
+  <data name="Import_UnfinishedAdd" xml:space="preserve">
+    <value>إضافة على أي حال</value>
+  </data>
+  <data name="Import_UnfinishedAddText.Text" xml:space="preserve">
+    <value>إضافة على أي حال</value>
+  </data>
+  <data name="ImportNote_UnfinishedDownload" xml:space="preserve">
+    <value>يدل اسمه على أنه تنزيل لم يكتمل:</value>
+  </data>
+  <data name="ImportLog_unreadable" xml:space="preserve">
+    <value>تعذّرت قراءة الملف كمرئي</value>
+  </data>
   <data name="Import_NoVideos" xml:space="preserve">
     <value>لا توجد مرئيات في هذا المجلد.</value>
   </data>

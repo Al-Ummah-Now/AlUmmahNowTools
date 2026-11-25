@@ -327,7 +327,7 @@ internal static class VideoCheck
         if (media is null) return VideoContent.Unknown;
         try
         {
-            await source.WithPathAsync(path, context, p => media.ProbeAsync(p, ct), ct).ConfigureAwait(false);
+            await source.ProbeAsync(media, path, context, ct).ConfigureAwait(false);
             return VideoContent.Video;
         }
         catch (LocalEncodeException probe)
@@ -335,7 +335,9 @@ internal static class VideoCheck
             return probe.Code switch
             {
                 "no_video" => VideoContent.NoVideo,
-                "probe_failed" or "no_media" => VideoContent.Damaged,
+                "no_media" => VideoContent.Damaged,
+                // It ended without saying what is wrong with the file
+                "probe_failed" => VideoContent.Undecided,
                 "source_read" => throw new StepFailedException("file_read", probe.Message, retryable: true, probe),
                 _ => VideoContent.Unknown,
             };

@@ -68,7 +68,7 @@ public sealed class SourceReadTests
     private static FfmpegMediaTools? Tools(string source, string reason, int code, double seconds, bool network = false) =>
         Tools(source, reason, code, "{\"streams\":[{\"codec_type\":\"video\",\"width\":640,\"height\":360}],\"format\":{\"duration\":\"" + seconds.ToString(System.Globalization.CultureInfo.InvariantCulture) + "\"}}", network);
 
-    private static FfmpegMediaTools? Tools(string source, string reason, int code, string probe, bool network, string before = "", string probeSays = "")
+    private static FfmpegMediaTools? Tools(string source, string reason, int code, string probe, bool network, string before = "", string probeSays = "", int probeCode = 0)
     {
         if (OperatingSystem.IsWindows()) return null;
         var dir = Temp.Folder();
@@ -81,7 +81,7 @@ public sealed class SourceReadTests
             return path;
         }
         var ffmpeg = Script("ffmpeg", $"{before}cat '{Path.Combine(dir, "said")}' >&2; exit {code}");
-        var ffprobe = Script("ffprobe", $"echo '{probe}'; echo '{probeSays}' >&2");
+        var ffprobe = Script("ffprobe", $"echo '{probe}'; echo '{probeSays}' >&2; exit {probeCode}");
         return new FfmpegMediaTools(_ => Task.FromResult<(string, string)?>((ffmpeg, ffprobe)), network ? Share() : null) { StallLimit = TimeSpan.FromSeconds(2), ProbeLimit = TimeSpan.FromSeconds(20) };
     }
 
@@ -206,6 +206,75 @@ public sealed class SourceReadTests
         const string probe = """{"streams":[{"codec_type":"video","width":640,"height":360,"duration":"10"}],"format":{"duration":"10"}}""";
         if (Tools(@"\\nas\v\a.mp4", "x", 0, probe, network: true, probeSays: "[mov @ 0x1] Error reading header: Invalid argument") is not { } tools) return;
         Assert.Equal("source_read", (await Assert.ThrowsAsync<LocalEncodeException>(() => tools.ProbeAsync(@"\\nas\v\a.mp4", default))).Code);
+    }
+
+    [Theory]
+    [InlineData("a.webm: Invalid data found when processing input", 1, "no_media")]
+    [InlineData("[mov,mp4 @ 0x1] moov atom not found", 1, "no_media")]
+    [InlineData("[matroska,webm @ 0x1] EBML header parsing failed", 1, "no_media")]
+    // It did not say that of the file
+    [InlineData("a.webm: Permission denied", 1, "probe_failed")]
+    [InlineData("a.webm: End of file", 1, "probe_failed")]
+    [InlineData("", 1, "probe_failed")]
+    [InlineData("a.webm: Invalid data found when processing input", 134, "probe_failed")]
+    public async Task Only_ffprobes_own_word_makes_a_file_no_video(string says, int code, string expected)
+    {
+        if (Tools("/media/a.webm", "x", 0, "", network: false, probeSays: says, probeCode: code) is not { } tools) return;
+        Assert.Equal(expected, (await Assert.ThrowsAsync<LocalEncodeException>(() => tools.ProbeAsync("/media/a.webm", default))).Code);
+    }
+
+    /// <summary>No media file the first time(s) it is asked.</summary>
+    private sealed class NoMedia(int times) : IMediaTools
+    {
+        private readonly FakeMedia _inner = new();
+        public int Asked;
+        public bool Encoded;
+        public Task<SourceInfo> ProbeAsync(string path, CancellationToken ct) => Encoded || ++Asked > times ? _inner.ProbeAsync(path, ct) : throw new LocalEncodeException("no_media", "ffprobe could not read the file");
+        public Task<string?> PickEncoderAsync(CancellationToken ct) => _inner.PickEncoderAsync(ct);
+        public Task ExtractAudioAsync(string source, string wavPath, CancellationToken ct) => throw new NotSupportedException();
+        public Task EncodeAsync(string source, SourceInfo info, IReadOnlyList<PlannedRung> rungs, IReadOnlyList<string> outputs, string encoder, EncodeLadderSettings settings, IProgress<double> progress, CancellationToken ct)
+        {
+            Encoded = true;
+            return _inner.EncodeAsync(source, info, rungs, outputs, encoder, settings, progress, ct);
+        }
+    }
+
+    [Theory]
+    [InlineData(true, 1, 2, false)]
+    [InlineData(true, 2, 2, true)]
+    [InlineData(false, 1, 1, true)]
+    public async Task A_share_is_asked_twice_before_its_file_is_refused_at_the_encode(bool share, int times, int asked, bool refused)
+    {
+        var media = new NoMedia(times);
+        var rig = Rig(media, share ? Share() : null);
+        if (refused) Assert.Equal("not_video", (await Assert.ThrowsAsync<StepFailedException>(() => rig.Step.RunAsync(rig.Item, rig.Context, default))).Code);
+        else Assert.Equal(StepResult.Done, await rig.Step.RunAsync(rig.Item, rig.Context, default));
+        Assert.Equal(asked, media.Asked);
+        Assert.Equal(!refused, media.Encoded);
+        Assert.Equal(refused, rig.Context.Lines.Any(l => l.Code == "unreadable"));
+        // Never the server's to encode, and not a fault of the app's
+        Assert.Empty(rig.Reported);
+        Assert.DoesNotContain(rig.Context.Lines, l => l.Code == "encode_failed");
+    }
+
+    /// <summary>That is what was made, not the file.</summary>
+    [Fact]
+    public async Task An_unreadable_output_does_not_refuse_the_file()
+    {
+        var media = new UnreadableOutput();
+        var rig = Rig(media);
+        Assert.Equal(StepResult.Skipped, await rig.Step.RunAsync(rig.Item, rig.Context, default));
+        Assert.Equal("ffmpeg_failed", Assert.IsType<LocalEncodeException>(Assert.Single(rig.Reported)).Code);
+    }
+
+    private sealed class UnreadableOutput : IMediaTools
+    {
+        private readonly FakeMedia _inner = new();
+        public Task<SourceInfo> ProbeAsync(string path, CancellationToken ct) => path.EndsWith(".mp4", StringComparison.Ordinal) ? throw new LocalEncodeException("no_media", "x") : _inner.ProbeAsync(path, ct);
+        public Task<string?> PickEncoderAsync(CancellationToken ct) => _inner.PickEncoderAsync(ct);
+        public Task ExtractAudioAsync(string source, string wavPath, CancellationToken ct) => throw new NotSupportedException();
+        public Task EncodeAsync(string source, SourceInfo info, IReadOnlyList<PlannedRung> rungs, IReadOnlyList<string> outputs, string encoder, EncodeLadderSettings settings, IProgress<double> progress, CancellationToken ct) =>
+            _inner.EncodeAsync(source, info, rungs, outputs, encoder, settings, progress, ct);
     }
 
     /// <summary>The bytes the copy reads are others, and the file's size and modified time are the same.</summary>

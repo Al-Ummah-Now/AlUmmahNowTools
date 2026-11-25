@@ -462,15 +462,15 @@ public sealed class ErrorReporter : IDisposable
         var report = new ErrorReport(
             kind,
             reference ?? ErrorReport.NewRef(),
-            message,
+            LocalPaths.Strip(message)!,
             Name: error.GetType().Name,
-            Stack: kind is "unhandled" or "rejection" ? error.StackTrace : null,
+            Stack: kind is "unhandled" or "rejection" ? LocalPaths.Strip(error.StackTrace) : null,
             Route: route,
             Status: error switch { ImportApiException a when a.Status > 0 => a.Status, TusException t when t.Status > 0 => t.Status, _ => null },
             Release: _release,
             Locale: _locale(),
             OccurredAt: DateTimeOffset.UtcNow.ToString("O"),
-            Extra: extra);
+            Extra: extra?.ToDictionary(e => e.Key, e => e.Value is string text ? LocalPaths.Strip(text) : e.Value));
         _waiting.Enqueue(report);
         while (_waiting.Count > MaxWaiting && _waiting.TryDequeue(out _)) { }
         return report.Ref;
@@ -533,7 +533,8 @@ public sealed class ServerFailureSink : IImportFailureSink
 
     public async Task ItemFailedAsync(QueueItem item, StepState step, Exception error, string reference, CancellationToken ct)
     {
-        var message = ImportQueue.Describe(error);
+        // It goes to the server: no folders of this computer
+        var message = LocalPaths.Strip(ImportQueue.Describe(error))!;
         var answer = StepFailedException.Answers(error);
         var known = error is StepFailedException or ImportApiException or TusException or TusGoneException or IOException or UnauthorizedAccessException or HttpRequestException;
         if (!answer) _reporter.Report(

@@ -201,6 +201,25 @@ public sealed class SourceAccess
         }
     }
 
+    /// <summary>
+    /// What ffprobe says of the file. "No media file" of one on a share is asked twice: a share that hands out something else for a
+    /// moment is no reason to refuse the file for good.
+    /// </summary>
+    public async Task<SourceInfo> ProbeAsync(IMediaTools media, string path, IStepContext? context, CancellationToken ct)
+    {
+        Task<SourceInfo> Ask() => WithPathAsync(path, context, p => media.ProbeAsync(p, ct), ct);
+        try
+        {
+            return await Ask().ConfigureAwait(false);
+        }
+        catch (LocalEncodeException none) when (none.Code == "no_media")
+        {
+            if (!await IsNetworkAsync(path, ct).ConfigureAwait(false)) throw;
+        }
+        await Delay(TimeSpan.FromSeconds(5), ct).ConfigureAwait(false);
+        return await Ask().ConfigureAwait(false);
+    }
+
     /// <summary>A path of the file that answers now, waiting for the share if need be.</summary>
     private async Task<(string Path, SourceStat Stat)> ReachAsync(string path, IStepContext? context, string? avoid, CancellationToken ct)
     {

@@ -1,1 +1,2 @@
 Rejecting, deleting, or signing out while imports run asks first and says what it does to how many videos. A deleted filter preset can be put back with Undo.
+Unfinished downloads (.temp.webm, .part and the like) are left out of a scan and listed; each can be added anyway. A file the video tools cannot read as a video is no longer uploaded.
