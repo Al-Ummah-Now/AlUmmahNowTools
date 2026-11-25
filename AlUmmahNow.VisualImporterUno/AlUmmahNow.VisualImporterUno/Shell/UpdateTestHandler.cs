@@ -32,7 +32,12 @@ internal sealed class UpdateTestHandler : HttpMessageHandler
             // The app closing is what installs a staged update; ProcessExit runs AppUpdates' own exit step
             if (v.Stage == UpdateStage.Ready) _ = Task.Run(async () =>
             {
-                await Task.Delay(1000);
+                await Task.Delay(int.TryParse(Environment.GetEnvironmentVariable("TOOLS_UPDATE_TEST_EXIT_MS"), out var ms) ? ms : 1000);
+                if (Environment.GetEnvironmentVariable("TOOLS_UPDATE_TEST_RECHECK") == "1")
+                {
+                    await service.CheckAsync(userAsked: true);
+                    Log($"rechecked {service.View.Stage}");
+                }
                 Environment.Exit(0);
             });
         };
