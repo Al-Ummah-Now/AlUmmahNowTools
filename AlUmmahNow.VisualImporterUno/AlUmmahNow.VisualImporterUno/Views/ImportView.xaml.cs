@@ -322,8 +322,6 @@ public sealed partial class ImportView : Page
                 scroller.ChangeView(null, scroller.ScrollableHeight, null, true);
             };
         }
-        root.Changed += RootChanged;
-        dialog.Closed += (_, _) => root.Changed -= RootChanged;
         if (Loc.IsArabic && ShellState.TextFontFor("ar") is { } arFont) dialog.FontFamily = arFont;
         DialogLook.Apply(dialog);
         dialog.PrimaryButtonClick += async (d, args) =>
@@ -365,7 +363,17 @@ public sealed partial class ImportView : Page
                 deferral.Complete();
             }
         };
-        if (await dialog.ShowAsync() == ContentDialogResult.Primary && ViewModel.SelectedChannel is { } channel) ChannelBox.Text = channel.LocalizedName;
+        ContentDialogResult result;
+        root.Changed += RootChanged;
+        try
+        {
+            result = await dialog.ShowAsync();
+        }
+        finally
+        {
+            root.Changed -= RootChanged;
+        }
+        if (result == ContentDialogResult.Primary && ViewModel.SelectedChannel is { } channel) ChannelBox.Text = channel.LocalizedName;
     }
 
     private static string? ChannelFieldErrorText(string slot, string? code) => code switch

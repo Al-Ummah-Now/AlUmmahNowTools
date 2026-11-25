@@ -10,6 +10,7 @@ Keep this table current: a Tools PR that needs a new server route adds its row (
 |---|---|---|
 | Sign-in, staff check (TA-10) | Auth client "Admin Tools (Desktop)" (AlUmmahNowAuth #470); admin-api `GET /api/admin/import/me` (AlUmmahNow #1715) | Auth: live since 2026-11-21; videos `v2026.11.21.5` |
 | Import: channels, batches, uploads, sidecars, transcripts (TA-11) | AlUmmahNow #1715, #1719, #1720 | `v2026.11.21.5` |
+| Import: New channel with its name and description in English and Arabic (#65) | AlUmmahNow #1814 (`nameLocalized`, `descriptionLocalized` on `POST /api/admin/import/channels`); Translate is `POST /api/translate/fields`, there since `v2026.11.16`. An older server keeps the English texts only | `v2026.11.25` |
 | Import: error reports to the Errors page (TA-11) | AlUmmahNow #1733 | `v2026.11.22` |
 | Encode on this computer, Check step (TA-12) | AlUmmahNow #1736 (renditions, `/encoding`, `/delivery`) | `v2026.11.22` |
 | Transcribe: Quran verse references (TA-13) | AlUmmahNow #1745 (`GET /api/admin/import/quran-index`) | `v2026.11.22.6` |
