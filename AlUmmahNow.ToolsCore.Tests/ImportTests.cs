@@ -345,6 +345,8 @@ internal sealed class RecordingContext : IStepContext
     public void Later(TimeSpan delay) => LaterDelay = delay;
     public StepWait Wait;
     public void Waiting(StepWait wait) => Wait = wait;
+    public Action<bool>? OnCopying;
+    public void Copying(bool copying) => OnCopying?.Invoke(copying);
 }
 
 public class ImportApiClientTests

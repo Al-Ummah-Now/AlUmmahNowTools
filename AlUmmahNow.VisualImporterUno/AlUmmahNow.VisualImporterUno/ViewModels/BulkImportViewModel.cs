@@ -987,6 +987,8 @@ public sealed partial class QueueRow : ObservableObject
             ItemPhase.Done => item.AlreadyImported ? Loc.Get("ImportPhase_AlreadyImported") : Loc.Get("ImportPhase_Done"),
             ItemPhase.Running when item.Wait == StepWait.Share => Loc.Get("ImportPhase_WaitingShare"),
             ItemPhase.Running when item.Wait == StepWait.Cloud => Loc.Get("ImportPhase_WaitingCloud"),
+            ItemPhase.Running when item.Wait == StepWait.Space => Loc.Get("ImportPhase_WaitingSpace"),
+            ItemPhase.Running when item.Copying => Loc.Format("ImportPhase_Copying", Loc.Percent(item.Progress * 100)),
             ItemPhase.Running when step!.Kind == ImportStepKind.Upload => Loc.Format("ImportPhase_Uploading", Loc.Percent(item.Progress * 100)),
             ItemPhase.Running when step!.Kind == ImportStepKind.Encode => Loc.Format("ImportPhase_Encoding", Loc.Percent(item.Progress * 100)),
             ItemPhase.Running when step!.Kind == ImportStepKind.Transcribe => Loc.Format("ImportPhase_Transcribing", Loc.Percent(item.Progress * 100)),
