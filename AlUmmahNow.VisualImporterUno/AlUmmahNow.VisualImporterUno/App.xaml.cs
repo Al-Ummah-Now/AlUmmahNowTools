@@ -354,6 +354,8 @@ public partial class App : Application
             Log.Information("Logs will be written to: {LogPath}", logPath);
 
             // Initialize services
+            // Before anything reads or saves them
+            if (Environment.GetEnvironmentVariable("TOOLS_DEMO") != "1") AlUmmahNow.ToolsCore.UserSettingsFile.Default.TakeOverOld();
             InitializeServices();
 
             // The shell (wiki TOOLS-ADMIN TA-10): preferences, language and the sign-in session first

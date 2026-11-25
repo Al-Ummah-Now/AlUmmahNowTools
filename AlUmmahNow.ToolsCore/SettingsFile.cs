@@ -5,6 +5,7 @@ namespace AlUmmahNow.ToolsCore;
 /// <summary>What the person chose on a page, kept between runs.</summary>
 public interface ISettingsStore
 {
+    /// <exception cref="IOException">What was saved cannot be read, and never was (<see cref="UnauthorizedAccessException"/> too)</exception>
     string? Get(string section, string key);
 
     void Set(string section, IReadOnlyDictionary<string, string> values);
@@ -19,6 +20,7 @@ public sealed class SettingsFile : ISettingsStore
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
     private readonly object _gate = new();
     private readonly string _path;
+    private Dictionary<string, Dictionary<string, string>?>? _last;
 
     public SettingsFile(string path) => _path = path;
 
@@ -28,14 +30,17 @@ public sealed class SettingsFile : ISettingsStore
     {
         lock (_gate)
         {
+            Dictionary<string, Dictionary<string, string>?> all;
             try
             {
-                return Read().TryGetValue(section, out var values) && values is not null && values.TryGetValue(key, out var value) ? value : null;
+                all = _last = Read();
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            catch (Exception ex) when (_last is not null && (ex is IOException or UnauthorizedAccessException))
             {
-                return null;
+                // Not readable now: as it was last
+                all = _last;
             }
+            return all.TryGetValue(section, out var values) && values is not null && values.TryGetValue(key, out var value) ? value : null;
         }
     }
 
@@ -48,6 +53,7 @@ public sealed class SettingsFile : ISettingsStore
             if (!all.TryGetValue(section, out var saved) || saved is null) all[section] = saved = new Dictionary<string, string>();
             foreach (var (key, value) in values) saved[key] = value;
             AtomicFile.Write(_path, JsonSerializer.Serialize(all, Json));
+            _last = all;
         }
     }
 
