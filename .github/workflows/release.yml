@@ -514,7 +514,8 @@ jobs:
         run: node scripts/app-release.mjs sign --in signed/app-release.json --require
       - name: The signature verifies under the key list the apps carry
         run: |
-          pub=$(jq -r '[.keys[].publicKey] | join(",")' AlUmmahNow.ToolsCore/Updates/keys/update-keys.json)
+          # A key the list revokes is not a key, even while it is still listed
+          pub=$(jq -re '.revoked as $gone | [.keys[] | select(.keyId as $id | $gone | index($id) | not) | .publicKey] | if length > 0 then join(",") else error("no usable key") end' AlUmmahNow.ToolsCore/Updates/keys/update-keys.json)
           node scripts/app-release.mjs verify --in signed/app-release.json --pub "$pub"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
