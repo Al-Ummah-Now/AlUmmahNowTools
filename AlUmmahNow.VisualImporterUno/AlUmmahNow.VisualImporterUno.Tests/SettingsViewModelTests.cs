@@ -1,3 +1,4 @@
+using AlUmmahNow.ToolsCore;
 using AlUmmahNow.VisualImporterUno.Converters;
 using AlUmmahNow.VisualImporterUno.Services;
 using AlUmmahNow.VisualImporterUno.ViewModels;
@@ -12,10 +13,12 @@ namespace AlUmmahNow.VisualImporterUno.Tests;
 public sealed class SettingsViewModelTests : IDisposable
 {
     private readonly List<FileScanServiceManager> _managers = new();
+    private readonly string _dir = Directory.CreateTempSubdirectory("settings-vm-").FullName;
 
     private SettingsViewModel CreateViewModel(
         Dictionary<string, string?>? configValues = null,
-        Mock<INotificationService>? notifications = null)
+        Mock<INotificationService>? notifications = null,
+        UserSettingsFile? file = null)
     {
         var config = new ConfigurationBuilder()
             .AddInMemoryCollection(configValues ?? new Dictionary<string, string?>())
@@ -23,15 +26,30 @@ public sealed class SettingsViewModelTests : IDisposable
         var serviceManager = new FileScanServiceManager(NullLogger<FileScanServiceManager>.Instance, "http://127.0.0.1:59999");
         _managers.Add(serviceManager);
         var notif = notifications ?? new Mock<INotificationService>();
-        return new SettingsViewModel(config, NullLogger<SettingsViewModel>.Instance, serviceManager, notif.Object);
+        return new SettingsViewModel(config, NullLogger<SettingsViewModel>.Instance, serviceManager, notif.Object, file ?? new UserSettingsFile(_dir));
     }
 
     public void Dispose()
     {
+        Directory.Delete(_dir, recursive: true);
         foreach (var manager in _managers)
         {
             manager.Dispose();
         }
+    }
+
+    [Fact]
+    public async Task SavedSettings_AreReadBackAndAreTheOnesTheAppsStartReads()
+    {
+        var vm = CreateViewModel();
+        vm.FileScanServiceUrl = "http://10.0.0.42:5000";
+        vm.AutoStartService = false;
+        (await vm.SaveSettingsAsync()).Should().BeTrue();
+
+        var next = CreateViewModel();
+        next.FileScanServiceUrl.Should().Be("http://10.0.0.42:5000");
+        next.AutoStartService.Should().BeFalse();
+        new UserSettingsFile(_dir).Read().Should().Contain("10.0.0.42");
     }
 
     [Fact]

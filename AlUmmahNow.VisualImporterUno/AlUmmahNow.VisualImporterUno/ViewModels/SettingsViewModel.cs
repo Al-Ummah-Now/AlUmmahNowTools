@@ -32,9 +32,11 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
         private string? _selectedDetectedPath;
         private bool _enableNotifications = true;
         private bool _enableNotificationSound = true;
+        private readonly AlUmmahNow.ToolsCore.UserSettingsFile _file;
 
-        public SettingsViewModel(IConfiguration configuration, ILogger<SettingsViewModel> logger, FileScanServiceManager serviceManager, INotificationService notificationService)
+        public SettingsViewModel(IConfiguration configuration, ILogger<SettingsViewModel> logger, FileScanServiceManager serviceManager, INotificationService notificationService, AlUmmahNow.ToolsCore.UserSettingsFile? file = null)
         {
+            _file = file ?? AlUmmahNow.ToolsCore.UserSettingsFile.Default;
             _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _serviceManager = serviceManager ?? throw new ArgumentNullException(nameof(serviceManager));
@@ -193,11 +195,6 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
             IsSaving = true;
             try
             {
-                var settingsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), 
-                    "AlUmmahNow", "VisualImporter", "settings.json");
-                
-                Directory.CreateDirectory(Path.GetDirectoryName(settingsPath)!);
-                
                 var settings = new
                 {
                     FileScanService = new { Url = FileScanServiceUrl },
@@ -218,9 +215,9 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
                     WriteIndented = true 
                 });
                 
-                await File.WriteAllTextAsync(settingsPath, json);
+                await Task.Run(() => _file.Write(json));
                 
-                _logger.LogInformation("Settings saved to: {SettingsPath}", settingsPath);
+                _logger.LogInformation("Settings saved to: {SettingsPath}", _file.Path);
                 return true;
             }
             catch (Exception ex)
@@ -250,12 +247,8 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
             try
             {
                 // The user settings file
-                var settingsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), 
-                    "AlUmmahNow", "VisualImporter", "settings.json");
-                
-                if (File.Exists(settingsPath))
+                if (_file.Read() is { } json)
                 {
-                    var json = File.ReadAllText(settingsPath);
                     var settings = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(json);
                     
                     if (settings.TryGetProperty("FileScanService", out var fileScanService) &&
@@ -290,7 +283,7 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
                         }
                     }
 
-                    _logger.LogInformation("Settings loaded from: {SettingsPath}", settingsPath);
+                    _logger.LogInformation("Settings loaded from: {SettingsPath}", _file.Path);
                 }
                 else
                 {
