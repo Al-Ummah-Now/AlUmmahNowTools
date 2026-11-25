@@ -94,6 +94,26 @@ public class LocalPathsTests
     [InlineData("POST https://admin.api.example/api/admin/import/items (500)", "POST https://admin.api.example/api/admin/import/items (500)")]
     [InlineData("kb/s and/or 10 s", "kb/s and/or 10 s")]
     [InlineData("no path at all", "no path at all")]
+    // What stands after the path stays
+    [InlineData(@"\\nas\media\a.mp4 (100 kb/s)", "a.mp4 (100 kb/s)")]
+    [InlineData(@"C:\Users\someone\a.mp4 (video/mp4)", "a.mp4 (video/mp4)")]
+    [InlineData("/Users/someone/a.mp4 and/or b.mp4", "a.mp4 and/or b.mp4")]
+    [InlineData("ffprobe could not read /Volumes/Media/a.mp4 [in#0/mov] error", "ffprobe could not read a.mp4 [in#0/mov] error")]
+    [InlineData(@"\\nas\media\lesson (video/mp4)", "lesson (video/mp4)")]
+    [InlineData(@"copied \\nas\media\a.mp4 to \\nas\other\b.mp4, 3/4", "copied a.mp4 to b.mp4, 3/4")]
+    [InlineData(@"moved /Volumes/Media/a.mp4 to /Users/someone/b.mp4 (1/2)", "moved a.mp4 to b.mp4 (1/2)")]
+    // Names with spaces, dots, quotes; in Arabic
+    [InlineData(@"\\nas\دروس الفقه\الصيام ١\الدرس الأول.mp4 (100 kb/s)", "الدرس الأول.mp4 (100 kb/s)")]
+    [InlineData("/Volumes/الوسائط/دروس/الدرس الأول.webm and/or x", "الدرس الأول.webm and/or x")]
+    [InlineData(@"C:\My Lessons v1.2 final\part 2.old\a b.c.mp4: gone", "a b.c.mp4: gone")]
+    [InlineData(@"\\nas\media\a.mp4.part 5/6", "a.mp4.part 5/6")]
+    [InlineData("'/Users/someone/Qur'an lessons/no extension' and 'c/d'", "'no extension' and 'c/d'")]
+    [InlineData(@"""C:\a b\c d"" x/y", @"""c d"" x/y")]
+    [InlineData(@"C:\Users\someone/mixed/a.mp4", "a.mp4")]
+    [InlineData("/Volumes/Media/d.mp4.download/d.mp4: cut", "d.mp4: cut")]
+    [InlineData(@"""\\\\nas\\media\\a.mp4""", @"""a.mp4""")]
+    // The names of macOS's file system have no case
+    [InlineData("/users/someone/a.mp4 in /VOLUMES/Media/x y/b.mp4", "a.mp4 in b.mp4")]
     [InlineData("", "")]
     public void Folders_stay_on_this_computer(string text, string stripped) => Assert.Equal(stripped, LocalPaths.Strip(text));
 
