@@ -154,19 +154,9 @@ public class NotificationService : INotificationService, IDisposable
     {
         try
         {
-            var localSettings = Windows.Storage.ApplicationData.Current.LocalSettings;
-            var notificationSettings = localSettings.CreateContainer("NotificationSettings",
-                Windows.Storage.ApplicationDataCreateDisposition.Always);
-
-            if (notificationSettings.Values.ContainsKey("IsEnabled"))
-            {
-                _isEnabled = (bool)(notificationSettings.Values["IsEnabled"] ?? true);
-            }
-
-            if (notificationSettings.Values.ContainsKey("IsSoundEnabled"))
-            {
-                _isSoundEnabled = (bool)(notificationSettings.Values["IsSoundEnabled"] ?? true);
-            }
+            var settings = AlUmmahNow.ToolsCore.SettingsFile.Default;
+            if (bool.TryParse(settings.Get("Notifications", "IsEnabled"), out var enabled)) _isEnabled = enabled;
+            if (bool.TryParse(settings.Get("Notifications", "IsSoundEnabled"), out var sound)) _isSoundEnabled = sound;
 
             _logger.LogInformation("Notification settings loaded: Enabled={IsEnabled}, Sound={IsSoundEnabled}",
                 _isEnabled, _isSoundEnabled);
@@ -181,12 +171,7 @@ public class NotificationService : INotificationService, IDisposable
     {
         try
         {
-            var localSettings = Windows.Storage.ApplicationData.Current.LocalSettings;
-            var notificationSettings = localSettings.CreateContainer("NotificationSettings",
-                Windows.Storage.ApplicationDataCreateDisposition.Always);
-
-            notificationSettings.Values["IsEnabled"] = _isEnabled;
-            notificationSettings.Values["IsSoundEnabled"] = _isSoundEnabled;
+            AlUmmahNow.ToolsCore.SettingsFile.Default.Set("Notifications", new Dictionary<string, string> { ["IsEnabled"] = _isEnabled.ToString(), ["IsSoundEnabled"] = _isSoundEnabled.ToString() });
 
             _logger.LogDebug("Notification settings saved");
         }

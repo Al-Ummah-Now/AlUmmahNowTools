@@ -111,26 +111,16 @@ public sealed class ImportWorkspace : IDisposable
     }
 
     /// <summary>The paths saved on the Video tools page, else the ones the app found on this computer.</summary>
-    private static async Task<(string Ffmpeg, string Ffprobe)?> LocateFfmpegAsync(CancellationToken ct)
-    {
-        try
+    private static Task<(string Ffmpeg, string Ffprobe)?> LocateFfmpegAsync(CancellationToken ct) => FfmpegPaths.LocateAsync(
+        AlUmmahNow.ToolsCore.SettingsFile.Default,
+        async token =>
         {
-            var settings = Windows.Storage.ApplicationData.Current.LocalSettings;
-            if (settings.Containers.TryGetValue("FFmpegSettings", out var saved)
-                && saved.Values["FFmpegPath"] is string ffmpeg && saved.Values["FFprobePath"] is string ffprobe
-                && File.Exists(ffmpeg) && File.Exists(ffprobe))
-            {
-                return (ffmpeg, ffprobe);
-            }
-        }
-        catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException or System.Runtime.InteropServices.COMException)
-        {
-            // No saved settings on this platform: the found paths follow
-        }
-        var manager = App.GetService<AlUmmahNow.Data.Services.IFFmpegManagerService>();
-        if (manager.FFmpegPath is null || manager.FFprobePath is null) await manager.AutoDetectFFmpegAsync().WaitAsync(ct).ConfigureAwait(false);
-        return manager.FFmpegPath is { } found && manager.FFprobePath is { } probe ? (found, probe) : null;
-    }
+            var manager = App.GetService<AlUmmahNow.Data.Services.IFFmpegManagerService>();
+            if (manager.FFmpegPath is null || manager.FFprobePath is null) await manager.AutoDetectFFmpegAsync().WaitAsync(token).ConfigureAwait(false);
+            return manager.FFmpegPath is { } found && manager.FFprobePath is { } probe ? (found, probe) : null;
+        },
+        ex => Serilog.Log.Warning(ex, "[Import] The saved ffmpeg paths could not be read"),
+        ct);
 
     /// <summary>A local encode that failed goes to the Errors page; the file itself carries on, encoded by the server.</summary>
     private void ReportEncodeFailure(Exception error, QueueItem item) =>

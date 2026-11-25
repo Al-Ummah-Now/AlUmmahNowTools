@@ -193,64 +193,40 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
             IsSaving = true;
             try
             {
-                // Use Windows ApplicationData for native Windows 11 settings storage
-                var localSettings = Windows.Storage.ApplicationData.Current.LocalSettings;
-                var settingsContainer = localSettings.CreateContainer("AlUmmahNowSettings", 
-                    Windows.Storage.ApplicationDataCreateDisposition.Always);
+                var settingsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), 
+                    "AlUmmahNow", "VisualImporter", "settings.json");
                 
-                // Store individual settings
-                settingsContainer.Values["FileScanServiceUrl"] = FileScanServiceUrl;
-                settingsContainer.Values["ServiceExecutablePath"] = ServiceExecutablePath;
-                settingsContainer.Values["AutoStartService"] = AutoStartService;
-                settingsContainer.Values["EnableNotifications"] = EnableNotifications;
-                settingsContainer.Values["EnableNotificationSound"] = EnableNotificationSound;
+                Directory.CreateDirectory(Path.GetDirectoryName(settingsPath)!);
                 
-                _logger.LogInformation("Settings saved using Windows ApplicationData API");
+                var settings = new
+                {
+                    FileScanService = new { Url = FileScanServiceUrl },
+                    ServiceInstallation = new
+                    {
+                        ExecutablePath = ServiceExecutablePath,
+                        StartAutomatically = AutoStartService
+                    },
+                    Notifications = new
+                    {
+                        Enabled = EnableNotifications,
+                        SoundEnabled = EnableNotificationSound
+                    }
+                };
                 
+                var json = System.Text.Json.JsonSerializer.Serialize(settings, new System.Text.Json.JsonSerializerOptions 
+                { 
+                    WriteIndented = true 
+                });
+                
+                await File.WriteAllTextAsync(settingsPath, json);
+                
+                _logger.LogInformation("Settings saved to: {SettingsPath}", settingsPath);
                 return true;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error saving settings using ApplicationData API");
-                
-                // Fallback to JSON file approach if ApplicationData fails
-                try
-                {
-                    var settingsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), 
-                        "AlUmmahNow", "VisualImporter", "settings.json");
-                    
-                    Directory.CreateDirectory(Path.GetDirectoryName(settingsPath)!);
-                    
-                    var settings = new
-                    {
-                        FileScanService = new { Url = FileScanServiceUrl },
-                        ServiceInstallation = new
-                        {
-                            ExecutablePath = ServiceExecutablePath,
-                            StartAutomatically = AutoStartService
-                        },
-                        Notifications = new
-                        {
-                            Enabled = EnableNotifications,
-                            SoundEnabled = EnableNotificationSound
-                        }
-                    };
-                    
-                    var json = System.Text.Json.JsonSerializer.Serialize(settings, new System.Text.Json.JsonSerializerOptions 
-                    { 
-                        WriteIndented = true 
-                    });
-                    
-                    await File.WriteAllTextAsync(settingsPath, json);
-                    
-                    _logger.LogInformation("Settings saved to fallback JSON file: {SettingsPath}", settingsPath);
-                    return true;
-                }
-                catch (Exception fallbackEx)
-                {
-                    _logger.LogError(fallbackEx, "Fallback settings save also failed");
-                    return false;
-                }
+                _logger.LogError(ex, "Error saving settings");
+                return false;
             }
             finally
             {
@@ -273,45 +249,7 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
         {
             try
             {
-                // Try to load from Windows ApplicationData first (native Windows 11 approach)
-                try
-                {
-                    var localSettings = Windows.Storage.ApplicationData.Current.LocalSettings;
-                    var settingsContainer = localSettings.Containers.ContainsKey("AlUmmahNowSettings") 
-                        ? localSettings.Containers["AlUmmahNowSettings"] 
-                        : null;
-                    
-                    if (settingsContainer != null)
-                    {
-                        if (settingsContainer.Values.ContainsKey("FileScanServiceUrl"))
-                            FileScanServiceUrl = settingsContainer.Values["FileScanServiceUrl"]?.ToString() ?? "http://localhost:5000";
-                        
-                        if (settingsContainer.Values.ContainsKey("ServiceExecutablePath"))
-                            ServiceExecutablePath = settingsContainer.Values["ServiceExecutablePath"]?.ToString() ?? "";
-                        
-                        if (settingsContainer.Values.ContainsKey("AutoStartService"))
-                            AutoStartService = (bool)(settingsContainer.Values["AutoStartService"] ?? true);
-
-                        if (settingsContainer.Values.ContainsKey("EnableNotifications"))
-                            EnableNotifications = (bool)(settingsContainer.Values["EnableNotifications"] ?? true);
-
-                        if (settingsContainer.Values.ContainsKey("EnableNotificationSound"))
-                            EnableNotificationSound = (bool)(settingsContainer.Values["EnableNotificationSound"] ?? true);
-
-                        _logger.LogInformation("Settings loaded from Windows ApplicationData");
-                        
-                        // Load database connection from configuration (security sensitive)
-                        DatabaseConnectionString = _configuration.GetConnectionString("DefaultConnection") ?? 
-                            "Server=(localdb)\\MSSQLLocalDB;Database=AlUmmahNowFileScan;Trusted_Connection=true;MultipleActiveResultSets=true;TrustServerCertificate=true";
-                        return;
-                    }
-                }
-                catch (Exception appDataEx)
-                {
-                    _logger.LogWarning(appDataEx, "Failed to load from ApplicationData, trying fallback methods");
-                }
-                
-                // Fallback: Try to load from user settings file
+                // The user settings file
                 var settingsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), 
                     "AlUmmahNow", "VisualImporter", "settings.json");
                 
@@ -352,7 +290,7 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
                         }
                     }
 
-                    _logger.LogInformation("Settings loaded from JSON fallback file: {SettingsPath}", settingsPath);
+                    _logger.LogInformation("Settings loaded from: {SettingsPath}", settingsPath);
                 }
                 else
                 {

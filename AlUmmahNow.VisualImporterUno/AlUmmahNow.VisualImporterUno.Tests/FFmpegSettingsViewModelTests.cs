@@ -1,4 +1,6 @@
 using AlUmmahNow.Data.Services;
+using AlUmmahNow.ToolsCore;
+using AlUmmahNow.ToolsCore.Import;
 using AlUmmahNow.VisualImporterUno.ViewModels;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -128,6 +130,53 @@ public sealed class FFmpegSettingsViewModelTests
         vm.FFprobePath = "/bad/ffprobe";
         (await vm.SavePathsAsync()).Should().BeFalse();
         manager.Verify(m => m.SetFFmpegPaths("/bad/ffmpeg", "/bad/ffprobe"), Times.Once);
+    }
+
+    [Fact]
+    public async Task SavedPaths_AreThereForTheNextPageAndForTheEncode()
+    {
+        var dir = Directory.CreateTempSubdirectory("ffmpeg-settings-");
+        try
+        {
+            var (ffmpeg, ffprobe) = (Path.Combine(dir.FullName, "ffmpeg"), Path.Combine(dir.FullName, "ffprobe"));
+            File.WriteAllText(ffmpeg, "");
+            File.WriteAllText(ffprobe, "");
+            var store = new SettingsFile(Path.Combine(dir.FullName, "settings.json"));
+            var manager = new Mock<IFFmpegManagerService>();
+            manager.Setup(m => m.VerifyFFmpegInstallationAsync()).ReturnsAsync(new FFmpegStatus { IsFullyInstalled = true, FFmpegPath = ffmpeg, FFprobePath = ffprobe });
+            var vm = new FFmpegSettingsViewModel(NullLogger<FFmpegSettingsViewModel>.Instance, manager.Object, store);
+            await WaitUntilIdleAsync(vm);
+            vm.FFmpegPath = ffmpeg;
+            vm.FFprobePath = ffprobe;
+            (await vm.SavePathsAsync()).Should().BeTrue();
+
+            var restarted = new SettingsFile(Path.Combine(dir.FullName, "settings.json"));
+            var next = new Mock<IFFmpegManagerService>();
+            next.Setup(m => m.VerifyFFmpegInstallationAsync()).ReturnsAsync(new FFmpegStatus());
+            var page = new FFmpegSettingsViewModel(NullLogger<FFmpegSettingsViewModel>.Instance, next.Object, restarted);
+            next.Verify(m => m.SetFFmpegPaths(ffmpeg, ffprobe), Times.Once);
+            await WaitUntilIdleAsync(page);
+            (await FfmpegPaths.LocateAsync(restarted, _ => Task.FromResult<(string, string)?>(null), null, default)).Should().Be((ffmpeg, ffprobe));
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task AStoreThatThrows_LeavesThePathsThatWereFound()
+    {
+        var store = new Mock<ISettingsStore>();
+        store.Setup(s => s.Get(It.IsAny<string>(), It.IsAny<string>())).Throws(new NotImplementedException("Containers"));
+        var manager = new Mock<IFFmpegManagerService>();
+        manager.SetupGet(m => m.FFmpegPath).Returns("/usr/bin/ffmpeg");
+        manager.SetupGet(m => m.FFprobePath).Returns("/usr/bin/ffprobe");
+        manager.Setup(m => m.VerifyFFmpegInstallationAsync()).ReturnsAsync(new FFmpegStatus { IsFullyInstalled = true, FFmpegPath = "/usr/bin/ffmpeg", FFprobePath = "/usr/bin/ffprobe" });
+        var vm = new FFmpegSettingsViewModel(NullLogger<FFmpegSettingsViewModel>.Instance, manager.Object, store.Object);
+        await WaitUntilIdleAsync(vm);
+        vm.FFmpegPath.Should().Be("/usr/bin/ffmpeg");
+        vm.IsInstalled.Should().BeTrue();
     }
 
     [Fact]

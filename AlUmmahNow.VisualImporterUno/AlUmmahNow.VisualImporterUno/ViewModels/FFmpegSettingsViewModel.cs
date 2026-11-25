@@ -1,6 +1,9 @@
 using AlUmmahNow.VisualImporterUno.Shell;
 using Microsoft.Extensions.Logging;
+using AlUmmahNow.ToolsCore;
+using AlUmmahNow.ToolsCore.Import;
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
@@ -12,6 +15,7 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
     {
         private readonly ILogger<FFmpegSettingsViewModel> _logger;
         private readonly IFFmpegManagerService _ffmpegManager;
+        private readonly ISettingsStore _settings;
 
         private string _ffmpegPath = "";
         private string _ffprobePath = "";
@@ -26,8 +30,10 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
 
         public FFmpegSettingsViewModel(
             ILogger<FFmpegSettingsViewModel> logger,
-            IFFmpegManagerService ffmpegManager)
+            IFFmpegManagerService ffmpegManager,
+            ISettingsStore? settings = null)
         {
+            _settings = settings ?? SettingsFile.Default;
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _ffmpegManager = ffmpegManager ?? throw new ArgumentNullException(nameof(ffmpegManager));
 
@@ -36,6 +42,9 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
             // Initialize with current paths
             _ffmpegPath = _ffmpegManager.FFmpegPath ?? "";
             _ffprobePath = _ffmpegManager.FFprobePath ?? "";
+
+            // The saved ones, when they are still there
+            LoadSettings();
 
             // Verify installation on startup
             _ = VerifyInstallationAsync();
@@ -227,13 +236,7 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
 
                 if (IsInstalled)
                 {
-                    // Save to application settings
-                    var localSettings = Windows.Storage.ApplicationData.Current.LocalSettings;
-                    var settingsContainer = localSettings.CreateContainer("FFmpegSettings",
-                        Windows.Storage.ApplicationDataCreateDisposition.Always);
-
-                    settingsContainer.Values["FFmpegPath"] = FFmpegPath;
-                    settingsContainer.Values["FFprobePath"] = FFprobePath;
+                    _settings.Set(FfmpegPaths.Section, new Dictionary<string, string> { [FfmpegPaths.Ffmpeg] = FFmpegPath, [FfmpegPaths.Ffprobe] = FFprobePath });
 
                     _logger.LogInformation("FFmpeg paths saved successfully");
                     return true;
@@ -256,18 +259,11 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
         {
             try
             {
-                var localSettings = Windows.Storage.ApplicationData.Current.LocalSettings;
-                var settingsContainer = localSettings.Containers.ContainsKey("FFmpegSettings")
-                    ? localSettings.Containers["FFmpegSettings"]
-                    : null;
-
-                if (settingsContainer != null)
+                if (_settings.Get(FfmpegPaths.Section, FfmpegPaths.Ffmpeg) is { } ffmpeg && _settings.Get(FfmpegPaths.Section, FfmpegPaths.Ffprobe) is { } ffprobe
+                    && System.IO.File.Exists(ffmpeg) && System.IO.File.Exists(ffprobe))
                 {
-                    if (settingsContainer.Values.ContainsKey("FFmpegPath"))
-                        FFmpegPath = settingsContainer.Values["FFmpegPath"]?.ToString() ?? "";
-
-                    if (settingsContainer.Values.ContainsKey("FFprobePath"))
-                        FFprobePath = settingsContainer.Values["FFprobePath"]?.ToString() ?? "";
+                    FFmpegPath = ffmpeg;
+                    FFprobePath = ffprobe;
 
                     _logger.LogInformation("FFmpeg settings loaded from storage");
 
