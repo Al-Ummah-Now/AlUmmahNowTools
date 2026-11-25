@@ -12,7 +12,7 @@ namespace AlUmmahNow.VisualImporterUno.Shell;
 /// The update test's ways of closing the app (<c>TOOLS_UPDATE_TEST_CLOSE</c>), each as the platform makes it:
 /// <list type="bullet">
 /// <item><c>quit</c>: the request every way ends in;</item>
-/// <item><c>close-button</c>: the window's close button (macOS <c>performClose:</c>, Windows <c>WM_CLOSE</c>);</item>
+/// <item><c>close-button</c>: the window's close button (macOS the button's own click, Windows <c>WM_CLOSE</c>);</item>
 /// <item><c>window-close</c>: <c>Window.Close()</c>, a close that cannot be cancelled;</item>
 /// <item><c>cmd-q</c> (macOS): the Quit menu item's <c>terminate:</c>;</item>
 /// <item><c>dock-quit</c> and <c>log-out</c> (macOS): the system's quit event, without a reason and with the log-out's;</item>
@@ -37,7 +37,7 @@ internal static class UpdateTestClose
                     case "close-button" when OperatingSystem.IsWindows():
                         if (!Process.GetCurrentProcess().CloseMainWindow()) throw new InvalidOperationException("no main window");
                         break;
-                    case "close-button": Send(MacWindow(), "performClose:", IntPtr.Zero); break;
+                    case "close-button": Send(MacCloseButton(), "performClick:", IntPtr.Zero); break;
                     case "cmd-q": Send(MacApp(), "terminate:", IntPtr.Zero); break;
                     case "dock-quit": SendQuitEvent(reason: 0); break;
                     case "log-out": SendQuitEvent(reason: 0x6C6F676F); break; // 'logo'
@@ -74,6 +74,7 @@ internal static class UpdateTestClose
     [DllImport(ObjC)] private static extern IntPtr sel_registerName(string name);
     [DllImport(ObjC, EntryPoint = "objc_msgSend")] private static extern IntPtr Send(IntPtr receiver, IntPtr selector);
     [DllImport(ObjC, EntryPoint = "objc_msgSend")] private static extern IntPtr Send(IntPtr receiver, IntPtr selector, IntPtr argument);
+    [DllImport(ObjC, EntryPoint = "objc_msgSend")] private static extern IntPtr SendButton(IntPtr receiver, IntPtr selector, nuint button);
     [DllImport(ObjC, EntryPoint = "objc_msgSend")] private static extern IntPtr SendUInt(IntPtr receiver, IntPtr selector, uint argument);
     [DllImport(ObjC, EntryPoint = "objc_msgSend")] private static extern IntPtr SendEvent(IntPtr receiver, IntPtr selector, uint eventClass, uint eventId, IntPtr target, short returnId, int transactionId);
     [DllImport(ObjC, EntryPoint = "objc_msgSend")] private static extern void SendAttribute(IntPtr receiver, IntPtr selector, IntPtr descriptor, uint keyword);
@@ -83,10 +84,21 @@ internal static class UpdateTestClose
 
     private static IntPtr MacApp() => Send(objc_getClass("NSApplication"), sel_registerName("sharedApplication"));
 
-    private static IntPtr MacWindow()
+    /// <summary>The close button of the app's window: the app has other windows (its menus'), which have none.</summary>
+    private static IntPtr MacCloseButton()
     {
-        var window = Send(Send(MacApp(), sel_registerName("windows")), sel_registerName("firstObject"));
-        return window != IntPtr.Zero ? window : throw new InvalidOperationException("no window");
+        var windows = Send(MacApp(), sel_registerName("windows"));
+        var count = (long)Send(windows, sel_registerName("count"));
+        var found = IntPtr.Zero;
+        for (nint i = 0; i < count; i++)
+        {
+            var window = Send(windows, sel_registerName("objectAtIndex:"), i);
+            var button = SendButton(window, sel_registerName("standardWindowButton:"), 0);
+            var visible = (Send(window, sel_registerName("isVisible")) & 0xFF) != 0;
+            UpdateTestHandler.Log($"window {Marshal.PtrToStringUTF8(Send(Send(Send(window, sel_registerName("class")), sel_registerName("description")), sel_registerName("UTF8String")))} visible={visible} button={button != IntPtr.Zero}");
+            if (visible && button != IntPtr.Zero) found = button;
+        }
+        return found != IntPtr.Zero ? found : throw new InvalidOperationException("no close button");
     }
 
     /// <summary>The quit event ('aevt'/'quit') to this process, as the Dock and the log-out send it.</summary>
