@@ -185,8 +185,9 @@ public partial class App : Application
 
             Log.Information("Application starting with temporary logger configuration");
 
-            var builder = this.CreateBuilder(args)
-                .Configure(host => host
+            // Not Application.CreateBuilder: it makes a window of its own, which macOS shows, empty, under the app's
+            var builder = UnoHost.CreateDefaultBuilder(typeof(App).Assembly);
+            builder
 #if DEBUG
                     // Switch to Development environment when running in DEBUG
                     .UseEnvironment(Environments.Development)
@@ -349,16 +350,7 @@ public partial class App : Application
                         // Register FFmpeg services
                         services.AddSingleton<IFFmpegManagerService, FFmpegManagerService>();
                         services.AddTransient<FFmpegSettingsViewModel>();
-                    })
-                );
-
-            // Don't use builder.Window, create our custom MainWindow instead
-            // MainWindow = builder.Window;
-
-#if DEBUG
-            // MainWindow.UseStudio();
-#endif
-            // MainWindow.SetWindowIcon();
+                    });
 
             Host = builder.Build();
 
