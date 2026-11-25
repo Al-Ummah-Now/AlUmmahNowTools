@@ -6,6 +6,7 @@ namespace AlUmmahNow.ToolsCore;
 /// </summary>
 public sealed class UserSettingsFile
 {
+    private readonly object _gate = new();
     private readonly string _old;
 
     /// <param name="root">The folder the app's data is in</param>
@@ -22,19 +23,26 @@ public sealed class UserSettingsFile
     /// <summary>The file's text, or null when nothing was saved.</summary>
     public string? Read()
     {
-        if (File.Exists(Path)) return File.ReadAllText(Path);
-        if (!File.Exists(_old)) return null;
-        var text = File.ReadAllText(_old);
-        try
+        lock (_gate)
         {
-            AtomicFile.Write(Path, text);
+            if (File.Exists(Path)) return File.ReadAllText(Path);
+            if (!File.Exists(_old)) return null;
+            var text = File.ReadAllText(_old);
+            try
+            {
+                // Another copy may have saved meanwhile: what is there is never written over
+                if (!AtomicFile.WriteNew(Path, text)) return File.ReadAllText(Path);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // Taken over at the next read
+            }
+            return text;
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            // Taken over at the next read
-        }
-        return text;
     }
 
-    public void Write(string text) => AtomicFile.Write(Path, text);
+    public void Write(string text)
+    {
+        lock (_gate) AtomicFile.Write(Path, text);
+    }
 }

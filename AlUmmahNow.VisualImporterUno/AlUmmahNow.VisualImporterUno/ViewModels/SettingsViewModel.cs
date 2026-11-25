@@ -42,6 +42,7 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
             _serviceManager = serviceManager ?? throw new ArgumentNullException(nameof(serviceManager));
             _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
 
+            (_enableNotifications, _enableNotificationSound) = (_notificationService.IsEnabled, _notificationService.IsSoundEnabled);
             LoadSettings();
             DetectServicePaths();
         }
@@ -198,15 +199,11 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
                 var settings = new
                 {
                     FileScanService = new { Url = FileScanServiceUrl },
+                    // The notification switches are saved by the notification service, as they are changed
                     ServiceInstallation = new
                     {
                         ExecutablePath = ServiceExecutablePath,
                         StartAutomatically = AutoStartService
-                    },
-                    Notifications = new
-                    {
-                        Enabled = EnableNotifications,
-                        SoundEnabled = EnableNotificationSound
                     }
                 };
                 
@@ -267,19 +264,6 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels
                         if (serviceInstallation.TryGetProperty("StartAutomatically", out var autoStart))
                         {
                             AutoStartService = autoStart.GetBoolean();
-                        }
-                    }
-
-                    if (settings.TryGetProperty("Notifications", out var notifications))
-                    {
-                        if (notifications.TryGetProperty("Enabled", out var enabled))
-                        {
-                            EnableNotifications = enabled.GetBoolean();
-                        }
-
-                        if (notifications.TryGetProperty("SoundEnabled", out var soundEnabled))
-                        {
-                            EnableNotificationSound = soundEnabled.GetBoolean();
                         }
                     }
 

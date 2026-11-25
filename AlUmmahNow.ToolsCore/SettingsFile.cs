@@ -26,9 +26,20 @@ public sealed class SettingsFile : ISettingsStore
 
     public string? Get(string section, string key)
     {
-        lock (_gate) return Read().TryGetValue(section, out var values) && values is not null && values.TryGetValue(key, out var value) ? value : null;
+        lock (_gate)
+        {
+            try
+            {
+                return Read().TryGetValue(section, out var values) && values is not null && values.TryGetValue(key, out var value) ? value : null;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return null;
+            }
+        }
     }
 
+    /// <exception cref="IOException">The file could not be read (so what else is in it cannot be kept) or written</exception>
     public void Set(string section, IReadOnlyDictionary<string, string> values)
     {
         lock (_gate)
@@ -40,16 +51,16 @@ public sealed class SettingsFile : ISettingsStore
         }
     }
 
-    /// <summary>A file that is missing or cannot be read is an empty one.</summary>
+    /// <summary>A file that is missing or damaged is an empty one; one that cannot be read now is not.</summary>
     private Dictionary<string, Dictionary<string, string>?> Read()
     {
         try
         {
-            if (File.Exists(_path)) return JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, string>?>>(File.ReadAllText(_path)) ?? new();
+            return JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, string>?>>(File.ReadAllText(_path)) ?? new();
         }
-        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException or JsonException)
         {
+            return new();
         }
-        return new();
     }
 }
