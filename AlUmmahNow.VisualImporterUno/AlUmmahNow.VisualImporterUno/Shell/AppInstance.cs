@@ -76,6 +76,8 @@ internal static class AppInstance
             {
                 WindowFront.Show(window);
                 Log.Information("[Instance] Brought forward for a second copy");
+                // The launch check reads it here: the console shows only warnings of the log
+                Console.Error.WriteLine("[Instance] Brought forward for a second copy");
             }
             catch (Exception ex)
             {
