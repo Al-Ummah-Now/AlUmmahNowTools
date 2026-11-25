@@ -20,6 +20,9 @@ namespace AlUmmahNow.FileScanService.Services
         private static readonly string[] VideoExtensions = { ".mp4", ".mkv", ".avi", ".mov", ".wmv", ".m4v", ".flv", ".webm" };
         private static readonly string[] ThumbnailExtensions = { ".jpg", ".jpeg", ".png", ".webp", ".bmp" };
 
+        private static bool IsFinishedVideo(FileInfo file, string root) =>
+            VideoExtensions.Contains(file.Extension.ToLowerInvariant()) && !AlUmmahNow.ToolsCore.Import.UnfinishedDownloads.IsAt(file.FullName, root);
+
         public event EventHandler<ScanProgressEventArgs>? ProgressChanged;
 
         public FileScanEngine(
@@ -60,11 +63,11 @@ namespace AlUmmahNow.FileScanService.Services
             
             // Determine initial scanning strategy
             var rootFiles = rootDir.GetFiles()
-                .Where(f => VideoExtensions.Contains(f.Extension.ToLowerInvariant()))
+                .Where(f => IsFinishedVideo(f, scanSession.RootPath))
                 .ToArray();
             
             var subdirectories = rootDir.GetDirectories()
-                .Where(d => !d.Name.StartsWith(".") && !d.Name.StartsWith("_"))
+                .Where(d => !d.Name.StartsWith(".") && !d.Name.StartsWith("_") && !AlUmmahNow.ToolsCore.Import.UnfinishedDownloads.IsFolder(d.Name))
                 .ToArray();
 
             if (rootFiles.Length > 0 && subdirectories.Length == 0)
@@ -113,7 +116,7 @@ namespace AlUmmahNow.FileScanService.Services
 
                     // Scan files in current directory
                     var videoFiles = currentDir.GetFiles()
-                        .Where(f => VideoExtensions.Contains(f.Extension.ToLowerInvariant()))
+                        .Where(f => IsFinishedVideo(f, scanSession.RootPath))
                         .ToArray();
 
                     foreach (var videoFile in videoFiles)
@@ -129,7 +132,7 @@ namespace AlUmmahNow.FileScanService.Services
 
                     // Queue subdirectories
                     var subdirs = currentDir.GetDirectories()
-                        .Where(d => !d.Name.StartsWith(".") && !d.Name.StartsWith("_"));
+                        .Where(d => !d.Name.StartsWith(".") && !d.Name.StartsWith("_") && !AlUmmahNow.ToolsCore.Import.UnfinishedDownloads.IsFolder(d.Name));
 
                     foreach (var subdir in subdirs)
                     {
@@ -191,7 +194,7 @@ namespace AlUmmahNow.FileScanService.Services
                     try
                     {
                         var subdirs = currentDir.GetDirectories()
-                            .Where(d => !d.Name.StartsWith(".") && !d.Name.StartsWith("_"));
+                            .Where(d => !d.Name.StartsWith(".") && !d.Name.StartsWith("_") && !AlUmmahNow.ToolsCore.Import.UnfinishedDownloads.IsFolder(d.Name));
 
                         foreach (var subdir in subdirs)
                         {

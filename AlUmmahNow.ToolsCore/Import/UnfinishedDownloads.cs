@@ -1,12 +1,17 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Text.RegularExpressions;
 
 namespace AlUmmahNow.ToolsCore.Import;
 
 /// <summary>
 /// Files a downloader has not finished, or made on its way, told by the names the downloaders themselves give: never by a word in
-/// an ordinary name ("temp", "part two").
+/// an ordinary name ("temp", "part two"). The scan of the Import page and the watched folders' service (which compiles this very
+/// file) leave them out.
 /// </summary>
-public static class UnfinishedDownloads
+internal static class UnfinishedDownloads
 {
     /// <summary>yt-dlp's file while it merges: <c>Title.temp.webm</c></summary>
     private static readonly Regex Merging = new(@"^.+\.temp\.[^.]+$", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
@@ -15,6 +20,32 @@ public static class UnfinishedDownloads
     private static readonly Regex Format = new(@"^(?<title>.+)\.f\d+(-\w+)?\.[^.]+$", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
 
     private static readonly string[] Endings = { ".part", ".ytdl", ".crdownload", ".download", ".partial" };
+
+    private static readonly string[] Videos = { ".mp4", ".m4v", ".mov", ".mkv", ".webm", ".avi", ".wmv", ".flv" };
+
+    /// <summary>A file where it is: by its name, what is beside it, and the folders it is in below <paramref name="root"/>.</summary>
+    public static bool IsAt(string path, string root)
+    {
+        if (Path.GetDirectoryName(path) is not { } folder) return false;
+        if (IsIn(folder, root)) return true;
+        var name = Path.GetFileName(path);
+        // Only for one format of a video it matters what is beside it
+        if (!Format.IsMatch(name)) return Is(name, Array.Empty<string>());
+        var names = new List<string>();
+        try
+        {
+            names.AddRange(Directory.EnumerateFiles(folder).Select(f => Path.GetFileName(f)));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // By its own name alone
+        }
+        return Is(name, names);
+    }
+
+    /// <summary>The folder is one a downloader keeps its file in, or inside one, below <paramref name="root"/> (which was chosen).</summary>
+    public static bool IsIn(string folder, string root) =>
+        Path.GetRelativePath(root, folder).Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar).Any(IsFolder);
 
     /// <summary>Safari keeps what it downloads in a folder of this name.</summary>
     public static bool IsFolder(string name) => name.EndsWith(".download", StringComparison.OrdinalIgnoreCase) && name.Length > ".download".Length;
@@ -28,19 +59,21 @@ public static class UnfinishedDownloads
         var title = format.Groups["title"].Value;
         return beside.Any(other => other.StartsWith(title + ".", StringComparison.OrdinalIgnoreCase)
             && (Merging.IsMatch(other) || Ends(other, ".part") || Ends(other, ".ytdl")
-                || (FolderScanner.IsVideo(other) && Path.GetFileNameWithoutExtension(other).Equals(title, StringComparison.OrdinalIgnoreCase))));
+                || (IsVideo(other) && Path.GetFileNameWithoutExtension(other).Equals(title, StringComparison.OrdinalIgnoreCase))));
     }
 
     /// <summary>The video it would become (<c>lesson.mp4</c> of <c>lesson.mp4.part</c>); null: it is none.</summary>
     public static string? VideoName(string name)
     {
-        if (FolderScanner.IsVideo(name)) return name;
+        if (IsVideo(name)) return name;
         var ending = Endings.FirstOrDefault(e => Ends(name, e));
         if (ending is null or ".ytdl") return null;
         var video = name[..^ending.Length];
         // Chrome does not say what it is until it is confirmed
-        return FolderScanner.IsVideo(video) || (ending == ".crdownload" && !Path.HasExtension(video)) ? video : null;
+        return IsVideo(video) || (ending == ".crdownload" && !Path.HasExtension(video)) ? video : null;
     }
+
+    private static bool IsVideo(string name) => Videos.Contains(Path.GetExtension(name), StringComparer.OrdinalIgnoreCase);
 
     private static bool Ends(string name, string ending) => name.Length > ending.Length && name.EndsWith(ending, StringComparison.OrdinalIgnoreCase);
 }
