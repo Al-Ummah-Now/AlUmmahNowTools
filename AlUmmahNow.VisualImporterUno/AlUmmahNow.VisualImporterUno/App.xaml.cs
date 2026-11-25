@@ -5,7 +5,6 @@ using AlUmmahNow.Data.Video;
 using AlUmmahNow.Data.Services;
 using AlUmmahNow.Importer;
 using AlUmmahNow.Importer.Core;
-using AlUmmahNow.ToolsCore.Import;
 using AlUmmahNow.VisualImporterUno.Services;
 using AlUmmahNow.VisualImporterUno.Services.Logging;
 using AlUmmahNow.VisualImporterUno.ViewModels;
@@ -494,7 +493,7 @@ public partial class App : Application
 
                     // One that is being started meanwhile does not start
                     serviceManager.Close();
-                    ended = await serviceManager.StopServiceAsync(EndLimits.ScannerAsked, EndLimits.ScannerKilled);
+                    ended = await serviceManager.StopServiceAsync(AlUmmahNow.ToolsCore.Import.EndLimits.ScannerAsked, AlUmmahNow.ToolsCore.Import.EndLimits.ScannerKilled);
 
                     Log.Information("FileScan service stopped: {Ended}", ended);
                     serviceManager.Dispose();
@@ -513,7 +512,7 @@ public partial class App : Application
                 if (signalRClient != null)
                 {
                     Log.Information("Disconnecting SignalR client...");
-                    await signalRClient.DisposeAsync().AsTask().WaitAsync(EndLimits.Connection);
+                    await signalRClient.DisposeAsync().AsTask().WaitAsync(AlUmmahNow.ToolsCore.Import.EndLimits.Connection);
                     Log.Information("SignalR client disconnected");
                 }
             }
