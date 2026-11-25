@@ -260,6 +260,7 @@ public class NetworkShareReadingTests
         /// <summary>A mount whose server is gone: asked what it is, it answers only once this is set</summary>
         public ManualResetEventSlim? Silent;
         public int Questions;
+        public readonly System.Collections.Concurrent.ConcurrentQueue<string> Asked = new();
         private void Hold()
         {
             if (Silent is not { } silent) return;
@@ -276,6 +277,7 @@ public class NetworkShareReadingTests
         private string? Resolve(string path) => Mapping && path.StartsWith("/y", StringComparison.Ordinal) ? "/nas" + path[2..] : null;
         public bool IsNetwork(string path)
         {
+            Asked.Enqueue(path);
             Hold();
             return OnShare;
         }
@@ -555,6 +557,35 @@ public class NetworkShareReadingTests
         // Once it has answered it is asked again
         rig.Paths.Silent = null;
         await Temp.WaitUntil(() => rig.Access.Candidates("/y/nas/a.mp4").Count == 2, 20_000);
+    }
+
+    [Fact]
+    public async Task The_drive_letter_is_not_asked_about_when_its_network_path_is_a_share()
+    {
+        var rig = new Rig();
+        await rig.ReadAll();
+        Assert.Equal(new[] { Network }, rig.Paths.Asked);
+    }
+
+    [Fact]
+    public async Task A_question_joined_late_waits_only_for_what_is_left_of_its_time()
+    {
+        using var answers = new ManualResetEventSlim();
+        var rig = new Rig(answer: TimeSpan.FromSeconds(4));
+        rig.Paths.Silent = answers;
+        try
+        {
+            var first = rig.Access.IsNetworkAsync("/y/nas/a.mp4", default);
+            await Task.Delay(TimeSpan.FromSeconds(3));
+            var asked = Stopwatch.StartNew();
+            Assert.True(await rig.Access.IsNetworkAsync("/y/nas/b.mp4", default));
+            Assert.InRange(asked.Elapsed, TimeSpan.Zero, TimeSpan.FromSeconds(3));
+            Assert.True(await first);
+        }
+        finally
+        {
+            answers.Set();
+        }
     }
 
     [Fact]

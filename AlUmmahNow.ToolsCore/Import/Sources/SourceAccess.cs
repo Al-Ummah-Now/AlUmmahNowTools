@@ -77,13 +77,16 @@ public sealed class SourceAccess
         {
             ct.ThrowIfCancellationRequested();
             Task<T>? mine = null;
-            Task? before = null;
+            Task answered;
+            var left = Answer;
             lock (asking)
             {
                 if (asking.Task is { IsCompleted: false } open)
                 {
-                    if (TimeProvider.System.GetElapsedTime(asking.Since) >= Answer) return whenSilent;
-                    before = open;
+                    // What is left of its time, not a whole time again
+                    left = Answer - TimeProvider.System.GetElapsedTime(asking.Since);
+                    if (left <= TimeSpan.Zero) return whenSilent;
+                    answered = open;
                 }
                 else
                 {
@@ -92,13 +95,20 @@ public sealed class SourceAccess
                     // A late failure is nobody's
                     _ = mine.ContinueWith(t => _ = t.Exception, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
                     (asking.Task, asking.Since) = (mine, TimeProvider.System.GetTimestamp());
+                    answered = mine;
                 }
             }
-            var answered = mine ?? before!;
-            if (await Task.WhenAny(answered, Task.Delay(Answer, ct)).ConfigureAwait(false) != answered)
+            try
             {
-                ct.ThrowIfCancellationRequested();
+                await answered.WaitAsync(left, ct).ConfigureAwait(false);
+            }
+            catch (TimeoutException) when (!answered.IsCompleted)
+            {
                 return whenSilent;
+            }
+            catch (Exception) when (mine is null && !ct.IsCancellationRequested)
+            {
+                // The question before this one failed: this one is asked now
             }
             if (mine is not null) return await mine.ConfigureAwait(false);
         }
@@ -332,7 +342,11 @@ internal sealed class SourceAttempts
         // What just failed goes last
         if (avoid is not null && candidates.Count > 1 && candidates.Remove(avoid)) candidates.Add(avoid);
         var network = false;
-        foreach (var candidate in candidates) network |= await access.IsNetworkAsync(candidate, ct).ConfigureAwait(false);
+        foreach (var candidate in candidates)
+        {
+            // One is enough: the drive letter is not asked about when its network path has said it
+            if (network = await access.IsNetworkAsync(candidate, ct).ConfigureAwait(false)) break;
+        }
         return new SourceAttempts(access, path, context, candidates, network);
     }
 
