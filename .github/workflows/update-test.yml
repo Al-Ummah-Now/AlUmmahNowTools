@@ -16,6 +16,9 @@ on:
       - AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno/Shell/AppUpdates.cs
       - AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno/Shell/AppInstance.cs
       - AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno/Shell/UpdateTestHandler.cs
+      - AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno/Shell/UpdateTestClose.cs
+      - AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno/Shell/UpdateBar.cs
+      - AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno/Shell/AppQuit.cs
       - AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno/Program.cs
       - AlUmmahNow.VisualImporterUno/Directory.Packages.props
   workflow_dispatch:
@@ -50,13 +53,20 @@ jobs:
         run: |
           powershell -Command "Start-Process (Resolve-Path keep/1/*-Setup.exe).Path -ArgumentList '--silent' -Wait"
           test -f "$LOCALAPPDATA/AlUmmahNow.Tools/current/AlUmmahNow.VisualImporterUno.exe"
+          powershell -Command "Get-Process AlUmmahNow.VisualImporterUno -ErrorAction SilentlyContinue | Stop-Process -Force"; sleep 3
+          cp -r "$LOCALAPPDATA/AlUmmahNow.Tools" keep/installed
       - name: Refused updates change nothing
         run: |
           for c in tampered bad-signature foreign-host planted swapped yanked second-copy; do
             node scripts/update-test.mjs --exe "$LOCALAPPDATA/AlUmmahNow.Tools/current/AlUmmahNow.VisualImporterUno.exe" --package keep/2/*-full.nupkg --packages "$LOCALAPPDATA/AlUmmahNow.Tools/packages" --package-name AlUmmahNow.Tools-2026.1.201-full.nupkg --state "$LOCALAPPDATA/AlUmmahNow/Tools/updates.json" --platform windows --arch x64 --from 2026.01.01 --to 2026.01.02 --case $c
           done
       - name: 2026.01.01 becomes 2026.01.02
-        run: node scripts/update-test.mjs --exe "$LOCALAPPDATA/AlUmmahNow.Tools/current/AlUmmahNow.VisualImporterUno.exe" --package keep/2/*-full.nupkg --packages "$LOCALAPPDATA/AlUmmahNow.Tools/packages" --package-name AlUmmahNow.Tools-2026.1.201-full.nupkg --state "$LOCALAPPDATA/AlUmmahNow/Tools/updates.json" --platform windows --arch x64 --from 2026.01.01 --to 2026.01.02
+        run: |
+          # However it is closed; the last one leaves 2026.01.02 installed
+          for c in close-button window-close restart quit; do
+            rm -rf "$LOCALAPPDATA/AlUmmahNow.Tools"; cp -r keep/installed "$LOCALAPPDATA/AlUmmahNow.Tools"
+            node scripts/update-test.mjs --exe "$LOCALAPPDATA/AlUmmahNow.Tools/current/AlUmmahNow.VisualImporterUno.exe" --package keep/2/*-full.nupkg --packages "$LOCALAPPDATA/AlUmmahNow.Tools/packages" --package-name AlUmmahNow.Tools-2026.1.201-full.nupkg --state "$LOCALAPPDATA/AlUmmahNow/Tools/updates.json" --platform windows --arch x64 --from 2026.01.01 --to 2026.01.02 --close $c
+          done
 
   macos:
     runs-on: macos-15
@@ -87,13 +97,17 @@ jobs:
           echo "EXE=$app/Contents/MacOS/$(/usr/libexec/PlistBuddy -c 'Print CFBundleExecutable' "$app/Contents/Info.plist")" >> "$GITHUB_ENV"
       - name: Refused updates change nothing
         run: |
-          for c in tampered bad-signature foreign-host planted swapped yanked second-copy; do
+          for c in tampered bad-signature foreign-host planted swapped yanked second-copy log-out; do
             node scripts/update-test.mjs --exe "$EXE" --package keep/2/*-full.nupkg --packages "$HOME/Library/Caches/velopack/AlUmmahNow.Tools/packages" --package-name AlUmmahNow.Tools-2026.1.201-full.nupkg --state "$HOME/Library/Application Support/AlUmmahNow/Tools/updates.json" --platform macos --arch arm64 --from 2026.01.01 --to 2026.01.02 --case $c
           done
       - name: 2026.01.01 becomes 2026.01.02
         run: |
-          node scripts/update-test.mjs --exe "$EXE" --package keep/2/*-full.nupkg --packages "$HOME/Library/Caches/velopack/AlUmmahNow.Tools/packages" --package-name AlUmmahNow.Tools-2026.1.201-full.nupkg --state "$HOME/Library/Application Support/AlUmmahNow/Tools/updates.json" --platform macos --arch arm64 --from 2026.01.01 --to 2026.01.02
-          codesign --verify --deep --strict "${EXE%/Contents/MacOS/*}"
+          # However it is closed; the last one leaves 2026.01.02 installed
+          for c in close-button window-close cmd-q dock-quit restart quit; do
+            rm -rf "${EXE%/Contents/MacOS/*}"; ditto -x -k keep/1/*-Portable.zip /Applications
+            node scripts/update-test.mjs --exe "$EXE" --package keep/2/*-full.nupkg --packages "$HOME/Library/Caches/velopack/AlUmmahNow.Tools/packages" --package-name AlUmmahNow.Tools-2026.1.201-full.nupkg --state "$HOME/Library/Application Support/AlUmmahNow/Tools/updates.json" --platform macos --arch arm64 --from 2026.01.01 --to 2026.01.02 --close $c
+            codesign --verify --deep --strict "${EXE%/Contents/MacOS/*}"
+          done
       - name: Velopack log
         if: always()
         run: tail -n 60 ~/Library/Logs/velopack*.log || true

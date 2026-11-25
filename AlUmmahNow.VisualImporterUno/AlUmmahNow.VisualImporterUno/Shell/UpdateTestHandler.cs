@@ -29,7 +29,7 @@ internal sealed class UpdateTestHandler : HttpMessageHandler
         {
             if (v.Stage != last) Log($"{v.Stage} {v.Version}");
             last = v.Stage;
-            // The app closing is what installs a staged update: the real quit, not an exit the platform would never make
+            // The app closing is what installs a staged update: a close the platform makes, not an exit it never would
             if (v.Stage == UpdateStage.Ready) _ = Task.Run(async () =>
             {
                 await Task.Delay(int.TryParse(Environment.GetEnvironmentVariable("TOOLS_UPDATE_TEST_EXIT_MS"), out var ms) ? ms : 1000);
@@ -38,11 +38,11 @@ internal sealed class UpdateTestHandler : HttpMessageHandler
                     await service.CheckAsync(userAsked: true);
                     Log($"rechecked {service.View.Stage}");
                 }
-                await AppQuit.RequestQuitAsync("update test");
+                UpdateTestClose.Run(Environment.GetEnvironmentVariable("TOOLS_UPDATE_TEST_CLOSE") ?? "quit");
             });
         };
     }
 
-    private static void Log(string line) => File.AppendAllText(LogPath, line + "\n");
+    public static void Log(string line) => File.AppendAllText(LogPath, line + "\n");
 }
 #endif
