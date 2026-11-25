@@ -96,3 +96,10 @@ AUN-APP-UPDATES). Operating-system code signing is separate and optional.
   checks that it becomes the second on Windows and macOS, and that a changed package is refused. Test builds
   (`-p:UpdateTest=true`) are the only ones that take their key and server from the environment; `release.yml`
   never sets it and refuses a build that has them (`scripts/no-test-hooks.mjs`).
+
+## Review frames
+
+`.github/workflows/review-frames.yml` (Run workflow, or `gh workflow run review-frames.yml --ref <branch> -f states='…'`) builds the app
+on a macOS runner and renders its own window to a PNG for each state, language and theme, so a UI change can be reviewed without a
+local build. Each line of `states` is `name: VAR=value VAR=value`, the variables being the demo switches (`TOOLS_DEMO_PAGE=import`,
+`TOOLS_DEMO_IMPORT=paused`, `TOOLS_SCREENSHOT_QUIT=1`, …). The PNGs are the `review-frames` artifact.
