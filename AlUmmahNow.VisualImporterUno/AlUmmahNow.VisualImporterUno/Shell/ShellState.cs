@@ -76,6 +76,14 @@ public sealed class ShellState
         Save();
     }
 
+    /// <summary>"Encode on this computer" on the Import page (TA-12), kept for next time.</summary>
+    public void SetEncodeHere(bool here)
+    {
+        if (Preferences.EncodeHere == here) return;
+        Preferences.EncodeHere = here;
+        Save();
+    }
+
     public void SetTheme(ToolsTheme theme)
     {
         Preferences.Theme = theme;

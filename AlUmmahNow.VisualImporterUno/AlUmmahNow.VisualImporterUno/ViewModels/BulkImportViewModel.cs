@@ -54,37 +54,48 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
 
     // ---------------------------------------------------------------- Encoding (TA-12)
 
-    /// <summary>"Let the server encode", as the admin chose it: the batch's files are not encoded on this computer.</summary>
+    /// <summary>"Encode on this computer", as the admin chose it; remembered.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ServerEncodesShown), nameof(EncodeBody))]
-    private bool _serverEncodes;
+    [NotifyPropertyChangedFor(nameof(EncodeHereShown), nameof(EncodeBody))]
+    private bool _encodeHere = ShellState.Current.Preferences.EncodeHere;
+
+    /// <summary>How many files in the queue the last change of the switch changed, or empty.</summary>
+    [ObservableProperty]
+    private string _encodeChanged = "";
 
     /// <summary>Why this computer cannot encode (no ffmpeg, no H.264 encoder), or empty.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasEncodeNote), nameof(CanChooseEncode), nameof(ServerEncodesShown), nameof(EncodeBody))]
+    [NotifyPropertyChangedFor(nameof(HasEncodeNote), nameof(CanChooseEncode), nameof(EncodeHereShown), nameof(EncodeBody))]
     private string _encodeNote = "";
 
     public bool HasEncodeNote => EncodeNote.Length > 0;
 
-    /// <summary>The box can be changed only when this computer can encode.</summary>
+    /// <summary>The switch can be changed only when this computer can encode.</summary>
     public bool CanChooseEncode => !HasEncodeNote;
 
-    /// <summary>
-    /// The box: ticked when the admin chose it, and always when this computer cannot encode (the server encodes them then),
-    /// so it never contradicts the note under it.
-    /// </summary>
-    public bool ServerEncodesShown
+    /// <summary>The switch: off when the admin turned it off, and always when this computer cannot encode, so it never contradicts the note under it.</summary>
+    public bool EncodeHereShown
     {
-        get => ServerEncodes || HasEncodeNote;
+        get => EncodeHere && !HasEncodeNote;
         set
         {
-            if (CanChooseEncode) ServerEncodes = value;
+            if (value == EncodeHereShown) return;
+            if (CanChooseEncode) ChooseEncode(value);
             else OnPropertyChanged();
         }
     }
 
-    /// <summary>The text above the box: who encodes this batch, matching the box (AUDIT-2 2026-11-22).</summary>
-    public string EncodeBody => Loc.Get(ServerEncodesShown ? "Import_EncodeBodyServer" : "Import_EncodeBodyHere");
+    /// <summary>Who encodes, matching the switch.</summary>
+    public string EncodeBody => Loc.Get(EncodeHereShown ? "Import_EncodeBodyHere" : "Import_EncodeBodyServer");
+
+    /// <summary>At once, for every file that is not uploaded yet.</summary>
+    internal void ChooseEncode(bool here)
+    {
+        EncodeHere = here;
+        if (!_workspace.IsDemo) ShellState.Current.SetEncodeHere(here);
+        var changed = _workspace.Queue.SetServerEncodes(!here);
+        EncodeChanged = changed == 0 ? "" : Loc.Plural(here ? "Import_EncodeNowHere" : "Import_EncodeNowServer", changed);
+    }
 
     private async Task CheckEncodingAsync()
     {
@@ -381,7 +392,7 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
         try
         {
             var name = Path.GetFileName(CleanFolder(FolderPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
-            var serverEncodes = ServerEncodesShown;
+            var serverEncodes = !EncodeHereShown;
             var transcribe = Transcription();
             var translate = TranslateCaptions;
             var batch = await _workspace.Api.CreateBatchAsync(channel.Id, string.IsNullOrWhiteSpace(name) ? null : name);
@@ -471,6 +482,7 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
     public void Pause(QueueRow row) => _workspace.Queue.Pause(row.Id);
     public void Resume(QueueRow row) => _workspace.Queue.Resume(row.Id);
     public void Retry(QueueRow row) => _workspace.Queue.Retry(row.Id);
+    public void LeaveToServer(QueueRow row) => _workspace.Queue.SetServerEncodes(true, row.Id);
     public void Remove(QueueRow row) => _workspace.Queue.Remove(row.Id);
 
     /// <summary>The Remove all dialog's title: how many files leave the queue.</summary>
@@ -622,7 +634,7 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
             "left_out_size" => Loc.WithDetail(Loc.Format("ImportLog_left_out_size", Num(1)), Arg(0)),
             "left_out_unreadable" => Loc.WithDetail(Loc.WithDetail(Loc.Get("ImportLog_left_out_unreadable"), Arg(0)), Arg(1)),
             // Encoding here and the server's verdict (TA-12); sizes, encoder names and the server's raw words on their own lines
-            "server_encode_chosen" or "server_encodes_target" or "server_encodes_started" or "renditions_sent" or "renditions_used" or "check_gave_up" => Loc.Get("ImportLog_" + line.Code),
+            "server_encode_chosen" or "encode_here_chosen" or "server_encodes_target" or "server_encodes_started" or "renditions_sent" or "renditions_used" or "check_gave_up" => Loc.Get("ImportLog_" + line.Code),
             "encode_plan" => Loc.Format("ImportLog_encode_plan", RungList(Arg(1)), EncoderName(Arg(0))),
             "encoded" => Arg(2).Length > 0
                 ? Loc.Format("ImportLog_encoded_from", Bytes(Arg(1)), Bytes(Arg(2)))
@@ -917,6 +929,7 @@ public sealed partial class QueueRow : ObservableObject
     [ObservableProperty] private bool _canPause;
     [ObservableProperty] private bool _canResume;
     [ObservableProperty] private bool _canRetry;
+    [ObservableProperty] private bool _canLeaveToServer;
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(RemoveLast))]
     private bool _removeFirst;
@@ -943,6 +956,9 @@ public sealed partial class QueueRow : ObservableObject
         Channel = channel ?? "";
         var step = item.CurrentStep;
         var phase = item.Phase;
+        var kind = step?.Kind;
+        // Left to the server while it was being encoded here: that stops, and the upload is next
+        if (phase == ItemPhase.Running && kind == ImportStepKind.Encode && item.ServerEncodes) (phase, kind) = (ItemPhase.Waiting, ImportStepKind.Upload);
         IsDone = phase == ItemPhase.Done;
         IsFailed = phase == ItemPhase.Failed;
         IsWaiting = phase == ItemPhase.Waiting;
@@ -954,6 +970,7 @@ public sealed partial class QueueRow : ObservableObject
         CanPause = item.CanPause;
         CanResume = item.CanResume;
         CanRetry = item.CanRetry;
+        CanLeaveToServer = item.CanLeaveToServer;
         // There is nothing to try with until another file is in its place: removing it is what can be done
         RemoveFirst = item.NeedsOtherFile;
         Status = phase switch
@@ -971,7 +988,7 @@ public sealed partial class QueueRow : ObservableObject
             ItemPhase.RetryWaiting => Loc.Format("ImportPhase_RetryAt", Loc.TimeWithZone(step!.NextAttemptAt!.Value.LocalDateTime)),
             ItemPhase.Paused => Loc.Get("ImportPhase_Paused"),
             ItemPhase.Failed => Loc.Format("ImportPhase_Failed", BulkImportViewModel.StepName(step!.Kind.ToString())),
-            _ => Loc.Format("ImportPhase_Waiting", BulkImportViewModel.StepName(step!.Kind.ToString())),
+            _ => Loc.Format("ImportPhase_Waiting", BulkImportViewModel.StepName(kind!.Value.ToString())),
         };
         StatusTip = phase == ItemPhase.RetryWaiting ? Loc.UtcText(step!.NextAttemptAt!.Value) : null;
         Detail = phase is ItemPhase.Failed or ItemPhase.RetryWaiting ? Loc.KeepLastWords(BulkImportViewModel.ErrorText(step!.LastErrorCode, step.LastError, step.ReadError)) : "";

@@ -126,6 +126,28 @@
                 </StackPanel>
             </Border>
 
+            <!-- Encoding: on this computer unless the server is asked to (TA-12); for the files to come and those in the queue -->
+            <Border x:Name="EncodeCard" Style="{StaticResource ToolsCard}">
+                <StackPanel Spacing="8">
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Spacing="4">
+                            <TextBlock x:Name="EncodeLabel" x:Uid="Import_EncodeHere" Text="Encode on this computer" Style="{StaticResource ToolsCardTitle}" />
+                            <TextBlock Text="{x:Bind ViewModel.EncodeBody, Mode=OneWay}" Style="{StaticResource ToolsMuted}" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <ToggleSwitch Grid.Column="1" IsOn="{x:Bind ViewModel.EncodeHereShown, Mode=TwoWay}" IsEnabled="{x:Bind ViewModel.CanChooseEncode, Mode=OneWay}"
+                                      OnContent="" OffContent="" MinWidth="0" VerticalAlignment="Top" AutomationProperties.LabeledBy="{Binding ElementName=EncodeLabel}" />
+                    </Grid>
+                    <TextBlock Text="{x:Bind ViewModel.EncodeChanged, Mode=OneWay}" Style="{StaticResource ToolsMuted}" Foreground="{ThemeResource FanousTextPrimaryBrush}" TextWrapping="Wrap"
+                               AutomationProperties.LiveSetting="Polite" Visibility="{x:Bind ViewModel.EncodeChanged, Mode=OneWay, Converter={StaticResource StringToVisibility}}" />
+                    <TextBlock Text="{x:Bind ViewModel.EncodeNote, Mode=OneWay}" Style="{StaticResource ToolsMuted}" Foreground="{ThemeResource FanousAccentBrush}"
+                               TextWrapping="Wrap" Visibility="{x:Bind ViewModel.HasEncodeNote, Mode=OneWay}" />
+                </StackPanel>
+            </Border>
+
             <!-- 3. What the scan found -->
             <Border Style="{StaticResource ToolsCard}" Visibility="{x:Bind ViewModel.HasReview, Mode=OneWay}">
                 <StackPanel Spacing="12">
@@ -164,16 +186,6 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
-                    <!-- Encoding: on this computer unless the server is asked to (TA-12) -->
-                    <Border Style="{StaticResource ToolsInsetCard}">
-                        <StackPanel Spacing="8">
-                            <TextBlock x:Uid="Import_EncodeTitle" Text="Encoding" Style="{StaticResource ToolsLabel}" />
-                            <TextBlock Text="{x:Bind ViewModel.EncodeBody, Mode=OneWay}" Style="{StaticResource ToolsMuted}" TextWrapping="Wrap" />
-                            <CheckBox x:Uid="Import_EncodeServer" Content="Let the server encode these videos" IsChecked="{x:Bind ViewModel.ServerEncodesShown, Mode=TwoWay}" IsEnabled="{x:Bind ViewModel.CanChooseEncode, Mode=OneWay}" />
-                            <TextBlock Text="{x:Bind ViewModel.EncodeNote, Mode=OneWay}" Style="{StaticResource ToolsMuted}" Foreground="{ThemeResource FanousAccentBrush}"
-                                       TextWrapping="Wrap" Visibility="{x:Bind ViewModel.HasEncodeNote, Mode=OneWay}" />
-                        </StackPanel>
-                    </Border>
                     <!-- Speech to text: on this computer, Quran as verse references, translated by the server (TA-13) -->
                     <Border Style="{StaticResource ToolsInsetCard}">
                         <StackPanel Spacing="8">
@@ -292,7 +304,7 @@
                                             <TextBlock Text="{x:Bind Note, Mode=OneWay}" Style="{StaticResource ToolsMuted}" Foreground="{ThemeResource FanousAccentBrush}"
                                                        TextWrapping="Wrap" Visibility="{x:Bind ShowProblemNote, Mode=OneWay}" />
                                             <TextBlock Text="{x:Bind TranscriptNote, Mode=OneWay}" Style="{StaticResource ToolsMuted}" TextWrapping="Wrap" Visibility="{x:Bind ShowTranscriptNote, Mode=OneWay}" />
-                                            <StackPanel Orientation="Horizontal" Spacing="4" Margin="-8,2,0,0">
+                                            <shell:WrapRow Spacing="4" Margin="-8,2,0,0">
                                                 <HyperlinkButton Style="{StaticResource ToolsLinkButton}" Padding="8,4" Tag="{x:Bind}" Click="Pause_Click" Visibility="{x:Bind CanPause, Mode=OneWay}">
                                                     <TextBlock x:Uid="Import_RowPause" Text="Pause" />
                                                 </HyperlinkButton>
@@ -301,6 +313,9 @@
                                                 </HyperlinkButton>
                                                 <HyperlinkButton Style="{StaticResource ToolsLinkButton}" Padding="8,4" Tag="{x:Bind}" Click="Retry_Click" Visibility="{x:Bind CanRetry, Mode=OneWay}">
                                                     <TextBlock x:Uid="Import_RowRetry" Text="Try again now" />
+                                                </HyperlinkButton>
+                                                <HyperlinkButton Style="{StaticResource ToolsLinkButton}" Padding="8,4" Tag="{x:Bind}" Click="LeaveToServer_Click" Visibility="{x:Bind CanLeaveToServer, Mode=OneWay}">
+                                                    <TextBlock x:Uid="Import_RowServerEncodes" Text="Let the server encode" />
                                                 </HyperlinkButton>
                                                 <HyperlinkButton Style="{StaticResource ToolsLinkButton}" Padding="8,4" Tag="{x:Bind}" Click="Remove_Click" Visibility="{x:Bind RemoveFirst, Mode=OneWay}">
                                                     <TextBlock x:Uid="Import_RowRemove" Text="Remove" />
@@ -311,7 +326,7 @@
                                                 <HyperlinkButton Style="{StaticResource ToolsLinkButton}" Padding="8,4" Tag="{x:Bind}" Click="Remove_Click" Visibility="{x:Bind RemoveLast, Mode=OneWay}">
                                                     <TextBlock x:Uid="Import_RowRemove" Text="Remove" />
                                                 </HyperlinkButton>
-                                            </StackPanel>
+                                            </shell:WrapRow>
                                             <!-- The log, opened under the row: what happened, when, and the reference to quote -->
                                             <Border Style="{StaticResource ToolsInsetCard}" Visibility="{x:Bind ShowLog, Mode=OneWay}" Margin="0,4,0,0">
                                                 <StackPanel Spacing="10">
@@ -376,7 +391,7 @@
                                     <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
                                 <ComboBox x:Name="HashBox" x:Uid="Import_ParallelHash" Header="Checking files" HorizontalAlignment="Stretch" ItemsSource="{x:Bind ViewModel.ParallelChoices}" SelectedIndex="{x:Bind ViewModel.HashParallel, Mode=TwoWay}" />
-                                <ComboBox x:Name="EncodeBox" Grid.Column="1" x:Uid="Import_ParallelEncode" Header="Encodes" HorizontalAlignment="Stretch" ItemsSource="{x:Bind ViewModel.EncodeChoices}" SelectedIndex="{x:Bind ViewModel.EncodeParallel, Mode=TwoWay}" />
+                                <ComboBox x:Name="EncodeBox" Grid.Column="1" x:Uid="Import_ParallelEncode" Header="Encodes" HorizontalAlignment="Stretch" ItemsSource="{x:Bind ViewModel.EncodeChoices}" SelectedIndex="{x:Bind ViewModel.EncodeParallel, Mode=TwoWay}" IsEnabled="{x:Bind ViewModel.EncodeHereShown, Mode=OneWay}" />
                                 <ComboBox x:Name="UploadBox" Grid.Row="1" x:Uid="Import_ParallelUpload" Header="Uploads" HorizontalAlignment="Stretch" ItemsSource="{x:Bind ViewModel.UploadChoices}" SelectedIndex="{x:Bind ViewModel.UploadParallel, Mode=TwoWay}" />
                                 <ComboBox x:Name="AttachBox" Grid.Row="1" Grid.Column="1" x:Uid="Import_ParallelAttach" Header="Captions and extras" HorizontalAlignment="Stretch" ItemsSource="{x:Bind ViewModel.ParallelChoices}" SelectedIndex="{x:Bind ViewModel.AttachParallel, Mode=TwoWay}" />
                             </Grid>

@@ -65,6 +65,17 @@ public sealed partial class ImportView : Page
                 PageScroll.ChangeView(null, Math.Max(0, top - 8), null, true);
             });
         }
+        // Frames of the switch turned off (TOOLS_DEMO_ENCODE=off), with what it changed in the queue
+        if (Environment.GetEnvironmentVariable("TOOLS_DEMO_ENCODE") == "off") ViewModel.ChooseEncode(false);
+        if (Environment.GetEnvironmentVariable("TOOLS_DEMO_IMPORT_SCROLL") is "encode" or "parallel" or "row5")
+        {
+            FrameworkElement part = Environment.GetEnvironmentVariable("TOOLS_DEMO_IMPORT_SCROLL") switch { "parallel" => ParallelGrid, "row5" => QueueCard, _ => EncodeCard };
+            // The fifth row, the one that is encoded, whatever the rows above it wrap to
+            var down = part == QueueCard ? 620 : part == ParallelGrid ? -120 : 0;
+            PageContent.Padding = new Thickness(PageContent.Padding.Left, PageContent.Padding.Top, PageContent.Padding.Right, 4000);
+            DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+                PageScroll.ChangeView(null, Math.Max(0, part.TransformToVisual(PageContent).TransformPoint(new Windows.Foundation.Point(0, 0)).Y - 8 + down), null, true));
+        }
         var dialog = Environment.GetEnvironmentVariable("TOOLS_DEMO_IMPORT_DIALOG") ?? (DemoImport.State == "remove-all" ? "remove-all" : null);
         // No caret in a frame unless it shows typing: focus rests on a button, without its keyboard ring
         if (dialog?.StartsWith("suggest", StringComparison.Ordinal) != true) DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => BrowseButton.Focus(FocusState.Programmatic));
@@ -423,6 +434,11 @@ public sealed partial class ImportView : Page
     private void Retry_Click(object sender, RoutedEventArgs e)
     {
         if (RowOf(sender) is { } row) ViewModel.Retry(row);
+    }
+
+    private void LeaveToServer_Click(object sender, RoutedEventArgs e)
+    {
+        if (RowOf(sender) is { } row) ViewModel.LeaveToServer(row);
     }
 
     /// <summary>Removing stops the file's work here; what already reached the channel stays there, so ask first.</summary>

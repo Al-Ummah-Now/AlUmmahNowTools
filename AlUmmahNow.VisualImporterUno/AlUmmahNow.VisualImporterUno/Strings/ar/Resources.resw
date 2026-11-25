@@ -2651,17 +2651,56 @@
   <data name="Import_LogCopiedNote.Text" xml:space="preserve">
     <value>نُسخ</value>
   </data>
-  <data name="Import_EncodeTitle.Text" xml:space="preserve">
-    <value>الترميز</value>
+  <data name="Import_EncodeHere.Text" xml:space="preserve">
+    <value>الترميز على هذا الجهاز</value>
+  </data>
+  <data name="Import_RowServerEncodes.Text" xml:space="preserve">
+    <value>الترميز على الخادم</value>
+  </data>
+  <data name="ImportLog_encode_here_chosen" xml:space="preserve">
+    <value>اختير الترميز على هذا الجهاز</value>
+  </data>
+  <data name="Import_EncodeNowServer_Zero" xml:space="preserve">
+    <value>{0} مرئي في قائمة الرفع صار ترميزها على الخادم.</value>
+  </data>
+  <data name="Import_EncodeNowServer_One" xml:space="preserve">
+    <value>مرئي واحد في قائمة الرفع صار ترميزه على الخادم.</value>
+  </data>
+  <data name="Import_EncodeNowServer_Two" xml:space="preserve">
+    <value>مرئيان في قائمة الرفع صار ترميزهما على الخادم.</value>
+  </data>
+  <data name="Import_EncodeNowServer_Few" xml:space="preserve">
+    <value>{0} مرئيات في قائمة الرفع صار ترميزها على الخادم.</value>
+  </data>
+  <data name="Import_EncodeNowServer_Many" xml:space="preserve">
+    <value>{0} مرئيًا في قائمة الرفع صار ترميزها على الخادم.</value>
+  </data>
+  <data name="Import_EncodeNowServer_Other" xml:space="preserve">
+    <value>{0} مرئي في قائمة الرفع صار ترميزها على الخادم.</value>
+  </data>
+  <data name="Import_EncodeNowHere_Zero" xml:space="preserve">
+    <value>{0} مرئي في قائمة الرفع صار ترميزها على هذا الجهاز.</value>
+  </data>
+  <data name="Import_EncodeNowHere_One" xml:space="preserve">
+    <value>مرئي واحد في قائمة الرفع صار ترميزه على هذا الجهاز.</value>
+  </data>
+  <data name="Import_EncodeNowHere_Two" xml:space="preserve">
+    <value>مرئيان في قائمة الرفع صار ترميزهما على هذا الجهاز.</value>
+  </data>
+  <data name="Import_EncodeNowHere_Few" xml:space="preserve">
+    <value>{0} مرئيات في قائمة الرفع صار ترميزها على هذا الجهاز.</value>
+  </data>
+  <data name="Import_EncodeNowHere_Many" xml:space="preserve">
+    <value>{0} مرئيًا في قائمة الرفع صار ترميزها على هذا الجهاز.</value>
+  </data>
+  <data name="Import_EncodeNowHere_Other" xml:space="preserve">
+    <value>{0} مرئي في قائمة الرفع صار ترميزها على هذا الجهاز.</value>
   </data>
   <data name="Import_EncodeBodyHere" xml:space="preserve">
-    <value>ترمّز الأدوات كل مرئي على هذا الجهاز وترسل الناتج مع الرفع، فيجهز للمشاهدة أسرع. ويفحص الخادم كل ملف، ويعيد ترميز المرئي بنفسه إن وجد خللًا.</value>
+    <value>يُرمّز كل مرئي على هذا الجهاز قبل رفعه ويُرسل الناتج معه، فيجهز للمشاهدة أسرع. ويفحص الخادم كل ملف، ويعيد ترميز المرئي بنفسه إن وجد خللًا.</value>
   </data>
   <data name="Import_EncodeBodyServer" xml:space="preserve">
-    <value>يرمّز الخادم كل مرئي بعد رفعه، فيتأخر قليلًا حتى يجهز للمشاهدة.</value>
-  </data>
-  <data name="Import_EncodeServer.Content" xml:space="preserve">
-    <value>دع الخادم يرمّز هذه المرئيات</value>
+    <value>تُرفع المرئيات كما هي. ويرمّز الخادم كل مرئي بعد رفعه، فيتأخر قليلًا حتى يجهز للمشاهدة.</value>
   </data>
   <data name="Import_EncodeNote_ffmpeg_missing" xml:space="preserve">
     <value>لا توجد أداة الترميز (البرنامج الذي يجهّز المرئي بمقاسات العرض) على هذا الجهاز، فيرمّز الخادم هذه المرئيات. أضفها من صفحة أدوات المرئيات.</value>

@@ -2327,17 +2327,32 @@ The list shows it once the scanner is back.</value>
   <data name="Import_LogCopiedNote.Text" xml:space="preserve">
     <value>Copied</value>
   </data>
-  <data name="Import_EncodeTitle.Text" xml:space="preserve">
-    <value>Encoding</value>
+  <data name="Import_EncodeHere.Text" xml:space="preserve">
+    <value>Encode on this computer</value>
+  </data>
+  <data name="Import_RowServerEncodes.Text" xml:space="preserve">
+    <value>Let the server encode</value>
+  </data>
+  <data name="ImportLog_encode_here_chosen" xml:space="preserve">
+    <value>Encode on this computer was chosen</value>
+  </data>
+  <data name="Import_EncodeNowServer_One" xml:space="preserve">
+    <value>The server will encode 1 video in the queue.</value>
+  </data>
+  <data name="Import_EncodeNowServer_Other" xml:space="preserve">
+    <value>The server will encode {0} videos in the queue.</value>
+  </data>
+  <data name="Import_EncodeNowHere_One" xml:space="preserve">
+    <value>1 video in the queue will be encoded on this computer.</value>
+  </data>
+  <data name="Import_EncodeNowHere_Other" xml:space="preserve">
+    <value>{0} videos in the queue will be encoded on this computer.</value>
   </data>
   <data name="Import_EncodeBodyHere" xml:space="preserve">
-    <value>Tools encodes each video on this computer and sends the result with the upload, so it’s ready to watch sooner. The server checks every file and encodes the video again itself if anything is off.</value>
+    <value>Each video is encoded on this computer before its upload, and the result goes with it, so it’s ready to watch sooner. The server checks every file and encodes the video again itself if anything is off.</value>
   </data>
   <data name="Import_EncodeBodyServer" xml:space="preserve">
-    <value>The server encodes each video after its upload, so it takes a little longer to be ready to watch.</value>
-  </data>
-  <data name="Import_EncodeServer.Content" xml:space="preserve">
-    <value>Let the server encode these videos</value>
+    <value>Videos upload as they are. The server encodes each one after its upload, so it takes a little longer to be ready to watch.</value>
   </data>
   <data name="Import_EncodeNote_ffmpeg_missing" xml:space="preserve">
     <value>The encoding tool (ffmpeg) isn’t on this computer, so the server encodes these videos. Add it on the Video tools page.</value>
