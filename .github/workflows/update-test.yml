@@ -9,6 +9,7 @@ on:
       - scripts/update-test.mjs
       - scripts/app-release.mjs
       - scripts/vpk-pack.sh
+      - scripts/mac-bundle.sh
       - AlUmmahNow.ToolsCore/Updates/**
       - AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno/Services/VelopackInstaller.cs
       - AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno/Shell/AppUpdates.cs
@@ -70,6 +71,7 @@ jobs:
             rm -rf out/publish; mkdir -p out; cp packaging/macos/entitlements.plist out/tools.entitlements
             dotnet publish "$APP" -f net9.0-desktop -c Release -r osx-arm64 --self-contained -p:PackageFormat=app -p:UpdateTest=true -p:InformationalVersion="2026.01.0$d" -o out/publish
             app=$(find out/publish -maxdepth 2 -name '*.app' -type d | head -1)
+            scripts/mac-bundle.sh "$app"
             exe=$(/usr/libexec/PlistBuddy -c 'Print CFBundleExecutable' "$app/Contents/Info.plist")
             scripts/vpk-pack.sh osx-arm64 "2026.1.${d}01" "$app" "$exe" --signAppIdentity - --signEntitlements "$PWD/out/tools.entitlements" --noInst
             mkdir -p "keep/$d"; cp out/vpk/*-Portable.zip out/vpk/*-full.nupkg "keep/$d/"
