@@ -1854,6 +1854,27 @@
   <data name="Import_NewChannelTaken" xml:space="preserve">
     <value>That handle is taken. Choose another.</value>
   </data>
+  <data name="Import_RemoveAll.Text" xml:space="preserve">
+    <value>Remove all</value>
+  </data>
+  <data name="Import_RemoveAllTitle_One" xml:space="preserve">
+    <value>Remove 1 file from the queue?</value>
+  </data>
+  <data name="Import_RemoveAllTitle_Other" xml:space="preserve">
+    <value>Remove all {0} files from the queue?</value>
+  </data>
+  <data name="Import_RemoveAllBody" xml:space="preserve">
+    <value>Videos already uploaded stay on the site. Files on your computer aren’t touched.</value>
+  </data>
+  <data name="Import_RemoveAllUploads_One" xml:space="preserve">
+    <value>1 unfinished upload is stopped.</value>
+  </data>
+  <data name="Import_RemoveAllUploads_Other" xml:space="preserve">
+    <value>{0} unfinished uploads are stopped.</value>
+  </data>
+  <data name="Import_RemoveAllConfirm" xml:space="preserve">
+    <value>Remove all</value>
+  </data>
   <data name="Import_RemoveTitle" xml:space="preserve">
     <value>Remove from the queue?</value>
   </data>

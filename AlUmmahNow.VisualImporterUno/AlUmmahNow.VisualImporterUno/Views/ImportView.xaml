@@ -243,6 +243,13 @@
                                     <TextBlock x:Uid="Import_ResumeAll" Text="Resume all" />
                                 </StackPanel>
                             </Button>
+                            <Button x:Name="RemoveAllButton" Style="{StaticResource ToolsSecondaryButton}" Click="RemoveAll_Click"
+                                    IsEnabled="{x:Bind ViewModel.HasQueue, Mode=OneWay}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon Glyph="&#xE74D;" FontSize="14" />
+                                    <TextBlock x:Uid="Import_RemoveAll" Text="Remove all" />
+                                </StackPanel>
+                            </Button>
                             <Button Style="{StaticResource ToolsSecondaryButton}" Command="{x:Bind ViewModel.ClearFinishedCommand}" Visibility="{x:Bind ViewModel.HasFinished, Mode=OneWay}">
                                 <TextBlock x:Uid="Import_ClearFinished" Text="Clear finished" />
                             </Button>

@@ -28,6 +28,7 @@ public sealed partial class ImportView : Page
         DataContext = ViewModel;
         if (ViewModel.SelectedChannel is { } channel) ChannelBox.Text = channel.Name;
         SuggestionsUnderBox.Attach(ChannelBox);
+        AutomationProperties.SetName(RemoveAllButton, Loc.Get("Import_RemoveAllConfirm"));
         Loaded += (_, _) =>
         {
             ViewModel.Attach();
@@ -39,7 +40,7 @@ public sealed partial class ImportView : Page
     }
 
     /// <summary>
-    /// Screenshots of the dialogs and the channel suggestions (<c>TOOLS_DEMO_IMPORT_DIALOG=log|remove|channel|suggest</c>)
+    /// Screenshots of the dialogs and the channel suggestions (<c>TOOLS_DEMO_IMPORT_DIALOG=log|remove|remove-all|channel|suggest</c>)
     /// and of the queue (<c>TOOLS_DEMO_IMPORT_SCROLL=end</c>: the queue card at the top, so no line is cut under the
     /// header), demo only.
     /// </summary>
@@ -74,6 +75,7 @@ public sealed partial class ImportView : Page
         {
             case "log" when row is not null: ViewModel.ToggleLog(row); break;
             case "remove" when row is not null: Remove_Click(tag, new RoutedEventArgs()); break;
+            case "remove-all": RemoveAll_Click(this, new RoutedEventArgs()); break;
             case "channel": NewChannel_Click(this, new RoutedEventArgs()); break;
             case "suggest":
                 ChannelBox.Focus(FocusState.Keyboard);
@@ -153,10 +155,13 @@ public sealed partial class ImportView : Page
             row.ColumnDefinitions[1].Width = narrow ? new GridLength(0) : GridLength.Auto;
             row.ColumnSpacing = narrow ? 0 : 12;
         }
-        Grid.SetRow(QueueActions, narrow ? 1 : 0);
-        // Pause all, Resume all and Clear finished do not fit side by side on the narrowest windows
-        QueueActions.Orientation = e.NewSize.Width < 480 ? Orientation.Vertical : Orientation.Horizontal;
-        Grid.SetColumn(QueueActions, narrow ? 0 : 1);
+        // Pause all, Resume all, Remove all and Clear finished: under the title unless there is room beside it, and one
+        // under the other when they do not fit in a row
+        var under = e.NewSize.Width < 960;
+        Grid.SetRow(QueueActions, under ? 1 : 0);
+        Grid.SetColumn(QueueActions, under ? 0 : 1);
+        Grid.SetColumnSpan(QueueActions, under ? 2 : 1);
+        QueueActions.Orientation = narrow ? Orientation.Vertical : Orientation.Horizontal;
         if (QueueActions.Parent is Grid header && header.RowDefinitions.Count < 2)
         {
             header.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -313,6 +318,37 @@ public sealed partial class ImportView : Page
         };
         DialogLook.Apply(dialog);
         if (await dialog.ShowAsync() == ContentDialogResult.Primary) ViewModel.Remove(row);
+    }
+
+    private bool _removeAllAsked;
+
+    /// <summary>Empties the queue, after asking: what is on the site and on the computer stays (pressing twice asks once).</summary>
+    private async void RemoveAll_Click(object sender, RoutedEventArgs e)
+    {
+        if (_removeAllAsked || !ViewModel.HasQueue) return;
+        _removeAllAsked = true;
+        try
+        {
+            var dialog = new ContentDialog
+            {
+                Title = ViewModel.RemoveAllTitle,
+                Content = DialogText(ViewModel.RemoveAllLines().ToArray()),
+                PrimaryButtonText = Loc.Get("Import_RemoveAllConfirm"),
+                CloseButtonText = Loc.Get("Import_Cancel"),
+                DefaultButton = ContentDialogButton.Close,
+                FlowDirection = FlowDirection,
+                XamlRoot = XamlRoot,
+            };
+            DialogLook.Apply(dialog);
+            if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+            ViewModel.RemoveAll();
+            // The button went with the queue: the keyboard goes on from the folder
+            BrowseButton.Focus(FocusState.Programmatic);
+        }
+        finally
+        {
+            _removeAllAsked = false;
+        }
     }
 
     /// <summary>Opens or closes the file's log under its row.</summary>
