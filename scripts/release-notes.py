@@ -39,7 +39,12 @@ print(f"""## Al Ummah Now Tools {tag}
 
 The staff app for bulk imports into Al Ummah Now: sign in with your Al Ummah Now staff account (admins only),
 pick the environment, then import folders of videos with their caption, chapter, thumbnail and metadata files.
-Arabic and English. It tells you when a new version is out; the Windows Setup and the macOS app install it themselves.
+Arabic and English. It tells you when a new version is out.
+
+**To get updates by themselves:** on Windows install with the `Setup` file once; on macOS drag the app from the `.dmg` to
+Applications once. If you used the MSI or the portable zip on Windows until now, install the `Setup` file once (you can
+then uninstall the old one; your settings and imports stay). The MSI, the portable zip and the Linux packages tell you
+about a new version and open this page.
 
 {warning}
 | System | File | Install |

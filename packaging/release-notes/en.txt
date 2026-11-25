@@ -1,2 +1,3 @@
 Tools now checks for updates and tells you when a new version is out.
-On Windows and Mac it can install the update itself.
+On Windows, install the new Setup file once and Tools then updates itself. If you use the MSI or the portable zip, you still get the notice with a download link.
+On a Mac, drag the app from the new disk image to Applications once and it then updates itself.
