@@ -444,6 +444,8 @@ public sealed class EncodeStep : IImportStep
 
     public async Task<StepResult> RunAsync(QueueItem item, IStepContext context, CancellationToken ct)
     {
+        // Of another file that was in this one's place
+        if (item.Renditions is null) WorkFiles.DeleteFolder(Path.Combine(_workRoot, item.Id), _workRoot, item.Id);
         if (item.ServerEncodes)
         {
             context.Log(LogLevel.Info, "server_encode_chosen", "Let the server encode was chosen: the server encodes this file");
@@ -453,6 +455,8 @@ public sealed class EncodeStep : IImportStep
         if (item.Renditions is { } done && (done.Sent || done.Files.All(f => File.Exists(Path.Combine(done.Directory, f.Path))))) return StepResult.Done;
         if (item.Sha256 is null || item.FingerprintHash is null) throw new StepFailedException("not_hashed", "The file has not been checked yet", retryable: false);
         await _source.CheckUnchangedAsync(item.Video, context, ct).ConfigureAwait(false);
+        // Hashed by a version that did not check: before anything is opened on the server
+        await VideoCheck.RunAsync(item, _source, _media, context, ct).ConfigureAwait(false);
         if (item.ServerItemId is null || item.TusSessionId is null)
         {
             if (!await UploadStep.OpenAsync(_api, _tusEndpoint, item, context, ct).ConfigureAwait(false)) return StepResult.SkipRest;
