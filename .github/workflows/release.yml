@@ -30,6 +30,7 @@ on:
       - scripts/smoke-launch.sh
       - scripts/app-release.mjs
       - scripts/release-files.mjs
+      - scripts/no-test-hooks.mjs
       - scripts/vpk-pack.sh
   workflow_dispatch:
 concurrency:
@@ -86,11 +87,6 @@ jobs:
             echo "display=$y.$m.$d"
             echo "build=$n"
           } | tee -a "$GITHUB_OUTPUT"
-      - name: No test hooks in a release
-        run: |
-          if grep -rnE 'UpdateTest(=|>)true|UPDATE_TEST' .github/workflows/release.yml scripts/vpk-pack.sh Directory.Packages.props AlUmmahNow.VisualImporterUno/Directory.*.props | grep -v 'No test hooks' | grep -v 'grep -rnE'; then
-            echo "::error::a release build must not define UPDATE_TEST"; exit 1
-          fi
       - name: Release notes are this release's
         run: |
           for f in en ar; do test -s "packaging/release-notes/$f.txt" || { echo "::error::packaging/release-notes/$f.txt is missing or empty"; exit 1; }; done
@@ -145,6 +141,8 @@ jobs:
           -p:Version=${{ needs.verify.outputs.numeric }} -p:FileVersion=${{ needs.verify.outputs.numeric }}
           -p:InformationalVersion=$env:NAME -p:ApplicationDisplayVersion=${{ needs.verify.outputs.display }}
           -p:ApplicationVersion=${{ needs.verify.outputs.build }} -o out/publish
+      - name: No update test hooks
+        run: node scripts/no-test-hooks.mjs out/publish
       - name: Signing certificate
         id: sign
         shell: pwsh
@@ -317,6 +315,7 @@ jobs:
           [ -n "$IDENTITY" ] || codesign --force --deep --sign - "$app"
           codesign --verify --deep --strict "$app"
           find "$app" -name THIRD-PARTY-NOTICES.md | grep -q . || { echo "::error::no licences in the app bundle"; exit 1; }
+          node scripts/no-test-hooks.mjs "$app"
           echo "APP_BUNDLE=$app" >> "$GITHUB_ENV"
       - name: Launch the app
         if: matrix.smoke
@@ -327,9 +326,10 @@ jobs:
         env:
           IDENTITY: ${{ steps.keychain.outputs.identity }}
         run: |
+          mkdir -p out && cp packaging/macos/entitlements.plist out/tools.entitlements # vpk wants the extension
           # No Developer ID: ad hoc ("-"), which macOS on Apple silicon needs and our own manifest signature doesn't replace
           scripts/vpk-pack.sh ${{ matrix.rid }} ${{ needs.verify.outputs.velopack }} "$APP_BUNDLE" "$(/usr/libexec/PlistBuddy -c 'Print CFBundleExecutable' "$APP_BUNDLE/Contents/Info.plist")" \
-            --signAppIdentity "${IDENTITY:--}" --signEntitlements "$PWD/packaging/macos/entitlements.plist" --noInst
+            --signAppIdentity "${IDENTITY:--}" --signEntitlements "$PWD/out/tools.entitlements" --noInst
           mkdir -p dist
           mv out/vpk/*-full.nupkg "dist/AlUmmahNow-Tools-macOS-$NAME-${{ matrix.arch }}-update.nupkg"
           # The .dmg holds this bundle, so an app dragged to Applications can update itself
@@ -398,6 +398,7 @@ jobs:
             -p:InformationalVersion="$NAME" -p:ApplicationDisplayVersion=${{ needs.verify.outputs.display }} \
             -p:ApplicationVersion=${{ needs.verify.outputs.build }} -o out/publish
           test -f out/publish/licenses/THIRD-PARTY-NOTICES.md
+          node scripts/no-test-hooks.mjs out/publish
       - name: Packages (.tar.gz, .deb)
         run: |
           mkdir -p dist

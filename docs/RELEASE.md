@@ -88,5 +88,5 @@ AUN-APP-UPDATES). Operating-system code signing is separate and optional.
   wiki §3.5.
 - **Update test** (`.github/workflows/update-test.yml`): builds two versions with a test key, installs the first, and
   checks that it becomes the second on Windows and macOS, and that a changed package is refused. Test builds
-  (`-p:UpdateTest=true`) are the only ones that take their key and server from the environment; `release.yml` never
-  sets it, and a check refuses it there.
+  (`-p:UpdateTest=true`) are the only ones that take their key and server from the environment; `release.yml`
+  never sets it and refuses a build that has them (`scripts/no-test-hooks.mjs`).
