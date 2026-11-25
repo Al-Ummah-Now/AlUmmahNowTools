@@ -12,7 +12,11 @@ on:
       - AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno/Views/SocialSourcesPage*
       - AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno/Views/WatchManagementPage*
       - AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno/Views/ApprovalWorkflowPage*
+      - AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno/ViewModels/ChannelSearch.cs
+      - AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno/ViewModels/BulkImportViewModel.cs
+      - AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno/ViewModels/SocialSourcesViewModel.cs
       - AlUmmahNow.VisualImporterUno/Directory.Packages.props
+      - AlUmmahNow.VisualImporterUno/global.json
       - global.json
   workflow_dispatch:
 permissions:
@@ -53,7 +57,7 @@ jobs:
             node scripts/suggest-check.mjs "$exe" $page pictures || failed=1
           done
           # Right to left, the lists are placed by the app
-          for page in Import SocialSources; do
+          for page in Import SocialSources WatchManagement ApprovalWorkflow; do
             CHECK_LANG=ar node scripts/suggest-check.mjs "$exe" $page pictures/ar || failed=1
           done
           exit $failed
