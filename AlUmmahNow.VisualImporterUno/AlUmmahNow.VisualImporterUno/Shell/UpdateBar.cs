@@ -105,7 +105,7 @@ public sealed partial class UpdateBar : UserControl
         var v = _service.View;
         if (v.Stage == UpdateStage.Ready)
         {
-            _service.RestartNow();
+            await _service.RestartNowAsync();
             return;
         }
         var url = await _service.UpdateNowAsync();

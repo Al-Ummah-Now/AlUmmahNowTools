@@ -52,9 +52,18 @@ public sealed class UpdateServiceTests : IDisposable
         public int Restarts;
         public Task StageAsync(string packagePath, CoreRelease release, CoreArtifact artifact, CancellationToken cancel)
         {
+            if (Broken is not null) return Task.FromException(Broken);
             Staged = packagePath;
             return Task.CompletedTask;
         }
+        public Exception? Broken;
+        public string? Bad;
+        public int Discarded;
+        public void VerifyStaged()
+        {
+            if (Bad is not null) throw new UpdateVerificationException(Bad);
+        }
+        public void Discard() => Discarded++;
         public int Exits;
         public void ApplyOnExit() => Exits++;
         public void ApplyAndRestart() => Restarts++;
@@ -74,7 +83,7 @@ public sealed class UpdateServiceTests : IDisposable
                 Reported = await request.Content!.ReadAsStringAsync(cancellationToken);
                 return new HttpResponseMessage(HttpStatusCode.Accepted);
             }
-            if (url.Contains("/api/v1/app-config?", StringComparison.Ordinal)) return Routes.TryGetValue("config", out var c) ? c() : new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"update\":{}}") };
+            if (url.Contains("/api/v1/app-config?", StringComparison.Ordinal)) return Routes.TryGetValue("config", out var c) ? c() : new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"update\":{\"enabled\":true,\"action\":\"install\",\"tag\":\"v2026.11.23\"}}") };
             return Routes.TryGetValue(url, out var r) ? r() : new HttpResponseMessage(HttpStatusCode.NotFound);
         }
     }
@@ -216,11 +225,11 @@ public sealed class UpdateServiceTests : IDisposable
     {
         var (busyService, _, busyInstaller, _) = Make(busy: true);
         await busyService.CheckAsync(userAsked: false);
-        Assert.False(busyService.RestartNow());
+        Assert.False(await busyService.RestartNowAsync());
         Assert.Equal(0, busyInstaller.Restarts);
         var (idle, _, idleInstaller, _) = Make();
         await idle.CheckAsync(userAsked: false);
-        Assert.True(idle.RestartNow());
+        Assert.True(await idle.RestartNowAsync());
         Assert.Equal(1, idleInstaller.Restarts);
     }
 
@@ -290,6 +299,130 @@ public sealed class UpdateServiceTests : IDisposable
         await service.CheckAsync(userAsked: true);
         Assert.Null(installer.Staged);
         Assert.Contains("\"reason\":\"wrong_tag\"", http.Reported);
+    }
+
+    [Fact]
+    public async Task An_installer_that_fails_hides_the_bar_reports_no_refusal_and_is_tried_again()
+    {
+        var (service, _, installer, http) = Make();
+        installer.Broken = new InvalidOperationException("disk");
+        await service.CheckAsync(userAsked: false);
+        Assert.Equal(UpdateStage.Hidden, service.View.Stage);
+        Assert.Null(http.Reported);
+        installer.Broken = null;
+        await service.CheckAsync(userAsked: false);
+        Assert.Equal(UpdateStage.Ready, service.View.Stage);
+    }
+
+    [Fact]
+    public async Task A_file_swapped_after_staging_is_never_applied_on_exit_or_restart()
+    {
+        var (service, _, installer, http) = Make();
+        await service.CheckAsync(userAsked: false);
+        installer.Bad = "hash";
+        Assert.False(await service.RestartNowAsync());
+        Assert.Equal(0, installer.Restarts);
+        Assert.Equal(UpdateStage.Hidden, service.View.Stage);
+        Assert.Contains("\"reason\":\"hash\"", http.Reported);
+        Assert.True(installer.Discarded > 0);
+
+        var (again, _, onExit, _) = Make();
+        await again.CheckAsync(userAsked: false);
+        onExit.Bad = "hash";
+        again.OnExit();
+        Assert.Equal(0, onExit.Exits);
+        Assert.True(onExit.Discarded > 0);
+    }
+
+    [Theory]
+    [InlineData("yanked")]
+    [InlineData("unknown_key")]
+    public async Task A_yank_or_revocation_after_staging_cancels_the_staged_update(string refused)
+    {
+        // Between stage and quit, without another check: the keys known at exit decide
+        var (service, core, installer, _) = Make();
+        await service.CheckAsync(userAsked: false);
+        core.Refuse = refused;
+        service.OnExit();
+        Assert.Equal(0, installer.Exits);
+
+        // A check that still offers the version, with a key list that no longer trusts it
+        var (checkedAgain, core2, installer2, http) = Make();
+        await checkedAgain.CheckAsync(userAsked: false);
+        core2.Refuse = refused;
+        await checkedAgain.CheckAsync(userAsked: false);
+        Assert.Equal(UpdateStage.Hidden, checkedAgain.View.Stage);
+        Assert.Contains($"\"reason\":\"{refused}\"", http.Reported);
+        core2.Refuse = null;
+        checkedAgain.OnExit();
+        Assert.Equal(0, installer2.Exits);
+    }
+
+    [Fact]
+    public async Task A_check_that_no_longer_offers_the_staged_version_cancels_it()
+    {
+        var (service, core, installer, http) = Make();
+        await service.CheckAsync(userAsked: false);
+        core.Prompt = core.Prompt with { Kind = "None", Action = "none" };
+        http.Routes["config"] = () => new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"update\":{\"enabled\":true,\"action\":\"none\",\"tag\":null}}") };
+        await service.CheckAsync(userAsked: false);
+        Assert.Equal(UpdateStage.Hidden, service.View.Stage);
+        Assert.Equal(1, installer.Discarded);
+        service.OnExit();
+        Assert.Equal(0, installer.Exits);
+        Assert.Null(http.Reported);
+    }
+
+    [Fact]
+    public async Task Closing_the_ready_bar_hides_it_and_the_update_still_installs_on_exit()
+    {
+        var (service, core, installer, _) = Make();
+        await service.CheckAsync(userAsked: false);
+        service.Dismiss();
+        core.Prompt = core.Prompt with { Kind = "None", Version = null };
+        await service.CheckAsync(userAsked: false);
+        Assert.Equal(UpdateStage.Hidden, service.View.Stage);
+        service.OnExit();
+        Assert.Equal(1, installer.Exits);
+    }
+
+    [Fact]
+    public async Task Restart_now_starts_the_updater_once()
+    {
+        var (service, _, installer, _) = Make();
+        await service.CheckAsync(userAsked: false);
+        Assert.True(await service.RestartNowAsync());
+        service.OnExit();
+        Assert.False(await service.RestartNowAsync());
+        Assert.Equal(1, installer.Restarts);
+        Assert.Equal(0, installer.Exits);
+    }
+
+    [Theory]
+    [InlineData("{\"update\":{},\"config\":{\"updates.autoInstallDefault\":false}}", null, false)]
+    [InlineData("{\"update\":{},\"config\":{\"updates.autoInstallDefault\":true}}", null, true)]
+    [InlineData("{\"update\":{},\"config\":{}}", null, true)]
+    [InlineData("{\"update\":{}}", null, true)]
+    [InlineData("{\"update\":{},\"config\":{\"updates.autoInstallDefault\":false}}", true, true)]
+    [InlineData("{\"update\":{},\"config\":{\"updates.autoInstallDefault\":true}}", false, false)]
+    public async Task The_admin_default_applies_until_the_user_chooses(string answer, bool? choice, bool installs)
+    {
+        var (service, core, installer, http) = Make();
+        http.Routes["config"] = () => new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(answer) };
+        core.AutoInstall = choice;
+        await service.CheckAsync(userAsked: false);
+        Assert.Equal(installs, service.AutoInstall);
+        Assert.Equal(installs ? UpdateStage.Ready : UpdateStage.Available, service.View.Stage);
+        Assert.Equal(installs, installer.Staged is not null);
+    }
+
+    [Fact]
+    public async Task An_upper_case_hash_in_the_manifest_is_the_same_hash()
+    {
+        var (service, core, _, _) = Make();
+        core.Sha = core.Sha.ToUpperInvariant();
+        await service.CheckAsync(userAsked: false);
+        Assert.Equal(UpdateStage.Ready, service.View.Stage);
     }
 
     [Fact]

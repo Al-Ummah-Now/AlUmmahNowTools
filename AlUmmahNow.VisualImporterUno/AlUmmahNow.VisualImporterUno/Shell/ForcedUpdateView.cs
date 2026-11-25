@@ -30,7 +30,7 @@ public sealed partial class ForcedUpdateView : UserControl
         {
             if (_service.View.Stage == UpdateStage.Ready)
             {
-                _service.RestartNow();
+                await _service.RestartNowAsync();
                 return;
             }
             var url = await _service.UpdateNowAsync();
