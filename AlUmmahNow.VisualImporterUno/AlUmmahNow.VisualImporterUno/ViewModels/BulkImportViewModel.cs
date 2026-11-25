@@ -622,7 +622,7 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
             "retry" or "started" or "stopped" or "done" or "skipped" => Loc.Format("ImportLog_" + line.Code, StepName(Arg(0))),
             "attempt" => Loc.Format("ImportLog_attempt", StepName(Arg(0)), Num(1)),
             "attempt_failed" => Loc.WithDetail(Loc.Format("ImportLog_attempt_failed", StepName(Arg(0)), Num(1), Num(3)), Loc.WithDetail(ErrorText(Arg(2), Arg(4)), ReadText(Arg(5), Arg(6), Arg(7), Arg(8)))),
-            "failed" => Loc.WithDetail(Loc.WithDetail(Loc.Format("ImportLog_failed", StepName(Arg(0)), Loc.Plural("ImportCount_attempts", Count(Arg(1)))), Loc.WithDetail(ErrorText(Arg(2), Arg(4)), ReadText(Arg(5), Arg(6), Arg(7), Arg(8)))), Loc.Format("ImportLog_reference", Arg(3))),
+            "failed" => Loc.WithDetail(Loc.WithDetail(Loc.Format("ImportLog_failed", StepName(Arg(0)), Loc.Plural("ImportCount_attempts", Count(Arg(1)))), Loc.WithDetail(ErrorText(Arg(2), Arg(4)), ReadText(Arg(5), Arg(6), Arg(7), Arg(8)))), Reference(Arg(3))),
             // Reading the file itself: a share, a cloud placeholder
             "share_path" or "share_chosen" => Loc.WithDetail(Loc.Get("ImportLog_" + line.Code), Arg(0)),
             "share_back" or "hash_resumed" => Loc.Format("ImportLog_" + line.Code, Num(0)),
@@ -660,6 +660,10 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
             _ => line.Text,
         };
     }
+
+    /// <summary>"Reference ERR-…"; in Arabic the reference on a line of its own (Uno swaps the halves of a mixed line).</summary>
+    private static string Reference(string reference) =>
+        Loc.IsArabic ? Loc.GetWithDetail("ImportLog_reference", reference) : Loc.Format("ImportLog_reference", reference);
 
     private static long Count(string value) => long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var n) ? n : 0;
 

@@ -2401,7 +2401,7 @@
     <value>توقف {0} بعد {1}</value>
   </data>
   <data name="ImportLog_reference" xml:space="preserve">
-    <value>المرجع {0}</value>
+    <value>المرجع:</value>
   </data>
   <data name="ImportLog_sha" xml:space="preserve">
     <value>بصمة الملف:</value>

@@ -59,6 +59,10 @@ public sealed class ImportLinesTests
         BulkImportViewModel.ErrorText("share_lost", "x", new ReadError("Windows", 59, System59, 123_456)).Should().NotMatchRegex("[\u2066-\u2069]");
     });
 
+    [Fact]
+    public void An_arabic_reference_stands_on_its_own_line() => WithCulture("ar", () =>
+        BulkImportViewModel.LogText(Lines().Single(l => l.Code == "failed")).Split('\n')[^1].Should().Be("ERR-AAAA-BBBB"));
+
     [Theory]
     [InlineData(@"\\nas\media\a.mp4", true)]
     [InlineData(@"Y:\a.mp4", true)]

@@ -300,8 +300,9 @@ internal static class DemoImport
         if (State == "resumed") queue.Resume(items[8].Id);
         if (State is not ("share-waiting" or "share-failed" or "damaged")) return;
 
-        // The fourth file, on a share: checked as far as 41%
-        var item = items[3];
+        // The fourth file (or TOOLS_DEMO_IMPORT_ROW), on a share: checked as far as 41%
+        var item = items[int.TryParse(System.Environment.GetEnvironmentVariable("TOOLS_DEMO_IMPORT_ROW"), out var row) && row < items.Count ? row : 3];
+        item.Verdict = null;
         foreach (var s in item.Steps)
         {
             s.Status = StepStatus.Pending;
