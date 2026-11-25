@@ -44,7 +44,7 @@ internal static class UnfinishedDownloads
     }
 
     /// <summary>The folder is one a downloader keeps its file in, or inside one, below <paramref name="root"/> (which was chosen).</summary>
-    public static bool IsIn(string folder, string root) =>
+    public static bool IsIn(string folder, string root) => root.Length > 0 &&
         Path.GetRelativePath(root, folder).Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar).Any(IsFolder);
 
     /// <summary>Safari keeps what it downloads in a folder of this name.</summary>

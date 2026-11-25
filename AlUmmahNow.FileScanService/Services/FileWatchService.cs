@@ -635,13 +635,6 @@ public class FileWatchService : IFileWatchService, IHostedService, IDisposable
                 return;
             }
 
-            // Its name when it is finished raises an event of its own
-            if (AlUmmahNow.ToolsCore.Import.UnfinishedDownloads.IsAt(filePath, channelWatchConfig.WatchPath))
-            {
-                _logger.LogDebug("Unfinished download, left out: {FilePath}", filePath);
-                return;
-            }
-
             var fileInfo = new FileInfo(filePath);
             var fileName = fileInfo.Name;
             var fileSize = fileInfo.Length;
@@ -652,6 +645,13 @@ public class FileWatchService : IFileWatchService, IHostedService, IDisposable
             if (channelWatch == null)
             {
                 _logger.LogDebug("Watch {WatchId} is no longer active; ignoring {FilePath}", channelWatchConfig.Id, filePath);
+                return;
+            }
+
+            // Its name when it is finished raises an event of its own
+            if (AlUmmahNow.ToolsCore.Import.UnfinishedDownloads.IsAt(filePath, channelWatch.WatchPath))
+            {
+                _logger.LogDebug("Unfinished download, left out: {FilePath}", filePath);
                 return;
             }
 
