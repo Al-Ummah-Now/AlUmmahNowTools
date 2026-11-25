@@ -261,18 +261,27 @@ public class InstanceInstallGuardTests
     [Fact]
     public async Task The_system_lists_a_running_program_by_its_path()
     {
-        // A second run of a program from one folder, as a second copy of the app would be
-        var folder = Temp.Folder();
-        var program = Path.Combine(folder, OperatingSystem.IsWindows() ? "aun-copy.exe" : "aun-copy");
-        File.Copy(OperatingSystem.IsWindows() ? Path.Combine(Environment.SystemDirectory, "PING.EXE") : "/bin/sleep", program);
-        if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(program, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
-        Process Start() => Process.Start(new ProcessStartInfo(program, OperatingSystem.IsWindows() ? "-n 60 127.0.0.1" : "60") { UseShellExecute = false, RedirectStandardOutput = true })!;
+        // A second run of one program, as a second copy of the app would be: ping from a folder of its own on Windows; elsewhere
+        // one nothing else here runs, where it is (macOS ends a copied system program, and some Linux ones are one program by many names)
+        var windows = OperatingSystem.IsWindows();
+        var program = "/usr/bin/awk";
+        if (windows)
+        {
+            program = Path.Combine(Temp.Folder(), "aun-copy.exe");
+            File.Copy(Path.Combine(Environment.SystemDirectory, "PING.EXE"), program);
+        }
+        Process Start()
+        {
+            var start = new ProcessStartInfo(program) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardInput = true };
+            foreach (var a in windows ? new[] { "-n", "60", "127.0.0.1" } : new[] { "BEGIN { getline }" }) start.ArgumentList.Add(a);
+            return Process.Start(start)!;
+        }
         using var first = Start();
         using var second = Start();
         try
         {
             string? path = null;
-            await Temp.WaitUntil(() => (path = new SystemProcesses().Find(["aun-copy"]).FirstOrDefault(p => p.Pid == first.Id).Path) is not null && path.EndsWith(Path.GetFileName(program), StringComparison.OrdinalIgnoreCase), 20_000);
+            await Temp.WaitUntil(() => (path = new SystemProcesses().Find(["aun-copy"]).FirstOrDefault(p => p.Pid == first.Id).Path) is not null && path.Contains(windows ? "aun-copy" : "awk", StringComparison.OrdinalIgnoreCase), 20_000);
             var guard = new InstallGuard(new SystemProcesses(), path!, first.Id, ignoreCase: !OperatingSystem.IsLinux());
             await Temp.WaitUntil(guard.OtherCopyRunning, 20_000);
             second.Kill();
