@@ -35,12 +35,12 @@ internal sealed class AppQuit
         _coordinator = new QuitCoordinator(
             () => ImportWorkspace.ActiveFiles,
             ConfirmAsync,
-            ct => StopAsync(ct, installUpdate: true),
+            StopAsync,
             ExitApp,
-            log: message => Log.Information("[Quit] {Message}", message));
+            log: message => Log.Information("[Quit] {Message}", message),
+            handOver: AppUpdates.InstallOnQuit);
     }
 
-    private int _stopped;
     private readonly Func<FlowDirection> _flow;
     private static AppQuit? _current;
 
@@ -61,14 +61,21 @@ internal sealed class AppQuit
         {
             quit._windowClosed = true;
             // A close that could not be cancelled, or Window.Close() from code: the window is gone, so there is no one to ask
-            if (!quit._coordinator.IsQuitting) _ = quit.RequestAsync("window closed");
+            // (a question that is open went with it)
+            if (!quit._coordinator.IsQuitting) _ = quit.RequestAsync("window closed", ask: false);
         };
         // Review frames of the question (TOOLS_DEMO=1 TOOLS_SCREENSHOT=out.png TOOLS_SCREENSHOT_QUIT=1)
         if (Environment.GetEnvironmentVariable("TOOLS_SCREENSHOT_QUIT") == "1") _ = quit.ShowForScreenshotAsync();
         // However the process is asked to end (SIGTERM, a log-out, the system's terminate): what runs stops and is saved first
-        AppDomain.CurrentDomain.ProcessExit += (_, _) => quit.StopOnProcessExit();
-        MacTerminateHook.Install(window.DispatcherQueue, () => quit._coordinator.IsExiting, () => _ = quit.RequestAsync("Cmd+Q / Dock Quit"), quit.StopOnProcessExit);
+        AppDomain.CurrentDomain.ProcessExit += (_, _) => quit.End("the process is ending", handOver: false);
+        MacTerminateHook.Install(window.DispatcherQueue, () => quit._coordinator.IsExiting, () => _ = quit.RequestAsync("Cmd+Q / Dock Quit"), () => quit.End("the session is ending", handOver: false, refuse: true));
     }
+
+    /// <summary>The host has returned: whatever closed the window, the work ends (and a staged update is handed over) before the process does.</summary>
+    public static void FinishBeforeExit() => _current?.End("the host has stopped", handOver: true);
+
+    /// <summary>Restart now: quits without a question, since nothing is running; the hand-over then starts the app again.</summary>
+    public static Task<bool> QuitNowAsync(string why) => _current is { } quit ? quit.RequestAsync(why, ask: false) : RequestQuitAsync(why);
 
     /// <summary>For the launch check (<c>TOOLS_SMOKE_CLOSE</c>) and anywhere else the app quits by itself.</summary>
     public static Task<bool> RequestQuitAsync(string why)
@@ -79,13 +86,13 @@ internal sealed class AppQuit
         return Task.FromResult(true);
     }
 
-    private async Task<bool> RequestAsync(string why)
+    private async Task<bool> RequestAsync(string why, bool ask = true)
     {
         try
         {
             if (!_since.IsRunning) _since.Restart();
             Log.Information("[Quit] Requested: {Why}", why);
-            return await _coordinator.RequestQuitAsync().ConfigureAwait(false);
+            return await (ask ? _coordinator.RequestQuitAsync() : _coordinator.QuitNowAsync()).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -152,47 +159,42 @@ internal sealed class AppQuit
     /// Stops what the app started: the queue (running steps, so ffmpeg and the others, the queue saved), then the FileScan
     /// service, SignalR, the host and the log. Each step has its own limit inside; the coordinator's budget covers all.
     /// </summary>
-    /// <param name="installUpdate">A quit: a staged update is handed to the updater, which waits for this process to end. Not when the
-    /// session ends, where the updater would be cut off in the middle of replacing the app.</param>
-    private static async Task StopAsync(CancellationToken ct, bool installUpdate)
+    private async Task StopAsync(CancellationToken ct)
     {
-        var quit = _current;
-        Log.Information("[Quit] Stopping the work ({Ms} ms after the request)", quit?._since.ElapsedMilliseconds);
-        await ImportWorkspace.StopForQuitAsync().ConfigureAwait(false);
-        // Here and not only on ProcessExit: a quit on macOS ends through the system, which never raises it
-        if (installUpdate) AppUpdates.InstallOnQuit();
-        await App.Current.ShutdownServicesAsync().ConfigureAwait(false);
+        Log.Information("[Quit] Stopping the work ({Ms} ms after the request)", _since.ElapsedMilliseconds);
+        var ended = false;
+        try
+        {
+            ended = await ImportWorkspace.StopForQuitAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            ended &= await App.Current.ShutdownServicesAsync().ConfigureAwait(false);
+        }
+        // Saved all the same; but nothing is installed over what still runs
+        if (!ended) throw new InvalidOperationException("something is still running");
+        Log.Information("[Quit] Work stopped and saved ({Ms} ms after the request)", _since.ElapsedMilliseconds);
 #if UPDATE_TEST
         UpdateTestHandler.Log("stopped");
 #endif
-        Log.Information("[Quit] Work stopped and saved ({Ms} ms after the request)", quit?._since.ElapsedMilliseconds);
     }
 
     /// <summary>
-    /// The process is ending (a signal, a log-out, the system's terminate): what runs is stopped and saved first, a few seconds
-    /// at most. A quit already stopping it is joined, not repeated and not ignored: the process must not end half way through it.
-    /// Once the quit has stopped everything and called the exit there is nothing left to wait for.
+    /// The process, its host or the session is ending by itself (a signal, a log-out, the last window gone): the same end as a
+    /// quit's, waited for here. One that already began is joined, not repeated and not ignored: the process must not end half way
+    /// through it. The process's own end is the last resort and starts no updater of its own.
     /// </summary>
-    private void StopOnProcessExit()
+    private void End(string why, bool handOver, bool refuse = false)
     {
-        // Once: the session's end on macOS comes here before the process does
-        if (_coordinator.IsExiting || Interlocked.Exchange(ref _stopped, 1) != 0) return;
         try
         {
-            var wait = TimeSpan.FromSeconds(8);
-            if (_coordinator.IsQuitting)
-            {
-                Log.Information("[Quit] The process is ending while the quit is stopping the work: waiting for it");
-                _coordinator.StopTask?.Wait(wait);
-                return;
-            }
-            Log.Information("[Quit] The process is ending: stopping the work first");
-            // Off this thread, which may be the interface's
-            Task.Run(() => StopAsync(CancellationToken.None, installUpdate: false)).Wait(wait);
+            if (!_since.IsRunning) _since.Restart();
+            if (!_coordinator.IsExiting) Log.Information("[Quit] {Why}: the work is stopped first", why);
+            _coordinator.EndAsync(handOver, refuse).Wait(EndLimits.Total + EndLimits.HandOver + TimeSpan.FromSeconds(1));
         }
         catch (Exception ex)
         {
-            Log.Warning(ex, "[Quit] Stopping on process exit failed");
+            Log.Warning(ex, "[Quit] Stopping on the way out failed");
         }
     }
 
@@ -209,6 +211,8 @@ internal sealed class AppQuit
                 try { _window.Close(); Log.Information("[Quit] Window closed"); }
                 catch (Exception ex) { Log.Warning(ex, "[Quit] Could not close the window"); }
             }
+            // The system ends the process from here on
+            if (OperatingSystem.IsMacOS()) Log.CloseAndFlush();
             try { Application.Current.Exit(); Log.Information("[Quit] Application.Exit returned"); }
             catch (Exception ex) { Log.Warning(ex, "[Quit] Application.Exit failed"); }
             // macOS: Exit asked the system to terminate, which ends the process. Windows and Linux: Uno's host does not end the

@@ -73,15 +73,126 @@ public class QuitCoordinatorTests
             async ct => { Calls.Add("stop"); await Stop(ct); },
             () => Calls.Add("exit"),
             budget,
-            Logs.Add);
+            Logs.Add,
+            () => { Calls.Add("hand over"); HandOver(); });
+
+        public Action HandOver = () => { };
     }
+
+    [Fact]
+    public async Task An_update_is_handed_over_after_the_work_has_stopped_and_before_the_exit()
+    {
+        var release = new TaskCompletionSource();
+        var rig = new Rig { Stop = async _ => await release.Task };
+        var quit = rig.Make();
+        var first = quit.RequestQuitAsync();
+        await Task.Delay(100);
+        Assert.Equal(new[] { "stop" }, rig.Calls);
+        release.SetResult();
+        Assert.True(await first);
+        Assert.Equal(new[] { "stop", "hand over", "exit" }, rig.Calls);
+    }
+
+    [Fact]
+    public async Task A_window_that_goes_under_the_question_stops_the_work_hands_over_and_exits_once_whatever_is_answered()
+    {
+        foreach (var answered in new[] { false, true })
+        {
+            var rig = new Rig { Active = 1 };
+            var answer = new TaskCompletionSource<bool>();
+            rig.Confirm = _ => answer.Task;
+            var quit = rig.Make();
+            var asked = quit.RequestQuitAsync();
+            Assert.True(quit.IsAsking);
+            Assert.True(await quit.QuitNowAsync());
+            answer.SetResult(answered);
+            Assert.True(await asked);
+            Assert.Equal(new[] { "ask 1", "stop", "hand over", "exit" }, rig.Calls);
+        }
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task The_process_ending_by_itself_stops_the_work_first_and_calls_no_exit(bool handOver)
+    {
+        var release = new TaskCompletionSource();
+        var rig = new Rig { Active = 2, Stop = async _ => await release.Task };
+        var quit = rig.Make();
+        var end = quit.EndAsync(handOver);
+        Assert.False(end.Wait(100));
+        release.SetResult();
+        await end.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.Equal(handOver ? new[] { "stop", "hand over" } : new[] { "stop" }, rig.Calls);
+        // Nothing of it again, whoever asks
+        await quit.EndAsync(handOver: true);
+        Assert.True(await quit.RequestQuitAsync());
+        Assert.Equal(handOver ? 2 : 1, rig.Calls.Count);
+    }
+
+    [Fact]
+    public async Task The_process_ending_during_a_quit_joins_it_and_its_hand_over()
+    {
+        var release = new TaskCompletionSource();
+        using var over = new ManualResetEventSlim();
+        var rig = new Rig { Stop = async _ => await release.Task };
+        rig.HandOver = () => over.Wait(TimeSpan.FromSeconds(10));
+        var quit = rig.Make();
+        var first = quit.RequestQuitAsync();
+        var end = quit.EndAsync(handOver: false);
+        release.SetResult();
+        Assert.False(end.Wait(200));
+        over.Set();
+        await end.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.True(await first);
+        Assert.Equal(new[] { "stop", "hand over", "exit" }, rig.Calls);
+    }
+
+    [Fact]
+    public async Task A_session_that_ends_during_a_quit_hands_nothing_over()
+    {
+        var release = new TaskCompletionSource();
+        var rig = new Rig { Stop = async _ => await release.Task };
+        var quit = rig.Make();
+        var first = quit.RequestQuitAsync();
+        var end = quit.EndAsync(handOver: false, refuse: true);
+        release.SetResult();
+        await end.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.True(await first);
+        Assert.Equal(new[] { "stop", "exit" }, rig.Calls);
+    }
+
+    [Fact]
+    public async Task Nothing_is_handed_over_when_the_work_did_not_end()
+    {
+        foreach (var stop in new Func<CancellationToken, Task>[] { _ => new TaskCompletionSource().Task, _ => throw new InvalidOperationException("something is still running") })
+        {
+            var rig = new Rig { Stop = stop };
+            Assert.True(await rig.Make(TimeSpan.FromMilliseconds(150)).QuitNowAsync());
+            Assert.Equal(new[] { "stop", "exit" }, rig.Calls);
+        }
+    }
+
+    [Fact]
+    public async Task A_hand_over_that_fails_does_not_keep_the_app()
+    {
+        var rig = new Rig { HandOver = () => throw new IOException("no updater") };
+        Assert.True(await rig.Make().QuitNowAsync());
+        Assert.Equal(new[] { "stop", "hand over", "exit" }, rig.Calls);
+        Assert.Contains(rig.Logs, l => l.Contains("no updater", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void The_limits_of_the_parts_fit_in_the_total() =>
+        // The scanner's word to it may block as long as its ending is waited for
+        Assert.True(EndLimits.Queue + EndLimits.Reports + (2 * EndLimits.ScannerAsked) + EndLimits.ScannerKilled + EndLimits.Connection < EndLimits.Total);
 
     [Fact]
     public async Task With_nothing_running_it_stops_and_exits_without_asking()
     {
         var rig = new Rig();
         Assert.True(await rig.Make().RequestQuitAsync());
-        Assert.Equal(new[] { "stop", "exit" }, rig.Calls);
+        Assert.Equal(new[] { "stop", "hand over", "exit" }, rig.Calls);
     }
 
     [Fact]
@@ -90,7 +201,7 @@ public class QuitCoordinatorTests
         var rig = new Rig { Active = 3 };
         var quit = rig.Make();
         Assert.True(await quit.RequestQuitAsync());
-        Assert.Equal(new[] { "ask 3", "stop", "exit" }, rig.Calls);
+        Assert.Equal(new[] { "ask 3", "stop", "hand over", "exit" }, rig.Calls);
         Assert.True(quit.IsQuitting);
     }
 
@@ -106,7 +217,7 @@ public class QuitCoordinatorTests
 
         rig.Confirm = _ => Task.FromResult(true);
         Assert.True(await quit.RequestQuitAsync());
-        Assert.Equal(new[] { "ask 2", "ask 2", "stop", "exit" }, rig.Calls);
+        Assert.Equal(new[] { "ask 2", "ask 2", "stop", "hand over", "exit" }, rig.Calls);
     }
 
     [Fact]
@@ -122,7 +233,7 @@ public class QuitCoordinatorTests
         Assert.Equal(1, rig.Questions);
         answer.SetResult(true);
         Assert.True(await first);
-        Assert.Equal(new[] { "ask 1", "stop", "exit" }, rig.Calls);
+        Assert.Equal(new[] { "ask 1", "stop", "hand over", "exit" }, rig.Calls);
     }
 
     [Fact]
@@ -193,7 +304,7 @@ public class QuitCoordinatorTests
         release.SetResult();
         Assert.True(await first);
         Assert.True(await again);
-        Assert.Equal(new[] { "stop", "exit" }, rig.Calls);
+        Assert.Equal(new[] { "stop", "hand over", "exit" }, rig.Calls);
     }
 
     [Fact]
@@ -201,7 +312,7 @@ public class QuitCoordinatorTests
     {
         var rig = new Rig { Active = 1, Confirm = _ => throw new InvalidOperationException("no window") };
         Assert.True(await rig.Make().RequestQuitAsync());
-        Assert.Equal(new[] { "ask 1", "stop", "exit" }, rig.Calls);
+        Assert.Equal(new[] { "ask 1", "stop", "hand over", "exit" }, rig.Calls);
         Assert.Contains(rig.Logs, l => l.Contains("could not be shown", StringComparison.Ordinal));
     }
 

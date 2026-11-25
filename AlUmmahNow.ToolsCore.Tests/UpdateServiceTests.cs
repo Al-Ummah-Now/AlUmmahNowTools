@@ -174,6 +174,31 @@ public sealed class UpdateServiceTests : IDisposable
         Assert.Equal((0, 1), (installer.Restarts, installer.Exits));
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Restart_now_quits_and_the_end_starts_the_updater(bool quits)
+    {
+        var (first, core, installer, http) = Make();
+        first.Dispose();
+        UpdateService? service = null;
+        var startedBefore = -1;
+        service = new UpdateService(http, () => new Uri("https://videos.api.example.com"), core, installer, Path.Combine(_dir, "updates.json"), Path.Combine(_dir, "dl"), "2026.11.22", "windows", "x64", () => false, true, quit: () =>
+        {
+            // The work is stopped here: nothing was handed over yet
+            startedBefore = installer.Restarts + installer.Exits;
+            if (quits) service!.OnExit();
+            return Task.FromResult(quits);
+        });
+        await service.CheckAsync(userAsked: true);
+        Assert.Equal(quits, await service.RestartNowAsync());
+        Assert.Equal((0, quits ? 1 : 0, 0), (startedBefore, installer.Restarts, installer.Exits));
+        if (quits) return;
+        // The quit did not come about: the app goes on, and closing it later installs without starting it again
+        service.OnExit();
+        Assert.Equal((0, 1), (installer.Restarts, installer.Exits));
+    }
+
     [Fact]
     public async Task A_restart_held_back_during_the_check_can_be_asked_for_again()
     {

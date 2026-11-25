@@ -643,7 +643,7 @@ public sealed class ImportQueue : IDisposable
 
     /// <summary>
     /// How long <see cref="StopAsync"/> waits in all: for running steps to stop (a step kills its ffmpeg when it is cancelled) and
-    /// for what is being deleted to be deleted. Under the 8 s the process-exit handler gives the whole quit.
+    /// for what is being deleted to be deleted. One part of the app's end (<see cref="EndLimits"/>).
     /// </summary>
     public static readonly TimeSpan StepStopGrace = TimeSpan.FromSeconds(6);
 
@@ -652,7 +652,8 @@ public sealed class ImportQueue : IDisposable
     /// processes are gone and its step is back to waiting, then saves the queue. A step that is still running when the wait
     /// ends is saved as running; the next start runs it again, as after a crash.
     /// </summary>
-    public async Task StopAsync(TimeSpan? grace = null)
+    /// <returns>Everything has ended; false: something still runs (the wait ended first)</returns>
+    public async Task<bool> StopAsync(TimeSpan? grace = null)
     {
         Task? loop;
         CancellationTokenSource? stopping;
@@ -695,9 +696,11 @@ public sealed class ImportQueue : IDisposable
             lock (_cleanGate) cleaning = _cleaning;
             await cleaning.ConfigureAwait(false);
         });
+        var ended = true;
         try { await settled.WaitAsync(grace ?? StepStopGrace).ConfigureAwait(false); }
-        catch (Exception ex) when (ex is TimeoutException or OperationCanceledException) { }
+        catch (Exception ex) when (ex is TimeoutException or OperationCanceledException) { ended = false; }
         lock (_gate) SaveLocked();
+        return ended;
     }
 
     public void Dispose()

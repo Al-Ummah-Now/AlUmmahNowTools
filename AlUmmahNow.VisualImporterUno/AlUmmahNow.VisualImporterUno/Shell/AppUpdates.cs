@@ -49,8 +49,8 @@ public static class AppUpdates
             IsBusy,
             ToolsUpdateKeys.RootKeys.Length > 0,
             // Velopack's updater ends every process of the install folder: never while another copy runs from it (Tools #89)
+            quit: () => AppQuit.QuitNowAsync("restart now"),
             otherCopy: () => demo == "ready-other" || AppInstance.Install?.OtherCopyRunning() == true);
-        AppDomain.CurrentDomain.ProcessExit += (_, _) => InstallOnQuit();
 #if UPDATE_TEST
         UpdateTestHandler.Watch(Service);
 #endif
@@ -58,7 +58,7 @@ public static class AppUpdates
         else Service.Start();
     }
 
-    /// <summary>The app is quitting: hands a staged update to the updater. Once, whoever asks (the quit, or the process's end).</summary>
+    /// <summary>The work has ended (<see cref="AppQuit"/> alone calls this): hands a staged update to the updater, once.</summary>
     public static void InstallOnQuit()
     {
         try
