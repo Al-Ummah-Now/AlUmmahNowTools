@@ -29,8 +29,7 @@ public static class WorkFiles
         path = Path.Combine(Path.GetFullPath(root), id);
         try
         {
-            // .NET removes a link inside the folder without following it
-            if (Directory.Exists(path)) Directory.Delete(path, recursive: true);
+            if (Directory.Exists(path)) DeleteTree(new DirectoryInfo(path));
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -38,6 +37,24 @@ public static class WorkFiles
             // Left for the next run's clean-up; the queue does not depend on it
             return false;
         }
+    }
+
+    /// <summary>
+    /// Links are removed themselves, never followed. Not .NET's own recursive delete: on Windows it takes a junction for a
+    /// mounted volume, and stops with an error after removing it.
+    /// </summary>
+    private static void DeleteTree(DirectoryInfo folder)
+    {
+        foreach (var entry in folder.EnumerateFileSystemInfos("*", new EnumerationOptions { AttributesToSkip = 0, IgnoreInaccessible = false }).ToList())
+        {
+            var link = (entry.Attributes & FileAttributes.ReparsePoint) != 0;
+            var directory = (entry.Attributes & FileAttributes.Directory) != 0;
+            if (directory && !link) DeleteTree((DirectoryInfo)entry);
+            // A junction or a directory link on Windows goes as an (empty) directory; everything else, and any link elsewhere, as a file
+            else if (directory && OperatingSystem.IsWindows()) Directory.Delete(entry.FullName, recursive: false);
+            else File.Delete(entry.FullName);
+        }
+        Directory.Delete(folder.FullName, recursive: false);
     }
 
     /// <summary>Deletes a file's transcript or sound: <c>root/id.json</c> or <c>root/id.wav</c>, and nothing else.</summary>
