@@ -313,6 +313,15 @@ public sealed partial class ImportView : Page
             XamlRoot = XamlRoot,
         };
         dialog.Resources["ContentDialogMaxWidth"] = 660.0;
+        // Frames of a short or narrow window: the dialog scrolled to its end (TOOLS_DEMO_IMPORT_CHANNEL_SCROLL=end)
+        if (ImportWorkspace.Current.IsDemo && Environment.GetEnvironmentVariable("TOOLS_DEMO_IMPORT_CHANNEL_SCROLL") == "end")
+        {
+            dialog.Opened += async (_, _) =>
+            {
+                await System.Threading.Tasks.Task.Delay(500);
+                scroller.ChangeView(null, scroller.ScrollableHeight, null, true);
+            };
+        }
         root.Changed += RootChanged;
         dialog.Closed += (_, _) => root.Changed -= RootChanged;
         if (Loc.IsArabic && ShellState.TextFontFor("ar") is { } arFont) dialog.FontFamily = arFont;
