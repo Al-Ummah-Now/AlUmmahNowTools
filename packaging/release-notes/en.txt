@@ -1,2 +1,3 @@
 A file with sound and no video is never uploaded, also when its own index says it has one (the pictures of chapters).
 “Encode on this computer” on the Import page is one switch, remembered, and holds at once for the videos already in the queue. One video can be left to the server from its row.
+Encoding on this computer: a video on a network share the video tools cannot read is copied here first, and one whose file is longer than its picture and sound is no longer sent to the server to encode.
