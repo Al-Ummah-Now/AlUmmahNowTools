@@ -49,6 +49,11 @@ internal sealed class ChannelBoxes
                 if (boxes._closed) box.IsSuggestionListOpen = false;
             });
         });
+        // Its list is placed where the box was when it opened
+        box.SizeChanged += (_, e) =>
+        {
+            if (e.PreviousSize.Width > 0 && e.NewSize.Width != e.PreviousSize.Width) boxes.Close();
+        };
         return boxes;
     }
 
@@ -91,7 +96,7 @@ internal sealed class ChannelBoxes
             (_closed, _looking, _settled, _typed) = (false, null, null, _box.Text);
             Deselect();
             _ = _search.SearchAsync(_box.Text);
-            _box.IsSuggestionListOpen = true;
+            Open();
         }
         // By the arrow keys the list stays; anything else that puts a text here ends what was typed before
         else if (_looking is null)
@@ -105,8 +110,19 @@ internal sealed class ChannelBoxes
     {
         if (source is not TextBox { FocusState: not FocusState.Programmatic } || _looking is not null || _box.Text == _settled) return;
         (_closed, _settled, _typed) = (false, null, _box.Text);
-        if (_search.Answers(_box.Text)) _box.IsSuggestionListOpen = true;
-        else _ = _search.SearchAsync(_box.Text);
+        if (!_search.Answers(_box.Text)) _ = _search.SearchAsync(_box.Text);
+        Open();
+    }
+
+    /// <summary>Opens the list, and once more when the event of a close just before has closed it (it comes later).</summary>
+    private void Open()
+    {
+        _box.IsSuggestionListOpen = true;
+        _box.DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+        {
+            if (!_closed && !_box.IsSuggestionListOpen && _search.Rows.Count > 0 && _box.XamlRoot is { } root && FocusManager.GetFocusedElement(root) is TextBox text && Within(text))
+                _box.IsSuggestionListOpen = true;
+        });
     }
 
     private void Left()

@@ -21,8 +21,6 @@ public sealed partial class ImportView : Page
 
     public BulkImportViewModel ViewModel { get; }
 
-    private readonly ChannelBoxes? _channels;
-
     public ImportView()
     {
         ViewModel = App.GetService<BulkImportViewModel>();
@@ -30,7 +28,7 @@ public sealed partial class ImportView : Page
         DataContext = ViewModel;
         if (ViewModel.SelectedChannel is { } channel) ChannelBox.Text = channel.LocalizedName;
         SuggestionsUnderBox.Attach(ChannelBox);
-        _channels = ChannelBoxes.Attach(ChannelBox, ViewModel.ChannelSearch, channel => ViewModel.SelectedChannel = channel);
+        ChannelBoxes.Attach(ChannelBox, ViewModel.ChannelSearch, channel => ViewModel.SelectedChannel = channel);
         AutomationProperties.SetName(RemoveAllButton, Loc.Get("Import_RemoveAllConfirm"));
         Loaded += (_, _) =>
         {
@@ -84,8 +82,10 @@ public sealed partial class ImportView : Page
             case "suggest-searching" or "suggest-none":
                 await System.Threading.Tasks.Task.Delay(1200);
                 ChannelBox.Text = Loc.IsArabic ? "درس" : "tafsir";
+                await System.Threading.Tasks.Task.Delay(300);
                 ChannelBox.Focus(FocusState.Keyboard);
-                await ViewModel.ChannelSearch.SearchAsync(ChannelBox.Text);
+                // The caret after what is typed, never through its first letter
+                if (FindChild<TextBox>(ChannelBox) is { } searched) searched.Select(searched.Text.Length, 0);
                 break;
             case "suggest":
                 // The window has its size by then: a list closes when its box gets another width
@@ -158,9 +158,6 @@ public sealed partial class ImportView : Page
     private void Page_SizeChanged(object sender, SizeChangedEventArgs e)
     {
         var narrow = e.NewSize.Width < NarrowWidth;
-        // The suggestions are placed where the box was when they opened: closed when it moves or gets another width, never
-        // because the page got shorter (the progress strip under it)
-        if (e.NewSize.Width != e.PreviousSize.Width) _channels?.Close();
         foreach (var (row, button) in new (Grid, FrameworkElement)[] { (ChannelRow, NewChannelButton), (FolderRow, BrowseButton) })
         {
             Grid.SetRow(button, narrow ? 1 : 0);

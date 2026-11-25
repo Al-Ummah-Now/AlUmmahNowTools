@@ -1,1 +1,2 @@
 A file with sound and no video is never uploaded, also when its own index says it has one (the pictures of chapters).
+Suggestion lists lie under their box in Arabic on Watched folders and Approvals too, and close when the window gets another width.

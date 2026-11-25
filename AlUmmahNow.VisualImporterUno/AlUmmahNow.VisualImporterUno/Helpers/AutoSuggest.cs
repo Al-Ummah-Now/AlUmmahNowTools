@@ -38,6 +38,9 @@ public static class AutoSuggest
     private static readonly DependencyProperty ClosedProperty = DependencyProperty.RegisterAttached(
         "Closed", typeof(bool), typeof(AutoSuggest), new PropertyMetadata(false));
 
+    private static readonly DependencyProperty AttachedProperty = DependencyProperty.RegisterAttached(
+        "Attached", typeof(bool), typeof(AutoSuggest), new PropertyMetadata(false));
+
     private static void OnValueChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
         if (d is not AutoSuggestBox box) return;
@@ -76,8 +79,10 @@ public static class AutoSuggest
         if (d is not AutoSuggestBox box) return;
         if (e.OldValue is INotifyCollectionChanged oldList) oldList.CollectionChanged -= Refresh(box);
         if (e.NewValue is INotifyCollectionChanged newList) newList.CollectionChanged += Refresh(box);
-        if (e.OldValue is null)
+        if (!(bool)box.GetValue(AttachedProperty))
         {
+            box.SetValue(AttachedProperty, true);
+            Shell.SuggestionsUnderBox.Attach(box);
             box.TextChanged += OnTextChanged;
             box.SuggestionChosen += OnSuggestionChosen;
             box.GotFocus += OnGotFocus;
@@ -93,9 +98,20 @@ public static class AutoSuggest
     private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<AutoSuggestBox, NotifyCollectionChangedEventHandler> Handlers = new();
 
     private static NotifyCollectionChangedEventHandler Refresh(AutoSuggestBox box) =>
-        Handlers.GetValue(box, b => (_, _) =>
+        Handlers.GetValue(box, b =>
         {
-            if (b.FocusState != FocusState.Unfocused) Update(b);
+            var waiting = false;
+            return (_, _) =>
+            {
+                // A list that is emptied and filled again is one change: in between, the box's own list would close for good
+                if (waiting) return;
+                waiting = true;
+                b.DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+                {
+                    waiting = false;
+                    if (b.IsSuggestionListOpen && !(bool)b.GetValue(ClosedProperty)) Update(b);
+                });
+            };
         });
 
     private static void Update(AutoSuggestBox box) =>

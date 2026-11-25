@@ -69,7 +69,8 @@ public sealed partial class ChannelSearch : ObservableObject, IDisposable
     public async Task SearchAsync(string query)
     {
         _search?.Cancel();
-        var search = _search = new CancellationTokenSource();
+        using var search = new CancellationTokenSource();
+        _search = search;
         if (Found.Count == 0 && _before is null)
         {
             _before = Rows;
@@ -101,6 +102,10 @@ public sealed partial class ChannelSearch : ObservableObject, IDisposable
             if (search.IsCancellationRequested) return;
             Back();
             _ended(ex);
+        }
+        finally
+        {
+            if (_search == search) _search = null;
         }
     }
 
