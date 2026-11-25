@@ -133,7 +133,7 @@ public sealed class ImportWorkspace : IDisposable
             ["itemId"] = item.ServerItemId,
             ["videoId"] = item.VideoId,
             ["fileSize"] = item.Video.Size,
-        });
+        }, files: AlUmmahNow.ToolsCore.LocalPaths.Of(item.Video));
 
     /// <summary>A local transcription that failed goes to the Errors page; the file itself carries on without a transcript.</summary>
     private void ReportTranscribeFailure(Exception error, QueueItem item) =>
@@ -145,7 +145,7 @@ public sealed class ImportWorkspace : IDisposable
             ["videoId"] = item.VideoId,
             ["model"] = item.SpeechModel,
             ["device"] = Transcriber.Device is { } d ? d.Backend : null,
-        });
+        }, files: AlUmmahNow.ToolsCore.LocalPaths.Of(item.Video));
 
     /// <summary>The app's version, sent with each error report</summary>
     public static string Release { get; } =

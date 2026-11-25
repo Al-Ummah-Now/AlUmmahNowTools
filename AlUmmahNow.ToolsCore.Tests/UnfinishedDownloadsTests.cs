@@ -82,43 +82,109 @@ public class UnfinishedDownloadsTests
 
 public class LocalPathsTests
 {
+    private const string Instead = "ffprobe could not read the file (probe_failed, 1)";
+
+    private static string Clean(string text, params string[] files) => LocalPaths.Clean(text, Instead, files);
+
     [Theory]
-    [InlineData(@"ffprobe could not read the file: \\nas\media\Lessons 2026\a b.temp.webm: Invalid data", "ffprobe could not read the file: a b.temp.webm: Invalid data")]
-    [InlineData(@"\\?\UNC\nas\media\x.mp4", "x.mp4")]
-    [InlineData(@"Could not find '\\NAS\Media\الدروس\درس.mp4'.", "Could not find 'درس.mp4'.")]
-    [InlineData(@"Access to the path 'Y:\Lessons\a.mp4' is denied.", "Access to the path 'a.mp4' is denied.")]
-    [InlineData("C:/Users/someone/a.mp4: gone", "a.mp4: gone")]
-    [InlineData("/Volumes/Media/Lessons/a b.mp4: Input/output error", "a b.mp4: Input/output error")]
-    [InlineData("in /Users/someone/Library/x.json", "in x.json")]
-    [InlineData("[in#0/mov @ 0x1] [error] Error during demuxing: Invalid argument", "[in#0/mov @ 0x1] [error] Error during demuxing: Invalid argument")]
-    [InlineData("POST https://admin.api.example/api/admin/import/items (500)", "POST https://admin.api.example/api/admin/import/items (500)")]
-    [InlineData("kb/s and/or 10 s", "kb/s and/or 10 s")]
-    [InlineData("no path at all", "no path at all")]
-    // What stands after the path stays
-    [InlineData(@"\\nas\media\a.mp4 (100 kb/s)", "a.mp4 (100 kb/s)")]
-    [InlineData(@"C:\Users\someone\a.mp4 (video/mp4)", "a.mp4 (video/mp4)")]
-    [InlineData("/Users/someone/a.mp4 and/or b.mp4", "a.mp4 and/or b.mp4")]
-    [InlineData("ffprobe could not read /Volumes/Media/a.mp4 [in#0/mov] error", "ffprobe could not read a.mp4 [in#0/mov] error")]
-    [InlineData(@"\\nas\media\lesson (video/mp4)", "lesson (video/mp4)")]
-    [InlineData(@"copied \\nas\media\a.mp4 to \\nas\other\b.mp4, 3/4", "copied a.mp4 to b.mp4, 3/4")]
-    [InlineData(@"moved /Volumes/Media/a.mp4 to /Users/someone/b.mp4 (1/2)", "moved a.mp4 to b.mp4 (1/2)")]
-    // Names with spaces, dots, quotes; in Arabic
-    [InlineData(@"\\nas\دروس الفقه\الصيام ١\الدرس الأول.mp4 (100 kb/s)", "الدرس الأول.mp4 (100 kb/s)")]
-    [InlineData("/Volumes/الوسائط/دروس/الدرس الأول.webm and/or x", "الدرس الأول.webm and/or x")]
-    [InlineData(@"C:\My Lessons v1.2 final\part 2.old\a b.c.mp4: gone", "a b.c.mp4: gone")]
-    [InlineData(@"\\nas\media\a.mp4.part 5/6", "a.mp4.part 5/6")]
-    [InlineData("'/Users/someone/Qur'an lessons/no extension' and 'c/d'", "'no extension' and 'c/d'")]
-    [InlineData(@"""C:\a b\c d"" x/y", @"""c d"" x/y")]
-    [InlineData(@"C:\Users\someone/mixed/a.mp4", "a.mp4")]
-    [InlineData("/Volumes/Media/d.mp4.download/d.mp4: cut", "d.mp4: cut")]
-    [InlineData(@"""\\\\nas\\media\\a.mp4""", @"""a.mp4""")]
-    // The names of macOS's file system have no case
-    [InlineData("/users/someone/a.mp4 in /VOLUMES/Media/x y/b.mp4", "a.mp4 in b.mp4")]
-    [InlineData("", "")]
-    public void Folders_stay_on_this_computer(string text, string stripped) => Assert.Equal(stripped, LocalPaths.Strip(text));
+    [InlineData(@"\\nas\media\Lessons 2026\a.mp4")]
+    [InlineData(@"C:\Users\Someone Else\Lessons 2026\a.mp4")]
+    [InlineData("C:/Users/Someone Else/Lessons 2026/a.mp4")]
+    [InlineData("/Volumes/Media/Lessons 2026/a.mp4")]
+    [InlineData(@"C:\Users\someone\video.mp4 (backup)\a.mp4")]
+    [InlineData(@"C:\Users\someone\Series.part 1\day 1\a.mp4")]
+    [InlineData("/Users/someone/archive.zip (2026)/lessons/a.mp4")]
+    [InlineData(@"C:\Users\someone/دروس الفقه/الصيام ١\a.mp4")]
+    [InlineData("/Users/someone/Qur'an lessons/a.mp4")]
+    [InlineData(@"\\nas\media\a.mp4")]
+    public void A_known_file_is_its_name_however_it_is_written(string path)
+    {
+        Assert.Equal("ffprobe could not read the file: a.mp4: Invalid data", Clean($"ffprobe could not read the file: {path}: Invalid data", path));
+        foreach (var after in new[] { "", " (100 kb/s)", " (video/mp4)", " and/or b.mp4", " [in#0/mov] error", "'", "\".", ", 3/4" })
+            Assert.Equal("read a.mp4" + after, Clean("read " + path + after, path));
+        foreach (var written in new[] { path.ToUpperInvariant(), path.ToLowerInvariant(), path.Replace('\\', '/'), path.Replace('/', '\\'), path.Replace("\\", "\\\\"), path.Replace(" ", "%20"), path.Replace('\'', '’'), path.Normalize(System.Text.NormalizationForm.FormD) })
+            Assert.Equal("read 'a.mp4' (1/2)", Clean($"read '{written}' (1/2)", path));
+        // Its folders, where nothing can come after them
+        for (var folder = path; folder.LastIndexOfAny(['/', '\\']) is > 2 and var at;)
+        {
+            folder = folder[..at];
+            if (folder.TrimStart('\\').IndexOfAny(['/', '\\']) < 0) break;
+            Assert.Equal("no such folder …: gone", Clean($"no such folder {folder}: gone", path));
+            Assert.Equal("no such folder …", Clean($"no such folder {folder}\\", path));
+            // Where something does, nothing is said
+            Assert.Equal(Instead, Clean($"no such folder {folder} (old)/b.mp4", path));
+            Assert.Equal(Instead, Clean($"no such folder {folder}/sub folder/b.mp4", path));
+        }
+    }
 
     [Fact]
-    public async Task A_report_carries_file_names_alone()
+    public void The_long_paths_of_windows_are_known_too()
+    {
+        Assert.Equal("a.mp4: gone", Clean(@"\\?\UNC\nas\media\a.mp4: gone", @"\\nas\media\a.mp4"));
+        Assert.Equal("a.mp4: gone", Clean(@"\\?\C:\x y\a.mp4: gone", @"C:\x y\a.mp4"));
+        Assert.Equal("a.mp4 to b.mp4", Clean(@"Y:\x\a.mp4 to \\nas\media\b.mp4", @"Y:\x\a.mp4", @"\\nas\media\b.mp4"));
+    }
+
+    [Theory]
+    [InlineData(@"\\nas\media\a.mp4 (100 kb/s)")]
+    [InlineData(@"C:\Users\someone\a.mp4 (video/mp4)")]
+    [InlineData("C:/Users/Mahmoud Darwish/Lessons 2026/a.mp4")]
+    [InlineData("C:/Users/someone/دروس الفقه/الدرس الأول.mp4")]
+    [InlineData("\"C:/Program Files/Al Ummah Now/a.mp4\"")]
+    [InlineData(@"C:\Users\someone/My Lessons/a.mp4")]
+    [InlineData(@"C:\Users\someone\video.mp4 (backup)\a.mp4")]
+    [InlineData(@"C:\Users\someone\Series.part 1\day 1\a.mp4")]
+    [InlineData("\"/Users/someone/archive.zip (2026)/lessons/a.mp4\"")]
+    [InlineData("/Users/someone/a.mp4 and/or b.mp4")]
+    [InlineData("ffprobe could not read /Volumes/Media/a.mp4 [in#0/mov] error")]
+    [InlineData("could not read:/mnt/nas/a.mp4")]
+    [InlineData("path=/opt/x")]
+    [InlineData("file:///Users/someone/a.mp4")]
+    [InlineData("file:%2F%2FUsers%2Fsomeone")]
+    [InlineData("~/Movies/a.mp4")]
+    [InlineData("//nas/media/a.mp4")]
+    [InlineData("in ../Lessons/a.mp4")]
+    [InlineData("(/data/x)")]
+    // A share's path read in another code page is nobody's known path
+    [InlineData("\\\\nas\\Ø¯Ø±Ø³\\a.mp4: Invalid data")]
+    public void Anything_else_that_looks_like_a_path_takes_its_line_with_it(string text)
+    {
+        Assert.Equal(Instead, Clean(text, "/Volumes/Media/Lessons/other.mp4"));
+        Assert.Equal("before\n" + Instead + "\nafter", Clean($"before\n{text}\r\nafter"));
+    }
+
+    [Theory]
+    [InlineData("[in#0/mov @ 0x1] [error] Error during demuxing: Invalid argument")]
+    [InlineData("POST https://admin.api.example/api/admin/import/items (500)")]
+    [InlineData("kb/s and/or 10 s, 3 / 4, a: b")]
+    [InlineData("الملف و/أو الصوت: تعذّرت القراءة")]
+    [InlineData("no path at all")]
+    [InlineData("")]
+    public void What_names_no_folder_stays(string text) => Assert.Equal(text, Clean(text, "/Volumes/Media/Lessons/other.mp4"));
+
+    [Fact]
+    public void The_apps_own_folders_are_known()
+    {
+        Assert.Equal("full: …", Clean("full: " + EncodeStep.DefaultWorkRoot));
+        Assert.Equal("full: …", Clean("full: " + Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)));
+        if (Path.IsPathRooted(EncodeStep.DefaultWorkRoot)) Assert.Equal(Instead, Clean("full: " + Path.Combine(EncodeStep.DefaultWorkRoot, "x", "360p.mp4")));
+        // Not a drive: a word before a colon stays
+        Assert.Equal("the doc: gone, etc:", Clean("the doc: gone, etc:", @"C:\a b\c.mp4"));
+    }
+
+    [Fact]
+    public void Text_that_is_no_text_is_not_sent() => Assert.Equal(Instead, Clean("broken " + (char)0xD800 + " text"));
+
+    [Fact]
+    public void Without_free_text_the_code_the_exit_code_and_a_fixed_sentence_are_left()
+    {
+        Assert.Equal("ffprobe could not read the file (probe_failed, 134)", ErrorReporter.Plain(new LocalEncodeException("probe_failed", "x") { ExitCode = 134 }));
+        Assert.Equal("The file could not be encoded here (disk_space)", ErrorReporter.Plain(new LocalEncodeException("disk_space", "x")));
+        Assert.Equal("It failed (file_missing)", ErrorReporter.Plain(new FileNotFoundException("x")));
+        Assert.Equal("It failed (unexpected)", ErrorReporter.Plain(new InvalidOperationException("x")));
+    }
+
+    private static async Task<ErrorReport> Sent(Exception error, string message, IReadOnlyDictionary<string, object?>? extra = null, params string[] files)
     {
         var sent = new List<ErrorReport>();
         using var reporter = new ErrorReporter((batch, _) =>
@@ -126,24 +192,44 @@ public class LocalPathsTests
             sent.AddRange(batch);
             return Task.CompletedTask;
         }, "1", () => "en", TimeSpan.FromHours(1));
-        reporter.Report("caught", new IOException("x"), @"Import Encode failed: \\nas\media\Lessons\a.mp4: Invalid data", extra: new Dictionary<string, object?> { ["file"] = @"\\nas\media\Lessons\a.mp4", ["fileSize"] = 5L });
+        reporter.Report("unhandled", error, message, extra: extra, files: files);
         await reporter.FlushAsync();
-        var report = Assert.Single(sent);
-        Assert.Equal("Import Encode failed: a.mp4: Invalid data", report.Message);
-        Assert.Equal("a.mp4", report.Extra!["file"]);
-        Assert.Equal(5L, report.Extra["fileSize"]);
+        return Assert.Single(sent);
+    }
+
+    [Fact]
+    public async Task A_report_carries_file_names_alone()
+    {
+        var extra = new Dictionary<string, object?> { ["file"] = @"\\nas\media\Lessons\a.mp4", ["other"] = @"\\nas\x\b.mp4", ["fileSize"] = 5L };
+        var known = await Sent(new IOException("x"), @"Import Encode failed: \\nas\media\Lessons\a.mp4: Invalid data", extra, @"\\nas\media\Lessons\a.mp4");
+        Assert.Equal("Import Encode failed: a.mp4: Invalid data", known.Message);
+        Assert.Equal("a.mp4", known.Extra!["file"]);
+        Assert.Equal("…", known.Extra["other"]);
+        Assert.Equal(5L, known.Extra["fileSize"]);
+
+        Exception thrown;
+        try { throw new LocalEncodeException("ffmpeg_failed", "x") { ExitCode = 1 }; } catch (LocalEncodeException ex) { thrown = ex; }
+        var unknown = await Sent(thrown, @"Import Encode failed: \\nas\media\Lessons\a.mp4: Invalid data");
+        Assert.Equal("ffmpeg stopped (ffmpeg_failed, 1)", unknown.Message);
+        Assert.Contains(nameof(A_report_carries_file_names_alone), unknown.Stack, StringComparison.Ordinal);
+        Assert.DoesNotContain(".cs", unknown.Stack, StringComparison.Ordinal);
     }
 
     [Fact]
     public async Task Nor_does_the_server_get_one_with_a_failed_file()
     {
-        var server = new FakeServer();
-        var api = new ImportApiClient(new Uri("https://admin.api.example"), _ => Task.FromResult<string?>("t"), server);
-        using var reporter = new ErrorReporter(api.ReportErrorsAsync, "1", () => "en", TimeSpan.FromHours(1));
-        var item = QueueItem.For(new ScannedVideo("/x/a.mp4", 10, 0, "video/mp4", Array.Empty<CaptionFile>(), null, null, null, new ImportMetadata { FallbackTitle = "a" }, Array.Empty<ScanNote>()), "b1", "ch1", DateTimeOffset.UtcNow);
-        item.ServerItemId = "item-9";
-        await new ServerFailureSink(api, reporter).ItemFailedAsync(item, item.Steps.Single(s => s.Kind == ImportStepKind.Upload), new InvalidOperationException(@"\\nas\media\a.mp4 went"), "ERR-AAAA-BBBB", default);
-        Assert.All(server.Calls, c => Assert.DoesNotContain("nas", c.Body ?? "", StringComparison.Ordinal));
-        Assert.Contains("a.mp4 went", server.Calls.Single(c => c.Path.EndsWith("/items/item-9/failed", StringComparison.Ordinal)).Body, StringComparison.Ordinal);
+        async Task<string?> Failed(string message)
+        {
+            var server = new FakeServer();
+            var api = new ImportApiClient(new Uri("https://admin.api.example"), _ => Task.FromResult<string?>("t"), server);
+            using var reporter = new ErrorReporter(api.ReportErrorsAsync, "1", () => "en", TimeSpan.FromHours(1));
+            var item = QueueItem.For(new ScannedVideo("/Volumes/Media/My lessons/a.mp4", 10, 0, "video/mp4", Array.Empty<CaptionFile>(), null, null, null, new ImportMetadata { FallbackTitle = "a" }, Array.Empty<ScanNote>()), "b1", "ch1", DateTimeOffset.UtcNow);
+            item.ServerItemId = "item-9";
+            await new ServerFailureSink(api, reporter).ItemFailedAsync(item, item.Steps.Single(s => s.Kind == ImportStepKind.Upload), new InvalidOperationException(message), "ERR-AAAA-BBBB", default);
+            Assert.All(server.Calls, c => Assert.DoesNotContain("lessons", c.Body ?? "", StringComparison.Ordinal));
+            return server.Calls.Single(c => c.Path.EndsWith("/items/item-9/failed", StringComparison.Ordinal)).Body;
+        }
+        Assert.Contains("a.mp4 went", await Failed("/Volumes/Media/My lessons/a.mp4 went"), StringComparison.Ordinal);
+        Assert.Contains("It failed (unexpected)", await Failed("/Volumes/Media/My lessons/b.mp4 went"), StringComparison.Ordinal);
     }
 }

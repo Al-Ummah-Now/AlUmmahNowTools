@@ -68,8 +68,17 @@ public sealed class SourceAccess
     }, null, ct);
 
     /// <summary>The paths to read the file by: its network path first when it is on a mapped drive, then as it was chosen.</summary>
-    public async Task<IReadOnlyList<string>> CandidatesAsync(string path, CancellationToken ct) =>
-        await AskAsync<string?>(path, () => _paths.Mapped(path), null, ct).ConfigureAwait(false) is { } network && network != path ? [network, path] : [path];
+    public async Task<IReadOnlyList<string>> CandidatesAsync(string path, CancellationToken ct)
+    {
+        if (await AskAsync<string?>(path, () => _paths.Mapped(path), null, ct).ConfigureAwait(false) is not { } network || network == path) return [path];
+        _networks[path] = network;
+        return [network, path];
+    }
+
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> _networks = new(StringComparer.Ordinal);
+
+    /// <summary>The file's paths as far as they were asked for, without asking.</summary>
+    internal IEnumerable<string> Known(string path) => _networks.TryGetValue(path, out var network) ? [path, network] : [path];
 
     /// <summary>For the scan, on its own thread; a step asks with its cancellation.</summary>
     public bool IsNetwork(string path) => IsNetworkAsync(path, CancellationToken.None).GetAwaiter().GetResult();

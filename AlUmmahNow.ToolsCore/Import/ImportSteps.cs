@@ -457,24 +457,44 @@ public sealed class ErrorReporter : IDisposable
     public int Waiting => _waiting.Count;
 
     /// <summary>Queues a report; answers its reference (ERR-XXXX-XXXX) to show or log.</summary>
-    public string Report(string kind, Exception error, string message, string? route = null, IReadOnlyDictionary<string, object?>? extra = null, string? reference = null)
+    public string Report(string kind, Exception error, string message, string? route = null, IReadOnlyDictionary<string, object?>? extra = null, string? reference = null, IEnumerable<string>? files = null)
     {
+        var known = files?.ToList();
         var report = new ErrorReport(
             kind,
             reference ?? ErrorReport.NewRef(),
-            LocalPaths.Strip(message)!,
+            LocalPaths.Clean(message, Plain(error), known),
             Name: error.GetType().Name,
-            Stack: kind is "unhandled" or "rejection" ? LocalPaths.Strip(error.StackTrace) : null,
+            Stack: kind is "unhandled" or "rejection" ? Stack(error, known) : null,
             Route: route,
             Status: error switch { ImportApiException a when a.Status > 0 => a.Status, TusException t when t.Status > 0 => t.Status, _ => null },
             Release: _release,
             Locale: _locale(),
             OccurredAt: DateTimeOffset.UtcNow.ToString("O"),
-            Extra: extra?.ToDictionary(e => e.Key, e => e.Value is string text ? LocalPaths.Strip(text) : e.Value));
+            Extra: extra?.ToDictionary(e => e.Key, e => e.Value is string text ? LocalPaths.Clean(text, "…", known) : e.Value));
         _waiting.Enqueue(report);
         while (_waiting.Count > MaxWaiting && _waiting.TryDequeue(out _)) { }
         return report.Ref;
     }
+
+    /// <summary>What went wrong without a word of the system's or ffmpeg's: the code, and the code it ended with.</summary>
+    internal static string Plain(Exception error)
+    {
+        var code = error switch { LocalEncodeException l => l.Code, Transcription.TranscribeException t => t.Code, _ => ImportQueue.ErrorCode(error) };
+        var what = code switch
+        {
+            "probe_failed" or "no_media" => "ffprobe could not read the file",
+            "source_read" => "The file could not be read to its end",
+            "ffmpeg_failed" => "ffmpeg stopped",
+            "ffmpeg_missing" => "ffmpeg could not be started",
+            _ => error is LocalEncodeException ? "The file could not be encoded here" : "It failed",
+        };
+        return what + " (" + code + (error is LocalEncodeException { ExitCode: { } exit } ? ", " + exit.ToString(CultureInfo.InvariantCulture) : "") + ")";
+    }
+
+    /// <summary>The methods; where their source was when it was built is nobody's.</summary>
+    private static string? Stack(Exception error, IReadOnlyList<string>? files) =>
+        error.StackTrace is { } stack ? LocalPaths.Clean(System.Text.RegularExpressions.Regex.Replace(stack, @"\) in [^\r\n]*", ")"), "…", files) : null;
 
     /// <summary>Sends what is waiting; what admin-api does not take stays for the next try.</summary>
     public async Task FlushAsync(CancellationToken ct = default)
@@ -534,7 +554,8 @@ public sealed class ServerFailureSink : IImportFailureSink
     public async Task ItemFailedAsync(QueueItem item, StepState step, Exception error, string reference, CancellationToken ct)
     {
         // It goes to the server: no folders of this computer
-        var message = LocalPaths.Strip(ImportQueue.Describe(error))!;
+        var files = LocalPaths.Of(item.Video).ToList();
+        var message = LocalPaths.Clean(ImportQueue.Describe(error), ErrorReporter.Plain(error), files);
         var answer = StepFailedException.Answers(error);
         var known = error is StepFailedException or ImportApiException or TusException or TusGoneException or IOException or UnauthorizedAccessException or HttpRequestException;
         if (!answer) _reporter.Report(
@@ -550,7 +571,8 @@ public sealed class ServerFailureSink : IImportFailureSink
                 ["videoId"] = item.VideoId,
                 ["fileSize"] = item.Video.Size,
             },
-            reference: reference);
+            reference: reference,
+            files: files);
         // The encode opens the file's video on the server before its upload
         if (step.Kind is ImportStepKind.Upload or ImportStepKind.Encode && item.ServerItemId is not null && !item.AlreadyImported)
         {
