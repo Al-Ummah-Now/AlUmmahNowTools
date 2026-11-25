@@ -96,7 +96,9 @@ internal static class UpdateTestClose
             var button = SendButton(window, sel_registerName("standardWindowButton:"), 0);
             var visible = (Send(window, sel_registerName("isVisible")) & 0xFF) != 0;
             UpdateTestHandler.Log($"window {Marshal.PtrToStringUTF8(Send(Send(Send(window, sel_registerName("class")), sel_registerName("description")), sel_registerName("UTF8String")))} visible={visible} button={button != IntPtr.Zero}");
-            if (visible && button != IntPtr.Zero) found = button;
+            if (!visible || button == IntPtr.Zero) continue;
+            if (found != IntPtr.Zero) throw new InvalidOperationException("the app has more than one window");
+            found = button;
         }
         return found != IntPtr.Zero ? found : throw new InvalidOperationException("no close button");
     }
