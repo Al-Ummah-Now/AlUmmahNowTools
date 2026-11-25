@@ -39,10 +39,74 @@ public sealed class SourceAccess
     internal Func<TimeSpan, CancellationToken, Task> Delay { get; }
     internal DateTimeOffset Now => _time.GetUtcNow();
 
-    public bool IsNetwork(string path) => _paths.IsNetwork(path);
+    /// <summary>
+    /// How long the system may take to say what a path is on (a mount whose server is gone may never say). Well inside the
+    /// time a stopping step has (<see cref="ImportQueue.StepStopGrace"/>).
+    /// </summary>
+    public TimeSpan Answer { get; init; } = TimeSpan.FromSeconds(3);
+
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, Asking> _asking = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>The question a mount was asked last.</summary>
+    private sealed class Asking
+    {
+        public Task? Task;
+        public long Since;
+    }
+
+    /// <summary>A path whose mount does not answer is on a share that is away.</summary>
+    public Task<bool> IsNetworkAsync(string path, CancellationToken ct) => AskAsync(path, () => _paths.IsNetwork(path), true, ct);
 
     /// <summary>The paths to read the file by: its network path first when it is on a mapped drive, then as it was chosen.</summary>
-    public IReadOnlyList<string> Candidates(string path) => _paths.Mapped(path) is { } network && network != path ? [network, path] : [path];
+    public async Task<IReadOnlyList<string>> CandidatesAsync(string path, CancellationToken ct) =>
+        await AskAsync<string?>(path, () => _paths.Mapped(path), null, ct).ConfigureAwait(false) is { } network && network != path ? [network, path] : [path];
+
+    /// <summary>For the scan, on its own thread; a step asks with its cancellation.</summary>
+    public bool IsNetwork(string path) => IsNetworkAsync(path, CancellationToken.None).GetAwaiter().GetResult();
+
+    public IReadOnlyList<string> Candidates(string path) => CandidatesAsync(path, CancellationToken.None).GetAwaiter().GetResult();
+
+    /// <summary>
+    /// Asks the system, one question at a time for each drive, share or mount: a question that is never answered holds one
+    /// thread of its own, and while it is open the next ones are not asked but count as unanswered.
+    /// </summary>
+    private async Task<T> AskAsync<T>(string path, Func<T> question, T whenSilent, CancellationToken ct)
+    {
+        var asking = _asking.GetOrAdd(MountOf(path), _ => new Asking());
+        while (true)
+        {
+            ct.ThrowIfCancellationRequested();
+            Task<T>? mine = null;
+            Task? before = null;
+            lock (asking)
+            {
+                if (asking.Task is { IsCompleted: false } open)
+                {
+                    if (TimeProvider.System.GetElapsedTime(asking.Since) >= Answer) return whenSilent;
+                    before = open;
+                }
+                else
+                {
+                    // A thread of its own, not one of the pool's
+                    mine = Task.Factory.StartNew(question, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+                    // A late failure is nobody's
+                    _ = mine.ContinueWith(t => _ = t.Exception, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+                    (asking.Task, asking.Since) = (mine, TimeProvider.System.GetTimestamp());
+                }
+            }
+            var answered = mine ?? before!;
+            if (await Task.WhenAny(answered, Task.Delay(Answer, ct)).ConfigureAwait(false) != answered)
+            {
+                ct.ThrowIfCancellationRequested();
+                return whenSilent;
+            }
+            if (mine is not null) return await mine.ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>The drive, share or volume; elsewhere the first two folders (<c>/mnt/nas</c>), where mounts are.</summary>
+    private static string MountOf(string path) =>
+        SourceFileSystem.RootOf(path) ?? string.Join('/', path.Split('/', 4).Take(3));
 
     /// <summary>The file's size and modified time, waiting for its share if need be.</summary>
     public async Task<SourceStat> StatAsync(string path, IStepContext? context, CancellationToken ct) =>
@@ -106,8 +170,9 @@ public sealed class SourceAccess
             {
                 return await work(use).ConfigureAwait(false);
             }
-            catch (LocalEncodeException error) when (error.Code == "source_read" && attempt < tries && (IsNetwork(use) || IsNetwork(path)))
+            catch (LocalEncodeException error) when (error.Code == "source_read" && attempt < tries)
             {
+                if (!await IsNetworkAsync(use, ct).ConfigureAwait(false) && !await IsNetworkAsync(path, ct).ConfigureAwait(false)) throw;
                 failed = use;
                 context?.Log(LogLevel.Warning, "share_tool", $"{error.Message}. Trying again", error.Message);
                 context?.Waiting(StepWait.Share);
@@ -126,7 +191,7 @@ public sealed class SourceAccess
     /// <summary>A path of the file that answers now, waiting for the share if need be.</summary>
     private async Task<(string Path, SourceStat Stat)> ReachAsync(string path, IStepContext? context, string? avoid, CancellationToken ct)
     {
-        var attempts = new SourceAttempts(this, path, context, avoid);
+        var attempts = await SourceAttempts.CreateAsync(this, path, context, ct, avoid).ConfigureAwait(false);
         try
         {
             while (true)
@@ -252,15 +317,23 @@ internal sealed class SourceAttempts
     private int _stops;
     private long _carefulUntil;
 
-    public SourceAttempts(SourceAccess access, string path, IStepContext? context, string? avoid = null)
+    private SourceAttempts(SourceAccess access, string path, IStepContext? context, List<string> candidates, bool network)
     {
         _access = access;
         _chosen = path;
         _context = context;
-        _candidates = access.Candidates(path).ToList();
+        _candidates = candidates;
+        Network = network;
+    }
+
+    public static async Task<SourceAttempts> CreateAsync(SourceAccess access, string path, IStepContext? context, CancellationToken ct, string? avoid = null)
+    {
+        var candidates = (await access.CandidatesAsync(path, ct).ConfigureAwait(false)).ToList();
         // What just failed goes last
-        if (avoid is not null && _candidates.Count > 1 && _candidates.Remove(avoid)) _candidates.Add(avoid);
-        Network = _candidates.Any(access.IsNetwork);
+        if (avoid is not null && candidates.Count > 1 && candidates.Remove(avoid)) candidates.Add(avoid);
+        var network = false;
+        foreach (var candidate in candidates) network |= await access.IsNetworkAsync(candidate, ct).ConfigureAwait(false);
+        return new SourceAttempts(access, path, context, candidates, network);
     }
 
     public string Current => _candidates[_index];
@@ -298,7 +371,7 @@ internal sealed class SourceAttempts
     /// </summary>
     public async Task FailedAsync(Exception error, long? offset, CancellationToken ct)
     {
-        if (!Network) Network = _access.IsNetwork(Current);
+        if (!Network) Network = await _access.IsNetworkAsync(Current, ct).ConfigureAwait(false);
         var path = Current;
         var network = Network;
         ReadFailure failure;
@@ -377,7 +450,7 @@ public sealed class SourceStream : Stream
     private readonly SourceAccess _access;
     private readonly string _path;
     private readonly IStepContext? _context;
-    private readonly SourceAttempts _attempts;
+    private SourceAttempts? _attempts;
     private long? _size;
     private long? _modifiedMs;
     private Stream? _inner;
@@ -393,7 +466,6 @@ public sealed class SourceStream : Stream
         _size = size;
         _modifiedMs = modifiedMs;
         _context = context;
-        _attempts = new SourceAttempts(access, path, context);
     }
 
     public override bool CanRead => true;
@@ -411,18 +483,23 @@ public sealed class SourceStream : Stream
         }
     }
 
+    /// <summary>The paths are asked for with the first read, where the step can be cancelled.</summary>
+    private async ValueTask<SourceAttempts> AttemptsAsync(CancellationToken ct) =>
+        _attempts ??= await SourceAttempts.CreateAsync(_access, _path, _context, ct).ConfigureAwait(false);
+
     public async Task<long> SizeAsync(CancellationToken ct)
     {
+        var attempts = await AttemptsAsync(ct).ConfigureAwait(false);
         while (_size is null)
         {
             ct.ThrowIfCancellationRequested();
             try
             {
-                await OpenAsync(ct).ConfigureAwait(false);
+                await OpenAsync(attempts, ct).ConfigureAwait(false);
             }
             catch (Exception ex) when (IsFailure(ex))
             {
-                await _attempts.FailedAsync(ex, null, ct).ConfigureAwait(false);
+                await attempts.FailedAsync(ex, null, ct).ConfigureAwait(false);
             }
         }
         return _size.Value;
@@ -431,29 +508,30 @@ public sealed class SourceStream : Stream
     public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken ct = default)
     {
         if (buffer.Length == 0 || (_size is { } size && _position >= size)) return 0;
+        var attempts = await AttemptsAsync(ct).ConfigureAwait(false);
         while (true)
         {
             ct.ThrowIfCancellationRequested();
             var reading = false;
             try
             {
-                await OpenAsync(ct).ConfigureAwait(false);
+                await OpenAsync(attempts, ct).ConfigureAwait(false);
                 if (_position >= _size!.Value) return 0;
                 reading = true;
-                var want = (int)Math.Min(Math.Min(buffer.Length, _attempts.Careful(_position) ? CarefulSize : BufferSize), _size.Value - _position);
-                var n = await ReadInnerAsync(want, ct).ConfigureAwait(false);
+                var want = (int)Math.Min(Math.Min(buffer.Length, attempts.Careful(_position) ? CarefulSize : BufferSize), _size.Value - _position);
+                var n = await ReadInnerAsync(attempts, want, ct).ConfigureAwait(false);
                 // Shorter than it was when it was opened
                 if (n == 0) throw SourceAccess.Changed(read: true);
                 _buffer.AsMemory(0, n).CopyTo(buffer);
                 _position += n;
-                _attempts.Succeeded(_position);
+                attempts.Succeeded(_position);
                 if (_cloud) Downloaded();
                 return n;
             }
             catch (Exception ex) when (IsFailure(ex))
             {
                 Close();
-                await _attempts.FailedAsync(ex, reading ? _position : null, ct).ConfigureAwait(false);
+                await attempts.FailedAsync(ex, reading ? _position : null, ct).ConfigureAwait(false);
             }
         }
     }
@@ -461,7 +539,7 @@ public sealed class SourceStream : Stream
     private static bool IsFailure(Exception ex) => ex is (IOException and not SourceReadException) or UnauthorizedAccessException or TimeoutException;
 
     /// <summary>Into this stream's own buffer: a read that never ends is left behind with it, so Pause does not wait for a dead share.</summary>
-    private async Task<int> ReadInnerAsync(int want, CancellationToken ct)
+    private async Task<int> ReadInnerAsync(SourceAttempts attempts, int want, CancellationToken ct)
     {
         var inner = _inner!;
         var buffer = _buffer ??= new byte[BufferSize];
@@ -474,7 +552,7 @@ public sealed class SourceStream : Stream
         }, CancellationToken.None);
         try
         {
-            return _attempts.Network ? await read.WaitAsync(_access.Stall, ct).ConfigureAwait(false) : await read.WaitAsync(ct).ConfigureAwait(false);
+            return attempts.Network ? await read.WaitAsync(_access.Stall, ct).ConfigureAwait(false) : await read.WaitAsync(ct).ConfigureAwait(false);
         }
         catch
         {
@@ -487,11 +565,11 @@ public sealed class SourceStream : Stream
         }
     }
 
-    private async Task OpenAsync(CancellationToken ct)
+    private async Task OpenAsync(SourceAttempts attempts, CancellationToken ct)
     {
         if (_inner is not null) return;
-        var path = _attempts.Current;
-        var opened = await _access.CallAsync(() => _access.Files.Open(path), _attempts.Network, ct).ConfigureAwait(false);
+        var path = attempts.Current;
+        var opened = await _access.CallAsync(() => _access.Files.Open(path), attempts.Network, ct).ConfigureAwait(false);
         if ((_size is { } size && opened.Stat.Length != size) || (_modifiedMs is { } modified && opened.Stat.ModifiedMs != modified))
         {
             CloseLater(opened.Stream);

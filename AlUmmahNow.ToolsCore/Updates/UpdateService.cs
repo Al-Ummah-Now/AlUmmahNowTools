@@ -568,11 +568,7 @@ public sealed class UpdateService : IDisposable
     {
         try
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(_statePath)!);
-            // Of this process alone: another copy may save its state too
-            var temp = $"{_statePath}.{Environment.ProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture)}.tmp";
-            File.WriteAllText(temp, _core.StateJson());
-            File.Move(temp, _statePath, overwrite: true);
+            AtomicFile.Write(_statePath, _core.StateJson());
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

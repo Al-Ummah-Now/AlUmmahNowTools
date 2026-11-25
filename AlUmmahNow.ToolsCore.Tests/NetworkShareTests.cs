@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Security.Cryptography;
 using AlUmmahNow.ToolsCore.Import;
 using AlUmmahNow.ToolsCore.Import.Sources;
@@ -256,8 +257,28 @@ public class NetworkShareReadingTests
     {
         public bool Mapping = true;
         public bool OnShare = true;
-        public string? Mapped(string path) => Mapping && path.StartsWith("/y", StringComparison.Ordinal) ? "/nas" + path[2..] : null;
-        public bool IsNetwork(string path) => OnShare;
+        /// <summary>A mount whose server is gone: asked what it is, it answers only once this is set</summary>
+        public ManualResetEventSlim? Silent;
+        public int Questions;
+        private void Hold()
+        {
+            if (Silent is not { } silent) return;
+            Interlocked.Increment(ref Questions);
+            silent.Wait(TimeSpan.FromSeconds(60));
+        }
+
+        public string? Mapped(string path)
+        {
+            Hold();
+            return Resolve(path);
+        }
+
+        private string? Resolve(string path) => Mapping && path.StartsWith("/y", StringComparison.Ordinal) ? "/nas" + path[2..] : null;
+        public bool IsNetwork(string path)
+        {
+            Hold();
+            return OnShare;
+        }
     }
 
     /// <summary>One file behind every path; a read, an open or a look-up fails when told to.</summary>
@@ -325,7 +346,7 @@ public class NetworkShareReadingTests
         public Action OnDelay = () => { };
         public readonly SourceAccess Access;
 
-        public Rig(TimeSpan? stall = null)
+        public Rig(TimeSpan? stall = null, TimeSpan? answer = null)
         {
             Access = new SourceAccess(Paths, Files, Clock, (wait, ct) =>
             {
@@ -334,7 +355,7 @@ public class NetworkShareReadingTests
                 Clock.Now += wait;
                 OnDelay();
                 return Task.CompletedTask;
-            }) { Stall = stall ?? TimeSpan.FromMinutes(2) };
+            }) { Stall = stall ?? TimeSpan.FromMinutes(2), Answer = answer ?? TimeSpan.FromSeconds(20) };
         }
 
         public ScannedVideo Video => new(Chosen, Files.Bytes.Length, Files.Modified, "video/mp4", Array.Empty<CaptionFile>(), null, null, null, new ImportMetadata { FallbackTitle = "a" }, Array.Empty<ScanNote>());
@@ -507,6 +528,58 @@ public class NetworkShareReadingTests
         cts.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => read.WaitAsync(TimeSpan.FromSeconds(5)));
     }
+
+    [Fact]
+    public async Task A_mount_that_does_not_say_what_it_is_counts_as_a_share_and_holds_one_thread_only()
+    {
+        using var answers = new ManualResetEventSlim();
+        var rig = new Rig(answer: TimeSpan.FromSeconds(1));
+        rig.Paths.Silent = answers;
+        try
+        {
+            var asked = Stopwatch.StartNew();
+            // Many files on it, at once and one after another
+            Assert.All(await Task.WhenAll(Enumerable.Range(0, 20).Select(i => rig.Access.IsNetworkAsync($"/y/nas/{i}.mp4", default))), Assert.True);
+            for (var i = 0; i < 20; i++) Assert.Equal(new[] { "/y/nas/a.mp4" }, await rig.Access.CandidatesAsync("/y/nas/a.mp4", default));
+            Assert.Equal(1, rig.Paths.Questions);
+            // Read by the chosen path meanwhile
+            Assert.Equal(rig.Files.Bytes, await rig.Access.ReadAllBytesAsync("/y/nas/a.mp4", rig.Context, default));
+            Assert.Equal(new[] { "/y/nas/a.mp4" }, rig.Files.Opens);
+            Assert.InRange(asked.Elapsed, TimeSpan.Zero, TimeSpan.FromSeconds(20));
+            Assert.Equal(1, rig.Paths.Questions);
+        }
+        finally
+        {
+            answers.Set();
+        }
+        // Once it has answered it is asked again
+        rig.Paths.Silent = null;
+        await Temp.WaitUntil(() => rig.Access.Candidates("/y/nas/a.mp4").Count == 2, 20_000);
+    }
+
+    [Fact]
+    public async Task A_step_waiting_for_a_silent_mount_stops_at_once()
+    {
+        using var answers = new ManualResetEventSlim();
+        var rig = new Rig(answer: TimeSpan.FromMinutes(5));
+        rig.Paths.Silent = answers;
+        try
+        {
+            using var cts = new CancellationTokenSource();
+            var read = rig.ReadAll(cts.Token);
+            await Temp.WaitUntil(() => rig.Paths.Questions == 1, 20_000);
+            cts.Cancel();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => read.WaitAsync(TimeSpan.FromSeconds(10)));
+        }
+        finally
+        {
+            answers.Set();
+        }
+    }
+
+    [Fact]
+    public void The_systems_answer_is_waited_for_less_than_a_stopping_step_has() =>
+        Assert.True(SourceAccess.Default.Answer * 1.5 < ImportQueue.StepStopGrace);
 
     [Fact]
     public async Task A_missing_file_is_the_files_failure_only_when_its_share_answers()

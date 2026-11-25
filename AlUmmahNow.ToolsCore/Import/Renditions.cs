@@ -190,7 +190,7 @@ public sealed class FfmpegMediaTools : IMediaTools
     {
         var (_, ffprobe) = await Paths(ct).ConfigureAwait(false);
         var (code, output, error) = await RunAsync(ffprobe, new[] { "-v", "error", "-print_format", "json", "-show_streams", "-show_format", path }, null, ct).ConfigureAwait(false);
-        ThrowIfSourceStopped(path, error, code);
+        await ThrowIfSourceStoppedAsync(path, error, code, ct).ConfigureAwait(false);
         if (code != 0) throw new LocalEncodeException("probe_failed", "ffprobe could not read the file: " + LastLine(error, path));
         return ParseProbe(output);
     }
@@ -250,7 +250,7 @@ public sealed class FfmpegMediaTools : IMediaTools
             }
         }
         var (code, _, error) = await RunAsync(ffmpeg, args, OnLine, ct).ConfigureAwait(false);
-        ThrowIfSourceStopped(source, error, code);
+        await ThrowIfSourceStoppedAsync(source, error, code, ct).ConfigureAwait(false);
         if (code != 0) throw new LocalEncodeException("ffmpeg_failed", $"ffmpeg stopped ({encoder}): " + LastLine(error, source));
     }
 
@@ -316,9 +316,9 @@ public sealed class FfmpegMediaTools : IMediaTools
     internal static bool SourceStopped(string source, string error, bool network) => error.Split('\n').Any(line =>
         (Reading.IsMatch(line) || line.Contains(source + ":", StringComparison.Ordinal)) && (ReadError.IsMatch(line) || (network && NetworkReadError.IsMatch(line))));
 
-    private static void ThrowIfSourceStopped(string source, string error, int code)
+    private static async Task ThrowIfSourceStoppedAsync(string source, string error, int code, CancellationToken ct)
     {
-        var network = SourceAccess.Default.IsNetwork(source);
+        var network = await SourceAccess.Default.IsNetworkAsync(source, ct).ConfigureAwait(false);
         // On a local disk only a run that failed is one that could not read
         if ((network || code != 0) && SourceStopped(source, error, network))
         {
@@ -342,7 +342,7 @@ public sealed class FfmpegMediaTools : IMediaTools
         {
             try { File.Delete(wavPath); } catch (IOException) { } catch (UnauthorizedAccessException) { }
         }
-        ThrowIfSourceStopped(source, error, code);
+        await ThrowIfSourceStoppedAsync(source, error, code, ct).ConfigureAwait(false);
         if (code == 0) return;
         // "-map 0:a:0" matches nothing in a file without sound
         throw new LocalEncodeException(error.Contains("matches no streams", StringComparison.Ordinal) ? "no_audio" : "ffmpeg_failed", "ffmpeg could not read the file's sound: " + LastLine(error, source));
