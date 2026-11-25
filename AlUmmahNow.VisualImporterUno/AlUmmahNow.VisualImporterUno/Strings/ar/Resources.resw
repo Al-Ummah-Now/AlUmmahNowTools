@@ -3747,4 +3747,34 @@
   <data name="Update_SettingsCheckFailed" xml:space="preserve">
     <value>تعذّر البحث عن تحديثات. حاول مرة أخرى لاحقًا.</value>
   </data>
+  <data name="Quit_Title" xml:space="preserve">
+    <value>عمليات الاستيراد ما زالت جارية</value>
+  </data>
+  <data name="Quit_Files_Zero" xml:space="preserve">
+    <value>لا مرئيات قيد الاستيراد.</value>
+  </data>
+  <data name="Quit_Files_One" xml:space="preserve">
+    <value>ما زال مرئي واحد قيد الاستيراد.</value>
+  </data>
+  <data name="Quit_Files_Two" xml:space="preserve">
+    <value>ما زال مرئيان قيد الاستيراد.</value>
+  </data>
+  <data name="Quit_Files_Few" xml:space="preserve">
+    <value>ما زالت {0} مرئيات قيد الاستيراد.</value>
+  </data>
+  <data name="Quit_Files_Many" xml:space="preserve">
+    <value>ما زال {0} مرئيًا قيد الاستيراد.</value>
+  </data>
+  <data name="Quit_Files_Other" xml:space="preserve">
+    <value>ما زال {0} مرئي قيد الاستيراد.</value>
+  </data>
+  <data name="Quit_Resume" xml:space="preserve">
+    <value>إذا خرجت فستتوقف هنا، وتكمل من حيث توقفت عند فتح التطبيق في المرة القادمة.</value>
+  </data>
+  <data name="Quit_Confirm" xml:space="preserve">
+    <value>اخرج وأوقف العمل</value>
+  </data>
+  <data name="Quit_Keep" xml:space="preserve">
+    <value>أبقِ العمل جاريًا</value>
+  </data>
 </root>

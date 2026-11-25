@@ -193,6 +193,25 @@ public sealed class ImportWorkspace : IDisposable
         Queue.Dispose();
         _ = Reporter.FlushAsync().ContinueWith(_ => Reporter.Dispose(), TaskScheduler.Default);
     }
+
+    /// <summary>Files being imported now (running, queued, waiting to try again), for the quit question (Tools #78).</summary>
+    public static int ActiveFiles => IfStarted is { } workspace ? QuitGuard.ActiveFiles(workspace.Queue.Items) : 0;
+
+    /// <summary>
+    /// Stops the queue for good: running steps stop (ffmpeg and the other child processes with them), the queue is saved so
+    /// every file carries on from where it was at the next start, and the error reports waiting are sent (a few seconds at most).
+    /// </summary>
+    public static async Task StopForQuitAsync()
+    {
+        ImportWorkspace? workspace;
+        lock (Gate) workspace = _current;
+        if (workspace is null) return;
+        workspace._disposed = true;
+        await workspace.Queue.StopAsync().ConfigureAwait(false);
+        try { await workspace.Reporter.FlushAsync().WaitAsync(TimeSpan.FromSeconds(3)).ConfigureAwait(false); }
+        catch (Exception ex) when (ex is TimeoutException or OperationCanceledException) { }
+        workspace.Reporter.Dispose();
+    }
 }
 
 /// <summary>The import's demo data for screenshots (<c>TOOLS_DEMO=1</c>; <c>TOOLS_DEMO_IMPORT=empty</c> for a fresh page, 

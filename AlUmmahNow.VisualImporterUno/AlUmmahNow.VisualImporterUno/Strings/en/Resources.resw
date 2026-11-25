@@ -3402,4 +3402,22 @@
   <data name="Update_SettingsCheckFailed" xml:space="preserve">
     <value>Couldn't check for updates. Try again later.</value>
   </data>
+  <data name="Quit_Title" xml:space="preserve">
+    <value>Imports are still running</value>
+  </data>
+  <data name="Quit_Files_One" xml:space="preserve">
+    <value>1 video is still being imported.</value>
+  </data>
+  <data name="Quit_Files_Other" xml:space="preserve">
+    <value>{0} videos are still being imported.</value>
+  </data>
+  <data name="Quit_Resume" xml:space="preserve">
+    <value>If you quit, they stop here and carry on from where they stopped the next time you open the app.</value>
+  </data>
+  <data name="Quit_Confirm" xml:space="preserve">
+    <value>Quit and stop</value>
+  </data>
+  <data name="Quit_Keep" xml:space="preserve">
+    <value>Keep running</value>
+  </data>
 </root>

@@ -25,7 +25,7 @@ public sealed partial class ForcedUpdateView : UserControl
         _update.Style = (Style)Application.Current.Resources["ToolsPrimaryButton"];
         _quit.Style = (Style)Application.Current.Resources["ToolsSecondaryButton"];
         _quit.Content = Loc.Get("Update_Quit");
-        _quit.Click += (_, _) => Application.Current.Exit();
+        _quit.Click += (_, _) => _ = AppQuit.RequestQuitAsync("forced update screen");
         _update.Click += async (_, _) =>
         {
             if (_service.View.Stage == UpdateStage.Ready)

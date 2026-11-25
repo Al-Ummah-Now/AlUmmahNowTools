@@ -22,6 +22,11 @@ public class Program
             .Build();
 
         host.Run();
+        // Run returns once the last window is gone and the quit has stopped and saved the work (Shell/AppQuit.cs). Uno's own
+        // event-loop threads are not background threads, so on Windows and Linux they would keep the process alive with no window
+        // (the launch check measured it): the process ends here, as Main returns
+        Serilog.Log.Information("[Quit] The host stopped; ending the process");
+        Environment.Exit(0);
     }
 }
 #endif
