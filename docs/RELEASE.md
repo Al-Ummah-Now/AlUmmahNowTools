@@ -102,4 +102,4 @@ AUN-APP-UPDATES). Operating-system code signing is separate and optional.
 `.github/workflows/review-frames.yml` (Run workflow, or `gh workflow run review-frames.yml --ref <branch> -f states='…'`) builds the app
 on a macOS runner and renders its own window to a PNG for each state, language and theme, so a UI change can be reviewed without a
 local build. Each line of `states` is `name: VAR=value VAR=value`, the variables being the demo switches (`TOOLS_DEMO_PAGE=import`,
-`TOOLS_DEMO_IMPORT=paused`, `TOOLS_SCREENSHOT_QUIT=1`, …). The PNGs are the `review-frames` artifact.
+`TOOLS_DEMO_IMPORT=paused`, …). The run sets `TOOLS_DEMO`, `TOOLS_DEMO_LANG`, `TOOLS_DEMO_THEME`, `TOOLS_DEMO_UPDATE=none` (so the app never asks a server for updates) and the screenshot switches itself; a state cannot change them, except that it may give `TOOLS_DEMO_UPDATE` another value to show an update screen. The PNGs are the `review-frames` artifact.
