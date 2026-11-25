@@ -2341,7 +2341,7 @@
     <value>الملف ليس مرئيًا كاملًا، وربما انقطع نسخه. يلزم نسخه مجددًا، ثم البحث في المجلد مجددًا.</value>
   </data>
   <data name="ImportError_content_changed" xml:space="preserve">
-    <value>ما قُرئ للرفع يختلف عما فُحص من قبل، فأُوقف الرفع. يمكن إعادة المحاولة، وإن تكرر ذلك يلزم نسخ الملف مجددًا، ثم البحث في المجلد مجددًا.</value>
+    <value>قُرئ الملف للرفع على غير ما كان عند فحصه، فأُوقف الرفع. يمكن إعادة المحاولة، وإن تكرر ذلك يلزم نسخ الملف مجددًا، ثم البحث في المجلد مجددًا.</value>
   </data>
   <data name="ImportError_upload_left" xml:space="preserve">
     <value>ما زال الرفع الموقوف قيد الإزالة من الخادم.</value>
@@ -2392,7 +2392,7 @@
     <value>يُستأنف الفحص من البايت {0}</value>
   </data>
   <data name="ImportLog_sent_check" xml:space="preserve">
-    <value>أُرسلت أول {0} بايت من قبل، ويُعاد فحصها</value>
+    <value>أُرسل {0} من قبل، ويُعاد فحصه</value>
   </data>
   <data name="ImportLog_video_unchecked" xml:space="preserve">
     <value>لم يُفحص وجود مرئي في الملف، لأن ffprobe غير موجود على هذا الجهاز</value>
