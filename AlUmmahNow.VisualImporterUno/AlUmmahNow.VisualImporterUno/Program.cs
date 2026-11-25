@@ -12,6 +12,8 @@ public class Program
         // Velopack's install, update and uninstall hooks run first and may exit (wiki AUN-APP-UPDATES §5.2)
         // and never install a package by themselves: UpdateService checks its signature and hash again first
         Velopack.VelopackApp.Build().SetAutoApplyOnStartup(false).Run();
+        // One copy per queue folder (Tools #89): the copy that is open came forward, and this one ends
+        if (!Shell.AppInstance.Start()) return;
         var host = UnoPlatformHostBuilder.Create()
             // One app for the three desktops (wiki TOOLS-ADMIN): AppKit on macOS, Win32 on Windows, X11 on Linux
             .UseMacOS()

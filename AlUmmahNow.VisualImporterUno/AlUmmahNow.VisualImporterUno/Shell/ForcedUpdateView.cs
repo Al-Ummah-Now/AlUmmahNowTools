@@ -30,7 +30,11 @@ public sealed partial class ForcedUpdateView : UserControl
         {
             if (_service.View.Stage == UpdateStage.Ready)
             {
-                await _service.RestartNowAsync();
+                if (!await _service.RestartNowAsync() && _service.View.Stage == UpdateStage.Ready)
+                {
+                    _message.Text = Loc.Get(_service.OtherCopyRunning ? "Update_ReadyOtherCopy" : "Update_ReadyBusy");
+                    _message.Visibility = Visibility.Visible;
+                }
                 return;
             }
             var url = await _service.UpdateNowAsync();

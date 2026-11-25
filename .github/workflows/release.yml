@@ -35,6 +35,8 @@ on:
       - scripts/mac-bundle.sh
       - scripts/smoke-close.sh
       - scripts/smoke-close.ps1
+      - scripts/smoke-second.sh
+      - scripts/smoke-second.ps1
   workflow_dispatch:
 concurrency:
   group: release-${{ github.ref }}
@@ -219,6 +221,8 @@ jobs:
           Write-Output "smoke launch passed: $((Get-Item $png).Length) byte screenshot"
           # Closing the app quits it, and nothing it started stays behind (Tools #78)
           foreach ($mode in 'close', 'quit') { .\scripts\smoke-close.ps1 -Exe $exe -Mode $mode -Seconds 8 }
+          # A second copy hands over to the one that is open (Tools #89)
+          .\scripts\smoke-second.ps1 -Exe $exe -Seconds 20
           $p = Start-Process msiexec -ArgumentList "/x `"$msi`" /qn" -Wait -PassThru
           if ($p.ExitCode -ne 0) { throw "uninstall failed: $($p.ExitCode)" }
           if (Test-Path $exe) { throw "uninstall left the app behind" }
@@ -355,6 +359,8 @@ jobs:
           for mode in close quit terminate; do
             scripts/smoke-close.sh "$mode" 8 "$APP_BUNDLE/Contents/MacOS/$exe"
           done
+          # A second copy hands over to the one that is open (Tools #89)
+          scripts/smoke-second.sh 20 "$APP_BUNDLE/Contents/MacOS/$exe"
       - name: Disk image
         env:
           IDENTITY: ${{ steps.keychain.outputs.identity }}
@@ -438,6 +444,8 @@ jobs:
           for mode in close quit; do
             scripts/smoke-close.sh "$mode" 8 xvfb-run -a -s "-screen 0 1280x800x24" /usr/bin/alummahnow-tools
           done
+          # A second copy hands over to the one that is open (Tools #89)
+          scripts/smoke-second.sh 20 xvfb-run -a -s "-screen 0 1280x800x24" /usr/bin/alummahnow-tools
           sudo dpkg --remove alummahnow-tools
           test ! -e /usr/bin/alummahnow-tools
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

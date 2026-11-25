@@ -81,7 +81,7 @@ public sealed partial class UpdateBar : UserControl
         {
             UpdateStage.Available => (Loc.Format("Update_Available", version), v.DownloadOnly ? Loc.Get("Update_Download") : Loc.Get("Update_Update")),
             UpdateStage.Downloading => (Loc.Format("Update_Downloading", Loc.Percent((v.Progress ?? 0) * 100)), null),
-            UpdateStage.Ready => (_busy() ? Loc.Get("Update_ReadyBusy") : Loc.Get("Update_Ready"), Loc.Get("Update_RestartNow")),
+            UpdateStage.Ready => (Loc.Get(_busy() ? "Update_ReadyBusy" : _service.OtherCopyRunning ? "Update_ReadyOtherCopy" : "Update_Ready"), Loc.Get("Update_RestartNow")),
             UpdateStage.RequiredSoon => (Loc.Get("Update_RequiredSoon"), null),
             _ => (string.Empty, null),
         };
@@ -92,7 +92,8 @@ public sealed partial class UpdateBar : UserControl
         _progress.Value = (v.Progress ?? 0) * 100;
         _whatsNew.Visibility = (Loc.IsArabic ? v.NotesAr : v.NotesEn) is { Length: > 0 } && v.Stage != UpdateStage.Downloading ? Visibility.Visible : Visibility.Collapsed;
         _close.Visibility = v.CanClose ? Visibility.Visible : Visibility.Collapsed;
-        var key = $"{v.Stage}:{v.Version}";
+        // Ready is said again when its words change (another copy is open)
+        var key = v.Stage == UpdateStage.Ready ? $"{v.Stage}:{v.Version}:{_text.Text}" : $"{v.Stage}:{v.Version}";
         if (_announced != key)
         {
             _announced = key;
@@ -105,7 +106,8 @@ public sealed partial class UpdateBar : UserControl
         var v = _service.View;
         if (v.Stage == UpdateStage.Ready)
         {
-            await _service.RestartNowAsync();
+            // Refused: the bar says why (another copy is open, or work started meanwhile)
+            if (!await _service.RestartNowAsync()) Render(_service.View);
             return;
         }
         var url = await _service.UpdateNowAsync();

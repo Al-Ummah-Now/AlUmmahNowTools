@@ -975,7 +975,8 @@ public sealed class ImportQueue : IDisposable
         // Pause all ends with the last file it paused (resumed, finished or removed)
         _allPaused = HeldLocked;
         Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
-        var temp = _path + ".tmp";
+        // Of this process alone: another one's save must never take it away (Tools #89)
+        var temp = $"{_path}.{Environment.ProcessId.ToString(CultureInfo.InvariantCulture)}.tmp";
         File.WriteAllText(temp, JsonSerializer.Serialize(new Saved(_settings, _items, _allPaused), Json));
         File.Move(temp, _path, overwrite: true);
     }
