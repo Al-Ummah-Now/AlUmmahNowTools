@@ -4,14 +4,19 @@
  * local server, checks its signature and hash, installs it as it closes, and starts as N+1. Keys are made for the run.
  *
  *   update-test.mjs --exe <installed app> --package <N+1 nupkg> --platform windows|macos --arch x64|arm64
- *                   --from <version N> --to <version N+1> [--case ok|tampered|bad-signature|foreign-host]
+ *                   --from <version N> --to <version N+1> --packages <Velopack's package folder> --package-name <its file name there>
+ *                   [--case ok|tampered|bad-signature|foreign-host|planted|swapped|yanked]
  *
- * `ok` must end on N+1. The others must stay on N, install nothing and report the right reason.
+ * `ok` must end on N+1. Every other case must stay on N through a second start:
+ *  - tampered, bad-signature, foreign-host: the download is refused and the reason reported;
+ *  - planted: a good N+1 package is already in the package folder, but this run verified none;
+ *  - swapped: the staged file is replaced (same size) before the app closes;
+ *  - yanked: after staging, a newer key list yanks N+1; the app learns it on a check and then closes.
  */
 import { createHash } from 'node:crypto';
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
-import { mkdtempSync, readFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { generateKey, signBytes, buildKeyList } from './app-release.mjs';
@@ -28,7 +33,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const lines = () => (existsSync(log) ? readFileSync(log, 'utf8').trim().split('\n') : []);
 
 const [root, release, stranger] = [await generateKey(), await generateKey(), await generateKey()];
-const list = Buffer.from(JSON.stringify(await buildKeyList({ repo: REPO, serial: Math.floor(Date.now() / 1000), keys: [release.publicKey] })));
+const serial = Math.floor(Date.now() / 1000);
+const list = Buffer.from(JSON.stringify(await buildKeyList({ repo: REPO, serial, keys: [release.publicKey] })));
+const yankedList = Buffer.from(JSON.stringify(await buildKeyList({ repo: REPO, serial: serial + 1, keys: [release.publicKey], yanked: [a.to] })));
+const stagedFile = join(a.packages, a['package-name']);
 const pkg = readFileSync(a.package);
 const manifest = Buffer.from(
 	JSON.stringify({
@@ -46,11 +54,12 @@ const manifest = Buffer.from(
 );
 const served = Buffer.from(pkg);
 if (kase === 'tampered') served[served.length >> 1] ^= 1;
-const sig = await signBytes(manifest, [kase === 'bad-signature' ? stranger.privateKey : release.privateKey]);
+const sig = await signBytes(manifest, [kase === 'bad-signature' || kase === 'planted' ? stranger.privateKey : release.privateKey]);
 const asset = kase === 'foreign-host' ? 'https://downloads.example.com/update.nupkg' : 'https://release-assets.githubusercontent.com/update.nupkg';
-const config = JSON.stringify({
-	update: { enabled: true, status: 'recommended', minimumVersion: '0.0.0', latestVersion: a.to, storeUrl: null, channel: 'stable', publishedAt: null, notes: null, message: null, action: 'install', url: null, manifestUrl: `${base}app-release.json`, tag, signed: true, available: true, checkHours: 6, keys: { list: list.toString(), sig: await signBytes(list, [root.privateKey]) } },
+const configWith = async (keys) => JSON.stringify({
+	update: { enabled: true, status: 'recommended', minimumVersion: '0.0.0', latestVersion: a.to, storeUrl: null, channel: 'stable', publishedAt: null, notes: null, message: null, action: 'install', url: null, manifestUrl: `${base}app-release.json`, tag, signed: true, available: true, checkHours: 6, keys: { list: keys.toString(), sig: await signBytes(keys, [root.privateKey]) } },
 });
+let config = await configWith(list);
 const calls = [];
 let reported = null;
 const server = createServer((req, res) => {
@@ -73,7 +82,11 @@ const server = createServer((req, res) => {
 	res.end();
 });
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
-const env = { ...process.env, TOOLS_DEMO: '1', TOOLS_DEMO_LANG: 'en', TOOLS_UPDATE_TEST_ROOT: root.publicKey, TOOLS_UPDATE_TEST_SERVER: `http://127.0.0.1:${server.address().port}`, TOOLS_UPDATE_TEST_LOG: log };
+const env = { ...process.env, TOOLS_DEMO: '1', TOOLS_DEMO_LANG: 'en', TOOLS_UPDATE_TEST_ROOT: root.publicKey, TOOLS_UPDATE_TEST_SERVER: `http://127.0.0.1:${server.address().port}`, TOOLS_UPDATE_TEST_LOG: log, ...(kase === 'swapped' || kase === 'yanked' ? { TOOLS_UPDATE_TEST_EXIT_MS: '8000' } : {}), ...(kase === 'yanked' ? { TOOLS_UPDATE_TEST_RECHECK: '1' } : {}) };
+if (kase === 'planted') {
+	mkdirSync(a.packages, { recursive: true });
+	writeFileSync(stagedFile, pkg);
+}
 const start = () => spawn(a.exe, [], { env, stdio: 'inherit' });
 const exited = (p) => new Promise((r) => (p.exitCode !== null ? r() : p.once('exit', r)));
 async function until(what, ms, test) {
@@ -84,6 +97,15 @@ async function until(what, ms, test) {
 	}
 	console.error(`timed out: ${what}\nlog:\n${lines().join('\n')}\ncalls:\n${calls.join('\n')}\nreported: ${JSON.stringify(reported)}`);
 	return false;
+}
+/** Through the updater's time and another start, the app is still N */
+async function unchanged() {
+	await sleep(10_000);
+	const before = lines().length;
+	const second = start();
+	if (!(await until('the app starts again', 60_000, () => lines().slice(before).some((l) => l.startsWith('started '))))) fail('did not start again');
+	second.kill();
+	if (lines().slice(before).find((l) => l.startsWith('started ')) !== `started ${a.from} self=true`) fail('the version changed');
 }
 function fail(why) {
 	console.error(`::error::update test (${kase}): ${why}\nlog:\n${lines().join('\n')}\ncalls:\n${calls.join('\n')}\nreported: ${JSON.stringify(reported)}`);
@@ -104,8 +126,20 @@ if (kase === 'ok') {
 	const started = lines().slice(before).find((l) => l.startsWith('started '));
 	if (started !== `started ${a.to} self=true`) fail(`after the update: ${started}`);
 	if (reported) fail('a good update was reported as failed');
+} else if (kase === 'swapped' || kase === 'yanked') {
+	if (!(await until('the update is staged', 180_000, () => lines().some((l) => l === `Ready ${a.to}`)))) fail('never staged');
+	if (kase === 'swapped') {
+		if (!existsSync(stagedFile)) fail(`nothing staged at ${stagedFile}`);
+		const other = Buffer.from(pkg);
+		other[other.length >> 1] ^= 1;
+		writeFileSync(stagedFile, other);
+	} else config = await configWith(yankedList);
+	await exited(first);
+	if (kase === 'yanked' && !lines().includes('rechecked Hidden')) fail('the yank did not cancel the staged update');
+	if (kase === 'yanked' && reported?.reason !== 'yanked') fail(`reported ${reported?.reason}, expected yanked`);
+	await unchanged();
 } else {
-	const reason = { tampered: 'hash', 'bad-signature': 'unknown_key', 'foreign-host': 'host' }[kase];
+	const reason = { tampered: 'hash', 'bad-signature': 'unknown_key', planted: 'unknown_key', 'foreign-host': 'host' }[kase];
 	if (!(await until('the refusal is reported', 180_000, () => reported !== null))) fail('not reported');
 	await sleep(3_000);
 	first.kill();
@@ -113,12 +147,7 @@ if (kase === 'ok') {
 	if (reported.reason !== reason) fail(`reported ${reported.reason}, expected ${reason}`);
 	if (lines().some((l) => l.startsWith('Ready'))) fail('staged a refused update');
 	if (kase === 'foreign-host' && calls.some((c) => c.startsWith('/downloads.example.com'))) fail('asked the foreign host');
-	await sleep(10_000);
-	const before = lines().length;
-	const second = start();
-	if (!(await until('the app starts again', 60_000, () => lines().slice(before).some((l) => l.startsWith('started '))))) fail('did not start again');
-	second.kill();
-	if (lines().slice(before).find((l) => l.startsWith('started ')) !== `started ${a.from} self=true`) fail('the version changed');
+	await unchanged();
 }
 console.log(`update test (${kase}) passed:\n${lines().join('\n')}`);
 server.close();

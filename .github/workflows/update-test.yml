@@ -49,11 +49,11 @@ jobs:
           test -f "$LOCALAPPDATA/AlUmmahNow.Tools/current/AlUmmahNow.VisualImporterUno.exe"
       - name: Refused updates change nothing
         run: |
-          for c in tampered bad-signature foreign-host; do
-            node scripts/update-test.mjs --exe "$LOCALAPPDATA/AlUmmahNow.Tools/current/AlUmmahNow.VisualImporterUno.exe" --package keep/2/*-full.nupkg --platform windows --arch x64 --from 2026.01.01 --to 2026.01.02 --case $c
+          for c in tampered bad-signature foreign-host planted swapped yanked; do
+            node scripts/update-test.mjs --exe "$LOCALAPPDATA/AlUmmahNow.Tools/current/AlUmmahNow.VisualImporterUno.exe" --package keep/2/*-full.nupkg --packages "$LOCALAPPDATA/AlUmmahNow.Tools/packages" --package-name AlUmmahNow.Tools-2026.1.201-full.nupkg --platform windows --arch x64 --from 2026.01.01 --to 2026.01.02 --case $c
           done
       - name: 2026.01.01 becomes 2026.01.02
-        run: node scripts/update-test.mjs --exe "$LOCALAPPDATA/AlUmmahNow.Tools/current/AlUmmahNow.VisualImporterUno.exe" --package keep/2/*-full.nupkg --platform windows --arch x64 --from 2026.01.01 --to 2026.01.02
+        run: node scripts/update-test.mjs --exe "$LOCALAPPDATA/AlUmmahNow.Tools/current/AlUmmahNow.VisualImporterUno.exe" --package keep/2/*-full.nupkg --packages "$LOCALAPPDATA/AlUmmahNow.Tools/packages" --package-name AlUmmahNow.Tools-2026.1.201-full.nupkg --platform windows --arch x64 --from 2026.01.01 --to 2026.01.02
 
   macos:
     runs-on: macos-15
@@ -83,12 +83,12 @@ jobs:
           echo "EXE=$app/Contents/MacOS/$(/usr/libexec/PlistBuddy -c 'Print CFBundleExecutable' "$app/Contents/Info.plist")" >> "$GITHUB_ENV"
       - name: Refused updates change nothing
         run: |
-          for c in tampered bad-signature foreign-host; do
-            node scripts/update-test.mjs --exe "$EXE" --package keep/2/*-full.nupkg --platform macos --arch arm64 --from 2026.01.01 --to 2026.01.02 --case $c
+          for c in tampered bad-signature foreign-host planted swapped yanked; do
+            node scripts/update-test.mjs --exe "$EXE" --package keep/2/*-full.nupkg --packages "$HOME/Library/Caches/velopack/AlUmmahNow.Tools/packages" --package-name AlUmmahNow.Tools-2026.1.201-full.nupkg --platform macos --arch arm64 --from 2026.01.01 --to 2026.01.02 --case $c
           done
       - name: 2026.01.01 becomes 2026.01.02
         run: |
-          node scripts/update-test.mjs --exe "$EXE" --package keep/2/*-full.nupkg --platform macos --arch arm64 --from 2026.01.01 --to 2026.01.02
+          node scripts/update-test.mjs --exe "$EXE" --package keep/2/*-full.nupkg --packages "$HOME/Library/Caches/velopack/AlUmmahNow.Tools/packages" --package-name AlUmmahNow.Tools-2026.1.201-full.nupkg --platform macos --arch arm64 --from 2026.01.01 --to 2026.01.02
           codesign --verify --deep --strict "${EXE%/Contents/MacOS/*}"
       - name: Velopack log
         if: always()
