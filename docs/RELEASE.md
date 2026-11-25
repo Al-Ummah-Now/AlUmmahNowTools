@@ -106,6 +106,14 @@ AUN-APP-UPDATES). Operating-system code signing is separate and optional.
   (`-p:UpdateTest=true`) are the only ones that take their key and server from the environment; `release.yml`
   never sets it and refuses a build that has them (`scripts/no-test-hooks.mjs`).
 
+## Real update test
+
+`.github/workflows/real-update.yml` installs a **published** release on throwaway Windows and macOS runners and lets it update itself
+to a newer published one, with the real server answer (QA's `appUpdates` must be on), download, signature and updater. Run it after a
+release, once QA offers it: `gh workflow run real-update.yml -f from=2026.11.25 -f to=2026.11.25.2`. It checks that the new version
+is installed and starts, that the macOS signature still holds, and that the import queue is untouched. Production names lead nowhere on
+the runner.
+
 ## Review frames
 
 `.github/workflows/review-frames.yml` (Run workflow, or `gh workflow run review-frames.yml --ref <branch> -f states='…'`) builds the app
