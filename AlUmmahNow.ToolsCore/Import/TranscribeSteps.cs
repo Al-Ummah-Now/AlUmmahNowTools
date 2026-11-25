@@ -176,7 +176,7 @@ public sealed class TranscribeStep : IImportStep
             var device = _transcriber.Device;
             var where = device is null ? "" : device.Name.Length > 0 ? $"{device.Name} ({device.Backend})" : device.Backend;
             var json = await _transcriber.TranscribeAsync(modelPath, source, item.SpokenLanguage, new Progress<double>(p => context.Progress(offset + p * share)), ct).ConfigureAwait(false);
-            DeleteFile(wav);
+            WorkFiles.DeleteFile(wav, _workRoot, item.Id, ".wav");
 
             var transcript = TranscriptUpload.From(CoreTranscript.Parse(json), index);
             if (transcript.Segments.Count == 0)
@@ -204,15 +204,15 @@ public sealed class TranscribeStep : IImportStep
         }
         catch (Exception ex) when (ex is OperationCanceledException || ct.IsCancellationRequested)
         {
-            DeleteFile(wav);
-            if (item.Transcript is null) DeleteFile(upload);
+            WorkFiles.DeleteFile(wav, _workRoot, item.Id, ".wav");
+            if (item.Transcript is null) WorkFiles.DeleteFile(upload, _workRoot, item.Id, ".json");
             throw;
         }
         catch (Exception ex) when (ex is TranscribeException or LocalEncodeException or IOException or UnauthorizedAccessException or JsonException)
         {
             // Not the file's failure: it is imported without a transcript
-            DeleteFile(wav);
-            DeleteFile(upload);
+            WorkFiles.DeleteFile(wav, _workRoot, item.Id, ".wav");
+            WorkFiles.DeleteFile(upload, _workRoot, item.Id, ".json");
             item.Transcript = null;
             context.Save();
             var code = ex switch
@@ -244,7 +244,7 @@ public sealed class TranscribeStep : IImportStep
         catch (ImportApiException ex) when (ex.Code == "invalid_transcript")
         {
             // The server refused what the app made: reported, and the file finishes without a transcript
-            DeleteFile(state.Path);
+            WorkFiles.DeleteFile(state.Path, _workRoot, item.Id, ".json");
             item.Transcript = null;
             context.Save();
             context.Log(LogLevel.Warning, "transcript_refused", $"The server refused the transcript: {ex.Message}. The file is imported without one", ex.Message);
@@ -253,24 +253,12 @@ public sealed class TranscribeStep : IImportStep
         }
         state.Sent = true;
         state.SentAt = _time.GetUtcNow();
-        DeleteFile(state.Path);
+        WorkFiles.DeleteFile(state.Path, _workRoot, item.Id, ".json");
         context.Save();
         return StepResult.Done;
     }
 
     private static string Num(int n) => n.ToString(CultureInfo.InvariantCulture);
-
-    private static void DeleteFile(string path)
-    {
-        try
-        {
-            if (File.Exists(path)) File.Delete(path);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            // Left for the next run's cleanup
-        }
-    }
 }
 
 /// <summary>

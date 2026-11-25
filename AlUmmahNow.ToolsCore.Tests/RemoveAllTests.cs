@@ -86,11 +86,12 @@ public class RemoveAllTests
     {
         var dir = Temp.Folder();
         var video = Temp.Bytes(dir, "mine.mp4", 100);
-        var renditions = Path.Combine(dir, "renditions", "x");
-        Temp.Write(renditions, Path.Combine("360p", "index.m3u8"), "#EXTM3U");
-        var transcript = Temp.Write(dir, "x.json", "{}");
-        using var queue = new ImportQueue(Path.Combine(dir, "queue.json"), ImportQueueTests.All());
         var item = Item("mine.mp4");
+        var work = Work(dir);
+        var renditions = Path.Combine(work.Renditions, item.Id);
+        Temp.Write(renditions, Path.Combine("360p", "index.m3u8"), "#EXTM3U");
+        var transcript = Temp.Write(work.Transcripts, item.Id + ".json", "{}");
+        using var queue = new ImportQueue(Path.Combine(dir, "queue.json"), ImportQueueTests.All(), work: work);
         item.Video = item.Video with { Path = video };
         item.Renditions = new RenditionSet { Directory = renditions };
         item.Transcript = new TranscriptState { Path = transcript };
@@ -106,7 +107,9 @@ public class RemoveAllTests
     public async Task A_running_step_stops_before_its_files_go()
     {
         var dir = Temp.Folder();
-        var renditions = Path.Combine(dir, "renditions");
+        var work = Work(dir);
+        var added = Item("a.mp4");
+        var renditions = Path.Combine(work.Renditions, added.Id);
         Temp.Write(renditions, "index.m3u8", "#EXTM3U");
         var stopping = new TaskCompletionSource();
         var upload = new ScriptedStep(ImportStepKind.Upload, async (item, _, ct) =>
@@ -116,8 +119,8 @@ public class RemoveAllTests
             finally { await stopping.Task; }
             return StepResult.Done;
         });
-        using var queue = new ImportQueue(Path.Combine(dir, "queue.json"), ImportQueueTests.All(upload));
-        queue.Add(new[] { Item("a.mp4") });
+        using var queue = new ImportQueue(Path.Combine(dir, "queue.json"), ImportQueueTests.All(upload), work: work);
+        queue.Add(new[] { added });
         await Until(queue, () => upload.Running == 1);
         queue.RemoveAll();
         Assert.Empty(queue.Items);
@@ -125,6 +128,138 @@ public class RemoveAllTests
         Assert.True(Directory.Exists(renditions));
         stopping.SetResult();
         await Temp.WaitUntil(() => !Directory.Exists(renditions));
+    }
+
+    /// <summary>A directory link: a junction on Windows (no rights needed), a symbolic link elsewhere.</summary>
+    private static void Link(string link, string target)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            Directory.CreateSymbolicLink(link, target);
+            return;
+        }
+        using var p = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("cmd.exe", $"/c mklink /J \"{link}\" \"{target}\"") { RedirectStandardOutput = true, UseShellExecute = false })!;
+        p.WaitForExit();
+        Assert.Equal(0, p.ExitCode);
+    }
+
+    private static WorkFolders Work(string dir) => new(Path.Combine(dir, "app", "renditions"), Path.Combine(dir, "app", "transcripts"));
+
+    /// <summary>Paths a damaged or edited queue file may hold: nothing but the app's own work for that very file is deleted.</summary>
+    [Theory]
+    [InlineData("videos")]
+    [InlineData("parent")]
+    [InlineData("dots")]
+    [InlineData("root")]
+    [InlineData("app")]
+    [InlineData("relative")]
+    [InlineData("other-name")]
+    [InlineData("inside")]
+    [InlineData("another-files")]
+    [InlineData("link")]
+    [InlineData("linked-root")]
+    [InlineData("linked-app")]
+    [InlineData("id")]
+    public async Task A_hostile_path_in_the_saved_queue_deletes_nothing(string attack)
+    {
+        var dir = Temp.Folder();
+        var videos = Path.Combine(dir, "videos");
+        var video = Temp.Bytes(Temp.Folder(videos), "mine.mp4", 100);
+        var sidecar = Temp.Write(videos, "mine.ar.srt", "1");
+        var work = Work(dir);
+        var item = Item("mine.mp4");
+        item.Video = item.Video with { Path = video };
+        var name = item.Id;
+        var bystander = Temp.Write(Path.Combine(work.Renditions, "0123456789abcdef0123456789abcdef"), "index.m3u8", "x");
+        Temp.Write(work.Transcripts, "0123456789abcdef0123456789abcdef.json", "{}");
+        var kept = new List<string> { video, sidecar, bystander };
+        string folder, file;
+        switch (attack)
+        {
+            case "videos": (folder, file) = (videos, video); break;
+            case "parent": (folder, file) = (dir, sidecar); break;
+            case "dots":
+                (folder, file) = (Path.Combine(work.Renditions, "..", "..", "videos"), Path.Combine(work.Transcripts, "..", "..", "videos", "mine.mp4"));
+                break;
+            case "root": (folder, file) = (work.Renditions, work.Transcripts); break;
+            case "app": (folder, file) = (Path.Combine(dir, "app"), Path.Combine(dir, "app")); break;
+            case "relative": (folder, file) = (name, name + ".json"); break;
+            case "other-name":
+                folder = Path.GetDirectoryName(kept[^1])!;
+                file = Temp.Write(work.Transcripts, "notes.json", "{}");
+                kept.Add(file);
+                break;
+            case "inside":
+                kept.Add(Temp.Write(Path.Combine(work.Renditions, name, "360p"), "index.m3u8", "x"));
+                folder = Path.Combine(work.Renditions, name, "360p");
+                file = kept[^1];
+                break;
+            case "another-files":
+                folder = Path.GetDirectoryName(bystander)!;
+                file = Path.Combine(work.Transcripts, "0123456789abcdef0123456789abcdef.json");
+                kept.Add(file);
+                break;
+            case "link":
+                // root/id is a link to the person's folder
+                Link(Path.Combine(work.Renditions, name), videos);
+                (folder, file) = (Path.Combine(work.Renditions, name), video);
+                break;
+            case "linked-root":
+                // The renditions folder itself leads somewhere else
+                Directory.Delete(work.Renditions, true);
+                kept.Remove(bystander);
+                kept.Add(Temp.Write(Path.Combine(videos, name), "mine2.mp4", "x"));
+                Link(work.Renditions, videos);
+                (folder, file) = (Path.Combine(work.Renditions, name), video);
+                break;
+            case "linked-app":
+                Directory.Delete(Path.Combine(dir, "app"), true);
+                kept.Remove(bystander);
+                kept.Add(Temp.Write(Path.Combine(videos, "renditions", name), "mine3.mp4", "x"));
+                kept.Add(Temp.Write(Path.Combine(videos, "transcripts"), name + ".json", "x"));
+                Link(Path.Combine(dir, "app"), videos);
+                (folder, file) = (Path.Combine(work.Renditions, name), Path.Combine(work.Transcripts, name + ".json"));
+                break;
+            default:
+                // The id leads out of the folder
+                item.Id = Path.Combine("..", "..", "videos");
+                (folder, file) = (Path.Combine(work.Renditions, item.Id), Path.Combine(work.Transcripts, item.Id));
+                break;
+        }
+        item.Renditions = new RenditionSet { Directory = folder };
+        item.Transcript = new TranscriptState { Path = file };
+        using (var queue = new ImportQueue(Path.Combine(dir, "queue.json"), ImportQueueTests.All(), work: work))
+        {
+            queue.Add(new[] { item });
+            Assert.Equal(1, queue.RemoveAll());
+            await queue.StopAsync();
+        }
+        Assert.All(kept, k => Assert.True(File.Exists(k), k));
+        Assert.True(Directory.Exists(videos));
+
+        // And the encode's own clean-up takes no such path either
+        Assert.False(WorkFiles.DeleteFolder(folder, work.Renditions, item.Id));
+        Assert.All(kept, k => Assert.True(File.Exists(k), k));
+    }
+
+    [Fact]
+    public async Task A_link_inside_the_apps_work_goes_without_what_it_leads_to()
+    {
+        var dir = Temp.Folder();
+        var videos = Path.Combine(dir, "videos");
+        var video = Temp.Bytes(Temp.Folder(videos), "mine.mp4", 100);
+        var work = Work(dir);
+        var item = Item("mine.mp4");
+        var renditions = Path.Combine(work.Renditions, item.Id);
+        Temp.Write(renditions, "index.m3u8", "x");
+        Link(Path.Combine(renditions, "360p"), videos);
+        item.Renditions = new RenditionSet { Directory = renditions };
+        using var queue = new ImportQueue(Path.Combine(dir, "queue.json"), ImportQueueTests.All(), work: work);
+        queue.Add(new[] { item });
+        queue.RemoveAll();
+        await queue.StopAsync();
+        Assert.False(Directory.Exists(renditions));
+        Assert.True(File.Exists(video));
     }
 
     [Fact]

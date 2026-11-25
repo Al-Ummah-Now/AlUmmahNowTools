@@ -124,6 +124,13 @@ public class PauseAllTests
         public void Dispose() => Queue.Dispose();
     }
 
+    /// <summary>The step has stopped, and the queue has saved that (it saves under its lock).</summary>
+    private static async Task Stopped(Rig rig)
+    {
+        await Temp.WaitUntil(() => rig.Step.Running == 0 && rig.State.Status != StepStatus.Running);
+        _ = rig.Queue.Items;
+    }
+
     private static ItemPhase PhaseOf(State state) => state switch
     {
         State.Queued => ItemPhase.Waiting,
@@ -215,7 +222,7 @@ public class PauseAllTests
         using var rig = new Rig(kind);
         await rig.Reach(state);
         rig.Queue.PauseAll();
-        await Temp.WaitUntil(() => rig.Step.Running == 0 && rig.State.Status != StepStatus.Running);
+        await Stopped(rig);
 
         var step = new ScriptedStep(kind);
         using var second = rig.Open(step);
@@ -408,7 +415,7 @@ public class PauseAllTests
         rig.Run = async (_, ct) => { rig.Item.UploadOffset = 4096; await Task.Delay(Timeout.Infinite, ct); return StepResult.Done; };
         await rig.Until(() => rig.Step.Running == 1 && rig.Item.UploadOffset == 4096);
         rig.Queue.PauseAll();
-        await Temp.WaitUntil(() => rig.Step.Running == 0 && rig.State.Status == StepStatus.Pending);
+        await Stopped(rig);
         using var second = rig.Open(new ScriptedStep(ImportStepKind.Upload));
         Assert.Equal(4096, second.Items[0].UploadOffset);
     }

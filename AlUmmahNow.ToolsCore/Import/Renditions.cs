@@ -431,7 +431,7 @@ public sealed class EncodeStep : IImportStep
         var directory = Path.Combine(_workRoot, item.Id);
         try
         {
-            DeleteFolder(directory);
+            WorkFiles.DeleteFolder(directory, _workRoot, item.Id);
             var info = await _media.ProbeAsync(item.Video.Path, ct).ConfigureAwait(false);
             var rungs = EncodeLadder.For(info, settings.Ladder);
             var encoder = await _media.PickEncoderAsync(ct).ConfigureAwait(false)
@@ -474,13 +474,13 @@ public sealed class EncodeStep : IImportStep
         catch (Exception ex) when (ex is OperationCanceledException || ct.IsCancellationRequested)
         {
             // Stopped (paused, removed or the app closing), whatever it stopped with: encoded from the start next time
-            DeleteFolder(directory);
+            WorkFiles.DeleteFolder(directory, _workRoot, item.Id);
             throw;
         }
         catch (Exception ex) when (ex is LocalEncodeException or IOException or UnauthorizedAccessException)
         {
             // Not the file's failure: the server encodes it as any upload
-            DeleteFolder(directory);
+            WorkFiles.DeleteFolder(directory, _workRoot, item.Id);
             item.Renditions = null;
             context.Save();
             var code = ex is LocalEncodeException local ? local.Code : "disk";
@@ -530,19 +530,6 @@ public sealed class EncodeStep : IImportStep
             return null;
         }
     }
-
-    internal static void DeleteFolder(string? directory)
-    {
-        if (string.IsNullOrEmpty(directory)) return;
-        try
-        {
-            if (System.IO.Directory.Exists(directory)) System.IO.Directory.Delete(directory, recursive: true);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            // Left for the next run's clean-up; the queue does not depend on it
-        }
-    }
 }
 
 /// <summary>
@@ -554,8 +541,13 @@ public sealed class RenditionSender
 {
     private const int Parallel = 4;
     private readonly ImportApiClient _api;
+    private readonly string _workRoot;
 
-    public RenditionSender(ImportApiClient api) => _api = api;
+    public RenditionSender(ImportApiClient api, string? workRoot = null)
+    {
+        _api = api;
+        _workRoot = workRoot ?? EncodeStep.DefaultWorkRoot;
+    }
 
     /// <param name="progress">0–1 over the renditions' bytes.</param>
     public async Task SendAsync(QueueItem item, IStepContext context, IProgress<double> progress, CancellationToken ct)
@@ -616,7 +608,7 @@ public sealed class RenditionSender
             {
                 set.Sent = true;
                 set.SentAt = DateTimeOffset.UtcNow;
-                EncodeStep.DeleteFolder(set.Directory);
+                WorkFiles.DeleteFolder(set.Directory, _workRoot, item.Id);
                 context.Save();
                 progress.Report(1);
                 context.Log(LogLevel.Info, "renditions_sent", "The server has the renditions; it checks them when it processes the video");
@@ -639,9 +631,9 @@ public sealed class RenditionSender
         }).ConfigureAwait(false);
     }
 
-    private static void Drop(QueueItem item, IStepContext context, string code, string reason)
+    private void Drop(QueueItem item, IStepContext context, string code, string reason)
     {
-        EncodeStep.DeleteFolder(item.Renditions?.Directory);
+        WorkFiles.DeleteFolder(item.Renditions?.Directory, _workRoot, item.Id);
         item.Renditions = null;
         context.Save();
         context.Log(LogLevel.Warning, "renditions_dropped", $"The server did not take the renditions ({reason}); it encodes this file itself", code, reason);
