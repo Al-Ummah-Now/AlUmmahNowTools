@@ -55,7 +55,7 @@ jobs:
           powershell -Command "Start-Process (Resolve-Path dl/*-Setup*.exe).Path -ArgumentList '--silent' -Wait"
           test -f "$LOCALAPPDATA/AlUmmahNow.Tools/current/AlUmmahNow.VisualImporterUno.exe"
           # The installer may have started it: the test starts it itself, set to QA
-          powershell -Command "Get-Process AlUmmahNow.VisualImporterUno -ErrorAction SilentlyContinue | Stop-Process -Force"; sleep 3
+          powershell -Command "Get-Process AlUmmahNow.VisualImporterUno -ErrorAction SilentlyContinue | Stop-Process -Force; exit 0"; sleep 3
       - name: It updates itself
         run: node scripts/real-update.mjs --exe "$LOCALAPPDATA/AlUmmahNow.Tools/current/AlUmmahNow.VisualImporterUno.exe" --packages "$LOCALAPPDATA/AlUmmahNow.Tools/packages" --data "$LOCALAPPDATA" --platform windows --arch x64 --from "$FROM" --to "$TO"
       - name: Logs
