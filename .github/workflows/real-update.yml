@@ -1,0 +1,124 @@
+name: Real update test
+# The published release N, installed as people have it, updates itself to the published N+1: the real server answer (QA), the
+# real download, key, signature and updater, on throwaway Windows and macOS runners. Run it by hand after a release:
+#   gh workflow run real-update.yml -f from=2026.11.25 -f to=2026.11.25.2
+# Nothing is built and no secret is used. The app is set to QA, and the production names lead nowhere on the runner.
+# The automatic Update test (update-test.yml) covers test builds and refused updates.
+on:
+  workflow_dispatch:
+    inputs:
+      from:
+        description: The installed release (2026.11.25)
+        required: true
+      to:
+        description: The newer release QA offers (2026.11.25.2)
+        required: true
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: bash
+    env:
+      FROM: ${{ inputs.from }}
+      TO: ${{ inputs.to }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check the versions
+        run: |
+          for v in "$FROM" "$TO"; do [[ "$v" =~ ^[0-9]{4}\.[0-9]{2}\.[0-9]{2}(\.[0-9]+)?$ ]] || { echo "::error::bad version"; exit 1; }; done
+      - name: Production leads nowhere on this runner
+        run: |
+          hosts=/c/Windows/System32/drivers/etc/hosts
+          echo >> "$hosts"
+          for h in alummahnow.net www.alummahnow.net auth.alummahnow.net api.alummahnow.net admin.alummahnow.net admin.api.alummahnow.net videos.alummahnow.net videos.api.alummahnow.net media.alummahnow.net; do
+            printf '0.0.0.0 %s\n:: %s\n' "$h" "$h" >> "$hosts"
+          done
+          ipconfig //flushdns
+          for v in 4 6; do if curl "-$v" -s -m 10 -o /dev/null https://videos.api.alummahnow.net/; then echo "::error::production is reachable (IPv$v)"; exit 1; fi; done
+      - name: Download the published release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "v$FROM" -R "$GITHUB_REPOSITORY" -p '*-x64-Setup*.exe' -p SHA256SUMS.txt -D dl
+          cd dl; ls -l; sha256sum --ignore-missing -c SHA256SUMS.txt | grep 'Setup.*OK'
+      - name: Install it for this user
+        run: |
+          powershell -Command "Start-Process (Resolve-Path dl/*-Setup*.exe).Path -ArgumentList '--silent' -Wait"
+          test -f "$LOCALAPPDATA/AlUmmahNow.Tools/current/AlUmmahNow.VisualImporterUno.exe"
+          # The installer may have started it: the test starts it itself, set to QA
+          powershell -Command "Get-Process AlUmmahNow.VisualImporterUno -ErrorAction SilentlyContinue | Stop-Process -Force"; sleep 3
+      - name: It updates itself
+        run: node scripts/real-update.mjs --exe "$LOCALAPPDATA/AlUmmahNow.Tools/current/AlUmmahNow.VisualImporterUno.exe" --packages "$LOCALAPPDATA/AlUmmahNow.Tools/packages" --data "$LOCALAPPDATA" --platform windows --arch x64 --from "$FROM" --to "$TO"
+      - name: Logs
+        if: always()
+        run: |
+          mkdir -p logs
+          cp "$LOCALAPPDATA"/AlUmmahNow/VisualImporterUno/Logs/*.txt logs/ || true
+          cp "$LOCALAPPDATA"/AlUmmahNow.Tools/*.log "$LOCALAPPDATA"/velopack/*.log logs/ || true
+          ls -l logs "$LOCALAPPDATA/AlUmmahNow.Tools" "$LOCALAPPDATA/AlUmmahNow.Tools/packages" || true
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: real-update-windows
+          path: logs
+          retention-days: 14
+          if-no-files-found: ignore
+
+  macos:
+    runs-on: macos-15
+    timeout-minutes: 40
+    # bash with pipefail, as the Windows job
+    defaults:
+      run:
+        shell: bash
+    env:
+      FROM: ${{ inputs.from }}
+      TO: ${{ inputs.to }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check the versions
+        run: |
+          for v in "$FROM" "$TO"; do [[ "$v" =~ ^[0-9]{4}\.[0-9]{2}\.[0-9]{2}(\.[0-9]+)?$ ]] || { echo "::error::bad version"; exit 1; }; done
+      - name: Production leads nowhere on this runner
+        run: |
+          echo | sudo tee -a /etc/hosts > /dev/null
+          for h in alummahnow.net www.alummahnow.net auth.alummahnow.net api.alummahnow.net admin.alummahnow.net admin.api.alummahnow.net videos.alummahnow.net videos.api.alummahnow.net media.alummahnow.net; do
+            printf '0.0.0.0 %s\n:: %s\n' "$h" "$h" | sudo tee -a /etc/hosts > /dev/null
+          done
+          sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder || true
+          for v in 4 6; do if curl "-$v" -s -m 10 -o /dev/null https://videos.api.alummahnow.net/; then echo "::error::production is reachable (IPv$v)"; exit 1; fi; done
+      - name: Download the published release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "v$FROM" -R "$GITHUB_REPOSITORY" -p '*-arm64*.dmg' -p SHA256SUMS.txt -D dl
+          cd dl; ls -l; shasum -a 256 --ignore-missing -c SHA256SUMS.txt | grep 'dmg: OK'
+      - name: Put it in Applications
+        run: |
+          mkdir mnt; hdiutil attach dl/*.dmg -nobrowse -readonly -mountpoint mnt
+          ditto "$(find mnt -maxdepth 1 -name '*.app' -type d | head -1)" "/Applications/$(basename "$(find mnt -maxdepth 1 -name '*.app' -type d | head -1)")"
+          hdiutil detach mnt
+          app=$(find /Applications -maxdepth 1 -name '*Tools.app' -type d | head -1)
+          codesign --verify --deep --strict "$app"
+          test -x "$app/Contents/MacOS/UpdateMac"
+          echo "EXE=$app/Contents/MacOS/$(/usr/libexec/PlistBuddy -c 'Print CFBundleExecutable' "$app/Contents/Info.plist")" >> "$GITHUB_ENV"
+      - name: It updates itself
+        run: node scripts/real-update.mjs --exe "$EXE" --packages "$HOME/Library/Caches/velopack/AlUmmahNow.Tools/packages" --data "$HOME/Library/Application Support" --platform macos --arch arm64 --from "$FROM" --to "$TO"
+      - name: Logs
+        if: always()
+        run: |
+          mkdir -p logs
+          cp "$HOME/Library/Application Support/AlUmmahNow/VisualImporterUno/Logs"/*.txt logs/ || true
+          cp "$HOME"/Library/Logs/velopack*.log logs/ || true
+          ls -l logs "$HOME/Library/Caches/velopack/AlUmmahNow.Tools/packages" || true
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: real-update-macos
+          path: logs
+          retention-days: 14
+          if-no-files-found: ignore
