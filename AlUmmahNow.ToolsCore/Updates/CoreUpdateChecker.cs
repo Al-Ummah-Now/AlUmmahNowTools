@@ -10,7 +10,11 @@ namespace AlUmmahNow.ToolsCore.Updates;
 public static class ToolsUpdateKeys
 {
     /// <summary>Base64 raw ed25519 root public keys (not secret). The private key is offline with the owner.</summary>
+#if UPDATE_TEST
+    public static readonly string[] RootKeys = { Environment.GetEnvironmentVariable("TOOLS_UPDATE_TEST_ROOT") ?? throw new InvalidOperationException("TOOLS_UPDATE_TEST_ROOT") };
+#else
     public static readonly string[] RootKeys = { "WDF0ms+fkqEYaNE9+4ouJJUzdja9NV+sZkoitP8P2kg=" };
+#endif
 
     /// <summary>The key list and its root signature as of this build.</summary>
     public static string BundledKeyList => Read("update-keys.json");

@@ -32,6 +32,12 @@
     </UnoFeatures>
   </PropertyGroup>
 
+  <!-- CI's update test only (.github/workflows/update-test.yml): the root key and the server come from the environment.
+       Never in a release: release.yml refuses it. -->
+  <PropertyGroup Condition="'$(UpdateTest)' == 'true'">
+    <DefineConstants>$(DefineConstants);UPDATE_TEST</DefineConstants>
+  </PropertyGroup>
+
   <ItemGroup>
     <!-- The staff icon (Tools #44): the logo's lantern in a gold octagon ring, from AlUmmahNow
          packages/app-icons (the app-icons build with app tools, its icon-512.png).

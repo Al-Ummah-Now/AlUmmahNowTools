@@ -1,0 +1,2 @@
+Tools now checks for updates and tells you when a new version is out.
+On Windows and Mac it can install the update itself.

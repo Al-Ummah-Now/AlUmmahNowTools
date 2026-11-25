@@ -33,7 +33,11 @@ public static class AppUpdates
         var demo = Environment.GetEnvironmentVariable("TOOLS_DEMO_UPDATE");
         var core = demo is { Length: > 0 } ? (IUpdateCore)new DemoUpdateCore() : CoreUpdateChecker.Load(InstalledVersion, UpdateService.DefaultStatePath);
         Service = new UpdateService(
+#if UPDATE_TEST
+            new UpdateTestHandler(),
+#else
             UpdateService.CreateHandler(),
+#endif
             () => ToolsEnvironment.For(state.Preferences.Environment).VideosApi,
             core,
             demo is { Length: > 0 } ? new DemoInstaller() : installer,
@@ -45,6 +49,9 @@ public static class AppUpdates
             IsBusy,
             ToolsUpdateKeys.RootKeys.Length > 0);
         AppDomain.CurrentDomain.ProcessExit += (_, _) => Service?.OnExit();
+#if UPDATE_TEST
+        UpdateTestHandler.Watch(Service);
+#endif
         if (demo is { Length: > 0 }) Service.Preview(DemoView(demo));
         else Service.Start();
     }

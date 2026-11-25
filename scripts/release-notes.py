@@ -39,12 +39,13 @@ print(f"""## Al Ummah Now Tools {tag}
 
 The staff app for bulk imports into Al Ummah Now: sign in with your Al Ummah Now staff account (admins only),
 pick the environment, then import folders of videos with their caption, chapter, thumbnail and metadata files.
-Arabic and English. This release has no automatic update check yet: download the next release from this page.
+Arabic and English. It tells you when a new version is out; the Windows Setup and the macOS app install it themselves.
 
 {warning}
 | System | File | Install |
 |---|---|---|
-| Windows 10/11, x64 | `AlUmmahNow-Tools-Windows-{version}-x64{w}.msi` | Run it; Start menu → Al Ummah Now Tools |
+| Windows 10/11, x64 | `AlUmmahNow-Tools-Windows-{version}-x64-Setup{w}.exe` | Run it (for you only, no administrator rights); updates itself |
+| Windows, for every user of the PC | `AlUmmahNow-Tools-Windows-{version}-x64{w}.msi` | Run it as administrator; Start menu → Al Ummah Now Tools |
 | Windows, no install | `AlUmmahNow-Tools-Windows-{version}-x64-portable{w}.zip` | Unzip, run `AlUmmahNow.VisualImporterUno.exe` |
 | macOS 13+, Apple silicon | `AlUmmahNow-Tools-macOS-{version}-arm64{m}.dmg` | Open, drag to Applications |
 | macOS 13+, Intel | `AlUmmahNow-Tools-macOS-{version}-x64{m}.dmg` | Open, drag to Applications |

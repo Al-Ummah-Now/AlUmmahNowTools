@@ -1,0 +1,94 @@
+name: Update test
+# A real self-update, N to N+1, on Windows and macOS (wiki AUN-APP-UPDATES §13), with test builds, keys made for the run and
+# a local server: nothing is published and no secret is used. Linux has no self-update; its notice is covered by the unit tests.
+on:
+  pull_request:
+    paths:
+      - .github/workflows/update-test.yml
+      - .github/workflows/release.yml
+      - scripts/update-test.mjs
+      - scripts/app-release.mjs
+      - scripts/vpk-pack.sh
+      - AlUmmahNow.ToolsCore/Updates/**
+      - AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno/Services/VelopackInstaller.cs
+      - AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno/Shell/AppUpdates.cs
+      - AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno/Shell/UpdateTestHandler.cs
+      - AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno/Program.cs
+      - AlUmmahNow.VisualImporterUno/Directory.Packages.props
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  APP: AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno.csproj
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  DOTNET_NOLOGO: '1'
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          dotnet-version: 9.0.x
+      - run: scripts/fetch-core.sh
+      - name: Build and pack 2026.01.01 and 2026.01.02
+        run: |
+          for d in 1 2; do
+            dotnet publish "$APP" -f net9.0-desktop -c Release -r win-x64 --self-contained -p:UpdateTest=true -p:InformationalVersion="2026.01.0$d" -o "out/publish$d"
+            scripts/vpk-pack.sh win-x64 "2026.1.${d}01" "out/publish$d" AlUmmahNow.VisualImporterUno.exe
+            mkdir -p "keep/$d"; cp out/vpk/*-Setup.exe out/vpk/*-full.nupkg "keep/$d/"
+          done
+      - name: Install 2026.01.01 for this user
+        run: |
+          powershell -Command "Start-Process (Resolve-Path keep/1/*-Setup.exe).Path -ArgumentList '--silent' -Wait"
+          test -f "$LOCALAPPDATA/AlUmmahNow.Tools/current/AlUmmahNow.VisualImporterUno.exe"
+      - name: Refused updates change nothing
+        run: |
+          for c in tampered bad-signature foreign-host; do
+            node scripts/update-test.mjs --exe "$LOCALAPPDATA/AlUmmahNow.Tools/current/AlUmmahNow.VisualImporterUno.exe" --package keep/2/*-full.nupkg --platform windows --arch x64 --from 2026.01.01 --to 2026.01.02 --case $c
+          done
+      - name: 2026.01.01 becomes 2026.01.02
+        run: node scripts/update-test.mjs --exe "$LOCALAPPDATA/AlUmmahNow.Tools/current/AlUmmahNow.VisualImporterUno.exe" --package keep/2/*-full.nupkg --platform windows --arch x64 --from 2026.01.01 --to 2026.01.02
+
+  macos:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          dotnet-version: 9.0.x
+      - run: scripts/fetch-core.sh
+      - name: Build and pack 2026.01.01 and 2026.01.02 (ad hoc signed)
+        run: |
+          for d in 1 2; do
+            rm -rf out/publish
+            dotnet publish "$APP" -f net9.0-desktop -c Release -r osx-arm64 --self-contained -p:PackageFormat=app -p:UpdateTest=true -p:InformationalVersion="2026.01.0$d" -o out/publish
+            app=$(find out/publish -maxdepth 2 -name '*.app' -type d | head -1)
+            exe=$(/usr/libexec/PlistBuddy -c 'Print CFBundleExecutable' "$app/Contents/Info.plist")
+            scripts/vpk-pack.sh osx-arm64 "2026.1.${d}01" "$app" "$exe" --signAppIdentity - --signEntitlements "$PWD/packaging/macos/entitlements.plist" --noInst
+            mkdir -p "keep/$d"; cp out/vpk/*-Portable.zip out/vpk/*-full.nupkg "keep/$d/"
+          done
+      - name: Put 2026.01.01 in Applications
+        run: |
+          ditto -x -k keep/1/*-Portable.zip /Applications
+          app=$(find /Applications -maxdepth 1 -name '*Tools.app' -type d | head -1)
+          codesign --verify --deep --strict "$app"
+          codesign -dv "$app" 2>&1 | grep 'Signature=adhoc'
+          echo "EXE=$app/Contents/MacOS/$(/usr/libexec/PlistBuddy -c 'Print CFBundleExecutable' "$app/Contents/Info.plist")" >> "$GITHUB_ENV"
+      - name: Refused updates change nothing
+        run: |
+          for c in tampered bad-signature foreign-host; do
+            node scripts/update-test.mjs --exe "$EXE" --package keep/2/*-full.nupkg --platform macos --arch arm64 --from 2026.01.01 --to 2026.01.02 --case $c
+          done
+      - name: 2026.01.01 becomes 2026.01.02
+        run: |
+          node scripts/update-test.mjs --exe "$EXE" --package keep/2/*-full.nupkg --platform macos --arch arm64 --from 2026.01.01 --to 2026.01.02
+          codesign --verify --deep --strict "${EXE%/Contents/MacOS/*}"
+      - name: Velopack log
+        if: always()
+        run: tail -n 60 ~/Library/Logs/velopack*.log || true
