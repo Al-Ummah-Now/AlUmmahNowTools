@@ -39,7 +39,7 @@ public sealed class LocalEncodeException : Exception
 {
     public LocalEncodeException(string code, string message, Exception? inner = null) : base(message, inner) => Code = code;
 
-    /// <summary>source_read (the file stopped being readable), ffmpeg_missing, probe_failed, no_video (sound alone), no_media, no_audio, disk_space, ffmpeg_failed, too_short (the encoded video), package_failed, too_large or settings_invalid</summary>
+    /// <summary>source_read (the file stopped being readable), ffmpeg_missing, probe_failed, no_video (sound alone), no_media (neither), no_dimensions (a video whose size could not be told), no_audio, disk_space, ffmpeg_failed, too_short (the encoded video), package_failed, too_large or settings_invalid</summary>
     public string Code { get; }
 }
 
@@ -64,7 +64,7 @@ public static class EncodeLadder
         var quarter = Math.Abs(source.Rotation) % 180 == 90;
         var width = quarter ? source.Height : source.Width;
         var height = quarter ? source.Width : source.Height;
-        if (width <= 0 || height <= 0) throw new LocalEncodeException("no_video", "The file has no picture size");
+        if (width <= 0 || height <= 0) throw new LocalEncodeException("no_dimensions", "The size of the picture could not be read");
         var portrait = height > width;
         var shortSide = Math.Min(width, height);
         var aspect = (double)width / height;
