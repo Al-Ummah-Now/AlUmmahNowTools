@@ -6,7 +6,7 @@ using Xunit;
 namespace AlUmmahNow.ToolsCore.Tests;
 
 /// <summary>
-/// The real aun-core UpdateChecker (Core v0.4.0-rc.5) from C#, with the signed vector shared by aun-core and the server
+/// The real aun-core UpdateChecker (Core v0.4.0-rc.7) from C#, with the signed vector shared by aun-core and the server
 /// (AlUmmahNowCore spec/app-updates/signed-vector.json, copied): the binding Tools relies on accepts it and refuses a change.
 /// </summary>
 public sealed class CoreUpdateCheckerTests
