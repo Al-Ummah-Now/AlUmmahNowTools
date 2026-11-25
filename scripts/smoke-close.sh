@@ -63,6 +63,8 @@ if kill -0 "$launcher" 2>/dev/null; then
   exit 1
 fi
 wait "$launcher"; code=$?
+# The app may end between two looks: its marker says it was closed
+[ -z "$closed_at" ] && [ -e "$ready.closing" ] && closed_at=$SECONDS
 [ -n "$closed_at" ] || { tail -n 60 "$log"; echo "::error::smoke-close ($mode): the app ended without being closed (exit $code)"; exit 1; }
 took=$(( SECONDS - closed_at ))
 if [ "$took" -gt "$seconds" ]; then echo "::error::smoke-close ($mode): the app took ${took}s to end after the close (limit ${seconds}s)"; exit 1; fi
