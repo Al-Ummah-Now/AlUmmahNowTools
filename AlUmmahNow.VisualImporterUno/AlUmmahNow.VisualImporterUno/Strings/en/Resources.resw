@@ -2071,7 +2071,7 @@
     <value>This file has sound but no picture. Choose the file that has the video, or remove it from the list.</value>
   </data>
   <data name="ImportError_not_video" xml:space="preserve">
-    <value>This file can’t be read as a video. Copy it to its folder again, and trying again is offered here.</value>
+    <value>This file can’t be read as a video. Copy it to its folder again; Try again now then appears here.</value>
   </data>
   <data name="ImportError_content_changed" xml:space="preserve">
     <value>The file wasn’t read the same for the upload as when it was checked, so the upload was stopped. Try again. If it happens again, copy the file again, then scan the folder again.</value>
