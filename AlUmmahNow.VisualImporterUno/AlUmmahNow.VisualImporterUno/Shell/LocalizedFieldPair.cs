@@ -16,6 +16,9 @@ internal sealed class LocalizedFieldPair
 {
     public delegate Task<FieldTranslateItem> TranslateDelegate(string from, string to, string text, string field, CancellationToken ct);
 
+    /// <summary>The pair's width under which its two languages are stacked.</summary>
+    private const double StackBelow = 420;
+
     private readonly string _field;
     private readonly int _maxLength;
     private readonly TranslateDelegate _translate;
@@ -209,6 +212,19 @@ internal sealed class LocalizedFieldPair
         Grid.SetColumn(arCol, 1);
         grid.Children.Add(enCol);
         grid.Children.Add(arCol);
+        // Too narrow for two columns: Arabic goes below English
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        grid.SizeChanged += (_, e) =>
+        {
+            var stacked = e.NewSize.Width < StackBelow;
+            if (Grid.GetRow(arCol) == (stacked ? 1 : 0)) return;
+            Grid.SetRow(arCol, stacked ? 1 : 0);
+            Grid.SetColumn(arCol, stacked ? 0 : 1);
+            Grid.SetColumnSpan(enCol, stacked ? 2 : 1);
+            Grid.SetColumnSpan(arCol, stacked ? 2 : 1);
+            grid.RowSpacing = stacked ? 10 : 0;
+        };
 
         // Constrained Grid so long status/error text wraps within the dialog width instead of clipping
         var statusTextCol = new StackPanel { Spacing = 2 };
