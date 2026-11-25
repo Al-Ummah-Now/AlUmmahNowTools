@@ -8,6 +8,8 @@ public enum StartDecision
     HandedOver,
     /// <summary>Another copy holds the queue and does not answer: say so, and run nothing</summary>
     AlreadyOpen,
+    /// <summary>This is the one copy, but the updater is replacing the app: say so, and run nothing before it is done</summary>
+    FinishingUpdate,
 }
 
 /// <summary>What a starting copy does (Tools #89): run, hand over to the copy that is open, or wait for one that is closing.</summary>
@@ -18,6 +20,23 @@ public static class SingleInstance
 
     /// <summary>A copy that does not answer may be just starting, or gone a moment later</summary>
     public static readonly TimeSpan WhileSilent = TimeSpan.FromSeconds(12);
+
+    /// <summary>After an update the updater starts the app and ends by itself: not worth a window</summary>
+    public static readonly TimeSpan UpdaterEnding = TimeSpan.FromSeconds(3);
+
+    /// <summary>
+    /// The whole start. The copy that has the queue listens for second ones before it waits for anything, so they find it
+    /// answering; and it waits without a window only for a moment.
+    /// </summary>
+    /// <param name="listen">Starts answering second copies</param>
+    /// <param name="waitForUpdater">Waits at most that long; false when the updater is still at work</param>
+    public static async Task<StartDecision> StartAsync(Func<LockAnswer> take, Func<Task<FrontAnswer?>> ask, Action listen, Func<TimeSpan, bool> waitForUpdater, TimeProvider? time = null, Func<TimeSpan, Task>? delay = null)
+    {
+        var decision = await DecideAsync(take, ask, time, delay).ConfigureAwait(false);
+        if (decision != StartDecision.Run) return decision;
+        listen();
+        return waitForUpdater(UpdaterEnding) ? StartDecision.Run : StartDecision.FinishingUpdate;
+    }
 
     private static readonly TimeSpan Between = TimeSpan.FromMilliseconds(500);
 

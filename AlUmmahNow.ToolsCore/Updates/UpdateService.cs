@@ -117,7 +117,7 @@ public sealed class UpdateService : IDisposable
     private UpdateView _view = UpdateView.None;
     private CorePrompt? _lastPrompt;
     private Staged? _staged;
-    private bool _applying;
+    private int _applying;
     private bool _autoInstallDefault = true;
     /// <summary>The release the last answer offers to install, whether or not its notice was closed</summary>
     private string? _offeredTag;
@@ -318,18 +318,39 @@ public sealed class UpdateService : IDisposable
     /// <summary>Restart now: refused while work is running (the bar says "Finish or pause your uploads first.") or another copy is open.</summary>
     public async Task<bool> RestartNowAsync(CancellationToken cancel = default)
     {
-        if (_view.Stage != UpdateStage.Ready || _busy() || _applying || _otherCopy()) return false;
-        if (!await StillGoodAsync(cancel).ConfigureAwait(false))
+        if (_view.Stage != UpdateStage.Ready || _busy() || _otherCopy()) return false;
+        if (!TryBeginApply()) return false;
+        var handedOver = false;
+        try
         {
-            Publish(_view.Required ? new UpdateView(UpdateStage.RequiredSoon, MessageEn: _view.MessageEn, MessageAr: _view.MessageAr) : UpdateView.None);
-            return false;
+            if (!await StillGoodAsync(cancel).ConfigureAwait(false))
+            {
+                Publish(_view.Required ? new UpdateView(UpdateStage.RequiredSoon, MessageEn: _view.MessageEn, MessageAr: _view.MessageAr) : UpdateView.None);
+                return false;
+            }
+            // Once more, after the check of the file: work or a copy may have started meanwhile
+            if (_busy() || _otherCopy()) return false;
+            handedOver = true;
+            _installer.ApplyAndRestart();
+            return true;
         }
-        // Once more, after the check of the file: a copy may have started meanwhile
-        if (_otherCopy()) return false;
-        _applying = true;
-        _installer.ApplyAndRestart();
-        return true;
+        catch when (handedOver)
+        {
+            // The updater did not start: the app goes on, and can try again
+            handedOver = false;
+            throw;
+        }
+        finally
+        {
+            if (!handedOver) EndApply();
+        }
     }
+
+    /// <summary>Only one hand-over to the updater at a time: a second click, or the exit during the first, finds it taken.</summary>
+    private bool TryBeginApply() => Interlocked.CompareExchange(ref _applying, 1, 0) == 0;
+
+    /// <summary>The hand-over did not happen: it may be tried again.</summary>
+    private void EndApply() => Interlocked.Exchange(ref _applying, 0);
 
     /// <summary>The × on the bar: hidden for this version.</summary>
     public void Dismiss()
@@ -344,10 +365,19 @@ public sealed class UpdateService : IDisposable
     public void OnExit()
     {
         // Restart now has started the updater already
-        if (_staged is null || _applying || _otherCopy()) return;
-        _applying = true;
-        // A copy that started during the check counts: the update is staged again at the next start
-        if (StillGoodAsync(CancellationToken.None, report: false).GetAwaiter().GetResult() && !_otherCopy()) _installer.ApplyOnExit();
+        if (_staged is null || _otherCopy() || !TryBeginApply()) return;
+        var handedOver = false;
+        try
+        {
+            // A copy that started during the check counts: the update is staged again at the next start
+            if (!StillGoodAsync(CancellationToken.None, report: false).GetAwaiter().GetResult() || _otherCopy()) return;
+            _installer.ApplyOnExit();
+            handedOver = true;
+        }
+        finally
+        {
+            if (!handedOver) EndApply();
+        }
     }
 
     /// <summary>
@@ -539,7 +569,8 @@ public sealed class UpdateService : IDisposable
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(_statePath)!);
-            var temp = _statePath + ".tmp";
+            // Of this process alone: another copy may save its state too
+            var temp = $"{_statePath}.{Environment.ProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture)}.tmp";
             File.WriteAllText(temp, _core.StateJson());
             File.Move(temp, _statePath, overwrite: true);
         }

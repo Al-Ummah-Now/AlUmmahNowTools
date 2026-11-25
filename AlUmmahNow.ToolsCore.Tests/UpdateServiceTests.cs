@@ -61,12 +61,19 @@ public sealed class UpdateServiceTests : IDisposable
         public int Discarded;
         public void VerifyStaged()
         {
+            OnVerify?.Invoke();
             if (Bad is not null) throw new UpdateVerificationException(Bad);
         }
         public void Discard() => Discarded++;
         public int Exits;
         public void ApplyOnExit() => Exits++;
-        public void ApplyAndRestart() => Restarts++;
+        public Action? OnVerify;
+        public Exception? RestartFails;
+        public void ApplyAndRestart()
+        {
+            if (RestartFails is not null) throw RestartFails;
+            Interlocked.Increment(ref Restarts);
+        }
     }
 
     private sealed class FakeHttp : HttpMessageHandler
@@ -140,6 +147,79 @@ public sealed class UpdateServiceTests : IDisposable
         asked = 0;
         service.OnExit();
         Assert.Equal(0, installer.Exits);
+    }
+
+    [Fact]
+    public async Task An_exit_held_back_by_a_copy_started_during_the_check_can_install_later()
+    {
+        var copies = new Queue<bool>(new[] { false, true });
+        var (service, _, installer, _) = Make(otherCopy: () => copies.Count > 0 && copies.Dequeue());
+        await service.CheckAsync(userAsked: true);
+        service.OnExit();
+        Assert.Equal(0, installer.Exits);
+        service.OnExit();
+        Assert.Equal(1, installer.Exits);
+        // Handed over once, whatever asks again
+        service.OnExit();
+        Assert.False(await service.RestartNowAsync());
+        Assert.Equal((0, 1), (installer.Restarts, installer.Exits));
+    }
+
+    [Fact]
+    public async Task A_restart_held_back_during_the_check_can_be_asked_for_again()
+    {
+        var copies = new Queue<bool>(new[] { false, true });
+        var (service, _, installer, _) = Make(otherCopy: () => copies.Count > 0 && copies.Dequeue());
+        await service.CheckAsync(userAsked: true);
+        Assert.False(await service.RestartNowAsync());
+        Assert.True(await service.RestartNowAsync());
+        Assert.Equal(1, installer.Restarts);
+    }
+
+    [Fact]
+    public async Task Restart_now_pressed_twice_hands_over_once()
+    {
+        var (service, _, installer, _) = Make();
+        await service.CheckAsync(userAsked: true);
+        // The first press is still checking the file when the second comes
+        var checking = new SemaphoreSlim(0);
+        using var goOn = new ManualResetEventSlim();
+        installer.OnVerify = () => { checking.Release(); goOn.Wait(TimeSpan.FromSeconds(20)); };
+        var first = Task.Run(() => service.RestartNowAsync());
+        Assert.True(await checking.WaitAsync(TimeSpan.FromSeconds(20)));
+        var second = Task.Run(() => service.RestartNowAsync());
+        // Refused at once, or (wrongly) checking the file too
+        await Task.WhenAny(second, checking.WaitAsync(TimeSpan.FromSeconds(20)));
+        // The app closing meanwhile does not hand over a second time either
+        var exit = Task.Run(service.OnExit);
+        await Task.WhenAny(exit, checking.WaitAsync(TimeSpan.FromSeconds(20)));
+        goOn.Set();
+        Assert.True(await first);
+        Assert.False(await second);
+        await exit;
+        Assert.Equal((1, 0), (installer.Restarts, installer.Exits));
+    }
+
+    [Fact]
+    public async Task An_updater_that_does_not_start_can_be_tried_again()
+    {
+        var (service, _, installer, _) = Make();
+        await service.CheckAsync(userAsked: true);
+        installer.RestartFails = new IOException("x");
+        await Assert.ThrowsAsync<IOException>(() => service.RestartNowAsync());
+        installer.RestartFails = null;
+        Assert.True(await service.RestartNowAsync());
+        Assert.Equal(1, installer.Restarts);
+    }
+
+    [Fact]
+    public async Task The_states_temporary_file_is_this_processs_own()
+    {
+        var (service, _, _, _) = Make();
+        // Another copy's, which this one could not write
+        Directory.CreateDirectory(Path.Combine(_dir, "updates.json.tmp"));
+        await service.CheckAsync(userAsked: true);
+        Assert.True(File.Exists(Path.Combine(_dir, "updates.json")));
     }
 
     [Fact]
