@@ -81,7 +81,7 @@ public sealed partial class ImportView : Page
             // With TOOLS_DEMO_IMPORT=empty: the row while searching (TOOLS_DEMO_CHANNELS_MS=60000), and the one when nothing is found
             case "suggest-searching" or "suggest-none":
                 await System.Threading.Tasks.Task.Delay(1200);
-                ChannelBox.Text = Loc.IsArabic ? "درس" : "tafsir";
+                ChannelBox.Text = "tafsir";
                 await System.Threading.Tasks.Task.Delay(300);
                 ChannelBox.Focus(FocusState.Keyboard);
                 // The caret after what is typed, never through its first letter
