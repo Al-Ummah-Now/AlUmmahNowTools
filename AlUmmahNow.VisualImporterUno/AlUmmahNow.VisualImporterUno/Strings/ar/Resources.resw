@@ -2768,6 +2768,9 @@
   <data name="ImportEncodeError_no_video" xml:space="preserve">
     <value>الملف بلا صورة</value>
   </data>
+  <data name="ImportEncodeError_no_dimensions" xml:space="preserve">
+    <value>تعذّرت قراءة مقاس صورة المرئي</value>
+  </data>
   <data name="ImportEncodeError_no_media" xml:space="preserve">
     <value>الملف بلا صورة ولا صوت</value>
   </data>

@@ -539,6 +539,24 @@ public sealed class ContentCheckTests
     }
 
     [Fact]
+    public async Task A_video_whose_size_could_not_be_told_is_left_to_the_server()
+    {
+        var probed = FfmpegMediaTools.ParseProbe("""{"streams":[{"codec_type":"video","codec_name":"prores"},{"codec_type":"audio"}],"format":{"duration":"12.0"}}""");
+        Assert.Equal(0, probed.Width);
+        var item = Item(Mp4IndexTests.File("vide", "soun"));
+        // The check passes it, with the same probe
+        var media = new FakeMedia { Info = probed };
+        Assert.Equal(StepResult.Done, await new HashStep(media: media).RunAsync(item, new RecordingContext(), default));
+        var api = new ImportApiClient(new Uri("https://admin.api.example"), _ => Task.FromResult<string?>("tok"), new RenditionServer());
+        var reported = new List<Exception>();
+        var context = new RecordingContext();
+        var step = new EncodeStep(api, new Uri("https://videos.api.example"), media, new FakePackager(), Temp.Folder(), "Tools test", (ex, _) => reported.Add(ex), _ => long.MaxValue);
+        Assert.Equal(StepResult.Skipped, await step.RunAsync(item, context, default));
+        Assert.Contains(context.Lines, l => l.Code == "encode_failed");
+        Assert.Equal("no_dimensions", Assert.IsType<LocalEncodeException>(Assert.Single(reported)).Code);
+    }
+
+    [Fact]
     public async Task A_file_refused_after_its_video_was_opened_marks_it_failed_on_the_server()
     {
         var server = new FakeServer();

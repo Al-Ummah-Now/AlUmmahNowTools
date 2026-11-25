@@ -2444,6 +2444,9 @@ The list shows it once the scanner is back.</value>
   <data name="ImportEncodeError_no_video" xml:space="preserve">
     <value>the file has no picture</value>
   </data>
+  <data name="ImportEncodeError_no_dimensions" xml:space="preserve">
+    <value>the video’s picture size couldn’t be read</value>
+  </data>
   <data name="ImportEncodeError_no_media" xml:space="preserve">
     <value>the file has neither picture nor sound</value>
   </data>
