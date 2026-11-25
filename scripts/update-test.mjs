@@ -84,7 +84,7 @@ const server = createServer((req, res) => {
 	res.end();
 });
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
-const env = { ...process.env, TOOLS_DEMO: '1', TOOLS_DEMO_LANG: 'en', TOOLS_UPDATE_TEST_ROOT: root.publicKey, TOOLS_UPDATE_TEST_SERVER: `http://127.0.0.1:${server.address().port}`, TOOLS_UPDATE_TEST_LOG: log, TOOLS_DEMO_INSTANCE: join(dir, 'queue'), ...(kase === 'swapped' || kase === 'yanked' ? { TOOLS_UPDATE_TEST_EXIT_MS: '8000' } : {}), ...(kase === 'yanked' ? { TOOLS_UPDATE_TEST_RECHECK: '1' } : {}) };
+const env = { ...process.env, TOOLS_DEMO: '1', TOOLS_DEMO_IMPORT: 'empty', TOOLS_DEMO_LANG: 'en', TOOLS_UPDATE_TEST_ROOT: root.publicKey, TOOLS_UPDATE_TEST_SERVER: `http://127.0.0.1:${server.address().port}`, TOOLS_UPDATE_TEST_LOG: log, TOOLS_DEMO_INSTANCE: join(dir, 'queue'), ...(kase === 'swapped' || kase === 'yanked' ? { TOOLS_UPDATE_TEST_EXIT_MS: '8000' } : {}), ...(kase === 'yanked' ? { TOOLS_UPDATE_TEST_RECHECK: '1' } : {}) };
 // Each case starts as a new install: a yank is remembered for good, so an earlier case's would count here
 rmSync(a.state, { force: true });
 if (kase === 'planted') {
