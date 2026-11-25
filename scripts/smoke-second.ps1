@@ -31,6 +31,7 @@ try {
   if (-not $second.WaitForExit($Seconds * 1000)) { throw "smoke-second: the second copy was still running after ${Seconds}s" }
   if ($second.ExitCode -ne 0) { throw "smoke-second: the second copy ended with $($second.ExitCode)" }
   if (-not (Select-String -Path (Join-Path $work 'second.err') -Pattern 'already open; its window is in front' -Quiet)) { throw 'smoke-second: the second copy did not hand over' }
+  if (-not (Select-String -Path (Join-Path $work 'first.err') -Pattern 'Brought forward for a second copy' -Quiet)) { throw 'smoke-second: the first copy did not come forward' }
   if ($first.HasExited) { throw 'smoke-second: the first copy ended' }
   Stop-Process -Id $first.Id -Force
   $first.WaitForExit(10000) | Out-Null
