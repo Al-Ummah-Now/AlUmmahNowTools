@@ -1,2 +1,3 @@
 On a Mac, an update that is ready now installs when you close Tools.
 When you log out or shut down a Mac during an import, the work is stopped and saved first.
+On a Mac, an empty second window no longer opens behind Tools.
