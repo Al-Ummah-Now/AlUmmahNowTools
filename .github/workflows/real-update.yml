@@ -38,7 +38,8 @@ jobs:
           hosts=/c/Windows/System32/drivers/etc/hosts
           echo >> "$hosts"
           for h in $BLOCKED; do
-            printf '0.0.0.0 %s\n:: %s\n' "$h" "$h" >> "$hosts"
+            # Windows answers nothing for 0.0.0.0 and ::, which proves nothing: this machine itself instead
+            printf '127.0.0.1 %s\n::1 %s\n' "$h" "$h" >> "$hosts"
           done
           ipconfig //flushdns
           # Proven by looking the names up; nothing is sent to them
