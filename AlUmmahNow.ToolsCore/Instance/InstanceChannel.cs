@@ -33,34 +33,45 @@ public static class InstanceChannel
     /// <summary>Answers second copies until <paramref name="ct"/>. Only the copy that holds the folder's lock listens.</summary>
     public static async Task ListenAsync(string folder, Func<Task<FrontAnswer>> bringForward, Action<Exception>? failed = null, CancellationToken ct = default)
     {
-        var name = NameFor(folder);
-        while (!ct.IsCancellationRequested)
+        NamedPipeServerStream Create() => new(NameFor(folder), PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+        NamedPipeServerStream? waiting = null;
+        try
         {
-            try
+            while (!ct.IsCancellationRequested)
             {
-                var pipe = new NamedPipeServerStream(name, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
                 try
                 {
-                    await pipe.WaitForConnectionAsync(ct).ConfigureAwait(false);
+                    waiting ??= Create();
+                    await waiting.WaitForConnectionAsync(ct).ConfigureAwait(false);
+                    // The next one waits before this one is answered and closed: on macOS and Linux the last one to close
+                    // takes the socket away, with whoever is just connecting
+                    var connected = waiting;
+                    waiting = null;
+                    try
+                    {
+                        waiting = Create();
+                    }
+                    finally
+                    {
+                        _ = AnswerAsync(connected, bringForward, failed, ct);
+                    }
                 }
-                catch
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ObjectDisposedException)
                 {
-                    await pipe.DisposeAsync().ConfigureAwait(false);
-                    throw;
+                    failed?.Invoke(ex);
+                    waiting?.Dispose();
+                    waiting = null;
+                    await Task.Delay(TimeSpan.FromSeconds(1), ct).ConfigureAwait(false);
                 }
-                // The next one can connect while this one is answered
-                _ = AnswerAsync(pipe, bringForward, failed, ct);
             }
-            catch (OperationCanceledException)
-            {
-                return;
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ObjectDisposedException)
-            {
-                failed?.Invoke(ex);
-                try { await Task.Delay(TimeSpan.FromSeconds(1), ct).ConfigureAwait(false); }
-                catch (OperationCanceledException) { return; }
-            }
+        }
+        catch (OperationCanceledException)
+        {
+            // The app is ending
+        }
+        finally
+        {
+            waiting?.Dispose();
         }
     }
 
