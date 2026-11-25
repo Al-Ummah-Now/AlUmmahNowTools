@@ -41,6 +41,9 @@ public sealed class LocalEncodeException : Exception
 
     /// <summary>source_read (the file stopped being readable), ffmpeg_missing, probe_failed, no_video (sound alone), no_media (neither), no_dimensions (a video whose size could not be told), no_audio, disk_space, ffmpeg_failed, too_short (the encoded video), copy_differs, took_too_long, package_failed, too_large, settings_invalid, colour_unsupported (no conversion shows it right), hdr_settings (the server's HDR tables are others) or colour_tags (the encoder wrote other colours)</summary>
     public string Code { get; }
+
+    /// <summary>What ffmpeg or ffprobe ended with</summary>
+    public int? ExitCode { get; init; }
 }
 
 /// <summary>A source as ffprobe sees it.</summary>
@@ -251,7 +254,7 @@ public sealed class FfmpegMediaTools : IMediaTools
         // Also when it ended well: what it could not read is not what the file lacks
         if (await SourceStoppedAsync(path, error, code, ct).ConfigureAwait(false) is { } stopped) throw stopped;
         // It says so itself: what it was given is no media file, or not a whole one. Anything else it ends with says nothing of the file
-        if (code != 0) throw new LocalEncodeException(code == 1 && NoMedia.IsMatch(error) ? "no_media" : "probe_failed", "ffprobe could not read the file: " + Why(error, path));
+        if (code != 0) throw new LocalEncodeException(code == 1 && NoMedia.IsMatch(error) ? "no_media" : "probe_failed", "ffprobe could not read the file: " + Why(error, path)) { ExitCode = code };
         return ParseProbe(output);
     }
 
@@ -364,7 +367,7 @@ public sealed class FfmpegMediaTools : IMediaTools
         // It ends well all the same, with what it had: whether it read the file to its end is in what it made. The same words come
         // from a file whose last bytes make no sense
         if (StoppedLine(source, error, network) is { } line && (code != 0 || !await IsWholeAsync(info, outputs, ct).ConfigureAwait(false))) throw Stopped(line, source, code);
-        if (code != 0) throw new LocalEncodeException("ffmpeg_failed", $"ffmpeg stopped ({encoder}, {code.ToString(CultureInfo.InvariantCulture)}): " + Why(error, source));
+        if (code != 0) throw new LocalEncodeException("ffmpeg_failed", $"ffmpeg stopped ({encoder}, {code.ToString(CultureInfo.InvariantCulture)}): " + Why(error, source)) { ExitCode = code };
     }
 
     /// <summary>Nothing is missing of any rung.</summary>
@@ -469,7 +472,7 @@ public sealed class FfmpegMediaTools : IMediaTools
     }
 
     private static LocalEncodeException Stopped(string line, string source, int code) =>
-        new("source_read", $"ffmpeg could not read the file to its end ({code.ToString(CultureInfo.InvariantCulture)}): " + Shown(line, source));
+        new("source_read", $"ffmpeg could not read the file to its end ({code.ToString(CultureInfo.InvariantCulture)}): " + Shown(line, source)) { ExitCode = code };
 
     private static string[] Lines(string text) => text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 

@@ -1,83 +1,72 @@
-using System.Text;
 using System.Text.RegularExpressions;
+using AlUmmahNow.ToolsCore.Import;
 
 namespace AlUmmahNow.ToolsCore;
 
 /// <summary>
-/// Takes the folders out of what leaves this computer: a path on a share, a drive or a Unix root keeps its last name alone, and
-/// neither the server's nor the person's folders are told. What stands after the path on its line stays.
+/// No folder of this computer, or of its shares, leaves it. Paths the app knows are replaced as they are, by their file's name; a
+/// line that still looks as if it had one is not sent at all. Where an unknown path ends is never guessed.
 /// </summary>
 public static class LocalPaths
 {
-    /// <summary>Where a path begins.</summary>
-    private static readonly Regex Roots = new(
-        // \\server\…, \\?\UNC\server\…, \\?\C:\…
-        @"(?<windows>\\{2,}(?:\?\\+(?:UNC\\+)?)?(?:[A-Za-z]:\\+)?"
-        // C:\… and C:/…, not the "s:/" of https://
-        + @"|(?<![A-Za-z])[A-Za-z]:(?:\\+|/(?!/)))"
-        // Where people's files, mounts and temporary files are on macOS and Linux; not an address' path
-        + @"|(?<![\w/:.\-])/(?i:Users|home|Volumes|mnt|media|run|private|tmp|var|opt|srv|root|data|Library|Applications)/",
-        RegexOptions.CultureInvariant);
+    /// <summary>A backslash, a drive, the home folder, a slash that no word is before; also written as in an address.</summary>
+    private static readonly Regex Absolute = new(@"\\|(?<!\p{L})[a-z]:/|~/|(?<!\w)/(?!\s|$)|%2f|%5c", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
 
-    /// <summary>A name ends with the extension of a file: not one a longer name goes on after, and not a folder's.</summary>
-    private static readonly Regex Extension = new(
-        @"\.(?:mp4|m4v|mov|mkv|webm|avi|wmv|flv|mpe?g|ts|m4a|mp3|wav|aac|flac|opus|ogg|srt|vtt|sbv|ass|json|csv|txt|xml|html?|jpe?g|png|webp|gif|bmp|part|ytdl|crdownload|partial|tmp|log|db|m3u8|m4s|zip|nupkg|exe|dll|dylib|so|cs|xaml)(?![\w\-\\/]|\.\w)",
-        RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
+    private static readonly Regex WebAddress = new(@"\bhttps?://[^\s\\]+", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
 
-    public static string? Strip(string? text)
+    private static readonly string[] Own =
+    [
+        Path.GetTempPath(),
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        EncodeStep.DefaultWorkRoot,
+        TranscribeStep.DefaultWorkRoot,
+    ];
+
+    /// <param name="files">The files it may be about, with their whole paths</param>
+    /// <param name="instead">What is sent in place of a line that may still name a folder</param>
+    public static string Clean(string text, string instead, IEnumerable<string>? files = null)
     {
-        if (text is null) return null;
-        var result = new StringBuilder(text.Length);
-        var at = 0;
-        while (Roots.Match(text, at) is { Success: true } root)
-        {
-            result.Append(text, at, root.Index - at);
-            at = FoldersEnd(text, root);
-        }
-        return result.Append(text, at, text.Length - at).ToString();
-    }
+        var known = (files ?? []).Where(f => f.Length > 0).Distinct().OrderByDescending(f => f.Length).ToList();
+        var names = known.Select(f => (Pattern: new Regex(Exactly(f) + @"(?![\\/\w])", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase), Name: Segments(f)[^1])).ToList();
+        // A folder alone, at the end of what is said or before a colon or a quote
+        var folders = known.SelectMany(Parents).Concat(Own.SelectMany(o => Parents(o).Prepend(o))).Where(f => Segments(f) is { Length: > 0 } s && !(s.Length == 1 && s[0].EndsWith(':'))).Distinct().OrderByDescending(f => f.Length)
+            .Select(f => new Regex(Exactly(f) + @"[\\/]*(?=$|[:""])", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase)).ToList();
+        return string.Join("\n", text.Split('\n').Select(line => Line(line) ?? instead).Distinct());
 
-    /// <summary>Behind the last separator of the path.</summary>
-    private static int FoldersEnd(string text, Match root)
-    {
-        var windows = root.Groups["windows"].Success;
-        var begin = root.Index + root.Length;
-        var limit = text.IndexOfAny([':', '*', '?', '"', '<', '>', '|', '\r', '\n'], begin) is var stop and >= 0 ? stop : text.Length;
-        // Quoted, it ends with its quote (which a name may have within it)
-        if (root.Index > 0 && Closing(text[root.Index - 1]) is { } quote)
+        string? Line(string line)
         {
-            for (var i = text.IndexOf(quote, begin); i >= 0 && i < limit; i = text.IndexOf(quote, i + 1))
-                if (i + 1 == text.Length || !char.IsLetterOrDigit(text[i + 1])) limit = i;
-        }
-        if (Extension.Match(text, begin, limit - begin) is { Success: true } file && Bounded(text, file)) limit = file.Index + file.Length;
-
-        var end = begin;
-        for (var i = begin; i < limit; i++)
-        {
-            if (text[i] is not ('\\' or '/')) continue;
-            var name = text.AsSpan(end, i - end);
-            if (name.Length > 0)
+            try
             {
-                // "a to \\nas": no name ends with a space; "lesson (video/mp4)": a slash in words is none of a Windows path
-                if (char.IsWhiteSpace(name[0]) || char.IsWhiteSpace(name[^1])) break;
-                if (windows && text[i] == '/' && name.IndexOf(' ') >= 0) break;
-                if (!windows && text[i] == '\\') break;
+                line = line.TrimEnd('\r').Normalize();
             }
-            end = i + 1;
+            catch (ArgumentException)
+            {
+                return null;
+            }
+            foreach (var (pattern, name) in names) line = pattern.Replace(line, _ => name);
+            var before = line;
+            foreach (var folder in folders) line = folder.Replace(line, "…");
+            var rest = WebAddress.Replace(line, " ");
+            // With a folder taken out, any separator left may be the rest of a longer path
+            return Absolute.IsMatch(rest) || (line != before && rest.IndexOfAny(['/', '\\']) >= 0) ? null : line;
         }
-        return end;
     }
 
-    /// <summary>The expression saw the text up to the limit only.</summary>
-    private static bool Bounded(string text, Match file) => Extension.Match(text, file.Index) is { Success: true } whole && whole.Index == file.Index;
+    /// <summary>What the app knows of a file's places: as it was chosen, through its share, and the files beside it.</summary>
+    public static IEnumerable<string> Of(ScannedVideo video) =>
+        new[] { video.Path, video.ChaptersPath, video.ThumbnailPath, video.MetadataPath }.Concat(video.Captions.Select(c => c.Path)).OfType<string>().SelectMany(Import.Sources.SourceAccess.Default.Known);
 
-    private static char? Closing(char opening) => opening switch
+    private static string[] Segments(string path) => path.Normalize().Split(['/', '\\'], StringSplitOptions.RemoveEmptyEntries);
+
+    private static IEnumerable<string> Parents(string path)
     {
-        '\'' => '\'',
-        '"' => '"',
-        '‘' => '’',
-        '“' => '”',
-        '`' => '`',
-        _ => null,
-    };
+        for (var at = path.TrimEnd('/', '\\').LastIndexOfAny(['/', '\\']); at > 0; at = path.LastIndexOfAny(['/', '\\'], at - 1))
+            yield return path[..at];
+    }
+
+    /// <summary>With every separator, doubled or not, and the prefixes Windows puts before a long path; quotes and spaces as they may be written.</summary>
+    private static string Exactly(string path) =>
+        (path[0] is '/' or '\\' ? @"(?:[\\/]+\?[\\/]+UNC[\\/]+|[\\/]+)" : @"(?:[\\/]+\?[\\/]+)?")
+        + string.Join(@"[\\/]+", Segments(path).Select(s => Regex.Escape(s).Replace("'", "['’‘]").Replace(@"\ ", @"(?:\ |%20)")));
 }
