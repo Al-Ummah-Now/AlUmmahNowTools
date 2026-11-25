@@ -491,7 +491,7 @@ public sealed class EncodeStep : IImportStep
             var outputs = rungs.Select(r => Path.Combine(directory, r.Name + ".mp4")).ToList();
             await _source.WithPathAsync(item.Video.Path, context, async path =>
             {
-                await _media.EncodeAsync(path, info, rungs, outputs, encoder, settings.Ladder, new Progress<double>(p => context.Progress(p * 0.9)), ct).ConfigureAwait(false);
+                await _media.EncodeAsync(path, info, rungs, outputs, encoder, settings.Ladder, new DirectProgress(p => context.Progress(p * 0.9)), ct).ConfigureAwait(false);
                 return true;
             }, ct).ConfigureAwait(false);
             await _source.CheckUnchangedAsync(item.Video, context, ct, read: true).ConfigureAwait(false);

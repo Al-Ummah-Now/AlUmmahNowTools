@@ -155,7 +155,7 @@ public sealed class TranscribeStep : IImportStep
             if (modelPath is null)
             {
                 context.Log(LogLevel.Info, "model_download", $"Downloading the speech model {model} (once)", model);
-                modelPath = await _transcriber.DownloadAsync(model, new Progress<double>(p => context.Progress(p * 0.5)), ct).ConfigureAwait(false);
+                modelPath = await _transcriber.DownloadAsync(model, new DirectProgress(p => context.Progress(p * 0.5)), ct).ConfigureAwait(false);
                 share = 0.5;
             }
             var offset = 1 - share;
@@ -184,7 +184,7 @@ public sealed class TranscribeStep : IImportStep
 
             var device = _transcriber.Device;
             var where = device is null ? "" : device.Name.Length > 0 ? $"{device.Name} ({device.Backend})" : device.Backend;
-            var json = await _transcriber.TranscribeAsync(modelPath, source, item.SpokenLanguage, new Progress<double>(p => context.Progress(offset + p * share)), ct).ConfigureAwait(false);
+            var json = await _transcriber.TranscribeAsync(modelPath, source, item.SpokenLanguage, new DirectProgress(p => context.Progress(offset + p * share)), ct).ConfigureAwait(false);
             WorkFiles.DeleteFile(wav, _workRoot, item.Id, ".wav");
 
             var transcript = TranscriptUpload.From(CoreTranscript.Parse(json), index);
