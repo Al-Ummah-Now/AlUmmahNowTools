@@ -7,6 +7,10 @@ name: Release
 # One build serves every environment: the app's environment picker chooses QA, stage or production.
 # Pull requests that change packaging, and workflow_dispatch, are dry runs: same builds and launches, no release.
 #
+# Update signing (wiki AUN-APP-UPDATES §3.1, §9): `manifest` lists every file in app-release.json without any secret;
+# `sign` is the only job with the environment update-signing (its key signs that one file and nothing else runs there);
+# `release` publishes the files, the manifest and its signature in one step, so a release never appears without them.
+#
 # Signing is optional and never fails the run when a value is missing (a ::notice:: names it):
 #   Windows Authenticode (exe + MSI): WINDOWS_CERT_PFX_BASE64, WINDOWS_CERT_PASSWORD (AlUmmahNowDesktop's names)
 #   macOS Developer ID + notarization: DEVELOPER_ID_P12 (base64), DEVELOPER_ID_P12_PASSWORD, APPLE_TEAM_ID,
@@ -24,6 +28,9 @@ on:
       - scripts/nuget-notices.py
       - scripts/release-notes.py
       - scripts/smoke-launch.sh
+      - scripts/app-release.mjs
+      - scripts/release-files.mjs
+      - scripts/vpk-pack.sh
   workflow_dispatch:
 concurrency:
   group: release-${{ github.ref }}
@@ -46,6 +53,7 @@ jobs:
       msi: ${{ steps.version.outputs.msi }}
       display: ${{ steps.version.outputs.display }}
       build: ${{ steps.version.outputs.build }}
+      velopack: ${{ steps.version.outputs.velopack }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -71,12 +79,25 @@ jobs:
             echo "name=${tag#v}"                       # file names, InformationalVersion, .deb version
             echo "numeric=$y.$m.$d.$n"                 # assembly and file version
             echo "msi=$((y - 2000)).$m.$((d * 100 + n))" # MSI: major<=255.minor<=255.build<=65535
+            echo "velopack=$y.$m.$((d * 100 + n))"       # Velopack package (VelopackInstaller.PackVersion)
             # Uno (Resizetizer) wants ApplicationDisplayVersion as 3 parts and ApplicationVersion as one small
             # integer; together they make the 4-part package version YYYY.M.D.N (CFBundleShortVersionString and
             # CFBundleVersion on macOS)
             echo "display=$y.$m.$d"
             echo "build=$n"
           } | tee -a "$GITHUB_OUTPUT"
+      - name: No test hooks in a release
+        run: |
+          if grep -rnE 'UpdateTest(=|>)true|UPDATE_TEST' .github/workflows/release.yml scripts/vpk-pack.sh Directory.Packages.props AlUmmahNow.VisualImporterUno/Directory.*.props | grep -v 'No test hooks' | grep -v 'grep -rnE'; then
+            echo "::error::a release build must not define UPDATE_TEST"; exit 1
+          fi
+      - name: Release notes are this release's
+        run: |
+          for f in en ar; do test -s "packaging/release-notes/$f.txt" || { echo "::error::packaging/release-notes/$f.txt is missing or empty"; exit 1; }; done
+          prev=$(git tag -l 'v[0-9][0-9][0-9][0-9].[0-9][0-9].[0-9][0-9]*' | grep -vx "${GITHUB_REF_NAME}" | sort -V | tail -1)
+          if [ "$GITHUB_EVENT_NAME" = push ] && [ -n "$prev" ] && git diff --quiet "$prev" HEAD -- packaging/release-notes; then
+            echo "::error::packaging/release-notes still says what $prev said: write what changed (apps show it under What's new)"; exit 1
+          fi
       - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           dotnet-version: |
@@ -148,6 +169,18 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force dist | Out-Null
           Compress-Archive -Path out/publish/* -DestinationPath "dist/AlUmmahNow-Tools-Windows-$env:NAME-x64-portable${{ steps.sign.outputs.suffix }}.zip"
+      - name: Velopack installer and update package
+        shell: bash
+        env:
+          PFX_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+          SUFFIX: ${{ steps.sign.outputs.suffix }}
+        run: |
+          # shellcheck disable=SC2016 # vpk expands {{file}}
+          sign=()
+          if [ -n "${PFX_PATH:-}" ]; then sign=(--signTemplate "\"$SIGNTOOL\" sign /fd SHA256 /f \"$PFX_PATH\" /p \"$PFX_PASSWORD\" /tr http://timestamp.digicert.com /td SHA256 {{file}}"); fi
+          scripts/vpk-pack.sh win-x64 ${{ needs.verify.outputs.velopack }} out/publish AlUmmahNow.VisualImporterUno.exe "${sign[@]}"
+          mv out/vpk/*-Setup.exe "dist/AlUmmahNow-Tools-Windows-$NAME-x64-Setup$SUFFIX.exe"
+          mv out/vpk/*-full.nupkg "dist/AlUmmahNow-Tools-Windows-$NAME-x64-update.nupkg"
       - name: MSI installer (WiX 5)
         shell: pwsh
         env:
@@ -290,6 +323,26 @@ jobs:
         run: |
           exe=$(/usr/libexec/PlistBuddy -c 'Print CFBundleExecutable' "$APP_BUNDLE/Contents/Info.plist")
           scripts/smoke-launch.sh "$PWD/smoke/macos.png" 120 "$APP_BUNDLE/Contents/MacOS/$exe"
+      - name: Velopack bundle and update package
+        env:
+          IDENTITY: ${{ steps.keychain.outputs.identity }}
+        run: |
+          # No Developer ID: ad hoc ("-"), which macOS on Apple silicon needs and our own manifest signature doesn't replace
+          scripts/vpk-pack.sh ${{ matrix.rid }} ${{ needs.verify.outputs.velopack }} "$APP_BUNDLE" "$(/usr/libexec/PlistBuddy -c 'Print CFBundleExecutable' "$APP_BUNDLE/Contents/Info.plist")" \
+            --signAppIdentity "${IDENTITY:--}" --signEntitlements "$PWD/packaging/macos/entitlements.plist" --noInst
+          mkdir -p dist
+          mv out/vpk/*-full.nupkg "dist/AlUmmahNow-Tools-macOS-$NAME-${{ matrix.arch }}-update.nupkg"
+          # The .dmg holds this bundle, so an app dragged to Applications can update itself
+          ditto -x -k out/vpk/*-Portable.zip out/bundle
+          app=$(find out/bundle -maxdepth 1 -name '*.app' -type d)
+          codesign --verify --deep --strict "$app"
+          test -x "$app/Contents/MacOS/UpdateMac"
+          echo "APP_BUNDLE=$app" >> "$GITHUB_ENV"
+      - name: Launch the packed app
+        if: matrix.smoke
+        run: |
+          exe=$(/usr/libexec/PlistBuddy -c 'Print CFBundleExecutable' "$APP_BUNDLE/Contents/Info.plist")
+          scripts/smoke-launch.sh "$PWD/smoke/macos-packed.png" 120 "$APP_BUNDLE/Contents/MacOS/$exe"
       - name: Disk image
         env:
           IDENTITY: ${{ steps.keychain.outputs.identity }}
@@ -377,10 +430,93 @@ jobs:
           path: smoke
           if-no-files-found: ignore
 
+  manifest:
+    # app-release.json for every file. No secret here. Dry runs also sign it, with a key made and thrown away in the job.
+    needs: [verify, windows, macos, linux]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TAG: ${{ needs.verify.outputs.tag }}
+      NAME: ${{ needs.verify.outputs.name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: release-*
+          path: dist
+          merge-multiple: true
+      - name: Build app-release.json
+        run: |
+          tag=$TAG; [ "$GITHUB_EVENT_NAME" = push ] || tag=${TAG%.0}
+          node scripts/release-files.mjs dist "$NAME" > artifacts.json
+          node scripts/app-release.mjs build --repo AlUmmahNowTools --tag "$tag" --channel stable \
+            --notes-en packaging/release-notes/en.txt --notes-ar packaging/release-notes/ar.txt --artifacts artifacts.json --out app-release.json
+          cat app-release.json
+      - name: Sign and verify with a throwaway key (dry run)
+        if: github.event_name != 'push'
+        run: |
+          pub=$(node scripts/app-release.mjs keygen --out "$RUNNER_TEMP/throwaway.key" | sed -n 's/^public key: //p')
+          cp app-release.json "$RUNNER_TEMP/app-release.json"
+          UPDATE_SIGNING_KEY=$(cat "$RUNNER_TEMP/throwaway.key") node scripts/app-release.mjs sign --in "$RUNNER_TEMP/app-release.json" --require
+          node scripts/app-release.mjs verify --in "$RUNNER_TEMP/app-release.json" --pub "$pub"
+          printf ' ' >> "$RUNNER_TEMP/app-release.json"
+          if node scripts/app-release.mjs verify --in "$RUNNER_TEMP/app-release.json" --pub "$pub"; then echo "::error::a changed manifest verified"; exit 1; fi
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: manifest
+          path: app-release.json
+          if-no-files-found: error
+
+  sign:
+    # The only job that sees the update signing key (environment update-signing, release tags only). It checks out this
+    # commit, refuses one that isn't on master, signs app-release.json and passes the signature on. It installs and
+    # builds nothing, and its token can only read.
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    needs: [verify, manifest]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: update-signing
+    permissions:
+      contents: read
+    env:
+      TAG: ${{ needs.verify.outputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: The tagged commit is on master
+        run: |
+          git fetch --no-tags origin +refs/heads/master:refs/remotes/origin/master
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/master || { echo "::error::$GITHUB_SHA is not on master: not signing"; exit 1; }
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: manifest
+          path: signed
+      - name: The manifest is this tag's
+        run: |
+          jq -e --arg tag "$TAG" --arg ref "$GITHUB_REF_NAME" '.schema == 1 and .repo == "AlUmmahNowTools" and .tag == $tag and .tag == $ref and .version == ($tag | ltrimstr("v"))' signed/app-release.json
+      - name: Sign
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+        run: node scripts/app-release.mjs sign --in signed/app-release.json --require
+      - name: The signature verifies under the key list the apps carry
+        run: |
+          pub=$(jq -r '[.keys[].publicKey] | join(",")' AlUmmahNow.ToolsCore/Updates/keys/update-keys.json)
+          node scripts/app-release.mjs verify --in signed/app-release.json --pub "$pub"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: manifest-signed
+          path: signed/*
+          if-no-files-found: error
+
   release:
     # Dry runs stop after the builds and launches above.
     if: github.event_name == 'push'
-    needs: [verify, windows, macos, linux]
+    needs: [verify, windows, macos, linux, sign]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -402,6 +538,14 @@ jobs:
         with:
           name: notices
           path: packaging/licenses
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: manifest-signed
+          path: dist
+      - name: Every file is the one the signed manifest lists
+        run: |
+          test -s dist/app-release.json.sig
+          jq -r '.artifacts[] | .sha256 + "  dist/" + (.url | split("/") | last)' dist/app-release.json | sha256sum --check --strict
       - name: Licences and checksums
         run: |
           (cd packaging && zip -r "../dist/AlUmmahNow-Tools-$NAME-licenses.zip" licenses)

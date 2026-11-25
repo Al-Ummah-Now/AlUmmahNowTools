@@ -7,6 +7,11 @@
     <Nullable>enable</Nullable>
     <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
   </PropertyGroup>
+  <!-- CI's update test only (.github/workflows/update-test.yml): the root key and the server come from the environment.
+       Never in a release: release.yml refuses it. -->
+  <PropertyGroup Condition="'$(UpdateTest)' == 'true'">
+    <DefineConstants>$(DefineConstants);UPDATE_TEST</DefineConstants>
+  </PropertyGroup>
   <ItemGroup>
     <!-- Fetched and checksum-verified by scripts/fetch-core.sh into .nuget-local (nuget.config) -->
     <PackageReference Include="AlUmmahNow.Core" Version="0.4.0-rc.5" />

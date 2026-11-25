@@ -73,4 +73,20 @@ too on Linux) and into the release's licences zip:
 
 ## Updates
 
-The app does not check for updates yet (wiki TOOLS-ADMIN TA-22): staff download each release from GitHub.
+The app asks `GET /api/v1/app-config` for a newer release and installs only what our own key signed (wiki
+AUN-APP-UPDATES). Operating-system code signing is separate and optional.
+
+- **Windows Setup and the macOS `.dmg`** are Velopack builds (`scripts/vpk-pack.sh`) and update themselves. The MSI, the
+  portable zip and the Linux packages show the notice, and **Download** opens the releases page.
+- **`packaging/release-notes/en.txt` and `ar.txt`**: plain text, at most 1,500 characters each, shown under *What's new*.
+  Change both before each release; a tag whose notes are the last release's is refused.
+- **`app-release.json`** lists every file with its SHA-256 (`scripts/release-files.mjs`, `scripts/app-release.mjs`, a copy
+  of AlUmmahNow `scripts/app-release/app-release.mjs`). The `sign` job signs it with `UPDATE_SIGNING_KEY` from the
+  environment `update-signing`, and refuses a commit that isn't on `master`. A failed signature means no release.
+- **Keys**: the root public key is in `AlUmmahNow.ToolsCore/Updates/CoreUpdateChecker.cs`; the root-signed key list is
+  `AlUmmahNow.ToolsCore/Updates/keys/`, byte for byte the one on the `update-keys` release. Rotation and revocation:
+  wiki §3.5.
+- **Update test** (`.github/workflows/update-test.yml`): builds two versions with a test key, installs the first, and
+  checks that it becomes the second on Windows and macOS, and that a changed package is refused. Test builds
+  (`-p:UpdateTest=true`) are the only ones that take their key and server from the environment; `release.yml` never
+  sets it, and a check refuses it there.
