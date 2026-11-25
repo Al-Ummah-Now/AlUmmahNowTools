@@ -36,6 +36,13 @@ internal static class DemoSuggest
                 File.Delete(path + ".focus");
                 Find<TextBox>(box)?.Focus(FocusState.Keyboard);
             }
+            // What the page gets from the scanner while the box is in use
+            if (File.Exists(path + ".refresh"))
+            {
+                File.Delete(path + ".refresh");
+                if (root is Frame { Content: Views.WatchManagementPage watched }) watched.ViewModel.RefreshWatchesCommand.Execute(null);
+                if (root is Frame { Content: Views.ApprovalWorkflowPage waiting }) waiting.ViewModel.RefreshApprovalsCommand.Execute(null);
+            }
             if (!focused)
             {
                 if (Find<TextBox>(box) is not { } text) return;
