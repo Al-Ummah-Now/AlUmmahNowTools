@@ -1,5 +1,7 @@
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using AlUmmahNow.ToolsCore.Import.Sources;
 
 namespace AlUmmahNow.ToolsCore.Import;
 
@@ -42,6 +44,8 @@ public sealed class StepState
     public string? LastError { get; set; }
     /// <summary>What kind of failure it was, for the app's words (<see cref="ImportQueue.ErrorCode"/>)</summary>
     public string? LastErrorCode { get; set; }
+    /// <summary>A failed read: the system's number and text and the offset, for the app's words</summary>
+    public ReadError? ReadError { get; set; }
     /// <summary>The step is waiting on the server's own work (its transcode), not on a retry</summary>
     public bool WaitingOnServer { get; set; }
     /// <summary>
@@ -58,6 +62,31 @@ public sealed class StepState
         "server" or "upload_refused" or "unexpected" => Attempts > 1,
         _ => false,
     };
+}
+
+/// <summary>What the system said about a failed read ("Windows", 59, "An unexpected network error occurred") and where it stopped.</summary>
+public sealed record ReadError(string System, int? Number, string Text, long? Offset)
+{
+    internal static ReadError? Of(Exception error) => error switch
+    {
+        SourceReadException r => new ReadError(r.Failure.SystemName, r.Failure.Number, r.Failure.Text, r.Offset),
+        StepFailedException => null,
+        IOException or UnauthorizedAccessException when ReadFailure.Of(error) is { Number: not null } f => new ReadError(f.SystemName, f.Number, f.Text, null),
+        _ => null,
+    };
+
+    /// <summary>As a log line's arguments, after the line's own.</summary>
+    internal string[] Args => [System, Number?.ToString(CultureInfo.InvariantCulture) ?? "", Text, Offset?.ToString(CultureInfo.InvariantCulture) ?? ""];
+}
+
+/// <summary>What a running step is waiting for.</summary>
+public enum StepWait
+{
+    None,
+    /// <summary>The network share stopped answering</summary>
+    Share,
+    /// <summary>The file comes down from cloud storage first</summary>
+    Cloud,
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter))]
@@ -134,6 +163,12 @@ public sealed class QueueItem
 
     /// <summary>Progress of the running step, 0–1 (not saved)</summary>
     [JsonIgnore] public double Progress { get; internal set; }
+
+    /// <summary>What the running step is waiting for (not saved)</summary>
+    [JsonIgnore] public StepWait Wait { get; internal set; }
+
+    /// <summary>The hash so far, kept over a failed attempt and a pause (not saved: a restart hashes from the start)</summary>
+    [JsonIgnore] internal HashSoFar? Hashing { get; set; }
 
     [JsonIgnore] public StepState? CurrentStep => Steps.FirstOrDefault(s => s.Status is StepStatus.Pending or StepStatus.Running or StepStatus.Failed);
     [JsonIgnore] public DateTimeOffset? NextAttemptAt => CurrentStep?.NextAttemptAt;
@@ -241,6 +276,8 @@ public interface IStepContext
     void Save();
     /// <summary>With <see cref="StepResult.Later"/>: when to run the step again.</summary>
     void Later(TimeSpan delay);
+    /// <summary>The step waits for something before it can go on.</summary>
+    void Waiting(StepWait wait) { }
 }
 
 public interface IImportStep
@@ -380,7 +417,7 @@ public sealed class ImportQueue : IDisposable
         TusGoneException => true,
         AlreadyImportedException => false,
         FileNotFoundException or DirectoryNotFoundException or UnauthorizedAccessException => false,
-        IOException => true,
+        IOException io => ReadFailure.Of(io).Retryable,
         HttpRequestException => true,
         TimeoutException => true,
         _ => false,
@@ -484,6 +521,7 @@ public sealed class ImportQueue : IDisposable
         step.NextAttemptAt = null;
         step.LastError = null;
         step.LastErrorCode = null;
+        step.ReadError = null;
         step.Retryable = null;
         step.WaitingOnServer = false;
         AppendLog(item, LogLevel.Info, "retry", $"Retry: {step.Kind}", step.Kind.ToString());
@@ -731,6 +769,7 @@ public sealed class ImportQueue : IDisposable
                 step.Status = result == StepResult.Skipped ? StepStatus.Skipped : StepStatus.Done;
                 step.LastError = null;
                 step.LastErrorCode = null;
+                step.ReadError = null;
                 step.Retryable = null;
                 item.Progress = 1;
                 if (result == StepResult.Skipped) AppendLog(item, LogLevel.Info, "skipped", $"{step.Kind}: nothing to do", step.Kind.ToString());
@@ -752,6 +791,8 @@ public sealed class ImportQueue : IDisposable
                 step.LastError = message;
                 step.LastErrorCode = code;
                 step.Retryable = IsRetryable(failure);
+                step.ReadError = ReadError.Of(failure);
+                var read = step.ReadError?.Args ?? [];
                 var attempts = step.Attempts.ToString(System.Globalization.CultureInfo.InvariantCulture);
                 if (IsRetryable(failure) && step.Attempts < _settings.MaxAttempts)
                 {
@@ -761,7 +802,7 @@ public sealed class ImportQueue : IDisposable
                     step.Status = StepStatus.Pending;
                     step.NextAttemptAt = _time.GetUtcNow() + wait;
                     var seconds = Math.Ceiling(wait.TotalSeconds).ToString(System.Globalization.CultureInfo.InvariantCulture);
-                    AppendLog(item, LogLevel.Warning, "attempt_failed", $"{step.Kind}: attempt {step.Attempts} failed: {message}. Next try in {seconds} s", step.Kind.ToString(), attempts, code, seconds, message);
+                    AppendLog(item, LogLevel.Warning, "attempt_failed", $"{step.Kind}: attempt {step.Attempts} failed: {message}. Next try in {seconds} s", [step.Kind.ToString(), attempts, code, seconds, message, .. read]);
                 }
                 else
                 {
@@ -769,7 +810,7 @@ public sealed class ImportQueue : IDisposable
                     // Failed for good just as it was paused: it reads Failed, and Resume all has nothing to do with it
                     if (!step.CanTryAgain) item.Paused = false;
                     reference = ErrorReport.NewRef();
-                    AppendLog(item, LogLevel.Error, "failed", $"{step.Kind}: failed after {step.Attempts} attempt(s): {message} (reference {reference})", step.Kind.ToString(), attempts, code, reference, message);
+                    AppendLog(item, LogLevel.Error, "failed", $"{step.Kind}: failed after {step.Attempts} attempt(s): {message} (reference {reference})", [step.Kind.ToString(), attempts, code, reference, message, .. read]);
                 }
             }
             Finish(item);
@@ -792,6 +833,7 @@ public sealed class ImportQueue : IDisposable
         void Finish(QueueItem i)
         {
             if (_running.Remove(i.Id, out var c)) c.Dispose();
+            i.Wait = StepWait.None;
             // Removed while it ran: its files are free now
             if (!_items.Contains(i)) DeleteWork(new[] { i });
             SaveLocked();
@@ -800,8 +842,8 @@ public sealed class ImportQueue : IDisposable
 
     /// <summary>
     /// The kind of failure, for the app's words: the step's own code, admin_unreachable, videos_unreachable,
-    /// signed_out, already_imported, upload_gone, upload_refused, file_missing, file_denied, file_read, server
-    /// (admin-api's own words follow) or unexpected.
+    /// signed_out, already_imported, upload_gone, upload_refused, file_missing, file_denied, server (admin-api's own words
+    /// follow), one of <see cref="ReadFailure"/>'s for a file that could not be read, or unexpected.
     /// </summary>
     public static string ErrorCode(Exception error) => error switch
     {
@@ -815,12 +857,15 @@ public sealed class ImportQueue : IDisposable
         AlreadyImportedException => "already_imported",
         FileNotFoundException or DirectoryNotFoundException => "file_missing",
         UnauthorizedAccessException => "file_denied",
-        IOException => "file_read",
+        IOException io => ReadFailure.Of(io).Code,
         _ => "unexpected",
     };
 
-    internal static string Describe(Exception error) => error switch
+    /// <summary>The failure in English, without any path on this computer (it goes into the server's reports).</summary>
+    public static string Describe(Exception error) => error switch
     {
+        SourceReadException r => r.Message,
+        IOException or UnauthorizedAccessException => ReadFailure.Of(error).Message,
         ImportApiException a when a.Status == 0 => "The admin API could not be reached",
         ImportApiException a => $"{a.Message} ({a.Status} {a.Code})",
         TusException t when t.Status == 0 => "The videos API could not be reached",
@@ -924,6 +969,13 @@ public sealed class ImportQueue : IDisposable
         public void Save()
         {
             lock (_queue._gate) _queue.SaveLocked();
+        }
+
+        public void Waiting(StepWait wait)
+        {
+            if (_item.Wait == wait) return;
+            _item.Wait = wait;
+            _queue.Notify(_item.Id);
         }
 
         public TimeSpan? LaterDelay { get; private set; }

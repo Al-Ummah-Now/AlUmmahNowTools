@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using AlUmmahNow.ToolsCore.Import.Sources;
 using AlUmmahNow.ToolsCore.Transcription;
 
 namespace AlUmmahNow.ToolsCore.Import;
@@ -81,12 +82,14 @@ public sealed class TranscribeStep : IImportStep
     private readonly string _workRoot;
     private readonly Action<Exception, QueueItem>? _report;
     private readonly TimeProvider _time;
+    private readonly SourceAccess _source;
 
     /// <summary>How long to wait for the server's Quran index when it has no fresh copy</summary>
     public static readonly TimeSpan IndexRetry = TimeSpan.FromMinutes(10);
 
-    public TranscribeStep(ImportApiClient api, ITranscriber transcriber, IMediaTools media, QuranIndexSource quran, string workRoot, Action<Exception, QueueItem>? report = null, TimeProvider? time = null)
+    public TranscribeStep(ImportApiClient api, ITranscriber transcriber, IMediaTools media, QuranIndexSource quran, string workRoot, Action<Exception, QueueItem>? report = null, TimeProvider? time = null, SourceAccess? source = null)
     {
+        _source = source ?? SourceAccess.Default;
         _time = time ?? TimeProvider.System;
         _api = api;
         _transcriber = transcriber;
@@ -125,7 +128,7 @@ public sealed class TranscribeStep : IImportStep
             context.Log(LogLevel.Warning, "transcribe_unavailable", "This build of the app cannot transcribe on this computer");
             return StepResult.Skipped;
         }
-        UploadStep.CheckUnchanged(item);
+        await _source.CheckUnchangedAsync(item.Video, context, ct).ConfigureAwait(false);
 
         // The index first: a transcript is never held, saved or sent before its Quran spans are references
         QuranIndex index;
@@ -161,7 +164,13 @@ public sealed class TranscribeStep : IImportStep
             var source = item.Video.Path;
             try
             {
-                await _media.ExtractAudioAsync(item.Video.Path, wav, ct).ConfigureAwait(false);
+                await _source.WithPathAsync(item.Video.Path, context, async path =>
+                {
+                    // aun-core reads this one itself when ffmpeg is missing
+                    source = path;
+                    await _media.ExtractAudioAsync(path, wav, ct).ConfigureAwait(false);
+                    return true;
+                }, ct).ConfigureAwait(false);
                 source = wav;
             }
             catch (LocalEncodeException missing) when (missing.Code == "ffmpeg_missing")
@@ -206,6 +215,12 @@ public sealed class TranscribeStep : IImportStep
         {
             WorkFiles.DeleteFile(wav, _workRoot, item.Id, ".wav");
             if (item.Transcript is null) WorkFiles.DeleteFile(upload, _workRoot, item.Id, ".json");
+            throw;
+        }
+        catch (Exception ex) when (ex is SourceReadException or StepFailedException)
+        {
+            // The share is away, or the file changed: for the queue to try again or to show
+            WorkFiles.DeleteFile(wav, _workRoot, item.Id, ".wav");
             throw;
         }
         catch (Exception ex) when (ex is TranscribeException or LocalEncodeException or IOException or UnauthorizedAccessException or JsonException)

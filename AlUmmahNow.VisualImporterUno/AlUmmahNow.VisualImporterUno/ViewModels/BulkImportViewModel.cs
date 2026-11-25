@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
 using AlUmmahNow.ToolsCore.Import;
+using AlUmmahNow.ToolsCore.Import.Sources;
 using AlUmmahNow.ToolsCore.Transcription;
 using LogLevel = AlUmmahNow.ToolsCore.Import.LogLevel;
 using AlUmmahNow.VisualImporterUno.Shell;
@@ -304,12 +305,14 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
     {
         IsScanning = true;
         ScanMessage = Loc.Get("Import_Scanning");
-        var folder = FolderPath.Trim();
+        // "Copy as path" on Windows puts quotes around it; \\server\share works as it is
+        var folder = FolderPath.Trim().Trim('"').Trim();
         var subfolders = IncludeSubfolders;
         var language = CaptionLanguageIndex switch { 1 => "ar", 2 => "en", _ => null };
         try
         {
-            if (!Directory.Exists(folder))
+            // A share may take a while to answer
+            if (!await Task.Run(() => SourceAccess.Default.FolderExists(folder)))
             {
                 ScanMessage = Loc.Get("Import_FolderMissing");
                 return;
@@ -319,7 +322,8 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            ScanMessage = Loc.GetWithDetail("Import_ScanFailed", ex.Message);
+            var failure = ReadFailure.Of(ex);
+            ScanMessage = Loc.WithDetail(Loc.GetWithDetail("Import_ScanFailed", ErrorText(failure.Code, null)), ReadText(failure.SystemName, failure.Number?.ToString(CultureInfo.InvariantCulture) ?? "", failure.Text, ""));
         }
         finally
         {
@@ -579,6 +583,26 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
         return code is "server" or "upload_refused" or "unexpected" ? Loc.WithDetail(text, raw) : text;
     }
 
+    /// <summary>A failed read: the app's words, then the system's number and text and where it stopped, each on its own line.</summary>
+    internal static string ErrorText(string? code, string? raw, ReadError? read) => read is null
+        ? ErrorText(code, raw)
+        : Loc.WithDetail(ErrorText(code, raw), ReadText(read.System, read.Number?.ToString(CultureInfo.InvariantCulture) ?? "", read.Text, read.Offset?.ToString(CultureInfo.InvariantCulture) ?? ""));
+
+    /// <summary>"Windows error 59", the system's own text, and the byte the reading stopped at; a line each, empty ones left out.</summary>
+    internal static string ReadText(string system, string number, string text, string offset)
+    {
+        string Num(string value) => long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var n) ? Loc.Number(n) : value;
+        var lines = new List<string>();
+        // An error number is a name, not a count: never grouped
+        if (number.Length > 0) lines.Add(Loc.Format("ImportRead_" + system, Loc.IsArabic ? Loc.ToArabicDigits(number) : number));
+        if (text.Length > 0) lines.Add(Isolate(text));
+        if (offset.Length > 0) lines.Add(Loc.Format("ImportRead_offset", Num(offset)));
+        return string.Join("\n", lines);
+    }
+
+    /// <summary>A path or the system's words, kept left to right (or in their own direction) whatever the line around them.</summary>
+    internal static string Isolate(string text) => text.Length == 0 ? "" : (text[0] is '\\' or '/' || (text.Length > 1 && text[1] == ':') ? '\u2066' : '\u2068') + text + '\u2069';
+
     internal static string ErrorText(Exception ex) => ErrorText(ImportQueue.ErrorCode(ex), ex.Message);
 
     internal static string StepName(string kind) => Loc.Get("ImportStep_" + kind);
@@ -597,8 +621,14 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
             "report_failed" => Loc.WithDetail(Loc.Get("ImportLog_report_failed"), ErrorText(Arg(0), Arg(1))),
             "retry" or "started" or "stopped" or "done" or "skipped" => Loc.Format("ImportLog_" + line.Code, StepName(Arg(0))),
             "attempt" => Loc.Format("ImportLog_attempt", StepName(Arg(0)), Num(1)),
-            "attempt_failed" => Loc.WithDetail(Loc.Format("ImportLog_attempt_failed", StepName(Arg(0)), Num(1), Num(3)), ErrorText(Arg(2), Arg(4))),
-            "failed" => Loc.WithDetail(Loc.WithDetail(Loc.Format("ImportLog_failed", StepName(Arg(0)), Num(1)), ErrorText(Arg(2), Arg(4))), Loc.Format("ImportLog_reference", Arg(3))),
+            "attempt_failed" => Loc.WithDetail(Loc.Format("ImportLog_attempt_failed", StepName(Arg(0)), Num(1), Num(3)), Loc.WithDetail(ErrorText(Arg(2), Arg(4)), ReadText(Arg(5), Arg(6), Arg(7), Arg(8)))),
+            "failed" => Loc.WithDetail(Loc.WithDetail(Loc.Format("ImportLog_failed", StepName(Arg(0)), Num(1)), Loc.WithDetail(ErrorText(Arg(2), Arg(4)), ReadText(Arg(5), Arg(6), Arg(7), Arg(8)))), Loc.Format("ImportLog_reference", Arg(3))),
+            // Reading the file itself: a share, a cloud placeholder
+            "share_path" or "share_chosen" => Loc.WithDetail(Loc.Get("ImportLog_" + line.Code), Isolate(Arg(0))),
+            "share_back" or "hash_resumed" => Loc.Format("ImportLog_" + line.Code, Num(0)),
+            "share_tool" => Loc.WithDetail(Loc.Get("ImportLog_share_tool"), Isolate(Arg(0))),
+            "cloud_download" => Loc.Get("ImportLog_cloud_download"),
+            "read_failed" => Loc.WithDetail(Loc.WithDetail(ErrorText(Arg(0), null), ReadText(Arg(1), Arg(2), Arg(3), Arg(4))), Isolate(Arg(5))),
             "sent" => Loc.Format("ImportLog_sent", Loc.Groups(a.Skip(1).Select(Part))),
             "left_out_size" => Loc.WithDetail(Loc.Format("ImportLog_left_out_size", Num(1)), Arg(0)),
             "left_out_unreadable" => Loc.WithDetail(Loc.WithDetail(Loc.Get("ImportLog_left_out_unreadable"), Arg(0)), Arg(1)),
@@ -901,6 +931,8 @@ public sealed partial class QueueRow : ObservableObject
         Status = phase switch
         {
             ItemPhase.Done => item.AlreadyImported ? Loc.Get("ImportPhase_AlreadyImported") : Loc.Get("ImportPhase_Done"),
+            ItemPhase.Running when item.Wait == StepWait.Share => Loc.Get("ImportPhase_WaitingShare"),
+            ItemPhase.Running when item.Wait == StepWait.Cloud => Loc.Get("ImportPhase_WaitingCloud"),
             ItemPhase.Running when step!.Kind == ImportStepKind.Upload => Loc.Format("ImportPhase_Uploading", Loc.Percent(item.Progress * 100)),
             ItemPhase.Running when step!.Kind == ImportStepKind.Encode => Loc.Format("ImportPhase_Encoding", Loc.Percent(item.Progress * 100)),
             ItemPhase.Running when step!.Kind == ImportStepKind.Transcribe => Loc.Format("ImportPhase_Transcribing", Loc.Percent(item.Progress * 100)),
@@ -914,7 +946,7 @@ public sealed partial class QueueRow : ObservableObject
             _ => Loc.Format("ImportPhase_Waiting", BulkImportViewModel.StepName(step!.Kind.ToString())),
         };
         StatusTip = phase == ItemPhase.RetryWaiting ? Loc.UtcText(step!.NextAttemptAt!.Value) : null;
-        Detail = phase is ItemPhase.Failed or ItemPhase.RetryWaiting ? Loc.KeepLastWords(BulkImportViewModel.ErrorText(step!.LastErrorCode, step.LastError)) : "";
+        Detail = phase is ItemPhase.Failed or ItemPhase.RetryWaiting ? Loc.KeepLastWords(BulkImportViewModel.ErrorText(step!.LastErrorCode, step.LastError, step.ReadError)) : "";
         HasDetail = Detail.Length > 0;
         // The server's verdict once it has one; before that, a file the server encodes says so
         var verdict = BulkImportViewModel.VerdictText(item);

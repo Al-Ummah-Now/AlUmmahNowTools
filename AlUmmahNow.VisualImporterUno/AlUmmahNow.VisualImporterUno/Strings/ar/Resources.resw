@@ -2226,6 +2226,78 @@
   <data name="ImportError_file_read" xml:space="preserve">
     <value>تعذّرت قراءة الملف.</value>
   </data>
+  <data name="ImportError_share_lost" xml:space="preserve">
+    <value>توقّف مجلد الشبكة عن الاستجابة أثناء قراءة الملف. إن تكرّر التوقف عند الموضع نفسه فقد يكون الملف تالفًا على الخادم.</value>
+  </data>
+  <data name="ImportError_share_not_found" xml:space="preserve">
+    <value>تعذّر الوصول إلى مجلد الشبكة. ينبغي التأكد من أن الخادم يعمل ومتصل.</value>
+  </data>
+  <data name="ImportError_share_credentials" xml:space="preserve">
+    <value>لم يقبل مجلد الشبكة تسجيل الدخول من هذا الجهاز. يمكن فتح المجلد في مدير الملفات وتسجيل الدخول، ثم إعادة المحاولة.</value>
+  </data>
+  <data name="ImportError_share_damaged" xml:space="preserve">
+    <value>تتوقف قراءة الملف عند الموضع نفسه كل مرة، وقد يكون تالفًا على الخادم.</value>
+  </data>
+  <data name="ImportError_file_in_use" xml:space="preserve">
+    <value>يستخدم الملفَّ تطبيق آخر، ويلزم إغلاقه هناك.</value>
+  </data>
+  <data name="ImportError_file_writing" xml:space="preserve">
+    <value>ما زال تطبيق آخر يكتب في الملف. يلزم البحث في المجلد مجددًا بعد اكتماله.</value>
+  </data>
+  <data name="ImportError_disk_read" xml:space="preserve">
+    <value>تعذّرت على القرص قراءة الملف.</value>
+  </data>
+  <data name="ImportError_drive_gone" xml:space="preserve">
+    <value>القرص أو مجلد الشبكة الذي فيه الملف غير متصل.</value>
+  </data>
+  <data name="ImportError_cloud_offline" xml:space="preserve">
+    <value>الملف في التخزين السحابي وتعذّر تنزيله. ينبغي التحقق من الاتصال ومن تطبيق التخزين.</value>
+  </data>
+  <data name="ImportError_name_too_long" xml:space="preserve">
+    <value>اسم الملف أو مساره أطول مما يجب. يلزم تقصيره ثم البحث في المجلد مجددًا.</value>
+  </data>
+  <data name="ImportRead_Windows" xml:space="preserve">
+    <value>خطأ ويندوز {0}</value>
+  </data>
+  <data name="ImportRead_macOS" xml:space="preserve">
+    <value>خطأ ماك {0}</value>
+  </data>
+  <data name="ImportRead_Linux" xml:space="preserve">
+    <value>خطأ لينكس {0}</value>
+  </data>
+  <data name="ImportRead_offset" xml:space="preserve">
+    <value>توقفت القراءة عند البايت {0}</value>
+  </data>
+  <data name="ImportPhase_WaitingShare" xml:space="preserve">
+    <value>في انتظار مجلد الشبكة…</value>
+  </data>
+  <data name="ImportPhase_WaitingCloud" xml:space="preserve">
+    <value>جار التنزيل من التخزين السحابي أولًا…</value>
+  </data>
+  <data name="ImportLog_share_path" xml:space="preserve">
+    <value>القراءة عبر مسار الشبكة</value>
+  </data>
+  <data name="ImportLog_share_chosen" xml:space="preserve">
+    <value>القراءة عبر المجلد المختار</value>
+  </data>
+  <data name="ImportLog_share_back" xml:space="preserve">
+    <value>عاد مجلد الشبكة إلى الاستجابة، وتُستأنف القراءة من البايت {0}</value>
+  </data>
+  <data name="ImportLog_share_tool" xml:space="preserve">
+    <value>لم تتمكن أدوات المرئيات من قراءة الملف إلى آخره، وتُعاد المحاولة</value>
+  </data>
+  <data name="ImportLog_hash_resumed" xml:space="preserve">
+    <value>يُستأنف الفحص من البايت {0}</value>
+  </data>
+  <data name="ImportLog_cloud_download" xml:space="preserve">
+    <value>جار التنزيل من التخزين السحابي أولًا</value>
+  </data>
+  <data name="ImportEncodeError_source_read" xml:space="preserve">
+    <value>لم تتمكن أدوات المرئيات من قراءة الملف إلى آخره.</value>
+  </data>
+  <data name="ImportTranscribeError_source_read" xml:space="preserve">
+    <value>لم تتمكن أدوات المرئيات من قراءة الملف إلى آخره.</value>
+  </data>
   <data name="ImportError_not_hashed" xml:space="preserve">
     <value>لم يُفحص الملف أولًا. أعد المحاولة.</value>
   </data>

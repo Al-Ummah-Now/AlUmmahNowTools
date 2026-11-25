@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using AlUmmahNow.ToolsCore.Import.Sources;
 
 namespace AlUmmahNow.ToolsCore.Import;
 
@@ -91,22 +92,33 @@ public static class FolderScanner
     /// <param name="folder">The folder to scan.</param>
     /// <param name="includeSubfolders">Also every folder inside it (each may have its own CSV).</param>
     /// <param name="batchLanguage">The language of caption files named without one, when the video's metadata has none.</param>
-    public static ScanResult Scan(string folder, bool includeSubfolders, string? batchLanguage, CancellationToken ct = default)
+    /// <remarks>A folder on a mapped drive is read through its network path; every path in the result is under <paramref name="folder"/>, as it was chosen.</remarks>
+    public static ScanResult Scan(string folder, bool includeSubfolders, string? batchLanguage, CancellationToken ct = default, SourceAccess? source = null) =>
+        (source ?? SourceAccess.Default).Scan(folder, root => ScanRoot(root, folder, includeSubfolders, batchLanguage, ct), ct);
+
+    private static ScanResult ScanRoot(string root, string folder, bool includeSubfolders, string? batchLanguage, CancellationToken ct)
     {
+        string Show(string path) => root == folder ? path : Path.Combine(folder, Path.GetRelativePath(root, path));
         var videos = new List<ScannedVideo>();
         var notes = new List<ScanNote>();
         var folders = includeSubfolders
-            ? new[] { folder }.Concat(Directory.EnumerateDirectories(folder, "*", new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true, AttributesToSkip = Skipped }))
-            : new[] { folder };
+            ? new[] { root }.Concat(Directory.EnumerateDirectories(root, "*", new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true, AttributesToSkip = Skipped }))
+            : new[] { root };
         foreach (var dir in folders)
         {
             ct.ThrowIfCancellationRequested();
-            ScanOne(dir, batchLanguage, videos, notes);
+            ScanOne(dir, Show, batchLanguage, videos, notes);
         }
         return new ScanResult(videos, notes);
     }
 
-    private static void ScanOne(string dir, string? batchLanguage, List<ScannedVideo> videos, List<ScanNote> notes)
+    /// <summary>That file alone: a share that drops is the scan's to try again.</summary>
+    private static bool Unreadable(Exception ex, string path) => ex is FormatException
+        || (ex is IOException or UnauthorizedAccessException && ReadFailure.Of(ex, SourceAccess.Default.IsNetwork(path)).Kind != ReadKind.Network);
+
+    private static string Why(Exception ex) => ex is FormatException ? ex.Message : ImportQueue.Describe(ex);
+
+    private static void ScanOne(string dir, Func<string, string> show, string? batchLanguage, List<ScannedVideo> videos, List<ScanNote> notes)
     {
         var files = Directory.EnumerateFiles(dir, "*", new EnumerationOptions { IgnoreInaccessible = true, AttributesToSkip = Skipped })
             .Where(f => !Path.GetFileName(f).StartsWith('.'))
@@ -122,9 +134,9 @@ public static class FolderScanner
             {
                 csv = MetadataCsv.Parse(File.ReadAllText(csvPath, Encoding.UTF8));
             }
-            catch (Exception ex) when (ex is FormatException or IOException or UnauthorizedAccessException)
+            catch (Exception ex) when (Unreadable(ex, csvPath))
             {
-                notes.Add(new ScanNote(ScanNoteCode.CsvUnreadable, $"{Path.GetFileName(csvPath)}: {ex.Message}"));
+                notes.Add(new ScanNote(ScanNoteCode.CsvUnreadable, $"{Path.GetFileName(csvPath)}: {Why(ex)}"));
             }
         }
 
@@ -163,9 +175,9 @@ public static class FolderScanner
                     {
                         fromJson = MetadataJson.Parse(File.ReadAllText(path, Encoding.UTF8));
                     }
-                    catch (Exception ex) when (ex is FormatException or IOException or UnauthorizedAccessException)
+                    catch (Exception ex) when (Unreadable(ex, path))
                     {
-                        own.Add(new ScanNote(ScanNoteCode.MetadataUnreadable, $"{Path.GetFileName(path)}: {ex.Message}"));
+                        own.Add(new ScanNote(ScanNoteCode.MetadataUnreadable, $"{Path.GetFileName(path)}: {Why(ex)}"));
                     }
                 }
                 else if (middle.Equals("chapters", StringComparison.OrdinalIgnoreCase) && ext is ".txt" or ".json")
@@ -201,19 +213,19 @@ public static class FolderScanner
                     own.Add(new ScanNote(ScanNoteCode.CaptionLanguageTwice, Path.GetFileName(path)));
                     continue;
                 }
-                captions.Add(new CaptionFile(language, path));
+                captions.Add(new CaptionFile(language, show(path)));
             }
             if (info.Length > MaxUploadBytes) own.Add(new ScanNote(ScanNoteCode.TooLarge, info.Name));
 
             videos.Add(new ScannedVideo(
-                video,
+                show(video),
                 info.Length,
                 new DateTimeOffset(info.LastWriteTimeUtc).ToUnixTimeMilliseconds(),
                 MimeTypeOf(video),
                 captions,
-                chaptersPath,
-                thumbnailPath,
-                metadataPath,
+                chaptersPath is null ? null : show(chaptersPath),
+                thumbnailPath is null ? null : show(thumbnailPath),
+                metadataPath is null ? null : show(metadataPath),
                 metadata,
                 own));
         }
@@ -228,9 +240,11 @@ public static class ChapterFile
     /// <c>{ "start": "1:05" | 65, "title": "…" }</c> (also <c>time</c>, <c>startTime</c>, <c>name</c>).
     /// </summary>
     /// <exception cref="FormatException">The JSON is not a chapter list.</exception>
-    public static string Read(string path)
+    public static string Read(string path) => Parse(path, File.ReadAllText(path, Encoding.UTF8));
+
+    /// <param name="path">For its extension: JSON or text.</param>
+    public static string Parse(string path, string text)
     {
-        var text = File.ReadAllText(path, Encoding.UTF8);
         return Path.GetExtension(path).Equals(".json", StringComparison.OrdinalIgnoreCase) ? FromJson(text) : text.Trim();
     }
 

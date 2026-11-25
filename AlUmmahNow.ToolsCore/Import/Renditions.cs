@@ -4,6 +4,8 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
+using AlUmmahNow.ToolsCore.Import.Sources;
 
 namespace AlUmmahNow.ToolsCore.Import;
 
@@ -37,7 +39,7 @@ public sealed class LocalEncodeException : Exception
 {
     public LocalEncodeException(string code, string message, Exception? inner = null) : base(message, inner) => Code = code;
 
-    /// <summary>ffmpeg_missing, probe_failed, no_video, no_audio, disk_space, ffmpeg_failed, package_failed, too_large or settings_invalid</summary>
+    /// <summary>source_read (the file stopped being readable), ffmpeg_missing, probe_failed, no_video, no_audio, disk_space, ffmpeg_failed, package_failed, too_large or settings_invalid</summary>
     public string Code { get; }
 }
 
@@ -188,7 +190,8 @@ public sealed class FfmpegMediaTools : IMediaTools
     {
         var (_, ffprobe) = await Paths(ct).ConfigureAwait(false);
         var (code, output, error) = await RunAsync(ffprobe, new[] { "-v", "error", "-print_format", "json", "-show_streams", "-show_format", path }, null, ct).ConfigureAwait(false);
-        if (code != 0) throw new LocalEncodeException("probe_failed", "ffprobe could not read the file: " + LastLine(error));
+        ThrowIfSourceStopped(path, error, code);
+        if (code != 0) throw new LocalEncodeException("probe_failed", "ffprobe could not read the file: " + LastLine(error, path));
         return ParseProbe(output);
     }
 
@@ -247,7 +250,8 @@ public sealed class FfmpegMediaTools : IMediaTools
             }
         }
         var (code, _, error) = await RunAsync(ffmpeg, args, OnLine, ct).ConfigureAwait(false);
-        if (code != 0) throw new LocalEncodeException("ffmpeg_failed", $"ffmpeg stopped ({encoder}): " + LastLine(error));
+        ThrowIfSourceStopped(source, error, code);
+        if (code != 0) throw new LocalEncodeException("ffmpeg_failed", $"ffmpeg stopped ({encoder}): " + LastLine(error, source));
     }
 
     /// <summary>
@@ -296,9 +300,37 @@ public sealed class FfmpegMediaTools : IMediaTools
         return double.TryParse(fraction, NumberStyles.Float, CultureInfo.InvariantCulture, out var v) ? v : 0;
     }
 
-    private static string LastLine(string text)
+    /// <summary>
+    /// ffmpeg's own words for a read that failed half way. It ends well all the same (exit code 0, a short output), so its
+    /// messages count; Windows' network errors reach it as "Invalid argument", which is no read error on a local disk.
+    /// </summary>
+    private static readonly Regex ReadError = new(
+        @"(Input/output error|Stale (NFS )?file handle|timed out|Host is down|No route to host|Network is (down|unreachable)|Socket is not connected|No such device|Device not configured|Unknown error)",
+        RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
+
+    private static readonly Regex NetworkReadError = new("(Invalid argument|Bad file descriptor|Permission denied)", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
+
+    /// <summary>The lines that are about reading the source, not about an output.</summary>
+    private static readonly Regex Reading = new("(Error during demuxing|Error reading|Error opening input|Error retrieving a packet)", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
+
+    internal static bool SourceStopped(string source, string error, bool network) => error.Split('\n').Any(line =>
+        (Reading.IsMatch(line) || line.Contains(source + ":", StringComparison.Ordinal)) && (ReadError.IsMatch(line) || (network && NetworkReadError.IsMatch(line))));
+
+    private static void ThrowIfSourceStopped(string source, string error, int code)
+    {
+        var network = SourceAccess.Default.IsNetwork(source);
+        // On a local disk only a run that failed is one that could not read
+        if ((network || code != 0) && SourceStopped(source, error, network))
+        {
+            throw new LocalEncodeException("source_read", "ffmpeg could not read the file to its end: " + LastLine(error, source));
+        }
+    }
+
+    /// <summary>The last line of ffmpeg's messages, with the file's name in place of its path (it may be reported).</summary>
+    private static string LastLine(string text, string source)
     {
         var line = text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).LastOrDefault() ?? "";
+        line = line.Replace(source, Path.GetFileName(source), StringComparison.Ordinal);
         return line.Length > 300 ? line[..300] : line;
     }
 
@@ -306,10 +338,14 @@ public sealed class FfmpegMediaTools : IMediaTools
     {
         var (ffmpeg, _) = await Paths(ct).ConfigureAwait(false);
         var (code, _, error) = await RunAsync(ffmpeg, new[] { "-nostdin", "-y", "-v", "error", "-i", source, "-map", "0:a:0", "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", wavPath }, null, ct).ConfigureAwait(false);
+        if (code != 0 || SourceStopped(source, error, network: true))
+        {
+            try { File.Delete(wavPath); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+        }
+        ThrowIfSourceStopped(source, error, code);
         if (code == 0) return;
-        try { File.Delete(wavPath); } catch (IOException) { } catch (UnauthorizedAccessException) { }
         // "-map 0:a:0" matches nothing in a file without sound
-        throw new LocalEncodeException(error.Contains("matches no streams", StringComparison.Ordinal) ? "no_audio" : "ffmpeg_failed", "ffmpeg could not read the file's sound: " + LastLine(error));
+        throw new LocalEncodeException(error.Contains("matches no streams", StringComparison.Ordinal) ? "no_audio" : "ffmpeg_failed", "ffmpeg could not read the file's sound: " + LastLine(error, source));
     }
 
     private static async Task<(int Code, string Output, string Error)> RunAsync(string exe, IEnumerable<string> args, Action<string>? onLine, CancellationToken ct)
@@ -380,10 +416,12 @@ public sealed class EncodeStep : IImportStep
     private readonly string _encoderName;
     private readonly Action<Exception, QueueItem>? _report;
     private readonly Func<string, long?> _freeSpace;
+    private readonly SourceAccess _source;
     private EncodingSettings? _settings;
 
-    public EncodeStep(ImportApiClient api, Uri videosApi, IMediaTools media, IRenditionPackager packager, string workRoot, string encoderName, Action<Exception, QueueItem>? report = null, Func<string, long?>? freeSpace = null)
+    public EncodeStep(ImportApiClient api, Uri videosApi, IMediaTools media, IRenditionPackager packager, string workRoot, string encoderName, Action<Exception, QueueItem>? report = null, Func<string, long?>? freeSpace = null, SourceAccess? source = null)
     {
+        _source = source ?? SourceAccess.Default;
         _api = api;
         _tusEndpoint = new Uri(videosApi, "/api/videos/tus");
         _media = media;
@@ -409,7 +447,7 @@ public sealed class EncodeStep : IImportStep
         // Encoded before the app stopped: kept while every file is still there
         if (item.Renditions is { } done && (done.Sent || done.Files.All(f => File.Exists(Path.Combine(done.Directory, f.Path))))) return StepResult.Done;
         if (item.Sha256 is null || item.FingerprintHash is null) throw new StepFailedException("not_hashed", "The file has not been checked yet", retryable: false);
-        UploadStep.CheckUnchanged(item);
+        await _source.CheckUnchangedAsync(item.Video, context, ct).ConfigureAwait(false);
         if (item.ServerItemId is null || item.TusSessionId is null)
         {
             if (!await UploadStep.OpenAsync(_api, _tusEndpoint, item, context, ct).ConfigureAwait(false)) return StepResult.SkipRest;
@@ -432,7 +470,7 @@ public sealed class EncodeStep : IImportStep
         try
         {
             WorkFiles.DeleteFolder(directory, _workRoot, item.Id);
-            var info = await _media.ProbeAsync(item.Video.Path, ct).ConfigureAwait(false);
+            var info = await _source.WithPathAsync(item.Video.Path, context, p => _media.ProbeAsync(p, ct), ct).ConfigureAwait(false);
             var rungs = EncodeLadder.For(info, settings.Ladder);
             var encoder = await _media.PickEncoderAsync(ct).ConfigureAwait(false)
                 ?? throw new LocalEncodeException("ffmpeg_failed", "This ffmpeg has no H.264 encoder");
@@ -442,7 +480,12 @@ public sealed class EncodeStep : IImportStep
 
             // 90% for the encode, 10% for packaging
             var outputs = rungs.Select(r => Path.Combine(directory, r.Name + ".mp4")).ToList();
-            await _media.EncodeAsync(item.Video.Path, info, rungs, outputs, encoder, settings.Ladder, new Progress<double>(p => context.Progress(p * 0.9)), ct).ConfigureAwait(false);
+            await _source.WithPathAsync(item.Video.Path, context, async path =>
+            {
+                await _media.EncodeAsync(path, info, rungs, outputs, encoder, settings.Ladder, new Progress<double>(p => context.Progress(p * 0.9)), ct).ConfigureAwait(false);
+                return true;
+            }, ct).ConfigureAwait(false);
+            await _source.CheckUnchangedAsync(item.Video, context, ct, read: true).ConfigureAwait(false);
             for (var i = 0; i < rungs.Count; i++)
             {
                 await _packager.PackageAsync(outputs[i], Path.Combine(directory, rungs[i].Name), settings.Ladder.SegmentSeconds, ct).ConfigureAwait(false);
@@ -477,6 +520,12 @@ public sealed class EncodeStep : IImportStep
             WorkFiles.DeleteFolder(directory, _workRoot, item.Id);
             throw;
         }
+        catch (Exception ex) when (ex is SourceReadException or StepFailedException)
+        {
+            // The file itself cannot be read: the upload could not either
+            WorkFiles.DeleteFolder(directory, _workRoot, item.Id);
+            throw;
+        }
         catch (Exception ex) when (ex is LocalEncodeException or IOException or UnauthorizedAccessException)
         {
             // Not the file's failure: the server encodes it as any upload
@@ -484,7 +533,8 @@ public sealed class EncodeStep : IImportStep
             item.Renditions = null;
             context.Save();
             var code = ex is LocalEncodeException local ? local.Code : "disk";
-            context.Log(LogLevel.Warning, "encode_failed", $"Could not encode here: {ex.Message}. The server encodes this file", code, ex.Message);
+            var why = ImportQueue.Describe(ex);
+            context.Log(LogLevel.Warning, "encode_failed", $"Could not encode here: {why}. The server encodes this file", code, why);
             _report?.Invoke(ex, item);
             return StepResult.Skipped;
         }

@@ -297,7 +297,7 @@ public sealed class TakeoutUploader
         }
         var chunk = upload.ChunkSize > 0 ? upload.ChunkSize : DefaultChunk;
         var offset = await _tus.OffsetAsync(url, token, ct).ConfigureAwait(false);
-        await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 20, FileOptions.Asynchronous);
+        await using var stream = Import.Sources.SourceAccess.Default.Open(path, file.Size, null, null);
         while (offset < file.Size)
         {
             ct.ThrowIfCancellationRequested();

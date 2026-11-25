@@ -320,6 +320,8 @@ internal sealed class RecordingContext : IStepContext
     public void Save() => Saves++;
     public TimeSpan? LaterDelay;
     public void Later(TimeSpan delay) => LaterDelay = delay;
+    public StepWait Wait;
+    public void Waiting(StepWait wait) => Wait = wait;
 }
 
 public class ImportApiClientTests
@@ -475,7 +477,7 @@ public class AttachStepTests
         var video = FolderScanner.Scan(dir, false, null).Videos[0];
         var context = new RecordingContext();
 
-        var payload = await AttachStep.BuildAsync(video, context, default);
+        var payload = await AttachStep.BuildAsync(video, AlUmmahNow.ToolsCore.Import.Sources.SourceAccess.Default, context, default);
 
         Assert.Equal("ar", Assert.Single(payload.Captions!).Language);
         Assert.Null(payload.Chapters);

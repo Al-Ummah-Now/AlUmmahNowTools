@@ -1,18 +1,44 @@
 using System.Collections.Concurrent;
+using System.Globalization;
 using System.Text;
+using AlUmmahNow.ToolsCore.Import.Sources;
 
 namespace AlUmmahNow.ToolsCore.Import;
 
 /// <summary>The file's SHA-256 and fingerprint. A file changed since the scan is refused (scan again).</summary>
 public sealed class HashStep : IImportStep
 {
+    private readonly SourceAccess _source;
+
+    public HashStep(SourceAccess? source = null) => _source = source ?? SourceAccess.Default;
+
     public ImportStepKind Kind => ImportStepKind.Hash;
 
     public async Task<StepResult> RunAsync(QueueItem item, IStepContext context, CancellationToken ct)
     {
-        UploadStep.CheckUnchanged(item);
-        var progress = new Progress<double>(context.Progress);
-        var (sha256, fingerprint) = await FileHasher.HashAsync(item.Video.Path, progress, ct).ConfigureAwait(false);
+        var video = item.Video;
+        await _source.CheckUnchangedAsync(video, context, ct).ConfigureAwait(false);
+        if (item.Hashing is { } kept && (kept.Size != video.Size || kept.ModifiedMs != video.LastModifiedMs))
+        {
+            kept.Dispose();
+            item.Hashing = null;
+        }
+        var state = item.Hashing ??= new HashSoFar(video.Size, video.LastModifiedMs);
+        if (state.Offset > 0)
+        {
+            var offset = state.Offset.ToString(CultureInfo.InvariantCulture);
+            context.Log(LogLevel.Info, "hash_resumed", $"The check goes on from byte {offset}", offset);
+        }
+        string sha256, fingerprint;
+        var stream = _source.Open(video.Path, video.Size, video.LastModifiedMs, context);
+        await using (stream.ConfigureAwait(false))
+        {
+            (sha256, fingerprint) = await FileHasher.HashAsync(stream, state, new Progress<double>(context.Progress), ct).ConfigureAwait(false);
+        }
+        // Read whole: whatever comes next, this hash is used up
+        item.Hashing = null;
+        state.Dispose();
+        await _source.CheckUnchangedAsync(video, context, ct, read: true).ConfigureAwait(false);
         item.Sha256 = sha256;
         item.FingerprintHash = fingerprint;
         context.Log(LogLevel.Info, "sha", $"SHA-256 {sha256}", sha256);
@@ -33,9 +59,11 @@ public sealed class UploadStep : IImportStep
     private readonly Uri _tusEndpoint;
     private readonly Func<CancellationToken, Task<string?>> _token;
     private readonly RenditionSender _renditions;
+    private readonly SourceAccess _source;
 
-    public UploadStep(ImportApiClient api, TusClient tus, Uri videosApi, Func<CancellationToken, Task<string?>> token, string? workRoot = null)
+    public UploadStep(ImportApiClient api, TusClient tus, Uri videosApi, Func<CancellationToken, Task<string?>> token, string? workRoot = null, SourceAccess? source = null)
     {
+        _source = source ?? SourceAccess.Default;
         _api = api;
         _tus = tus;
         _tusEndpoint = new Uri(videosApi, "/api/videos/tus");
@@ -45,23 +73,10 @@ public sealed class UploadStep : IImportStep
 
     public ImportStepKind Kind => ImportStepKind.Upload;
 
-    /// <summary>The file must still be the one that was scanned and hashed.</summary>
-    internal static void CheckUnchanged(QueueItem item)
-    {
-        var info = new FileInfo(item.Video.Path);
-        if (!info.Exists) throw new StepFailedException("file_missing", "The file is no longer in its folder", retryable: false);
-        if (info.LinkTarget is not null) throw new StepFailedException("file_link", "The file is now a link to another file. Scan the folder again", retryable: false);
-        var modified = new DateTimeOffset(info.LastWriteTimeUtc).ToUnixTimeMilliseconds();
-        if (info.Length != item.Video.Size || modified != item.Video.LastModifiedMs)
-        {
-            throw new StepFailedException("file_changed", "The file changed after it was scanned. Scan the folder again", retryable: false);
-        }
-    }
-
     public async Task<StepResult> RunAsync(QueueItem item, IStepContext context, CancellationToken ct)
     {
         if (item.Sha256 is null || item.FingerprintHash is null) throw new StepFailedException("not_hashed", "The file has not been checked yet", retryable: false);
-        CheckUnchanged(item);
+        await _source.CheckUnchangedAsync(item.Video, context, ct).ConfigureAwait(false);
         if (item.ServerItemId is null || item.TusSessionId is null)
         {
             if (!await OpenAsync(_api, _tusEndpoint, item, context, ct).ConfigureAwait(false)) return StepResult.SkipRest;
@@ -158,11 +173,13 @@ public sealed class UploadStep : IImportStep
         var url = new Uri(item.UploadUrl);
         var offset = await _tus.OffsetAsync(url, token, ct).ConfigureAwait(false);
         item.UploadOffset = offset;
-        await using var file = new FileStream(item.Video.Path, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 20, FileOptions.Asynchronous);
+        await using var file = _source.Open(item.Video.Path, size, item.Video.LastModifiedMs, context);
         while (offset < size)
         {
             ct.ThrowIfCancellationRequested();
             var count = (int)Math.Min(item.ChunkSize, size - offset);
+            // Other apps may write to the file while it is sent: the last part only goes when it is still the one that was checked
+            if (offset + count >= size) await _source.CheckUnchangedAsync(item.Video, context, ct, read: true).ConfigureAwait(false);
             token = await Token(ct).ConfigureAwait(false);
             try
             {
@@ -192,15 +209,20 @@ public sealed class AttachStep : IImportStep
     public const int MaxCaptionChars = 2 * 1024 * 1024;
     public const long MaxThumbnailBytes = 6L * 1024 * 1024;
     private readonly ImportApiClient _api;
+    private readonly SourceAccess _source;
 
-    public AttachStep(ImportApiClient api) => _api = api;
+    public AttachStep(ImportApiClient api, SourceAccess? source = null)
+    {
+        _api = api;
+        _source = source ?? SourceAccess.Default;
+    }
 
     public ImportStepKind Kind => ImportStepKind.Attach;
 
     public async Task<StepResult> RunAsync(QueueItem item, IStepContext context, CancellationToken ct)
     {
         if (item.ServerItemId is null) throw new StepFailedException("not_uploaded", "The file was not uploaded", retryable: false);
-        var payload = await BuildAsync(item.Video, context, ct).ConfigureAwait(false);
+        var payload = await BuildAsync(item.Video, _source, context, ct).ConfigureAwait(false);
         if (payload.IsEmpty) return StepResult.Skipped;
         var jobId = await _api.AttachSidecarsAsync(item.ServerItemId, payload, ct).ConfigureAwait(false);
         item.AttachJobId = jobId;
@@ -215,13 +237,16 @@ public sealed class AttachStep : IImportStep
         return StepResult.Done;
     }
 
-    /// <summary>What can be sent: a part that cannot be read is left out with a line in the log.</summary>
-    internal static async Task<SidecarPayload> BuildAsync(ScannedVideo video, IStepContext context, CancellationToken ct)
+    /// <summary>
+    /// What can be sent: a part that cannot be read is left out with a line in the log. A share that dropped fails the step
+    /// instead, so nothing is left out because of it.
+    /// </summary>
+    internal static async Task<SidecarPayload> BuildAsync(ScannedVideo video, SourceAccess source, IStepContext context, CancellationToken ct)
     {
         var captions = new List<CaptionSidecar>();
         foreach (var caption in video.Captions)
         {
-            var text = await Read(caption.Path, context, ct).ConfigureAwait(false);
+            var text = await Read(source, caption.Path, context, ct).ConfigureAwait(false);
             if (text is null) continue;
             if (string.IsNullOrWhiteSpace(text) || text.Length > MaxCaptionChars)
             {
@@ -236,12 +261,12 @@ public sealed class AttachStep : IImportStep
         {
             try
             {
-                chapters = ChapterFile.Read(video.ChaptersPath);
+                chapters = ChapterFile.Parse(video.ChaptersPath, await source.ReadAllTextAsync(video.ChaptersPath, context, ct).ConfigureAwait(false));
                 if (chapters.Length == 0) chapters = null;
             }
-            catch (Exception ex) when (ex is FormatException or IOException or UnauthorizedAccessException)
+            catch (Exception ex) when (ex is FormatException || LeftOut(ex))
             {
-                context.Log(LogLevel.Warning, "left_out_unreadable", $"{Path.GetFileName(video.ChaptersPath)} could not be read ({ex.Message}); left out", Path.GetFileName(video.ChaptersPath), ex.Message);
+                context.Log(LogLevel.Warning, "left_out_unreadable", $"{Path.GetFileName(video.ChaptersPath)} could not be read ({Why(ex)}); left out", Path.GetFileName(video.ChaptersPath), Why(ex));
             }
         }
 
@@ -250,20 +275,20 @@ public sealed class AttachStep : IImportStep
         {
             try
             {
-                var info = new FileInfo(video.ThumbnailPath);
-                if (info.Length > MaxThumbnailBytes)
+                var name = Path.GetFileName(video.ThumbnailPath);
+                if ((await source.StatAsync(video.ThumbnailPath, context, ct).ConfigureAwait(false)).Length > MaxThumbnailBytes)
                 {
-                    context.Log(LogLevel.Warning, "left_out_size", $"{info.Name} is larger than 6 MB; left out", info.Name, "6");
+                    context.Log(LogLevel.Warning, "left_out_size", $"{name} is larger than 6 MB; left out", name, "6");
                 }
                 else
                 {
-                    var bytes = await File.ReadAllBytesAsync(video.ThumbnailPath, ct).ConfigureAwait(false);
-                    thumbnail = new ThumbnailSidecar(Convert.ToBase64String(bytes), FolderScanner.ImageTypes[info.Extension]);
+                    var bytes = await source.ReadAllBytesAsync(video.ThumbnailPath, context, ct).ConfigureAwait(false);
+                    thumbnail = new ThumbnailSidecar(Convert.ToBase64String(bytes), FolderScanner.ImageTypes[Path.GetExtension(name)]);
                 }
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            catch (Exception ex) when (LeftOut(ex))
             {
-                context.Log(LogLevel.Warning, "left_out_unreadable", $"{Path.GetFileName(video.ThumbnailPath)} could not be read ({ex.Message}); left out", Path.GetFileName(video.ThumbnailPath), ex.Message);
+                context.Log(LogLevel.Warning, "left_out_unreadable", $"{Path.GetFileName(video.ThumbnailPath)} could not be read ({Why(ex)}); left out", Path.GetFileName(video.ThumbnailPath), Why(ex));
             }
         }
 
@@ -275,15 +300,25 @@ public sealed class AttachStep : IImportStep
             video.Metadata.PublishAt);
     }
 
-    private static async Task<string?> Read(string path, IStepContext context, CancellationToken ct)
+    /// <summary>The part alone cannot be read: not a share or drive that is away, which a later try finds again.</summary>
+    private static bool LeftOut(Exception ex) => ex switch
+    {
+        SourceReadException r => r.Failure.Kind != ReadKind.Network && r.Failure.Code is not ("share_credentials" or "drive_gone"),
+        StepFailedException f => f.Code is "file_writing" or "file_changed",
+        _ => ex is IOException or UnauthorizedAccessException,
+    };
+
+    private static string Why(Exception ex) => ex is IOException or UnauthorizedAccessException ? ImportQueue.Describe(ex) : ex.Message;
+
+    private static async Task<string?> Read(SourceAccess source, string path, IStepContext context, CancellationToken ct)
     {
         try
         {
-            return await File.ReadAllTextAsync(path, Encoding.UTF8, ct).ConfigureAwait(false);
+            return await source.ReadAllTextAsync(path, context, ct).ConfigureAwait(false);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (LeftOut(ex))
         {
-            context.Log(LogLevel.Warning, "left_out_unreadable", $"{Path.GetFileName(path)} could not be read ({ex.Message}); left out", Path.GetFileName(path), ex.Message);
+            context.Log(LogLevel.Warning, "left_out_unreadable", $"{Path.GetFileName(path)} could not be read ({Why(ex)}); left out", Path.GetFileName(path), Why(ex));
             return null;
         }
     }
