@@ -2056,7 +2056,7 @@
     <value>The network share can’t be reached. Check that the server is on and connected.</value>
   </data>
   <data name="ImportError_share_credentials" xml:space="preserve">
-    <value>The network share didn’t accept this computer’s sign-in. Open the share in the file manager, sign in, then press Retry.</value>
+    <value>The network share didn’t accept this computer’s sign-in. Open the share in the file manager, sign in, then try again.</value>
   </data>
   <data name="ImportError_share_damaged" xml:space="preserve">
     <value>Reading the file stops at the same place every time. It may be damaged on the server.</value>
@@ -2074,7 +2074,7 @@
     <value>The file isn’t a whole video: it may have been cut off while it was copied. Copy it again, then scan the folder again.</value>
   </data>
   <data name="ImportError_content_changed" xml:space="preserve">
-    <value>What was read for the upload isn’t what was checked before, so the upload was stopped. Press Retry. If it happens again, copy the file again, then scan the folder again.</value>
+    <value>The file wasn’t read the same for the upload as when it was checked, so the upload was stopped. Try again. If it happens again, copy the file again, then scan the folder again.</value>
   </data>
   <data name="ImportError_upload_left" xml:space="preserve">
     <value>The stopped upload is still being removed from the server.</value>
@@ -2125,7 +2125,7 @@
     <value>The check goes on from byte {0}</value>
   </data>
   <data name="ImportLog_sent_check" xml:space="preserve">
-    <value>The first {0} bytes were sent before; they’re checked again</value>
+    <value>{0} were sent before; they’re checked again</value>
   </data>
   <data name="ImportLog_video_unchecked" xml:space="preserve">
     <value>Not checked for a video: ffprobe isn’t on this computer</value>

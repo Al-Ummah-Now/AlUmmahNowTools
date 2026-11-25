@@ -641,7 +641,8 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
             "failed" => Loc.WithDetail(Loc.WithDetail(Loc.Format("ImportLog_failed", StepName(Arg(0)), Loc.Plural("ImportCount_attempts", Count(Arg(1)))), Loc.WithDetail(ErrorText(Arg(2), Arg(4)), ReadText(Arg(5), Arg(6), Arg(7), Arg(8)))), Reference(Arg(3))),
             // Reading the file itself: a share, a cloud placeholder
             "share_path" or "share_chosen" => Loc.WithDetail(Loc.Get("ImportLog_" + line.Code), Arg(0)),
-            "share_back" or "hash_resumed" or "sent_check" => Loc.Format("ImportLog_" + line.Code, Num(0)),
+            "share_back" or "hash_resumed" => Loc.Format("ImportLog_" + line.Code, Num(0)),
+            "sent_check" => Loc.Format("ImportLog_sent_check", Bytes(Arg(0))),
             "share_tool" => Loc.WithDetail(Loc.Get("ImportLog_share_tool"), Arg(0)),
             "cloud_download" => Loc.Get("ImportLog_cloud_download"),
             "read_failed" => Loc.WithDetail(Loc.WithDetail(ErrorText(Arg(0), null), ReadText(Arg(1), Arg(2), Arg(3), Arg(4))), Arg(5)),
