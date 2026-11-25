@@ -226,11 +226,37 @@ public sealed class UpdateServiceTests : IDisposable
         await Task.WhenAny(second, checking.WaitAsync(TimeSpan.FromSeconds(20)));
         // The app closing meanwhile does not hand over a second time either
         var exit = Task.Run(service.OnExit);
-        await Task.WhenAny(exit, checking.WaitAsync(TimeSpan.FromSeconds(20)));
+        await Task.Delay(200);
+        Assert.False(exit.IsCompleted);
         goOn.Set();
         Assert.True(await first);
         Assert.False(await second);
         await exit;
+        Assert.Equal((1, 0), (installer.Restarts, installer.Exits));
+    }
+
+    [Fact]
+    public async Task The_app_closing_while_Restart_now_checks_the_file_still_hands_over()
+    {
+        var (first, core, installer, http) = Make();
+        first.Dispose();
+        var quit = new TaskCompletionSource<bool>();
+        var service = new UpdateService(http, () => new Uri("https://videos.api.example.com"), core, installer, Path.Combine(_dir, "updates.json"), Path.Combine(_dir, "dl"), "2026.11.22", "windows", "x64", () => false, true, quit: () => quit.Task);
+        await service.CheckAsync(userAsked: true);
+        var checking = new SemaphoreSlim(0);
+        using var goOn = new ManualResetEventSlim();
+        installer.OnVerify = () => { checking.Release(); goOn.Wait(TimeSpan.FromSeconds(20)); };
+        var restart = Task.Run(() => service.RestartNowAsync());
+        Assert.True(await checking.WaitAsync(TimeSpan.FromSeconds(20)));
+        // The window was closed: its quit has stopped the work, and hands over
+        var exit = Task.Run(service.OnExit);
+        await Task.Delay(200);
+        Assert.False(exit.IsCompleted);
+        goOn.Set();
+        Assert.True(await exit);
+        quit.SetResult(true);
+        Assert.True(await restart);
+        Assert.True(service.RestartAsked);
         Assert.Equal((1, 0), (installer.Restarts, installer.Exits));
     }
 
