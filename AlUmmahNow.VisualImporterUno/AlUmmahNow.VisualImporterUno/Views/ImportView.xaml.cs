@@ -355,6 +355,18 @@ public sealed partial class ImportView : Page
         if (RowOf(sender) is { } row) ViewModel.ToggleLog(row);
     }
 
+    /// <summary>A log entry's time beside its lines, or above them where they would be squeezed.</summary>
+    private void LogEntry_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (sender is not Grid { Children: { Count: 2 } parts } entry || parts[1] is not FrameworkElement lines) return;
+        var narrow = e.NewSize.Width < 420;
+        if (Grid.GetRow(lines) == (narrow ? 1 : 0)) return;
+        entry.ColumnDefinitions[0].Width = new GridLength(narrow ? 0 : 150);
+        entry.ColumnSpacing = narrow ? 0 : 12;
+        Grid.SetColumnSpan((FrameworkElement)parts[0], narrow ? 2 : 1);
+        Grid.SetRow(lines, narrow ? 1 : 0);
+    }
+
     /// <summary>Copies the file's log for a bug report.</summary>
     private void CopyLog_Click(object sender, RoutedEventArgs e)
     {
