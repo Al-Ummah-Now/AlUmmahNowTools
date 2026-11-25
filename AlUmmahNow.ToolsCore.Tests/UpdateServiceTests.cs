@@ -270,6 +270,22 @@ public sealed class UpdateServiceTests : IDisposable
         Assert.Equal(2, http.Calls.Count);
     }
 
+    /// <summary>The bar that can't be closed: no version, no notes, whatever the answer says (an unsigned notice, nothing available, a refused manifest).</summary>
+    [Theory]
+    [InlineData("RequiredBar", "none", null)]
+    [InlineData("RequiredBar", "download", null)]
+    [InlineData("Forced", "notice", null)]
+    [InlineData("Forced", "install", "bad_signature")]
+    public async Task Required_with_nothing_to_update_to_names_nothing(string kind, string action, string? refuse)
+    {
+        var (service, core, _, _) = Make();
+        core.Refuse = refuse;
+        core.Prompt = core.Prompt with { Kind = kind, Action = action, NotesEn = "new", NotesAr = "جديد", MessageEn = "m", MessageAr = "ر" };
+        Assert.NotNull(core.Prompt.Version);
+        await service.CheckAsync(userAsked: true);
+        Assert.Equal(new UpdateView(UpdateStage.RequiredSoon), service.View);
+    }
+
     [Fact]
     public async Task The_forced_screen_needs_a_verified_manifest_and_stays_through_the_update()
     {

@@ -290,7 +290,12 @@ public sealed class UpdateService : IDisposable
 
     private bool Installs(CorePrompt p) => p.Action == "install" && CanSelfUpdate;
 
+    /// <summary>
+    /// The bar that can't be closed names no version, notes or message: there is nothing to update to, or nothing this
+    /// build may be told of (an unsigned release, a refused manifest). Core fills them in all the same.
+    /// </summary>
     private UpdateView ViewFor(UpdateStage stage, CorePrompt p) =>
+        stage == UpdateStage.RequiredSoon ? new(stage) :
         new(stage, p.Version, p.NotesEn, p.NotesAr, p.MessageEn, p.MessageAr, DownloadOnly: p.Action != "none" && !Installs(p), Required: stage == UpdateStage.Forced);
 
     /// <summary>The bar's Update button (or the forced screen's): install, or open the download page.</summary>
