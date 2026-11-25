@@ -50,12 +50,26 @@ public static class AppUpdates
             ToolsUpdateKeys.RootKeys.Length > 0,
             // Velopack's updater ends every process of the install folder: never while another copy runs from it (Tools #89)
             otherCopy: () => demo == "ready-other" || AppInstance.Install?.OtherCopyRunning() == true);
-        AppDomain.CurrentDomain.ProcessExit += (_, _) => Service?.OnExit();
+        AppDomain.CurrentDomain.ProcessExit += (_, _) => InstallOnQuit();
 #if UPDATE_TEST
         UpdateTestHandler.Watch(Service);
 #endif
         if (demo is { Length: > 0 }) Service.Preview(DemoView(demo));
         else Service.Start();
+    }
+
+    /// <summary>The app is quitting: hands a staged update to the updater. Once, whoever asks (the quit, or the process's end).</summary>
+    public static void InstallOnQuit()
+    {
+        try
+        {
+            Service?.OnExit();
+        }
+        catch (Exception ex)
+        {
+            // Not handed over: staged again at the next start
+            Serilog.Log.Warning(ex, "[Update] The staged update was not handed over");
+        }
     }
 
     private static UpdateView DemoView(string state)
