@@ -1003,6 +1003,8 @@ public sealed partial class QueueRow : ObservableObject
         };
         StatusTip = phase == ItemPhase.RetryWaiting ? Loc.UtcText(step!.NextAttemptAt!.Value) : null;
         Detail = phase is ItemPhase.Failed or ItemPhase.RetryWaiting ? Loc.KeepLastWords(BulkImportViewModel.ErrorText(step!.LastErrorCode, step.LastError, step.ReadError)) : "";
+        // Another file is in its place: what is said of the one before no longer holds
+        if (item.NeedsOtherFile && item.CanRetry) Detail = Loc.KeepLastWords(Loc.Get("Import_FileChangedNow"));
         HasDetail = Detail.Length > 0;
         // The server's verdict once it has one; before that, a file the server encodes says so
         var verdict = BulkImportViewModel.VerdictText(item);

@@ -2067,6 +2067,9 @@
   <data name="ImportError_file_writing" xml:space="preserve">
     <value>Another app is still writing the file. Scan the folder again once it’s finished.</value>
   </data>
+  <data name="Import_FileChangedNow" xml:space="preserve">
+    <value>The file has changed. It can be tried again now.</value>
+  </data>
   <data name="ImportError_no_video" xml:space="preserve">
     <value>This file has sound but no picture. Choose the file that has the video, or remove it from the list.</value>
   </data>

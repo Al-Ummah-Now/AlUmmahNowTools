@@ -218,7 +218,7 @@ public sealed class ImportWorkspace : IDisposable
 
 /// <summary>The import's demo data for screenshots (<c>TOOLS_DEMO=1</c>; <c>TOOLS_DEMO_IMPORT=empty</c> for a fresh page, 
 /// <c>paused</c> for the queue after Pause all, <c>resumed</c> with one file resumed after it, <c>remove-all</c> for its dialog,
-/// <c>share-waiting</c>, <c>share-failed</c> and <c>damaged</c> for a file on a network share, in the fourth row, <c>content</c> for files that are not sent, <c>content-changed</c> once the second was copied again).</summary>
+/// <c>share-waiting</c>, <c>share-failed</c> and <c>damaged</c> for a file on a network share, in the fourth row, <c>content</c> for files that are not sent, <c>content-changed</c> once the first two were copied again).</summary>
 internal static class DemoImport
 {
     public static bool Empty => System.Environment.GetEnvironmentVariable("TOOLS_DEMO_IMPORT") == "empty";
@@ -320,11 +320,14 @@ internal static class DemoImport
         // Queued: it goes on as queued, beside the others, all paused
         if (State == "resumed") queue.Resume(items[8].Id);
         if (State is "content" or "content-changed") SettleContent(items);
-        // The second file was copied again: another one, by size and time, is in its place
+        // The first two were copied again: another file, by size and time, is in their places
         if (State == "content-changed")
         {
-            typeof(QueueItem).GetProperty("OnDisk", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
-                .SetValue(items[1], new AlUmmahNow.ToolsCore.Import.Sources.SourceStat(items[1].Video.Size + 1, 1));
+            foreach (var item in items.Take(2))
+            {
+                typeof(QueueItem).GetProperty("OnDisk", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+                    .SetValue(item, new AlUmmahNow.ToolsCore.Import.Sources.SourceStat(item.Video.Size + 1, 1));
+            }
         }
         if (State is not ("share-waiting" or "share-failed" or "damaged")) return;
 
