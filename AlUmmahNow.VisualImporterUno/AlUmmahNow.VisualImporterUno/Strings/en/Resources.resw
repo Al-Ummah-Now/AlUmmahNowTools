@@ -3447,6 +3447,12 @@
   <data name="Instance_Body" xml:space="preserve">
     <value>Another copy of Tools is open but doesn’t answer. Close it, then try again. Two copies can’t import from the same queue.</value>
   </data>
+  <data name="Instance_UpdateTitle" xml:space="preserve">
+    <value>An update is being installed</value>
+  </data>
+  <data name="Instance_UpdateBody" xml:space="preserve">
+    <value>Tools opens again when it is done. If it closes, open it again.</value>
+  </data>
   <data name="Instance_TryAgain" xml:space="preserve">
     <value>Try again</value>
   </data>

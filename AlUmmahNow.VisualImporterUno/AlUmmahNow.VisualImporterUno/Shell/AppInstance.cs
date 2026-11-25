@@ -13,7 +13,7 @@ namespace AlUmmahNow.VisualImporterUno.Shell;
 /// One copy of the app per queue folder (Tools #89). Decided in <c>Main</c>, before the window, the services and the updates:
 /// a second copy brings the first one forward and ends, or says it is already open when the first one does not answer. A
 /// demo run has no queue of its own on disk and runs beside anything; <c>TOOLS_DEMO_INSTANCE=folder</c> gives it one (the
-/// launch check), <c>TOOLS_DEMO_INSTANCE=busy</c> shows the "already open" window for review frames.
+/// launch check); <c>busy</c> and <c>finishing</c> show the "already open" and "finishing an update" windows for review frames.
 /// </summary>
 internal static class AppInstance
 {
@@ -25,25 +25,41 @@ internal static class AppInstance
     /// <summary>Another copy has the queue and does not answer: only the window that says so is shown.</summary>
     public static bool AlreadyOpen { get; private set; }
 
+    /// <summary>The updater is replacing the app: only the window that says so is shown.</summary>
+    public static bool FinishingUpdate { get; private set; }
+
     /// <summary>This copy may run the queue and install updates.</summary>
     public static bool OwnsQueue { get; private set; }
+
+    /// <summary>Started again because the updater did not end: not waited for again.</summary>
+    private const string AfterUpdater = "--after-updater";
+
+    private static volatile bool _restarting;
+    private static Task? _listening;
 
     /// <summary>Other copies running from this install; an update waits for them.</summary>
     public static InstallGuard? Install { get; } = InstallGuard.ForThisProcess();
 
     /// <summary>False: the copy that is open came forward, and this one ends.</summary>
-    public static bool Start()
+    public static bool Start(string[] args)
     {
+        // The pipe goes with the process; second copies are not kept waiting on one that is ending
+        AppDomain.CurrentDomain.ProcessExit += (_, _) => Ending.Cancel();
         _folder = Path.GetDirectoryName(ImportQueue.DefaultPath(ToolsEnvironment.For(ToolsEnvironmentKind.Production)));
         if (Environment.GetEnvironmentVariable("TOOLS_DEMO") == "1")
         {
             var demo = Environment.GetEnvironmentVariable("TOOLS_DEMO_INSTANCE");
             AlreadyOpen = demo == "busy";
-            if (string.IsNullOrEmpty(demo) || AlreadyOpen) return true;
+            FinishingUpdate = demo == "finishing";
+            if (string.IsNullOrEmpty(demo) || AlreadyOpen || FinishingUpdate) return true;
             _folder = demo;
         }
         var folder = _folder!;
-        var decision = SingleInstance.DecideAsync(() => QueueFolderLock.TryTake(folder, out _lock), () => InstanceChannel.AskAsync(folder, AllowForeground)).GetAwaiter().GetResult();
+        var decision = SingleInstance.StartAsync(
+            () => QueueFolderLock.TryTake(folder, out _lock),
+            () => InstanceChannel.AskAsync(folder, AllowForeground),
+            () => _listening = Task.Run(() => InstanceChannel.ListenAsync(folder, BringForwardAsync, ex => Log.Warning("[Instance] A second copy was not answered: {Why}", ex.Message), Ending.Token)),
+            limit => args.Contains(AfterUpdater) || Install?.WaitForUpdater(limit) != false).GetAwaiter().GetResult();
         switch (decision)
         {
             case StartDecision.HandedOver:
@@ -53,20 +69,31 @@ internal static class AppInstance
                 Console.Error.WriteLine("[Instance] Al Ummah Now Tools is already open and does not answer.");
                 AlreadyOpen = true;
                 return true;
+            case StartDecision.FinishingUpdate:
+                Console.Error.WriteLine("[Instance] An update is being installed.");
+                FinishingUpdate = true;
+                return true;
         }
         OwnsQueue = true;
-        // Started while the updater replaces the app: it ends what runs from the folder, so nothing is imported before it is done
-        Install?.WaitForUpdater(TimeSpan.FromSeconds(90));
-        _ = Task.Run(() => InstanceChannel.ListenAsync(folder, BringForwardAsync, ex => Log.Warning("[Instance] A second copy was not answered: {Why}", ex.Message), Ending.Token));
         return true;
     }
+
+    /// <summary>
+    /// The updater ends what runs from the install folder, and starts nothing after an update at exit: the "finishing an update"
+    /// window stays until it is done or ends this process, then the app starts again. An updater that never ends is not waited for twice.
+    /// </summary>
+    public static void StartAgainAfterUpdate(Window window) => _ = Task.Run(() =>
+    {
+        var done = Install?.WaitForUpdater(TimeSpan.FromSeconds(90)) != false;
+        window.DispatcherQueue.TryEnqueue(() => StartAgain(done ? null : AfterUpdater));
+    });
 
     /// <summary>The window a second copy brings forward.</summary>
     public static void Attach(Window window) => _window = window;
 
     private static async Task<FrontAnswer> BringForwardAsync()
     {
-        if (AppQuit.Coordinator is { IsQuitting: true }) return FrontAnswer.Quitting;
+        if (_restarting || AppQuit.Coordinator is { IsQuitting: true }) return FrontAnswer.Quitting;
         // Still starting: its window opens in front by itself
         if (_window is not { } window) return FrontAnswer.Shown;
         var shown = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -89,16 +116,27 @@ internal static class AppInstance
         return FrontAnswer.Shown;
     }
 
-    /// <summary>Starts the app again, for Try again in the "already open" window, and ends this one.</summary>
-    public static void StartAgain()
+    /// <summary>Starts the app again, for Try again in the "already open" window and after an update, and ends this one.</summary>
+    public static void StartAgain(string? argument = null)
     {
+        _restarting = true;
+        // The new one takes the queue at once; this one's pipe goes first (on macOS and Linux closing it later would take the new one's away)
+        Ending.Cancel();
+        _listening?.Wait(TimeSpan.FromSeconds(3));
+        _lock?.Dispose();
         if (Environment.ProcessPath is { } program)
         {
             var bundle = program.IndexOf(".app/Contents/MacOS/", StringComparison.Ordinal);
-            var start = OperatingSystem.IsMacOS() && bundle > 0
+            if (!OperatingSystem.IsMacOS()) bundle = -1;
+            var start = bundle > 0
                 ? new ProcessStartInfo("/usr/bin/open") { ArgumentList = { "-n", program[..(bundle + 4)] } }
                 : new ProcessStartInfo(program);
             start.UseShellExecute = false;
+            if (argument is not null)
+            {
+                if (bundle > 0) start.ArgumentList.Add("--args");
+                start.ArgumentList.Add(argument);
+            }
             try { Process.Start(start)?.Dispose(); }
             catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException) { Console.Error.WriteLine("[Instance] " + ex.Message); }
         }

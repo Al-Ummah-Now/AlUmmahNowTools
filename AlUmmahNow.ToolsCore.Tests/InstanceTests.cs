@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using AlUmmahNow.ToolsCore.Import;
+using AlUmmahNow.ToolsCore.Import.Sources;
 using AlUmmahNow.ToolsCore.Instance;
 using Xunit;
 
@@ -179,6 +180,44 @@ public class InstanceDecisionTests
     }
 
     [Fact]
+    public async Task The_copy_that_has_the_queue_listens_before_it_waits_and_waits_without_a_window_only_for_a_moment()
+    {
+        var order = new List<string>();
+        async Task<StartDecision> Start(LockAnswer answer, bool updaterEnds) => await SingleInstance.StartAsync(() => answer, () => Task.FromResult<FrontAnswer?>(FrontAnswer.Shown),
+            () => order.Add("listen"), limit => { order.Add("wait " + limit.TotalSeconds); return updaterEnds; });
+        Assert.Equal(StartDecision.Run, await Start(LockAnswer.Taken, updaterEnds: true));
+        Assert.Equal(new[] { "listen", "wait 3" }, order);
+        order.Clear();
+        Assert.Equal(StartDecision.FinishingUpdate, await Start(LockAnswer.Taken, updaterEnds: false));
+        Assert.Equal(new[] { "listen", "wait 3" }, order);
+        order.Clear();
+        // A second copy neither listens nor waits
+        Assert.Equal(StartDecision.HandedOver, await Start(LockAnswer.Busy, updaterEnds: true));
+        Assert.Empty(order);
+    }
+
+    [Fact]
+    public async Task A_second_copy_started_while_the_first_waits_for_the_updater_is_answered()
+    {
+        var folder = Temp.Folder();
+        QueueFolderLock? first = null, second = null;
+        using var end = new CancellationTokenSource();
+        var server = Task.CompletedTask;
+        var waiting = new TaskCompletionSource();
+        using var updaterDone = new ManualResetEventSlim();
+        var starting = Task.Run(() => SingleInstance.StartAsync(() => QueueFolderLock.TryTake(folder, out first), () => InstanceChannel.AskAsync(folder),
+            () => server = Task.Run(() => InstanceChannel.ListenAsync(folder, () => Task.FromResult(FrontAnswer.Shown), ct: end.Token)),
+            _ => { waiting.SetResult(); updaterDone.Wait(); return true; }));
+        await waiting.Task.WaitAsync(TimeSpan.FromSeconds(20));
+        Assert.Equal(StartDecision.HandedOver, await SingleInstance.StartAsync(() => QueueFolderLock.TryTake(folder, out second), () => InstanceChannel.AskAsync(folder, limit: TimeSpan.FromSeconds(20)), () => Assert.Fail("not the first"), _ => true));
+        updaterDone.Set();
+        Assert.Equal(StartDecision.Run, await starting);
+        end.Cancel();
+        await server;
+        first!.Dispose();
+    }
+
+    [Fact]
     public async Task Two_copies_on_one_folder_for_real()
     {
         var folder = Temp.Folder();
@@ -201,24 +240,47 @@ public class InstanceInstallGuardTests
 {
     private sealed class Listed(params (int, string)[] all) : IRunningProcesses
     {
-        public List<(int Pid, string Path)> All = all.Select(p => (p.Item1, p.Item2)).ToList();
+        public readonly List<(int Pid, string Path)> Running = all.Select(p => (p.Item1, p.Item2)).ToList();
+        /// <summary>Short names, junctions and links, and where they lead</summary>
+        public readonly Dictionary<string, string> Links = new(StringComparer.OrdinalIgnoreCase);
         public Exception? Fails;
-        public IReadOnlyList<(int Pid, string Path)> Find(IReadOnlyCollection<string> names) => Fails is null ? All : throw Fails;
+        public IReadOnlyList<(int Pid, string Path)> All() => Fails is null ? Running : throw Fails;
+        public string Final(string path)
+        {
+            foreach (var (from, to) in Links)
+            {
+                if (path.StartsWith(from, StringComparison.OrdinalIgnoreCase)) return to + path[from.Length..];
+            }
+            return path;
+        }
     }
 
     private const string Windows = @"C:\Users\a\AppData\Local\AlUmmahNow.Tools\current\Tools.exe";
     private const string Mac = "/Applications/Al Ummah Now Tools.app/Contents/MacOS/Tools";
 
-    private static bool Other(string program, params (int, string)[] running) => new InstallGuard(new Listed(running), program, 1, ignoreCase: true).OtherCopyRunning();
+    private static InstallGuard Guard(IRunningProcesses listed, string program) => new(listed, program, 1, program == Mac ? ReadSystem.MacOS : ReadSystem.Windows);
 
-    [Fact]
-    public void The_folder_the_updater_replaces()
-    {
-        Assert.Equal(@"C:\Users\a\AppData\Local\AlUmmahNow.Tools", InstallGuard.RootOf(Windows));
-        Assert.Equal(@"C:\Tools", InstallGuard.RootOf(@"C:\Tools\Tools.exe"));
-        Assert.Equal("/Applications/Al Ummah Now Tools.app", InstallGuard.RootOf(Mac));
-        Assert.Equal("/usr/lib/tools", InstallGuard.RootOf("/usr/lib/tools/Tools"));
-    }
+    private static bool Other(string program, params (int, string)[] running) => Guard(new Listed(running), program).OtherCopyRunning();
+
+    [Theory]
+    [InlineData(@"C:\Users\a\AppData\Local\AlUmmahNow.Tools\current\Tools.exe", false, @"C:\Users\a\AppData\Local\AlUmmahNow.Tools")]
+    [InlineData(@"C:\Tools\Tools.exe", false, @"C:\Tools")]
+    [InlineData(@"C:\current\Tools.exe", false, @"C:\current")]
+    [InlineData("/Applications/Al Ummah Now Tools.app/Contents/MacOS/Tools", true, "/Applications/Al Ummah Now Tools.app")]
+    [InlineData("/usr/lib/tools/Tools", false, "/usr/lib/tools")]
+    // Never a whole drive, file system or share
+    [InlineData(@"C:\Tools.exe", false, null)]
+    [InlineData("/Tools", false, null)]
+    [InlineData("/Tools", true, null)]
+    [InlineData(@"\\nas\share\Tools.exe", false, null)]
+    [InlineData(@"\\nas\share\current\Tools.exe", false, @"\\nas\share\current")]
+    [InlineData(@"\\nas\share\x\current\Tools.exe", false, @"\\nas\share\x")]
+    // A bundle only on macOS, and only around Contents
+    [InlineData(@"C:\dev.app\Tools\current\Tools.exe", false, @"C:\dev.app\Tools")]
+    [InlineData(@"C:\dev.app\Contents\Tools\Tools.exe", false, @"C:\dev.app\Contents\Tools")]
+    [InlineData("/Users/a/dev.app/Tools/Tools", true, "/Users/a/dev.app/Tools")]
+    [InlineData("/Users/a/dev.app/x/Tools.app/Contents/MacOS/Tools", true, "/Users/a/dev.app/x/Tools.app")]
+    public void The_folder_the_updater_replaces(string program, bool mac, string? root) => Assert.Equal(root, InstallGuard.RootOf(program, mac));
 
     [Fact]
     public void Only_another_copy_of_the_app_from_the_same_install_counts()
@@ -234,9 +296,30 @@ public class InstanceInstallGuardTests
     }
 
     [Fact]
+    public void A_program_on_a_drive_itself_is_only_compared_with_itself()
+    {
+        Assert.False(Other(@"C:\Tools.exe", (2, @"C:\elsewhere\Tools.exe")));
+        Assert.True(Other(@"C:\Tools.exe", (2, @"c:\tools.EXE")));
+    }
+
+    [Theory]
+    [InlineData(@"C:\Users\a\AppData\Local\ALUMMA~1.TOO\current\Tools.exe", @"C:\Users\a\AppData\Local\ALUMMA~1.TOO", @"C:\Users\a\AppData\Local\AlUmmahNow.Tools")]
+    [InlineData(@"C:\Users\a\AppData\Local\AlUmmahNow.Tools\current\TOOLS~1.EXE", @"C:\Users\a\AppData\Local\AlUmmahNow.Tools\current\TOOLS~1.EXE", Windows)]
+    [InlineData(@"D:\link\current\Tools.exe", @"D:\link", @"C:\Users\a\AppData\Local\AlUmmahNow.Tools")]
+    public void A_copy_started_by_a_short_name_or_through_a_junction_is_found(string started, string from, string to)
+    {
+        var listed = new Listed((1, Windows), (2, started)) { Links = { [from] = to } };
+        Assert.True(Guard(listed, Windows).OtherCopyRunning());
+        // And the other way round: this copy was started so, the other one plainly
+        var other = new Listed((1, started), (2, Windows)) { Links = { [from] = to } };
+        Assert.True(Guard(other, started).OtherCopyRunning());
+        Assert.False(Guard(new Listed((1, started)) { Links = { [from] = to } }, started).OtherCopyRunning());
+    }
+
+    [Fact]
     public void A_listing_that_fails_makes_the_update_wait()
     {
-        Assert.True(new InstallGuard(new Listed { Fails = new InvalidOperationException("x") }, Windows, 1, true).OtherCopyRunning());
+        Assert.True(Guard(new Listed { Fails = new InvalidOperationException("x") }, Windows).OtherCopyRunning());
     }
 
     [Fact]
@@ -245,45 +328,79 @@ public class InstanceInstallGuardTests
         foreach (var (program, updater) in new[] { (Windows, @"C:\Users\a\AppData\Local\AlUmmahNow.Tools\Update.exe"), (Mac, "/Applications/Al Ummah Now Tools.app/Contents/MacOS/UpdateMac") })
         {
             var listed = new Listed((1, program), (9, updater));
-            var guard = new InstallGuard(listed, program, 1, true);
+            var guard = Guard(listed, program);
             Assert.True(guard.UpdaterRunning());
             var slept = 0;
-            Assert.True(guard.WaitForUpdater(TimeSpan.FromSeconds(60), _ => { if (++slept == 3) listed.All.RemoveAt(1); }));
+            Assert.True(guard.WaitForUpdater(TimeSpan.FromSeconds(60), _ => { if (++slept == 3) listed.Running.RemoveAt(1); }));
             Assert.Equal(3, slept);
             Assert.True(guard.WaitForUpdater(TimeSpan.FromSeconds(60), _ => Assert.Fail("nothing to wait for")));
         }
-        var stuck = new InstallGuard(new Listed((9, @"C:\Users\a\AppData\Local\AlUmmahNow.Tools\Update.exe")), Windows, 1, true);
-        Assert.False(stuck.WaitForUpdater(TimeSpan.FromSeconds(5), _ => { }));
+        Assert.False(Guard(new Listed((9, @"C:\Users\a\AppData\Local\AlUmmahNow.Tools\Update.exe")), Windows).WaitForUpdater(TimeSpan.FromSeconds(5), _ => { }));
         // Another app's updater is none of ours
-        Assert.False(new InstallGuard(new Listed((9, @"C:\Users\a\AppData\Local\Other\Update.exe")), Windows, 1, true).UpdaterRunning());
+        Assert.False(Guard(new Listed((9, @"C:\Users\a\AppData\Local\Other\Update.exe")), Windows).UpdaterRunning());
     }
 
-    [Fact]
-    public async Task The_system_lists_a_running_program_by_its_path()
+    /// <summary>A second run of one program, as a second copy of the app would be; also through a junction or a linked folder, and by its short name where Windows keeps them.</summary>
+    [Theory]
+    [InlineData("plain")]
+    [InlineData("link")]
+    [InlineData("short")]
+    public async Task The_system_lists_a_running_program_by_its_final_path(string way)
     {
-        // A second run of one program, as a second copy of the app would be: ping from a folder of its own on Windows; elsewhere
-        // one nothing else here runs, where it is (macOS ends a copied system program, and some Linux ones are one program by many names)
+        // Ping from a folder of its own on Windows; elsewhere one nothing else here runs, where it is (macOS ends a copied system
+        // program, and some Linux ones are one program by many names)
         var windows = OperatingSystem.IsWindows();
-        var program = "/usr/bin/awk";
+        var folder = "/usr/bin";
+        var name = "awk";
         if (windows)
         {
-            program = Path.Combine(Temp.Folder(), "aun-copy.exe");
-            File.Copy(Path.Combine(Environment.SystemDirectory, "PING.EXE"), program);
+            folder = Path.Combine(Temp.Folder(), "a long folder name");
+            name = "aun second copy.exe";
+            Directory.CreateDirectory(folder);
+            File.Copy(Path.Combine(Environment.SystemDirectory, "PING.EXE"), Path.Combine(folder, name));
         }
-        Process Start()
+        var program = Path.Combine(folder, name);
+        var other = program;
+        switch (way)
         {
-            var start = new ProcessStartInfo(program) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardInput = true };
+            case "link":
+                var link = Path.Combine(Temp.Folder(), "link");
+                if (windows)
+                {
+                    using var make = Process.Start(new ProcessStartInfo("cmd.exe", $"/c mklink /J \"{link}\" \"{folder}\"") { UseShellExecute = false, RedirectStandardOutput = true })!;
+                    await make.WaitForExitAsync();
+                    Assert.Equal(0, make.ExitCode);
+                }
+                else Directory.CreateSymbolicLink(link, folder);
+                other = Path.Combine(link, name);
+                break;
+            case "short":
+                if (!windows) return;
+                using (var ask = Process.Start(new ProcessStartInfo("cmd.exe", $"/c for %I in (\"{program}\") do @echo %~sI") { UseShellExecute = false, RedirectStandardOutput = true })!)
+                {
+                    other = (await ask.StandardOutput.ReadToEndAsync()).Trim();
+                }
+                // This volume keeps no short names
+                if (!other.Contains('~')) return;
+                break;
+        }
+        Process Start(string path)
+        {
+            var start = new ProcessStartInfo(path) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardInput = true };
             foreach (var a in windows ? new[] { "-n", "60", "127.0.0.1" } : new[] { "BEGIN { getline }" }) start.ArgumentList.Add(a);
             return Process.Start(start)!;
         }
-        using var first = Start();
-        using var second = Start();
+        using var first = Start(program);
+        using var second = Start(other);
         try
         {
+            var system = new SystemProcesses();
             string? path = null;
-            await Temp.WaitUntil(() => (path = new SystemProcesses().Find(["aun-copy"]).FirstOrDefault(p => p.Pid == first.Id).Path) is not null && path.Contains(windows ? "aun-copy" : "awk", StringComparison.OrdinalIgnoreCase), 20_000);
-            var guard = new InstallGuard(new SystemProcesses(), path!, first.Id, ignoreCase: !OperatingSystem.IsLinux());
+            await Temp.WaitUntil(() => (path = system.All().FirstOrDefault(p => p.Pid == first.Id).Path) is not null && path.Contains(windows ? "aun second copy" : "awk", StringComparison.OrdinalIgnoreCase), 20_000);
+            var guard = new InstallGuard(system, path!, first.Id, ReadFailure.ThisSystem);
             await Temp.WaitUntil(guard.OtherCopyRunning, 20_000);
+            // And seen from the other one
+            await Temp.WaitUntil(new InstallGuard(system, other, second.Id, ReadFailure.ThisSystem).OtherCopyRunning, 20_000);
             second.Kill();
             await second.WaitForExitAsync();
             await Temp.WaitUntil(() => !guard.OtherCopyRunning(), 20_000);

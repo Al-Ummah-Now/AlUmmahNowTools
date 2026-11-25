@@ -146,9 +146,17 @@ public partial class App : Application
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
-        if (Shell.AppInstance.AlreadyOpen)
+#if WINDOWS
+        // This target has a Main of its own (Program.cs is the desktop one's)
+        if (!Shell.AppInstance.Start(Environment.GetCommandLineArgs()))
         {
-            ShowAlreadyOpen();
+            Environment.Exit(0);
+            return;
+        }
+#endif
+        if (Shell.AppInstance.AlreadyOpen || Shell.AppInstance.FinishingUpdate)
+        {
+            ShowInstanceNotice();
             return;
         }
         try
@@ -397,13 +405,15 @@ public partial class App : Application
         }
     }
 
-    /// <summary>Another copy has the queue and does not answer (Tools #89): only the window that says so, no services and no updates.</summary>
-    private void ShowAlreadyOpen()
+    /// <summary>Another copy has the queue and does not answer, or the updater is at work (Tools #89): only the window that says so, no services and no updates.</summary>
+    private void ShowInstanceNotice()
     {
         var preferences = Shell.ShellDemo.FromEnvironment()?.Preferences ?? AlUmmahNow.ToolsCore.ToolsPreferences.Load(AlUmmahNow.ToolsCore.ToolsPreferences.DefaultPath);
         Shell.ShellState.ApplyLanguage(preferences.Language);
-        MainWindow = new Shell.AlreadyOpenWindow(preferences);
+        MainWindow = new Shell.InstanceNoticeWindow(preferences, Shell.AppInstance.FinishingUpdate);
         MainWindow.Activate();
+        Shell.AppInstance.Attach(MainWindow);
+        if (Shell.AppInstance.FinishingUpdate && Environment.GetEnvironmentVariable("TOOLS_DEMO") != "1") Shell.AppInstance.StartAgainAfterUpdate(MainWindow);
 #if !WINDOWS
         if (Environment.GetEnvironmentVariable("TOOLS_SCREENSHOT") is { Length: > 0 } shot) _ = Shell.ScreenshotRunner.RunAsync(MainWindow, shot);
 #endif
