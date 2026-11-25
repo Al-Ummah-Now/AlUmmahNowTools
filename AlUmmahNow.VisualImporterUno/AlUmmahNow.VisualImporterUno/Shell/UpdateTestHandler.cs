@@ -23,7 +23,7 @@ internal sealed class UpdateTestHandler : HttpMessageHandler
 
     public static void Watch(UpdateService service)
     {
-        Log($"started {service.InstalledVersion} self={service.CanSelfUpdate}");
+        Log($"started {service.InstalledVersion} self={(service.CanSelfUpdate ? "true" : "false")}");
         var last = UpdateStage.Hidden;
         service.Changed += v =>
         {
