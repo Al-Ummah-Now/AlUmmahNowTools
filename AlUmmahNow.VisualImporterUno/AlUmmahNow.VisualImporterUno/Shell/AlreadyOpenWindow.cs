@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 
 namespace AlUmmahNow.VisualImporterUno.Shell;
 
@@ -27,8 +28,16 @@ internal sealed partial class AlreadyOpenWindow : Window
             Application.Current.Exit();
             ExitBackstop.EndSoon();
         };
+        var icon = new Border
+        {
+            Width = 72,
+            Height = 72,
+            CornerRadius = new CornerRadius(16),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Background = new ImageBrush { ImageSource = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri("ms-appx:///Assets/Images/staff_mark.png")), Stretch = Stretch.UniformToFill },
+        };
         var buttons = new StackPanel { Spacing = 10, Width = 280, HorizontalAlignment = HorizontalAlignment.Center, Children = { again, close } };
-        var panel = new StackPanel { Spacing = 16, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, Padding = new Thickness(24), Children = { title, body, buttons } };
+        var panel = new StackPanel { Spacing = 16, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, Padding = new Thickness(24), Children = { icon, title, body, buttons } };
         var root = UpdateBar.Themed<Grid>("<Grid Background=\"{ThemeResource FanousBackgroundBrush}\" />");
         var page = new UserControl { Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto } };
         if (ShellState.TextFontFor(preferences.Language) is { } font) page.FontFamily = font;

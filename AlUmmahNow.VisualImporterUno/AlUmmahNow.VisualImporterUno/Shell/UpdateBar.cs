@@ -54,6 +54,17 @@ public sealed partial class UpdateBar : UserControl
         row.Children.Add(_whatsNew);
         row.Children.Add(_action);
         row.Children.Add(_close);
+        // Narrow: the words have the first line to themselves, the buttons stand under them
+        row.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        row.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        row.SizeChanged += (_, e) =>
+        {
+            var narrow = e.NewSize.Width < 640;
+            if (Grid.GetRow(_action) == (narrow ? 1 : 0)) return;
+            row.RowSpacing = narrow ? 6 : 0;
+            Grid.SetColumnSpan(_text, narrow ? 4 : 1);
+            foreach (var part in new FrameworkElement[] { _progress, _whatsNew, _action }) Grid.SetRow(part, narrow ? 1 : 0);
+        };
         // Brushes through {ThemeResource} so the bar follows Light and Dark (a code lookup would pin one theme)
         var border = Themed<Border>("<Border Background=\"{ThemeResource FanousSurfaceBrush}\" BorderBrush=\"{ThemeResource FanousOutlineBrush}\" BorderThickness=\"0,0,0,1\" />");
         border.Child = row;
