@@ -59,9 +59,10 @@ public static class PrivateFolder
             // Only its owner may set a folder's mode, so this also proves the folder is ours
             File.SetUnixFileMode(path, mode);
         }
-        catch (UnauthorizedAccessException)
+        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
         {
-            throw new IOException($"{path} belongs to someone else");
+            // Not the owner, or a system volume nobody writes
+            throw new IOException($"{path} belongs to someone else", ex);
         }
         if ((File.GetUnixFileMode(path) & (UnixFileMode.GroupWrite | UnixFileMode.OtherWrite)) != 0) throw new IOException($"{path} can be written by others");
     }
