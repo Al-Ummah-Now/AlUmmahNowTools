@@ -231,7 +231,7 @@ jobs:
       run: scripts/fetch-core.sh
 
     - name: Test updates
-      run: dotnet test AlUmmahNow.ToolsCore.Tests/AlUmmahNow.ToolsCore.Tests.csproj -c Release --filter "FullyQualifiedName~Update|FullyQualifiedName~StagedPackage|FullyQualifiedName~PrivateFolder|FullyQualifiedName~PauseAll|FullyQualifiedName~RemoveAll|FullyQualifiedName~NetworkShare|FullyQualifiedName~Instance|FullyQualifiedName~QueueStop"
+      run: dotnet test AlUmmahNow.ToolsCore.Tests/AlUmmahNow.ToolsCore.Tests.csproj -c Release --filter "FullyQualifiedName~Update|FullyQualifiedName~StagedPackage|FullyQualifiedName~PrivateFolder|FullyQualifiedName~PauseAll|FullyQualifiedName~RemoveAll|FullyQualifiedName~NetworkShare|FullyQualifiedName~Instance|FullyQualifiedName~QueueStop|FullyQualifiedName~SettingsFile"
 
   coverage:
     name: Unified coverage report
