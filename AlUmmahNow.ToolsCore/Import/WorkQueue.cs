@@ -673,8 +673,9 @@ public sealed class ImportQueue : IDisposable
         {
             if (loop is not null)
             {
-                try { await loop.ConfigureAwait(false); } catch (OperationCanceledException) { }
-                stopping?.Dispose();
+                try { await loop.ConfigureAwait(false); }
+                catch (OperationCanceledException) { }
+                finally { stopping?.Dispose(); }
             }
             while (true)
             {

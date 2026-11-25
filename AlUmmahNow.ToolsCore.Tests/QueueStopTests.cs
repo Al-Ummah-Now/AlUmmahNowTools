@@ -12,43 +12,54 @@ public class QueueStopTests
 
     private static Task<T> Soon<T>(Task<T> task) => task.WaitAsync(TimeSpan.FromSeconds(30));
 
-    /// <summary>A step whose cancellation writes to the log (the queue's lock) while the step itself is already ending.</summary>
-    private static ScriptedStep EndsDuringItsCancellation() => new(ImportStepKind.Hash, async (_, context, ct) =>
+    /// <summary>
+    /// A step whose cancellation writes to the log (the queue's lock) while the step itself is already ending: its callback is
+    /// not waited for, so the queue finishes the step with the callback still running.
+    /// </summary>
+    private static ScriptedStep EndsDuringItsCancellation(int milliseconds) => new(ImportStepKind.Hash, async (_, context, ct) =>
     {
         var cancelled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        using var registration = ct.UnsafeRegister(_ => { cancelled.SetResult(); Thread.Sleep(500); context.Log(LogLevel.Info, "x", "x"); }, null);
+        // Never disposed: that would wait for the callback
+        ct.UnsafeRegister(_ => { cancelled.SetResult(); Thread.Sleep(milliseconds); context.Log(LogLevel.Info, "x", "x"); }, null);
         await cancelled.Task;
-        // Not waiting for the callback, as a step that just ends
-        registration.Unregister();
         ct.ThrowIfCancellationRequested();
         return StepResult.Done;
     });
 
+    /// <summary>
+    /// Many times, with many steps at once: with sources linked to the loop's it hung only when the loop's cancellation came to a
+    /// step before the step's own did.
+    /// </summary>
     [Theory]
-    [InlineData("stop")]
-    [InlineData("pause")]
-    [InlineData("remove")]
-    public async Task A_cancellation_that_needs_the_lock_while_its_step_ends_does_not_hang(string way)
+    [InlineData("stop", 150)]
+    [InlineData("pause", 5)]
+    [InlineData("remove", 5)]
+    public async Task A_cancellation_that_needs_the_lock_while_its_step_ends_does_not_hang(string way, int times)
     {
-        var step = EndsDuringItsCancellation();
-        var queue = new ImportQueue(Path.Combine(Temp.Folder(), "queue.json"), ImportQueueTests.All(step));
-        queue.Add(new[] { Item() });
-        queue.Start();
-        await Temp.WaitUntil(() => step.Running == 1, 20_000);
-        await Soon(Task.Run(async () =>
+        const int files = 8;
+        for (var n = 0; n < times; n++)
         {
-            switch (way)
+            var step = EndsDuringItsCancellation(5);
+            var queue = new ImportQueue(Path.Combine(Temp.Folder(), "queue.json"), ImportQueueTests.All(step));
+            queue.SetParallel(ImportStepKind.Hash, files);
+            queue.Add(Enumerable.Range(0, files).Select(_ => Item()));
+            queue.Start();
+            await Temp.WaitUntil(() => step.Running == files, 20_000);
+            await Soon(Task.Run(async () =>
             {
-                case "pause": queue.PauseAll(); break;
-                case "remove": queue.RemoveAll(); break;
-            }
-            await queue.StopAsync();
-            return true;
-        }));
-        Assert.Equal(0, step.Running);
-        // Nothing holds the lock
-        Assert.Equal(way == "remove" ? 0 : 1, (await Soon(Task.Run(() => queue.Items))).Count);
-        queue.Dispose();
+                switch (way)
+                {
+                    case "pause": queue.PauseAll(); break;
+                    case "remove": queue.RemoveAll(); break;
+                }
+                await queue.StopAsync();
+                return true;
+            }));
+            Assert.Equal(0, step.Running);
+            // Nothing holds the lock
+            Assert.Equal(way == "remove" ? 0 : files, (await Soon(Task.Run(() => queue.Items))).Count);
+            queue.Dispose();
+        }
     }
 
     [Fact]
