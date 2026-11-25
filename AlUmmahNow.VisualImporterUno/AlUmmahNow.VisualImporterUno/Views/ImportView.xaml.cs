@@ -155,13 +155,11 @@ public sealed partial class ImportView : Page
             row.ColumnDefinitions[1].Width = narrow ? new GridLength(0) : GridLength.Auto;
             row.ColumnSpacing = narrow ? 0 : 12;
         }
-        // Pause all, Resume all, Remove all and Clear finished: under the title unless there is room beside it, and one
-        // under the other when they do not fit in a row
+        // Pause all, Resume all, Remove all and Clear finished: under the title unless there is room beside it
         var under = e.NewSize.Width < 960;
         Grid.SetRow(QueueActions, under ? 1 : 0);
         Grid.SetColumn(QueueActions, under ? 0 : 1);
         Grid.SetColumnSpan(QueueActions, under ? 2 : 1);
-        QueueActions.Orientation = narrow ? Orientation.Vertical : Orientation.Horizontal;
         if (QueueActions.Parent is Grid header && header.RowDefinitions.Count < 2)
         {
             header.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
