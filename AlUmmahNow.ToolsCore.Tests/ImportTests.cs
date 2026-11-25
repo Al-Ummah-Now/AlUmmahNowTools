@@ -17,6 +17,12 @@ internal static class Temp
         return dir;
     }
 
+    public static string Folder(string path)
+    {
+        Directory.CreateDirectory(path);
+        return path;
+    }
+
     public static string Write(string dir, string name, string text)
     {
         var path = Path.Combine(dir, name);

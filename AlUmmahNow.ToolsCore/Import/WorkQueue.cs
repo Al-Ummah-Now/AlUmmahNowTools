@@ -310,9 +310,13 @@ public sealed class ImportQueue : IDisposable
     private Task? _loopTask;
     private QueueSettings _settings = new();
     private bool _allPaused;
+    private readonly WorkFolders _work;
+    private readonly object _cleanGate = new();
+    private Task _cleaning = Task.CompletedTask;
 
-    public ImportQueue(string path, IEnumerable<IImportStep> steps, IImportFailureSink? sink = null, TimeProvider? time = null, Func<int, TimeSpan>? backoff = null)
+    public ImportQueue(string path, IEnumerable<IImportStep> steps, IImportFailureSink? sink = null, TimeProvider? time = null, Func<int, TimeSpan>? backoff = null, WorkFolders? work = null)
     {
+        _work = work ?? WorkFolders.Default;
         _path = path;
         _steps = steps.ToDictionary(s => s.Kind);
         _sink = sink;
@@ -532,35 +536,40 @@ public sealed class ImportQueue : IDisposable
         return removed;
     }
 
-    /// <summary>The renditions and the transcript made here for files that left the queue before the server had them.</summary>
-    private static void DeleteWork(IReadOnlyList<QueueItem> items)
+    /// <summary>
+    /// The renditions and the transcript made here for files that left the queue: only the app's own work
+    /// (<see cref="WorkFiles"/>), whatever the saved queue says.
+    /// </summary>
+    private void DeleteWork(IReadOnlyCollection<QueueItem> items)
     {
-        var folders = items.Select(i => i.Renditions?.Directory).Where(d => !string.IsNullOrEmpty(d)).ToList();
-        var transcripts = items.Select(i => i.Transcript?.Path).Where(p => !string.IsNullOrEmpty(p)).ToList();
-        if (folders.Count == 0 && transcripts.Count == 0) return;
-        // Thousands of segments: not on the app's own thread
-        _ = Task.Run(() =>
+        var made = items.Where(i => i.Renditions is not null || i.Transcript is not null).ToList();
+        if (made.Count == 0) return;
+        void Delete()
         {
-            foreach (var folder in folders) EncodeStep.DeleteFolder(folder);
-            foreach (var transcript in transcripts)
+            foreach (var item in made)
             {
-                try { File.Delete(transcript!); }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+                WorkFiles.DeleteFolder(item.Renditions?.Directory, _work.Renditions, item.Id);
+                WorkFiles.DeleteFile(item.Transcript?.Path, _work.Transcripts, item.Id, ".json");
             }
-        });
+        }
+        // Thousands of segments: not on the app's own thread
+        lock (_cleanGate) _cleaning = _cleaning.ContinueWith(_ => Delete(), CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
     }
 
     /// <summary>Removes the files that are done.</summary>
     public int ClearDone()
     {
-        int removed;
+        List<QueueItem> done;
         lock (_gate)
         {
-            removed = _items.RemoveAll(i => i.Phase == ItemPhase.Done);
-            if (removed > 0) SaveLocked();
+            done = _items.Where(i => i.Phase == ItemPhase.Done).ToList();
+            _items.RemoveAll(i => i.Phase == ItemPhase.Done);
+            if (done.Count > 0) SaveLocked();
         }
-        if (removed > 0) Notify(null);
-        return removed;
+        if (done.Count > 0) Notify(null);
+        // Already deleted when the server had them, unless another app held a file then
+        DeleteWork(done);
+        return done.Count;
     }
 
     /// <summary>The file's log lines, oldest first.</summary>
@@ -606,6 +615,10 @@ public sealed class ImportQueue : IDisposable
             try { await loop.ConfigureAwait(false); } catch (OperationCanceledException) { }
         }
         lock (_gate) SaveLocked();
+        // What is being deleted is deleted whole, within reason
+        Task cleaning;
+        lock (_cleanGate) cleaning = _cleaning;
+        await Task.WhenAny(cleaning, Task.Delay(TimeSpan.FromSeconds(5))).ConfigureAwait(false);
     }
 
     public void Dispose()

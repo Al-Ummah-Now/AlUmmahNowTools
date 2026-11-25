@@ -34,13 +34,13 @@ public sealed class UploadStep : IImportStep
     private readonly Func<CancellationToken, Task<string?>> _token;
     private readonly RenditionSender _renditions;
 
-    public UploadStep(ImportApiClient api, TusClient tus, Uri videosApi, Func<CancellationToken, Task<string?>> token)
+    public UploadStep(ImportApiClient api, TusClient tus, Uri videosApi, Func<CancellationToken, Task<string?>> token, string? workRoot = null)
     {
         _api = api;
         _tus = tus;
         _tusEndpoint = new Uri(videosApi, "/api/videos/tus");
         _token = token;
-        _renditions = new RenditionSender(api);
+        _renditions = new RenditionSender(api, workRoot);
     }
 
     public ImportStepKind Kind => ImportStepKind.Upload;

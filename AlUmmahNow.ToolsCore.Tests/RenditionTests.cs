@@ -299,7 +299,7 @@ public class EncodeStepTests
         await Step(api, work, new FakeMedia()).RunAsync(item, new RecordingContext(), default);
         var folder = item.Renditions!.Directory;
         server.LoseOnce.Add("480p/seg_00002.m4s");
-        var upload = new UploadStep(api, new TusClient(server), new Uri("https://videos.api.example"), _ => Task.FromResult<string?>("tok"));
+        var upload = new UploadStep(api, new TusClient(server), new Uri("https://videos.api.example"), _ => Task.FromResult<string?>("tok"), work);
         var context = new RecordingContext();
         Assert.Equal(StepResult.Done, await upload.RunAsync(item, context, default));
 
@@ -320,7 +320,7 @@ public class EncodeStepTests
         await Step(api, work, new FakeMedia()).RunAsync(item, new RecordingContext(), default);
         server.StageRefusal = "too_late";
         var context = new RecordingContext();
-        var upload = new UploadStep(api, new TusClient(server), new Uri("https://videos.api.example"), _ => Task.FromResult<string?>("tok"));
+        var upload = new UploadStep(api, new TusClient(server), new Uri("https://videos.api.example"), _ => Task.FromResult<string?>("tok"), work);
         Assert.Equal(StepResult.Done, await upload.RunAsync(item, context, default));
         Assert.Null(item.Renditions);
         Assert.Contains(context.Lines, l => l.Code == "renditions_dropped");

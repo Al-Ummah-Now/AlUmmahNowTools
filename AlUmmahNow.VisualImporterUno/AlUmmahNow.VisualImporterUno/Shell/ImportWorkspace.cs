@@ -50,6 +50,7 @@ public sealed class ImportWorkspace : IDisposable
         var path = IsDemo
             ? Path.Combine(Path.GetTempPath(), "aun-tools-demo-" + Guid.NewGuid().ToString("N"), "queue.json")
             : ImportQueue.DefaultPath(Environment);
+        WorkFiles.Skipped = text => Serilog.Log.Warning("[Import] {Text}", text);
         Queue = new ImportQueue(path, steps, new ServerFailureSink(Api, Reporter));
         if (IsDemo)
         {
