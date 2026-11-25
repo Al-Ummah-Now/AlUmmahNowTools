@@ -436,6 +436,9 @@ namespace AlUmmahNow.VisualImporterUno.Services
         /// <returns>Path to executable or command to run with dotnet</returns>
         private string? FindServiceExecutable()
         {
+#if UPDATE_TEST
+            if (Environment.GetEnvironmentVariable("TOOLS_UPDATE_TEST_SCANNER") is { Length: > 0 } scanner) return scanner;
+#endif
             // Use configured path if available
             if (!string.IsNullOrEmpty(_serviceExecutablePath))
             {

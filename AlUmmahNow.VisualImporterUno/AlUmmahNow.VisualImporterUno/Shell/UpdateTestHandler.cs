@@ -38,6 +38,7 @@ internal sealed class UpdateTestHandler : HttpMessageHandler
                     await service.CheckAsync(userAsked: true);
                     Log($"rechecked {service.View.Stage}");
                 }
+                if (UpdateTestStep.On) await UpdateTestStep.WaitAsync();
                 UpdateTestClose.Run(Environment.GetEnvironmentVariable("TOOLS_UPDATE_TEST_CLOSE") ?? "quit");
             });
         };

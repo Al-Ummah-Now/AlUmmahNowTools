@@ -77,12 +77,18 @@ public sealed class VelopackInstaller : IUpdateInstaller
     public void ApplyOnExit()
     {
         if (_manager is null || _staged is null) return;
+#if UPDATE_TEST
+        Shell.UpdateTestHandler.Log($"handed over {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}");
+#endif
         _manager.WaitExitThenApplyUpdates(_staged.TargetFullRelease, silent: true, restart: false);
     }
 
     public void ApplyAndRestart()
     {
         if (_manager is null || _staged is null) return;
+#if UPDATE_TEST
+        Shell.UpdateTestHandler.Log($"handed over {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}");
+#endif
         _manager.ApplyUpdatesAndRestart(_staged.TargetFullRelease);
     }
 
