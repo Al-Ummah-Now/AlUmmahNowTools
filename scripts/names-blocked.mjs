@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * Every name given must lead nowhere on this machine, over IPv4 and IPv6 each: the system's own answer is only 0.0.0.0 for the
- * one and only :: for the other. Names are only looked up; nothing connects to them. Usage: names-blocked.mjs <host>...
+ * one and only :: for the other. On Windows, which gives no answer at all for those, it is the machine itself: only 127.0.0.1
+ * and only ::1. Names are only looked up; nothing connects to them. Usage: names-blocked.mjs <host>...
  */
 import { ALL } from 'node:dns';
 import { lookup } from 'node:dns/promises';
@@ -11,14 +12,14 @@ import { networkInterfaces } from 'node:os';
 const hosts = process.argv.slice(2);
 if (hosts.length === 0) throw new Error('no host given');
 const file = process.platform === 'win32' ? `${process.env.SystemRoot ?? 'C:\\Windows'}\\System32\\drivers\\etc\\hosts` : '/etc/hosts';
-const NOWHERE = { 4: '0.0.0.0', 6: '::' };
+const NOWHERE = process.platform === 'win32' ? { 4: '127.0.0.1', 6: '::1' } : { 4: '0.0.0.0', 6: '::' };
 // Without any hint macOS takes AI_V4MAPPED_CFG | AI_ADDRCONFIG, which leaves a family out, or writes IPv4 as IPv6; ALL alone does nothing else
 const hints = process.platform === 'darwin' ? ALL : 0;
 /** An IPv6 address of this machine that leads outside it (not the loopback, not link-local) */
 const hasIPv6 = Object.values(networkInterfaces()).flat().some((i) => i.family === 'IPv6' && !i.internal && !/^fe[89ab]/i.test(i.address));
 const listed = (host) => readFileSync(file, 'utf8').split(/\r?\n/).some((line) => {
 	const [address, ...names] = line.replace(/#.*/, '').trim().split(/\s+/);
-	return address === '::' && names.includes(host);
+	return address === NOWHERE[6] && names.includes(host);
 });
 
 async function check(host, family) {
@@ -28,7 +29,7 @@ async function check(host, family) {
 	} catch (e) {
 		// A machine without IPv6 may not answer for it at all: then only the hosts file itself can say it
 		const blocked = family === 6 && e.code === 'ENOTFOUND' && !hasIPv6 && listed(host);
-		return { blocked, said: blocked ? 'no answer, no IPv6 here, :: in the hosts file' : `${e.code}` };
+		return { blocked, said: blocked ? `no answer, no IPv6 here, ${NOWHERE[6]} in the hosts file` : `${e.code}` };
 	}
 }
 
