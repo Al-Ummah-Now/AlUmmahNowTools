@@ -282,6 +282,23 @@ public class EncodeStepTests
     }
 
     [Fact]
+    public async Task What_was_made_for_a_file_left_to_the_server_after_all_is_deleted_and_not_sent()
+    {
+        var (item, server, api, work) = Setup();
+        await Step(api, work, new FakeMedia()).RunAsync(item, new RecordingContext(), default);
+        var folder = item.Renditions!.Directory;
+        Assert.True(Directory.Exists(folder));
+        item.ServerEncodes = true;
+        // Whatever it still holds, the upload sends only the file
+        var upload = new UploadStep(api, new TusClient(server), new Uri("https://videos.api.example"), _ => Task.FromResult<string?>("tok"), work);
+        Assert.Equal(StepResult.Done, await upload.RunAsync(item, new RecordingContext(), default));
+        Assert.Null(server.Staged);
+        Assert.Equal(StepResult.Skipped, await Step(api, work, new FakeMedia()).RunAsync(item, new RecordingContext(), default));
+        Assert.Null(item.Renditions);
+        Assert.False(Directory.Exists(folder));
+    }
+
+    [Fact]
     public async Task A_local_failure_leaves_the_encode_to_the_server_logs_why_and_reports_it()
     {
         var (item, _, api, work) = Setup();

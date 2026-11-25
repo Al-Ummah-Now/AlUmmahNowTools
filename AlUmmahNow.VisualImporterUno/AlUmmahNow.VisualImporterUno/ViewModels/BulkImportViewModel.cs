@@ -392,13 +392,12 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
         try
         {
             var name = Path.GetFileName(CleanFolder(FolderPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
-            var serverEncodes = !EncodeHereShown;
             var transcribe = Transcription();
             var translate = TranslateCaptions;
             var batch = await _workspace.Api.CreateBatchAsync(channel.Id, string.IsNullOrWhiteSpace(name) ? null : name);
             _channelNames[channel.Id] = channel.LocalizedName;
             var now = DateTimeOffset.UtcNow;
-            _workspace.Queue.Add(chosen.Select((r, i) => QueueItem.For(r.Video, batch.Id, channel.Id, now.AddMilliseconds(i), serverEncodes, transcribe, translate)));
+            _workspace.Queue.Add(chosen.Select((r, i) => QueueItem.For(r.Video, batch.Id, channel.Id, now.AddMilliseconds(i), !EncodeHereShown, transcribe, translate)));
             foreach (var r in chosen) ReviewRows.Remove(r);
             ReviewCount = ReviewRows.Count;
             CountSelected();
@@ -477,7 +476,11 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
     private void ResumeAll() => _workspace.Queue.ResumeAll();
 
     [RelayCommand]
-    private void ClearFinished() => _workspace.Queue.ClearDone();
+    private void ClearFinished()
+    {
+        EncodeChanged = "";
+        _workspace.Queue.ClearDone();
+    }
 
     public void Pause(QueueRow row) => _workspace.Queue.Pause(row.Id);
     public void Resume(QueueRow row) => _workspace.Queue.Resume(row.Id);
@@ -497,7 +500,11 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>Empties the queue (after the dialog).</summary>
-    public void RemoveAll() => _workspace.Queue.RemoveAll();
+    public void RemoveAll()
+    {
+        EncodeChanged = "";
+        _workspace.Queue.RemoveAll();
+    }
 
     /// <summary>Shows or hides the file's log under its row.</summary>
     public void ToggleLog(QueueRow row)
@@ -542,6 +549,7 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
         CanResumeAll = _workspace.Queue.CanResumeAll;
         HasFinished = items.Any(i => i.Phase == ItemPhase.Done);
         QueueSummary = Summary(items);
+        if (items.All(i => i.Phase == ItemPhase.Done)) EncodeChanged = "";
         OnPropertyChanged(nameof(ShowEmptyReview));
     }
 

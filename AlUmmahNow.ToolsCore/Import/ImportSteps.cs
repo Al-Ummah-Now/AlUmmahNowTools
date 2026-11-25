@@ -95,7 +95,7 @@ public sealed class UploadStep : IImportStep
 
         // The renditions' share of the step's progress, by bytes
         var share = 0.0;
-        if (item.Renditions is { Sent: false } set)
+        if (!item.ServerEncodes && item.Renditions is { Sent: false } set)
         {
             share = (double)set.Bytes / Math.Max(1, set.Bytes + item.Video.Size);
             await _renditions.SendAsync(item, context, new DirectProgress(p => context.Progress(p * share)), ct).ConfigureAwait(false);

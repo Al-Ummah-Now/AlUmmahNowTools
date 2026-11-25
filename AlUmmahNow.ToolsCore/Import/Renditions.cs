@@ -444,10 +444,12 @@ public sealed class EncodeStep : IImportStep
 
     public async Task<StepResult> RunAsync(QueueItem item, IStepContext context, CancellationToken ct)
     {
+        // The choice this run was started for: one made meanwhile starts it again (ImportQueue)
+        var server = item.EncodeRun ?? item.ServerEncodes;
         // Left to the server after all, or of another file that was in this one's place
-        if (item.ServerEncodes) item.Renditions = null;
+        if (server) item.Renditions = null;
         if (item.Renditions is null) WorkFiles.DeleteFolder(Path.Combine(_workRoot, item.Id), _workRoot, item.Id);
-        if (item.ServerEncodes)
+        if (server)
         {
             context.Log(LogLevel.Info, "server_encode_chosen", "Let the server encode was chosen: the server encodes this file");
             return StepResult.Skipped;
@@ -525,6 +527,14 @@ public sealed class EncodeStep : IImportStep
             context.Log(LogLevel.Info, "encoded", $"Encoded {item.Renditions.Rungs.Count} rungs here ({size} MB); they go with the upload", item.Renditions.Rungs.Count.ToString(CultureInfo.InvariantCulture), bytes.ToString(CultureInfo.InvariantCulture), item.Video.Size.ToString(CultureInfo.InvariantCulture));
             return StepResult.Done;
         }
+        catch (LocalEncodeException ex) when (ex.Code is "no_video" or "no_media")
+        {
+            // The server would find the same once everything was sent: refused as when it is checked
+            WorkFiles.DeleteFolder(directory, _workRoot, item.Id);
+            throw ex.Code == "no_video"
+                ? new StepFailedException("no_video", "The file has sound and no video", retryable: false, ex)
+                : new StepFailedException("not_video", "The file cannot be read as a video: it may have been cut off while it was copied", retryable: false, ex);
+        }
         catch (Exception ex) when (ex is OperationCanceledException || ct.IsCancellationRequested)
         {
             // Stopped (paused, removed or the app closing), whatever it stopped with: encoded from the start next time
@@ -536,14 +546,6 @@ public sealed class EncodeStep : IImportStep
             // The file itself cannot be read: the upload could not either
             WorkFiles.DeleteFolder(directory, _workRoot, item.Id);
             throw;
-        }
-        catch (LocalEncodeException ex) when (ex.Code is "no_video" or "no_media")
-        {
-            // The server would find the same once everything was sent: refused as when it is checked
-            WorkFiles.DeleteFolder(directory, _workRoot, item.Id);
-            throw ex.Code == "no_video"
-                ? new StepFailedException("no_video", "The file has sound and no video", retryable: false, ex)
-                : new StepFailedException("not_video", "The file cannot be read as a video: it may have been cut off while it was copied", retryable: false, ex);
         }
         catch (Exception ex) when (ex is LocalEncodeException or IOException or UnauthorizedAccessException)
         {
