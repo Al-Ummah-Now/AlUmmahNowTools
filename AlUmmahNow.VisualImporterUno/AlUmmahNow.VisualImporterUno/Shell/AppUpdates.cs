@@ -86,6 +86,8 @@ public static class AppUpdates
         // The notice states are builds that can't install an update: Settings has no automatic switch
         public bool CanSelfUpdate => Environment.GetEnvironmentVariable("TOOLS_DEMO_UPDATE") is not ("notice" or "forced-notice" or "download");
         public Task StageAsync(string packagePath, CoreRelease release, CoreArtifact artifact, CancellationToken cancel) => Task.CompletedTask;
+        public void VerifyStaged() { }
+        public void Discard() { }
         public void ApplyOnExit() { }
         public void ApplyAndRestart() { }
     }

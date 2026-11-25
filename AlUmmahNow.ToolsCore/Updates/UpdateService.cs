@@ -37,7 +37,7 @@ public sealed record UpdateView(
     bool Required = false)
 {
     public static readonly UpdateView None = new(UpdateStage.Hidden);
-    public bool CanClose => Stage is UpdateStage.Available or UpdateStage.Ready;
+    public bool CanClose => !Required && (Stage is UpdateStage.Available or UpdateStage.Ready);
 }
 
 /// <summary>The decision the core makes for one answer (aun-core <c>UpdatePrompt</c>).</summary>
@@ -75,9 +75,14 @@ public interface IUpdateInstaller
     bool CanSelfUpdate { get; }
     /// <summary>Hands Velopack the downloaded, verified package; <see cref="ApplyOnExit"/> or <see cref="ApplyAndRestart"/> installs it</summary>
     Task StageAsync(string packagePath, CoreRelease release, CoreArtifact artifact, CancellationToken cancel);
-    /// <summary>The app is exiting: installs the staged update once it has</summary>
+    /// <summary>The staged file is still the one the signed manifest lists</summary>
+    /// <exception cref="UpdateVerificationException">it isn't</exception>
+    void VerifyStaged();
+    /// <summary>Drops the staged update: it is not installed, now or later</summary>
+    void Discard();
+    /// <summary>The app is exiting: installs the staged update once it has. Only right after <see cref="VerifyStaged"/></summary>
     void ApplyOnExit();
-    /// <summary>Applies the staged update now and restarts the app</summary>
+    /// <summary>Applies the staged update now and restarts the app. Only right after <see cref="VerifyStaged"/></summary>
     void ApplyAndRestart();
 }
 
@@ -110,7 +115,14 @@ public sealed class UpdateService : IDisposable
     private ITimer? _timer;
     private UpdateView _view = UpdateView.None;
     private CorePrompt? _lastPrompt;
-    private string? _stagedVersion;
+    private Staged? _staged;
+    private bool _applying;
+    private bool _autoInstallDefault = true;
+    /// <summary>The release the last answer offers to install, whether or not its notice was closed</summary>
+    private string? _offeredTag;
+
+    /// <summary>A staged update and what proves it: checked again before it is installed</summary>
+    private sealed record Staged(string Version, string Tag, byte[] Manifest, string Signature);
 
     /// <param name="hasRootKey">this build carries a root key: without one it can verify nothing, so it only shows the notice with its fixed page (§4.1.1)</param>
     /// <param name="busy">true while an import, upload or encode runs: never restart then</param>
@@ -137,10 +149,13 @@ public sealed class UpdateService : IDisposable
     public UpdateView View => _view;
     public event Action<UpdateView>? Changed;
 
-    /// <summary>Settings → Updates: "Install updates automatically"; on by default (APPUPD-D5)</summary>
+    /// <summary>
+    /// Settings → Updates: "Install updates automatically": the user's own choice, else the admin's default
+    /// (`updates.autoInstallDefault`), else on (APPUPD-D5)
+    /// </summary>
     public bool AutoInstall
     {
-        get => _core.AutoInstall ?? true;
+        get => _core.AutoInstall ?? _autoInstallDefault;
         set
         {
             _core.AutoInstall = value;
@@ -186,6 +201,10 @@ public sealed class UpdateService : IDisposable
                 using (var answer = JsonDocument.Parse(json))
                 {
                     Enabled = answer.RootElement.TryGetProperty("update", out var update) && update.TryGetProperty("enabled", out var on) && on.ValueKind == JsonValueKind.True;
+                    _offeredTag = Enabled == true && update.TryGetProperty("action", out var action) && action.ValueKind == JsonValueKind.String && action.GetString() == "install"
+                        && update.TryGetProperty("tag", out var tag) && tag.ValueKind == JsonValueKind.String ? tag.GetString() : null;
+                    _autoInstallDefault = !(answer.RootElement.TryGetProperty("config", out var config) && config.ValueKind == JsonValueKind.Object
+                        && config.TryGetProperty("updates.autoInstallDefault", out var auto) && auto.ValueKind == JsonValueKind.False);
                 }
                 prompt = Gate(_core.ApplyAnswer(json, null));
                 _core.MarkChecked(_clock.GetUtcNow().ToUnixTimeMilliseconds());
@@ -224,10 +243,22 @@ public sealed class UpdateService : IDisposable
 
     private async Task ActOnAsync(CorePrompt p, CancellationToken cancel)
     {
-        if (p.Version is not null && p.Version == _stagedVersion && p.Kind != "None")
+        if (_staged is { } staged)
         {
-            Publish(new UpdateView(UpdateStage.Ready, p.Version, p.NotesEn, p.NotesAr, p.MessageEn, p.MessageAr, Required: p.Kind == "Forced"));
-            return;
+            // Still offered, and still trusted after whatever key list this answer brought (a revoked key, a yanked version)
+            if (_offeredTag != staged.Tag || !CanSelfUpdate) Unstage();
+            else if (await StillGoodAsync(cancel).ConfigureAwait(false))
+            {
+                // Closed for this version: it still installs as the app closes, without the bar
+                if (p.Kind == "None") Publish(UpdateView.None);
+                else Publish(new UpdateView(UpdateStage.Ready, staged.Version, p.NotesEn, p.NotesAr, p.MessageEn, p.MessageAr, Required: p.Kind == "Forced"));
+                return;
+            }
+            else
+            {
+                Publish(p.Kind == "Forced" ? ViewFor(UpdateStage.RequiredSoon, p) : UpdateView.None);
+                return;
+            }
         }
         switch (p.Kind)
         {
@@ -274,9 +305,15 @@ public sealed class UpdateService : IDisposable
     }
 
     /// <summary>Restart now: refused while work is running (the bar says "Finish or pause your uploads first.").</summary>
-    public bool RestartNow()
+    public async Task<bool> RestartNowAsync(CancellationToken cancel = default)
     {
-        if (_view.Stage != UpdateStage.Ready || _busy()) return false;
+        if (_view.Stage != UpdateStage.Ready || _busy() || _applying) return false;
+        if (!await StillGoodAsync(cancel).ConfigureAwait(false))
+        {
+            Publish(_view.Required ? new UpdateView(UpdateStage.RequiredSoon, MessageEn: _view.MessageEn, MessageAr: _view.MessageAr) : UpdateView.None);
+            return false;
+        }
+        _applying = true;
         _installer.ApplyAndRestart();
         return true;
     }
@@ -293,7 +330,37 @@ public sealed class UpdateService : IDisposable
     /// <summary>Every window is closed: install the staged update as the app goes.</summary>
     public void OnExit()
     {
-        if (_stagedVersion is not null) _installer.ApplyOnExit();
+        // Restart now has started the updater already
+        if (_staged is null || _applying) return;
+        _applying = true;
+        if (StillGoodAsync(CancellationToken.None, report: false).GetAwaiter().GetResult()) _installer.ApplyOnExit();
+    }
+
+    /// <summary>
+    /// The staged update, checked again from the start: its manifest's signature under the keys trusted now, and the
+    /// file on disk. If either fails it is dropped and (unless the app is going) reported.
+    /// </summary>
+    private async Task<bool> StillGoodAsync(CancellationToken cancel, bool report = true)
+    {
+        if (_staged is not { } staged) return false;
+        try
+        {
+            _core.VerifyManifest(staged.Manifest, staged.Signature, staged.Tag);
+            _installer.VerifyStaged();
+            return true;
+        }
+        catch (UpdateVerificationException ex)
+        {
+            Unstage();
+            if (report) await ReportFailureAsync(staged.Tag, ex.Reason, cancel).ConfigureAwait(false);
+            return false;
+        }
+    }
+
+    private void Unstage()
+    {
+        _staged = null;
+        _installer.Discard();
     }
 
     /// <summary>The release the answer names, its signature checked; null when refused (and reported) or unreachable.</summary>
@@ -302,7 +369,7 @@ public sealed class UpdateService : IDisposable
         if (p.ManifestUrl is null || p.Tag is null) return null;
         try
         {
-            return await FetchReleaseAsync(p.ManifestUrl, p.Tag, cancel).ConfigureAwait(false);
+            return (await FetchReleaseAsync(p.ManifestUrl, p.Tag, cancel).ConfigureAwait(false)).Release;
         }
         catch (UpdateVerificationException ex)
         {
@@ -315,13 +382,13 @@ public sealed class UpdateService : IDisposable
         }
     }
 
-    private async Task<CoreRelease> FetchReleaseAsync(string manifestUrl, string tag, CancellationToken cancel)
+    private async Task<(CoreRelease Release, Staged Proof)> FetchReleaseAsync(string manifestUrl, string tag, CancellationToken cancel)
     {
         var manifest = await FetchAsync(manifestUrl, 256 * 1024, null, cancel).ConfigureAwait(false);
         var signature = Encoding.UTF8.GetString(await FetchAsync(manifestUrl + ".sig", 4096, null, cancel).ConfigureAwait(false));
         var release = _core.VerifyManifest(manifest, signature, tag);
         SaveState();
-        return release;
+        return (release, new Staged(release.Version, tag, manifest, signature));
     }
 
     private async Task DownloadAndStageAsync(CorePrompt p, CancellationToken cancel)
@@ -332,7 +399,7 @@ public sealed class UpdateService : IDisposable
         string reason;
         try
         {
-            var release = await FetchReleaseAsync(p.ManifestUrl, p.Tag, cancel).ConfigureAwait(false);
+            var (release, proof) = await FetchReleaseAsync(p.ManifestUrl, p.Tag, cancel).ConfigureAwait(false);
             // The signed manifest names the version, not the answer
             if (release.Version != p.Version) throw new UpdateVerificationException("wrong_tag");
             var artifact = release.Artifacts.FirstOrDefault(a => a.App == "tools" && a.Platform == _platform && a.Kind == "velopack-full" && (a.Arch is null || a.Arch == _arch || a.Arch == "universal"))
@@ -340,14 +407,24 @@ public sealed class UpdateService : IDisposable
             Directory.CreateDirectory(_downloadDir);
             var path = Path.Combine(_downloadDir, $"tools-{release.Version}-{_arch}.nupkg");
             await DownloadVerifiedAsync(artifact, path, cancel).ConfigureAwait(false);
-            await _installer.StageAsync(path, release, artifact, cancel).ConfigureAwait(false);
-            _stagedVersion = release.Version;
+            try
+            {
+                await _installer.StageAsync(path, release, artifact, cancel).ConfigureAwait(false);
+                _installer.VerifyStaged();
+            }
+            catch (Exception ex) when (ex is not (UpdateVerificationException or OperationCanceledException))
+            {
+                // The installer couldn't take a verified package (disk, permissions): not a refusal, and never a stuck bar
+                throw new IOException("the installer could not take the update", ex);
+            }
+            _staged = proof;
             Publish(new UpdateView(UpdateStage.Ready, release.Version, release.NotesEn, release.NotesAr, p.MessageEn, p.MessageAr, Required: required));
             return;
         }
         catch (UpdateVerificationException ex)
         {
             reason = ex.Reason;
+            Unstage();
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException)
         {
@@ -411,12 +488,12 @@ public sealed class UpdateService : IDisposable
                 await StreamAsync(artifact.Url, file, (long)artifact.Size, f => Publish(_view with { Progress = f }), cancel).ConfigureAwait(false);
             }
             var info = new FileInfo(temp);
-            string hash;
+            byte[] hash;
             await using (var check = File.OpenRead(temp))
             {
-                hash = Convert.ToHexStringLower(await SHA256.HashDataAsync(check, cancel).ConfigureAwait(false));
+                hash = await SHA256.HashDataAsync(check, cancel).ConfigureAwait(false);
             }
-            if (info.Length != (long)artifact.Size || !CryptographicOperations.FixedTimeEquals(Encoding.ASCII.GetBytes(hash), Encoding.ASCII.GetBytes(artifact.Sha256)))
+            if (info.Length != (long)artifact.Size || !CryptographicOperations.FixedTimeEquals(hash, Convert.FromHexString(artifact.Sha256)))
                 throw new UpdateVerificationException("hash");
             File.Move(temp, path, overwrite: true);
         }
