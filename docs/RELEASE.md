@@ -25,7 +25,9 @@
 | windows | `win-x64` self-contained publish; portable `.zip`; per-machine `.msi` (WiX 5, `packaging/windows/tools.wxs`); installs the MSI, launches the installed app, uninstalls |
 | macos | `osx-arm64` and `osx-x64` `.app` bundles (Uno `PackageFormat=app`) in `.dmg`s; launches the arm64 app |
 | linux | `linux-x64` self-contained `.tar.gz` and `.deb` (`scripts/build-deb.sh`); installs the `.deb`, launches it under Xvfb, removes it |
-| release | `SHA256SUMS.txt`, `AlUmmahNow-Tools-<version>-licenses.zip`, notes (`scripts/release-notes.py`: install table, signing warnings, server requirements, PRs merged since the previous tag), then the GitHub release |
+| manifest | `app-release.json`: every file with its SHA-256 and the release notes; no secret. A dry run signs a copy with a throwaway key and checks that a change is refused |
+| sign | Only on a tag, in the environment `update-signing`: refuses a commit that isn't on `master` or a manifest of another tag, signs `app-release.json`, verifies it under the key list the apps carry |
+| release | Checks every file against the signed manifest; `SHA256SUMS.txt`, `AlUmmahNow-Tools-<version>-licenses.zip`, notes (`scripts/release-notes.py`: install table, signing warnings, server requirements, PRs merged since the previous tag), then the GitHub release |
 
 The launch check starts the installed app in demo mode (`TOOLS_DEMO=1`, no network, no sign-in) with
 `TOOLS_SCREENSHOT`, which renders the window to a PNG and exits; no PNG within 120 s fails the run. The PNGs are
@@ -43,6 +45,7 @@ Tag `vYYYY.MM.DD[.N]` (N is 1 when absent) becomes:
 | File names, About, `InformationalVersion`, `.deb` | tag without `v` | `2026.11.22.2` |
 | Assembly and file version | `YYYY.M.D.N` | `2026.11.22.2` |
 | MSI `ProductVersion` (major ≤ 255, only 3 fields compare) | `YY.M.(D×100+N)` | `26.11.2202` |
+| Velopack package (3 fields) | `YYYY.M.(D×100+N)` | `2026.11.2202` |
 | Uno `ApplicationDisplayVersion` / `ApplicationVersion` (macOS `CFBundleShortVersionString` / `CFBundleVersion`) | `YYYY.M.D` / `N` | `2026.11.22` / `2` |
 
 ## Signing
@@ -78,6 +81,9 @@ AUN-APP-UPDATES). Operating-system code signing is separate and optional.
 
 - **Windows Setup and the macOS `.dmg`** are Velopack builds (`scripts/vpk-pack.sh`) and update themselves. The MSI, the
   portable zip and the Linux packages show the notice, and **Download** opens the releases page.
+- **An older Setup run by hand replaces a newer install**: Velopack's installer offers the downgrade, and `--silent` does it
+  without asking. That is the user's own act on their own computer. The app itself never goes back to an older version,
+  and once it runs it offers the newest one again. Take a release with a known fault off GitHub as well as yanking it.
 - **`packaging/release-notes/en.txt` and `ar.txt`**: plain text, at most 1,500 characters each, shown under *What's new*.
   Change both before each release; a tag whose notes are the last release's is refused.
 - **`app-release.json`** lists every file with its SHA-256 (`scripts/release-files.mjs`, `scripts/app-release.mjs`, a copy
