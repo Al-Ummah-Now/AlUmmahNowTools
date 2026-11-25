@@ -39,7 +39,7 @@ public sealed class HashStep : IImportStep
         var stream = _source.Open(video.Path, video.Size, video.LastModifiedMs, context);
         await using (stream.ConfigureAwait(false))
         {
-            (sha256, fingerprint) = await FileHasher.HashAsync(stream, state, new Progress<double>(context.Progress), ct).ConfigureAwait(false);
+            (sha256, fingerprint) = await FileHasher.HashAsync(stream, state, new DirectProgress(context.Progress), ct).ConfigureAwait(false);
         }
         // Read whole: whatever comes next, this hash is used up
         item.Hashing = null;
@@ -98,7 +98,7 @@ public sealed class UploadStep : IImportStep
         if (item.Renditions is { Sent: false } set)
         {
             share = (double)set.Bytes / Math.Max(1, set.Bytes + item.Video.Size);
-            await _renditions.SendAsync(item, context, new Progress<double>(p => context.Progress(p * share)), ct).ConfigureAwait(false);
+            await _renditions.SendAsync(item, context, new DirectProgress(p => context.Progress(p * share)), ct).ConfigureAwait(false);
         }
 
         var reopened = false;
