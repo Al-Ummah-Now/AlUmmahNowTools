@@ -18,20 +18,46 @@ public static class SuggestionsUnderBox
 {
     public static void Attach(AutoSuggestBox box)
     {
-        box.Loaded += (_, _) =>
+        Popup? attached = null;
+        long token = 0;
+        var place = new Place();
+        EventHandler<object> opened = (_, _) => { if (attached is { } popup) Later(box, popup, place); };
+        void Detach()
         {
-            if (Find<Popup>(box) is not { } popup) return;
+            if (attached is not { } popup) return;
+            popup.Opened -= opened;
+            popup.UnregisterPropertyChangedCallback(Popup.HorizontalOffsetProperty, token);
+            attached = null;
+        }
+        // In a folded part of a page a box is loaded before it has its parts: they are there once it has a size or the focus
+        void AttachNow()
+        {
+            if (attached is not null || Find<Popup>(box) is not { } popup) return;
+            attached = popup;
+            place.Offset = null;
             // Its rows follow the window, as the chosen channel's card does; set before any row is drawn (turned round later, Uno
             // now and then drew a left-to-right line of a row, the email, mirrored)
             if (popup.Child is FrameworkElement rows) rows.FlowDirection = box.FlowDirection;
-            var place = new Place();
-            popup.Opened += (_, _) => Later(box, popup, place);
-            popup.RegisterPropertyChangedCallback(Popup.HorizontalOffsetProperty, (_, _) =>
+            popup.Opened += opened;
+            token = popup.RegisterPropertyChangedCallback(Popup.HorizontalOffsetProperty, (_, _) =>
             {
                 if (place.Moving || !popup.IsOpen) return;
                 if (place.Offset is { } offset && place.Width == box.ActualWidth) Move(popup, place, offset);
                 Later(box, popup, place);
             });
+        }
+        box.Loaded += (_, _) =>
+        {
+            Detach();
+            AttachNow();
+        };
+        box.GotFocus += (_, _) => AttachNow();
+        box.Unloaded += (_, _) => Detach();
+        // The list is placed where the box was when it opened
+        box.SizeChanged += (_, e) =>
+        {
+            AttachNow();
+            if (e.PreviousSize.Width > 0 && e.NewSize.Width != e.PreviousSize.Width) box.IsSuggestionListOpen = false;
         };
     }
 
@@ -64,7 +90,7 @@ public static class SuggestionsUnderBox
 
     private static void Align(AutoSuggestBox box, Popup popup, Place place)
     {
-        if (popup.Child is not FrameworkElement list) return;
+        if (!popup.IsOpen || popup.Child is not FrameworkElement list) return;
         if (list.Width != box.ActualWidth) list.Width = box.ActualWidth;
         if (list.FlowDirection != box.FlowDirection) list.FlowDirection = box.FlowDirection;
         // Right to left, the popup's origin is the box's right edge but the list is drawn from its left edge there

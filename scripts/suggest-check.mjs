@@ -38,11 +38,14 @@ function run(command, args, timeout = 30_000) {
 }
 
 const powershell = (script) => run('powershell', ['-NoProfile', '-STA', '-Command', script]);
+/** Windows opens each window lower than the one before, down to where a row lies behind the taskbar. */
+const moved = (to) => powershell(`Add-Type -Name S -Namespace W -MemberDefinition '[System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)] public struct R { public int L; public int T; public int Right; public int B; } [System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool GetWindowRect(System.IntPtr h, out R r); [System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool MoveWindow(System.IntPtr h, int x, int y, int w, int t, bool p);'; $h = (Get-Process -Id ${app.pid}).MainWindowHandle; $r = New-Object W.S+R; [W.S]::GetWindowRect($h, [ref]$r) | Out-Null; [W.S]::MoveWindow($h, ${to}, $true) | Out-Null`);
 const KEYS = {
-	win32: { front: () => powershell(`(New-Object -ComObject WScript.Shell).AppActivate(${app.pid}) | Out-Null`), text: (t) => powershell(`Add-Type -AssemblyName System.Windows.Forms; foreach ($c in '${t}'.ToCharArray()) { [System.Windows.Forms.SendKeys]::SendWait([string]$c); Start-Sleep -Milliseconds 150 }`), click: (x, y) => powershell(`Add-Type -Name M -Namespace W -MemberDefinition '[System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)] public struct P { public int X; public int Y; } [System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool ClientToScreen(System.IntPtr h, ref P p); [System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y); [System.Runtime.InteropServices.DllImport("user32.dll")] public static extern void mouse_event(uint f, uint x, uint y, uint d, System.UIntPtr e);'; $p = New-Object W.M+P; $p.X = ${x}; $p.Y = ${y}; [W.M]::ClientToScreen((Get-Process -Id ${app.pid}).MainWindowHandle, [ref]$p) | Out-Null; [W.M]::SetCursorPos($p.X, $p.Y) | Out-Null; Start-Sleep -Milliseconds 300; [W.M]::mouse_event(2, 0, 0, 0, [UIntPtr]::Zero); Start-Sleep -Milliseconds 80; [W.M]::mouse_event(4, 0, 0, 0, [UIntPtr]::Zero)`), key: (k) => powershell(`Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('${{ Backspace: '{BACKSPACE}', Escape: '{ESC}', Down: '{DOWN}', Enter: '{ENTER}', Tab: '{TAB}', All: '^a' }[k]}')`) },
+	win32: { front: () => powershell(`(New-Object -ComObject WScript.Shell).AppActivate(${app.pid}) | Out-Null`), text: (t) => powershell(`Add-Type -AssemblyName System.Windows.Forms; foreach ($c in '${t}'.ToCharArray()) { [System.Windows.Forms.SendKeys]::SendWait([string]$c); Start-Sleep -Milliseconds 150 }`), top: () => moved('0, 0, $r.Right - $r.L, $r.B - $r.T'), narrower: () => moved('$r.L, $r.T, $r.Right - $r.L - 120, $r.B - $r.T'), click: (x, y) => powershell(`Add-Type -Name M -Namespace W -MemberDefinition '[System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)] public struct P { public int X; public int Y; } [System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool ClientToScreen(System.IntPtr h, ref P p); [System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y); [System.Runtime.InteropServices.DllImport("user32.dll")] public static extern void mouse_event(uint f, uint x, uint y, uint d, System.UIntPtr e);'; $p = New-Object W.M+P; $p.X = ${x}; $p.Y = ${y}; [W.M]::ClientToScreen((Get-Process -Id ${app.pid}).MainWindowHandle, [ref]$p) | Out-Null; [W.M]::SetCursorPos($p.X, $p.Y) | Out-Null; Start-Sleep -Milliseconds 300; [W.M]::mouse_event(2, 0, 0, 0, [UIntPtr]::Zero); Start-Sleep -Milliseconds 80; [W.M]::mouse_event(4, 0, 0, 0, [UIntPtr]::Zero)`), key: (k) => powershell(`Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('${{ Backspace: '{BACKSPACE}', Escape: '{ESC}', Down: '{DOWN}', Enter: '{ENTER}', Tab: '{TAB}', All: '^a' }[k]}')`) },
 	darwin: {
 		front: () => run('osascript', ['-e', `tell application "System Events" to set frontmost of (first process whose unix id is ${app.pid}) to true`]),
 		text: (t) => run('osascript', [...t].flatMap((c) => ['-e', `tell application "System Events" to keystroke "${c}"`, '-e', 'delay 0.15'])),
+		narrower: () => run('osascript', ['-e', `tell application "System Events" to tell (first process whose unix id is ${app.pid})`, '-e', 'set s to size of window 1', '-e', 'set size of window 1 to {(item 1 of s) - 120, item 2 of s}', '-e', 'end tell']),
 		key: (k) => run('osascript', ['-e', `tell application "System Events" to ${k === 'All' ? 'keystroke "a" using command down' : `key code ${{ Backspace: 51, Escape: 53, Down: 125, Enter: 36, Tab: 48 }[k]}`}`]),
 	},
 	linux: { front: () => {}, text: (t) => run('xdotool', ['type', '--delay', '150', t]), key: (k) => run('xdotool', ['key', { Backspace: 'BackSpace', Escape: 'Escape', Down: 'Down', Enter: 'Return', Tab: 'Tab', All: 'ctrl+a' }[k]]) },
@@ -52,7 +55,7 @@ const problems = [];
 function expect(what, ok) {
 	const s = state();
 	// Wherever it opens, the channel lists lie under their box (they are placed anew at every change)
-	const placed = !server || !s.open || (s.under !== '' && Math.abs(Number(s.under)) <= 2);
+	const placed = !s.open || (s.under !== '' && Math.abs(Number(s.under)) <= 2);
 	console.log(`${ok(s) && placed ? 'ok  ' : 'FAIL'} ${page}: ${what} -- ${JSON.stringify(s)}`);
 	if (!ok(s)) problems.push(what);
 	if (!placed) problems.push(`${what}: the list is not under its box (${s.under})`);
@@ -83,6 +86,7 @@ const [SOME, NONE] = ['se', 'zz'];
 try {
 	for (let i = 0; i < 240 && !ended && !lines().length; i++) await wait(500);
 	if (!lines().length) throw new Error(ended ? 'the app ended' : 'the box was not found');
+	KEYS.top?.();
 	KEYS.front();
 	await wait(3000);
 	if (server) expect('moving to the empty box lists the first channels, and they stay', (s) => s.open && s.items > 1);
@@ -183,6 +187,38 @@ try {
 		KEYS.key('Enter');
 		await wait(2500);
 		expect('arrow, typing, Enter: the row the arrow was on is not chosen', (s) => !s.open && s.text === `${ALL_FIRST()}h` && s.chosen === SEERAH);
+	}
+	// The list closes with the box's width, on every page, and opens under the box again
+	const [WORD, OTHER] = ['se', 'h'];
+	await back();
+	KEYS.key('All');
+	KEYS.text(WORD);
+	await wait(3000);
+	expect('before the window gets narrower: the list is open', (s) => s.open && s.items > 0);
+	KEYS.narrower();
+	await wait(1500);
+	expect('the window got narrower: the list is closed', (s) => !s.open && s.text === WORD);
+	KEYS.front();
+	await back();
+	KEYS.key('All');
+	KEYS.text(server ? OTHER : 'e');
+	await wait(3000);
+	expect('typing opens it under the box again', (s) => s.open && s.items > 0);
+	if (!server) {
+		const refresh = async () => {
+			writeFileSync(`${log}.refresh`, '');
+			await wait(2000);
+		};
+		await refresh();
+		expect('the names are loaded again while the list is open: it stays', (s) => s.open && s.items > 0 && s.text === 'e');
+		KEYS.key('Escape');
+		await wait(800);
+		await refresh();
+		expect('the names are loaded again after Escape: it stays closed', (s) => !s.open && s.text === 'e');
+		KEYS.key('All');
+		KEYS.text(WORD);
+		await wait(1500);
+		expect('typing opens it again after that', (s) => s.open && s.items > 0 && s.text === WORD);
 	}
 } catch (e) {
 	problems.push(e.message);
