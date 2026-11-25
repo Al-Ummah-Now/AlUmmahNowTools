@@ -357,6 +357,8 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
         UnfinishedCount = UnfinishedRows.Count;
         AddReviewRow(row.Video);
         SumReview();
+        // There is one now
+        ScanMessage = string.Join("\n", ScanMessage.Split('\n').Where(l => l != Loc.Get("Import_NoVideos")));
     }
 
     private void AddReviewRow(ScannedVideo video)
