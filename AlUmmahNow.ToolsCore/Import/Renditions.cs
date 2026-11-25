@@ -39,7 +39,7 @@ public sealed class LocalEncodeException : Exception
 {
     public LocalEncodeException(string code, string message, Exception? inner = null) : base(message, inner) => Code = code;
 
-    /// <summary>source_read (the file stopped being readable), ffmpeg_missing, probe_failed, no_video (sound alone), no_media (neither), no_dimensions (a video whose size could not be told), no_audio, disk_space, ffmpeg_failed, too_short (the encoded video), copy_differs, took_too_long, package_failed, too_large or settings_invalid</summary>
+    /// <summary>source_read (the file stopped being readable), ffmpeg_missing, probe_failed, no_video (sound alone), no_media (neither), no_dimensions (a video whose size could not be told), no_audio, disk_space, ffmpeg_failed, too_short (the encoded video), copy_differs, took_too_long, package_failed, too_large, settings_invalid, colour_unsupported (no conversion shows it right), hdr_settings (the server's HDR tables are others) or colour_tags (the encoder wrote other colours)</summary>
     public string Code { get; }
 }
 
@@ -49,6 +49,9 @@ public sealed class LocalEncodeException : Exception
 /// <param name="AudioSeconds">How long its first sound is; 0 when it does not say</param>
 public sealed record SourceInfo(int Width, int Height, int Rotation, double Fps, bool HasAudio, double DurationSeconds, double VideoSeconds = 0, double AudioSeconds = 0)
 {
+    /// <summary>The picture's colours; null when nothing was read of them.</summary>
+    public SourceColour? Colour { get; init; }
+
     /// <summary>How long what is encoded of it is: a container is as long as its longest track, which may be a subtitle.</summary>
     public double Seconds
     {
@@ -293,7 +296,7 @@ public sealed class FfmpegMediaTools : IMediaTools
             sound is not null,
             duration,
             Length(video),
-            sound is null ? 0 : Length(sound));
+            sound is null ? 0 : Length(sound)) { Colour = SourceColour.Of(video) };
     }
 
     /// <summary>A stream's own length; Matroska keeps where it ends in a tag ("00:00:10.023000000").</summary>
@@ -320,6 +323,13 @@ public sealed class FfmpegMediaTools : IMediaTools
     {
         var (ffmpeg, _) = await Paths(ct).ConfigureAwait(false);
         var args = Arguments(source, info, rungs, outputs, encoder, settings);
+        string? folder = null;
+        if (SdrPlan.For(info.Colour) is { IsHdr: true } hdr)
+        {
+            // ffmpeg reads the table by its bare name, from the folder it runs in
+            folder = Path.GetDirectoryName(Path.GetFullPath(outputs[0]))!;
+            await File.WriteAllBytesAsync(Path.Combine(folder, HdrCubes.FileName), HdrCubes.For(hdr, settings), ct).ConfigureAwait(false);
+        }
         var duration = info.Seconds;
         using var stall = CancellationTokenSource.CreateLinkedTokenSource(ct);
         stall.CancelAfter(StallLimit);
@@ -339,11 +349,15 @@ public sealed class FfmpegMediaTools : IMediaTools
         string error;
         try
         {
-            (code, _, error) = await RunAsync(ffmpeg, args, OnLine, stall.Token).ConfigureAwait(false);
+            (code, _, error) = await RunAsync(ffmpeg, args, OnLine, stall.Token, folder).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
             throw await StalledAsync(source, "ffmpeg", StallLimit, "ffmpeg_failed", ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            if (folder is not null) File.Delete(Path.Combine(folder, HdrCubes.FileName));
         }
         var network = await _source.IsNetworkAsync(source, ct).ConfigureAwait(false);
         // It ends well all the same, with what it had: whether it read the file to its end is in what it made. The same words come
@@ -378,8 +392,10 @@ public sealed class FfmpegMediaTools : IMediaTools
     public static IReadOnlyList<string> Arguments(string source, SourceInfo info, IReadOnlyList<PlannedRung> rungs, IReadOnlyList<string> outputs, string encoder, EncodeLadderSettings settings)
     {
         var format = H264Encoders.InputFormat(encoder);
-        var split = $"[0:v]split={rungs.Count}" + string.Concat(rungs.Select((_, i) => $"[v{i}]"));
-        var scales = rungs.Select((r, i) => $"[v{i}]scale=w={r.Width}:h={r.Height}:flags=bicubic,format={format}[v{i}o]");
+        // Every rung is SDR BT.709 and says so, whatever the source (Colour.cs)
+        var sdr = SdrPlan.For(info.Colour).Filters(rungs[^1].Width, rungs[^1].Height, HdrCubes.FileName);
+        var split = $"[0:v]{sdr}{(sdr.Length > 0 ? "," : "")}split={rungs.Count}" + string.Concat(rungs.Select((_, i) => $"[v{i}]"));
+        var scales = rungs.Select((r, i) => $"[v{i}]scale=w={r.Width}:h={r.Height}:flags=bicubic,format={format},{SdrPlan.End}[v{i}o]");
         // Its warnings and errors, each with its level: the encoders' closing figures are no reason for anything
         var args = new List<string> { "-hide_banner", "-loglevel", "level+warning", "-nostdin", "-y", "-i", source, "-filter_complex", string.Join(";", new[] { split }.Concat(scales)) };
         var fps = EncodeLadder.CappedFps(info, settings);
@@ -392,6 +408,7 @@ public sealed class FfmpegMediaTools : IMediaTools
             args.AddRange(new[] { "-map", $"[v{i}o]" });
             if (info.HasAudio) args.AddRange(new[] { "-map", "0:a:0" });
             args.AddRange(new[] { "-c:v:0", encoder });
+            args.AddRange(new[] { "-color_range:v:0", "tv", "-colorspace:v:0", "bt709", "-color_trc:v:0", "bt709", "-color_primaries:v:0", "bt709" });
             args.AddRange(H264Encoders.Options(encoder, r, settings.Video.Crf, keyint, 0));
             if (fps is { } f) args.AddRange(new[] { "-r:v:0", f.ToString(CultureInfo.InvariantCulture) });
             args.AddRange(new[] { "-force_key_frames:v:0", $"expr:gte(t,n_forced*{gop})" });
@@ -486,9 +503,10 @@ public sealed class FfmpegMediaTools : IMediaTools
         throw new LocalEncodeException(error.Contains("matches no streams", StringComparison.Ordinal) ? "no_audio" : "ffmpeg_failed", "ffmpeg could not read the file's sound: " + Why(error, source));
     }
 
-    private static async Task<(int Code, string Output, string Error)> RunAsync(string exe, IEnumerable<string> args, Action<string>? onLine, CancellationToken ct)
+    private static async Task<(int Code, string Output, string Error)> RunAsync(string exe, IEnumerable<string> args, Action<string>? onLine, CancellationToken ct, string? folder = null)
     {
         var start = new ProcessStartInfo(exe) { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
+        if (folder is not null) start.WorkingDirectory = folder;
         foreach (var a in args) start.ArgumentList.Add(a);
         using var process = new Process { StartInfo = start };
         var output = new StringBuilder();
@@ -807,6 +825,8 @@ public sealed class EncodeStep : IImportStep
         async Task<Plan> PlanAsync(SourceInfo info)
         {
             var rungs = EncodeLadder.For(info, settings.Ladder);
+            // What cannot be shown right, or not as the server would, is the server's: before anything is encoded
+            if (SdrPlan.For(info.Colour) is { IsHdr: true } hdr) HdrCubes.For(hdr, settings.Ladder);
             var encoder = await _media.PickEncoderAsync(time).ConfigureAwait(false)
                 ?? throw new LocalEncodeException("ffmpeg_failed", "This ffmpeg has no H.264 encoder");
             return new Plan(info, rungs, rungs.Select(r => Path.Combine(directory, r.Name + ".mp4")).ToList(), encoder);
@@ -822,6 +842,11 @@ public sealed class EncodeStep : IImportStep
             System.IO.Directory.CreateDirectory(directory);
             var names = string.Join(", ", made.Rungs.Select(r => r.Name));
             context.Log(LogLevel.Info, "encode_plan", $"Encoding {names} with {made.Encoder}", made.Encoder, names);
+            if (SdrPlan.For(made.Info.Colour) is { IsHdr: true } hdr)
+            {
+                var kind = hdr.Kind == SdrPlan.Hlg ? "HLG" : "PQ";
+                context.Log(LogLevel.Info, "encode_hdr", $"HDR ({kind}), converted to standard colors", kind);
+            }
         }
         Plan? plan = null;
         try
@@ -861,7 +886,9 @@ public sealed class EncodeStep : IImportStep
             // A read that stops half way may end ffmpeg well, with a short video or without its sound
             foreach (var output in plan.Outputs)
             {
-                if (plan.Info.Missing(await _media.ProbeAsync(output, time).ConfigureAwait(false)) is { } missing) throw new LocalEncodeException("too_short", missing);
+                var made = await _media.ProbeAsync(output, time).ConfigureAwait(false);
+                if (plan.Info.Missing(made) is { } missing) throw new LocalEncodeException("too_short", missing);
+                if (made.Colour is { } colours && SdrPlan.For(plan.Info.Colour).Wrong(colours) is { } wrong) throw new LocalEncodeException("colour_tags", wrong);
             }
             return (plan.Rungs, plan.Outputs, plan.Encoder);
         }
