@@ -15,6 +15,8 @@ on:
       - AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno/ViewModels/ChannelSearch.cs
       - AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno/ViewModels/BulkImportViewModel.cs
       - AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno/ViewModels/SocialSourcesViewModel.cs
+      - AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno/ViewModels/WatchViewModel.cs
+      - AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno/ViewModels/ApprovalViewModel.cs
       - AlUmmahNow.VisualImporterUno/Directory.Packages.props
       - AlUmmahNow.VisualImporterUno/global.json
       - global.json

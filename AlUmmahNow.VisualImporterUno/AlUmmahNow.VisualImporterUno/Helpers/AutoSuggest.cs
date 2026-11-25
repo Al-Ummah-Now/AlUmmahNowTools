@@ -77,12 +77,15 @@ public static class AutoSuggest
     private static void OnCandidatesChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
         if (d is not AutoSuggestBox box) return;
-        if (e.OldValue is INotifyCollectionChanged oldList) oldList.CollectionChanged -= Refresh(box);
-        if (e.NewValue is INotifyCollectionChanged newList) newList.CollectionChanged += Refresh(box);
+        Follow(box, e.OldValue, false);
+        Follow(box, e.NewValue, true);
         if (!(bool)box.GetValue(AttachedProperty))
         {
             box.SetValue(AttachedProperty, true);
             Shell.SuggestionsUnderBox.Attach(box);
+            // The lists live as long as the app, the pages do not
+            box.Unloaded += (_, _) => Follow(box, GetCandidates(box), box.IsLoaded);
+            box.Loaded += (_, _) => Follow(box, GetCandidates(box), true);
             box.TextChanged += OnTextChanged;
             box.SuggestionChosen += OnSuggestionChosen;
             box.GotFocus += OnGotFocus;
@@ -92,6 +95,14 @@ public static class AutoSuggest
                 if (key.Key == Windows.System.VirtualKey.Escape) box.SetValue(ClosedProperty, true);
             }), true);
         }
+    }
+
+    /// <summary>Once, however often it is asked.</summary>
+    private static void Follow(AutoSuggestBox box, object? candidates, bool follow)
+    {
+        if (candidates is not INotifyCollectionChanged list) return;
+        list.CollectionChanged -= Refresh(box);
+        if (follow) list.CollectionChanged += Refresh(box);
     }
 
     // One handler per box, so it can be removed again when the list is replaced
@@ -140,6 +151,7 @@ public static class AutoSuggest
     {
         if (sender is AutoSuggestBox box && string.IsNullOrEmpty(box.Text))
         {
+            box.SetValue(ClosedProperty, false);
             Update(box);
             box.IsSuggestionListOpen = true;
         }

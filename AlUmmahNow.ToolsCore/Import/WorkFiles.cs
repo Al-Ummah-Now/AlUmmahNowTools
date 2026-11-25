@@ -55,13 +55,17 @@ public static class WorkFiles
                 if (unfinished.Contains(id)) DeleteFolder(path, root, id);
                 else if (Check(path, root, id, id))
                 {
-                    foreach (var copy in Directory.EnumerateFiles(path, EncodeStep.CopyName + ".*").ToList()) File.Delete(copy);
+                    foreach (var copy in Directory.EnumerateFiles(path, EncodeStep.CopyName + ".*").ToList())
+                    {
+                        // Another app holds it: the next start, and the others now
+                        try { File.Delete(copy); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+                    }
                 }
             }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            // No folder yet, or another app holds a copy: the next start
+            // No folder yet
         }
     }
 
