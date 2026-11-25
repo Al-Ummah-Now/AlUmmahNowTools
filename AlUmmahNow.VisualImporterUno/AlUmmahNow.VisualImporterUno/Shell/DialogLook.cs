@@ -14,12 +14,16 @@ namespace AlUmmahNow.VisualImporterUno.Shell;
 /// </summary>
 internal static class DialogLook
 {
-    public static void Apply(ContentDialog dialog)
+    /// <summary>The tag of a box Enter does nothing in: a number typed to confirm neither confirms by itself nor cancels.</summary>
+    internal const string EnterDoesNothing = "EnterDoesNothing";
+
+    /// <param name="danger">The primary button loses something: in the danger colour</param>
+    public static void Apply(ContentDialog dialog, bool danger = false)
     {
         var resources = Application.Current.Resources;
         var chosen = dialog.DefaultButton;
         Style For(ContentDialogButton button) => (Style)resources[chosen == button ? "ToolsDialogDefaultButton" : "ToolsDialogButton"];
-        dialog.PrimaryButtonStyle = For(ContentDialogButton.Primary);
+        dialog.PrimaryButtonStyle = danger ? (Style)resources["ToolsDialogDangerButton"] : For(ContentDialogButton.Primary);
         dialog.SecondaryButtonStyle = For(ContentDialogButton.Secondary);
         dialog.CloseButtonStyle = For(ContentDialogButton.Close);
         if (chosen == ContentDialogButton.None) return;
@@ -32,7 +36,7 @@ internal static class DialogLook
         var name = chosen switch { ContentDialogButton.Primary => "PrimaryButton", ContentDialogButton.Secondary => "SecondaryButton", _ => "CloseButton" };
         dialog.AddHandler(UIElement.KeyDownEvent, new KeyEventHandler((_, e) =>
         {
-            if (e.Key != VirtualKey.Enter || e.OriginalSource is TextBox { AcceptsReturn: true } or Button) return;
+            if (e.Key != VirtualKey.Enter || e.OriginalSource is TextBox { AcceptsReturn: true } or TextBox { Tag: EnterDoesNothing } or Button) return;
             if (FindChild(dialog, name) is Button button && button.IsEnabled && new ButtonAutomationPeer(button).GetPattern(PatternInterface.Invoke) is Microsoft.UI.Xaml.Automation.Provider.IInvokeProvider invoke)
             {
                 invoke.Invoke();

@@ -45,7 +45,7 @@ public sealed partial class SocialSourcesPage : Page
     }
 
     /// <summary>
-    /// Demo frames (<c>TOOLS_DEMO_SOCIAL=job|items|remove|add|cancel|cancelled|takeout|uploads_off|uploads_off_takeout|uploads_off_job</c>):
+    /// Demo frames (<c>TOOLS_DEMO_SOCIAL=job|items|remove|add|cancel|cancelled|takeout|takeout-cancel|uploads_off|uploads_off_takeout|uploads_off_job</c>):
     /// the failed source's job log open, the Telegram source's items open, the Remove dialog, the Add card at the top, the Cancel
     /// dialog on the Telegram source's running sync, that sync cancelled with its log, the YouTube source's Takeout match, or the
     /// uploads-off views (sources list, Takeout panel, failed sync-job drawer).
@@ -86,6 +86,11 @@ public sealed partial class SocialSourcesPage : Page
                 ScrollTo(SourcesCard);
                 await System.Threading.Tasks.Task.Delay(1000);
                 CancelJob_Click(new Border { Tag = running }, new RoutedEventArgs());
+                break;
+            case "takeout-cancel" when Row(DemoSocial.YouTubeId) is { } matching:
+                ScrollTo(SourcesCard);
+                await System.Threading.Tasks.Task.Delay(1000);
+                CancelTakeout_Click(new Border { Tag = matching }, new RoutedEventArgs());
                 break;
             case "cancelled" when Row(DemoSocial.TelegramId) is { } stopped:
                 ViewModel.ToggleJob(stopped);
@@ -277,25 +282,8 @@ public sealed partial class SocialSourcesPage : Page
         if (await ConfirmCancelAsync(SocialSourcesViewModel.CancelDialogLines(row.Label, ViewModel.UploadsOn))) await ViewModel.CancelJobAsync(row);
     }
 
-    /// <summary>Asks before cancelling. Each line is short enough for one line: the popup's Arabic order only holds on one.</summary>
-    private async System.Threading.Tasks.Task<bool> ConfirmCancelAsync(params string[] lines)
-    {
-        var panel = new StackPanel { Spacing = 6 };
-        foreach (var line in lines)
-            panel.Children.Add(new TextBlock { Text = Loc.PopupLine(Loc.KeepLastWords(line)), TextWrapping = TextWrapping.Wrap });
-        var dialog = new ContentDialog
-        {
-            Title = Loc.Get("Social_CancelTitle"),
-            Content = panel,
-            PrimaryButtonText = Loc.Get("Social_CancelConfirm"),
-            CloseButtonText = Loc.Get("Social_CancelKeep"),
-            DefaultButton = ContentDialogButton.Close,
-            FlowDirection = FlowDirection,
-            XamlRoot = XamlRoot,
-        };
-        DialogLook.Apply(dialog);
-        return await dialog.ShowAsync() == ContentDialogResult.Primary;
-    }
+    private System.Threading.Tasks.Task<bool> ConfirmCancelAsync(params string[] lines) =>
+        ConfirmDialog.AskAsync(new ConfirmRequest(Loc.Get("Social_CancelTitle"), lines, Loc.Get("Social_CancelConfirm"), Loc.Get("Social_CancelKeep")), XamlRoot);
 
     // ------------------------------------------------------------ Takeout
 
@@ -352,21 +340,10 @@ public sealed partial class SocialSourcesPage : Page
     private async void Remove_Click(object sender, RoutedEventArgs e)
     {
         if (RowOf(sender) is not { } row) return;
-        var panel = new StackPanel { Spacing = 6 };
-        foreach (var line in new[] { row.Label, Loc.Get("Social_RemoveBody") })
-            panel.Children.Add(new TextBlock { Text = Loc.PopupLine(Loc.KeepLastWords(line)), TextWrapping = TextWrapping.Wrap });
-        var dialog = new ContentDialog
-        {
-            Title = Loc.Get("Social_RemoveTitle"),
-            Content = panel,
-            PrimaryButtonText = Loc.Get("Social_RemoveConfirm"),
-            CloseButtonText = Loc.Get("Import_Cancel"),
-            DefaultButton = ContentDialogButton.Close,
-            FlowDirection = FlowDirection,
-            XamlRoot = XamlRoot,
-        };
-        DialogLook.Apply(dialog);
-        if (await dialog.ShowAsync() == ContentDialogResult.Primary) await ViewModel.RemoveAsync(row);
+        var remove = new ConfirmRequest(Loc.Get("Social_RemoveTitle"), [row.Label, Loc.Get("Social_RemoveBody")], Loc.Get("Social_RemoveConfirm"));
+        if (!await ConfirmDialog.AskAsync(remove, XamlRoot)) return;
+        await ViewModel.RemoveAsync(row);
+        AppDialogs.KeepFocus(RefreshButton);
     }
 
     // ------------------------------------------------------------ Add

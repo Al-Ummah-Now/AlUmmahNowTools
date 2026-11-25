@@ -154,9 +154,17 @@ public partial class ServiceStatusViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private async Task ScannerActionAsync()
     {
-        if (ScannerState == ScannerState.On) await StopAsync();
+        if (ScannerState == ScannerState.On)
+        {
+            // Nothing is lost but the scans that run now
+            if (OngoingOperations.Count > 0 && !await AskToStopAsync(OngoingOperations.Count)) return;
+            await StopAsync();
+        }
         else await StartAsync();
     }
+
+    internal static Task<bool> AskToStopAsync(int scans) => ConfirmDialog.AskAsync(new ConfirmRequest(
+        Loc.Get("Scanner_StopTitle"), [Loc.Format("Scanner_StopScans", scans), Loc.Get("Scanner_StopBody")], Loc.Get("Scanner_ActionTurnOff")));
 
     [RelayCommand]
     private Task StartServiceAsync() => StartAsync();

@@ -19,6 +19,7 @@ namespace AlUmmahNow.VisualImporterUno.Views
             ViewModel = App.GetService<SettingsViewModel>();
             InitializeComponent();
             ShowUpdates();
+            DemoDialogs.OnLoaded(this, "reset", ResetAsync);
         }
 
         /// <summary>Settings → Updates (wiki AUN-APP-UPDATES §5.3): version, last check, install automatically, Check now.</summary>
@@ -70,8 +71,11 @@ namespace AlUmmahNow.VisualImporterUno.Views
             }
         }
 
-        private void ResetDefaultsButton_Click(object sender, RoutedEventArgs e)
+        private async void ResetDefaultsButton_Click(object sender, RoutedEventArgs e) => await ResetAsync();
+
+        internal async System.Threading.Tasks.Task ResetAsync()
         {
+            if (!await ConfirmDialog.AskAsync(new ConfirmRequest(Loc.Get("Settings_ResetTitle"), [Loc.Get("Settings_ResetBody"), Loc.Get("Settings_ResetBody2")], Loc.Get("Settings_ResetConfirm")), XamlRoot)) return;
             ViewModel.ResetToDefaults();
             ShowStatus(Loc.Get("Settings_ResetDone"));
         }

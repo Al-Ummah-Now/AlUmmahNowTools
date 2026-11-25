@@ -330,7 +330,8 @@ public sealed class StepFailedException : Exception
     /// </summary>
     public bool IsAnswer => Code is "no_video" or "not_video" or "content_changed" or "file_changed" or "file_writing" or "file_missing" or "file_link";
 
-    public static bool Answers(Exception error) => error is StepFailedException { IsAnswer: true };
+    /// <summary>Also a file that went while it was read (only the file itself: the app's own work missing is the app's failure).</summary>
+    public static bool Answers(Exception error) => error is StepFailedException { IsAnswer: true } or Sources.SourceReadException { Failure.Code: "file_missing" };
 }
 
 /// <summary>What a running step may do besides its work.</summary>
@@ -355,7 +356,7 @@ public interface IImportStep
     Task<StepResult> RunAsync(QueueItem item, IStepContext context, CancellationToken ct);
 }
 
-/// <summary>Told when a file's step has failed for good, with the reference shown in its log (not for <see cref="StepFailedException.IsAnswer"/>).</summary>
+/// <summary>Told when a file's step has failed for good, with the reference shown in its log (empty: <see cref="StepFailedException.IsAnswer"/>).</summary>
 public interface IImportFailureSink
 {
     Task ItemFailedAsync(QueueItem item, StepState step, Exception error, string reference, CancellationToken ct);
@@ -734,6 +735,13 @@ public sealed class ImportQueue : IDisposable
     /// <summary>The same for every file, in one go; answers how many left the queue.</summary>
     public int RemoveAll() => RemoveWhere(_ => true);
 
+    /// <summary>The same for these files.</summary>
+    public int RemoveAll(IReadOnlyCollection<string> ids)
+    {
+        var which = ids.ToHashSet();
+        return RemoveWhere(i => which.Contains(i.Id));
+    }
+
     private int RemoveWhere(Func<QueueItem, bool> which)
     {
         var idle = new List<QueueItem>();
@@ -820,6 +828,37 @@ public sealed class ImportQueue : IDisposable
             var ct = _loop.Token;
             _loopTask = Task.Run(() => LoopAsync(ct));
         }
+    }
+
+    private string? _account;
+
+    /// <summary>It runs (steps start by themselves).</summary>
+    public bool IsStarted
+    {
+        get { lock (_gate) return _loop is not null; }
+    }
+
+    /// <summary>
+    /// Runs the queue for the account that is signed in. What another account put in it is paused first: it goes on when someone
+    /// says so. Stopped with <see cref="StopAsync"/> when nobody is signed in, every file carries on from where it was.
+    /// </summary>
+    public void StartFor(string account)
+    {
+        lock (_gate)
+        {
+            if (_account is not null && _account != account)
+            {
+                foreach (var item in _items.Where(i => i.Pausable)) PauseLocked(item);
+                _allPaused = true;
+            }
+            if (_account != account)
+            {
+                _account = account;
+                SaveLocked();
+            }
+        }
+        Notify(null);
+        Start();
     }
 
     /// <summary>
@@ -1064,9 +1103,8 @@ public sealed class ImportQueue : IDisposable
                     step.Status = StepStatus.Failed;
                     // Failed for good just as it was paused: it reads Failed, and Resume all has nothing to do with it
                     if (!step.CanTryAgain) item.Paused = false;
-                    reference = ErrorReport.NewRef();
-                    var shown = StepFailedException.Answers(failure) ? "" : reference;
-                    AppendLog(item, LogLevel.Error, "failed", $"{step.Kind}: failed after {step.Attempts} attempt(s): {message}" + (shown.Length > 0 ? $" (reference {shown})" : ""), [step.Kind.ToString(), attempts, code, shown, message, .. read]);
+                    reference = StepFailedException.Answers(failure) ? "" : ErrorReport.NewRef();
+                    AppendLog(item, LogLevel.Error, "failed", $"{step.Kind}: failed after {step.Attempts} attempt(s): {message}" + (reference.Length > 0 ? $" (reference {reference})" : ""), [step.Kind.ToString(), attempts, code, reference, message, .. read]);
                 }
             }
             Finish(item);
@@ -1161,7 +1199,7 @@ public sealed class ImportQueue : IDisposable
         if (item.Log.Count > MaxLogLines) item.Log.RemoveRange(0, item.Log.Count - MaxLogLines);
     }
 
-    private sealed record Saved(QueueSettings Settings, List<QueueItem> Items, bool AllPaused = false);
+    private sealed record Saved(QueueSettings Settings, List<QueueItem> Items, bool AllPaused = false, string? Account = null);
 
     private void Load()
     {
@@ -1172,6 +1210,7 @@ public sealed class ImportQueue : IDisposable
             if (saved is null) return;
             _settings = saved.Settings ?? new QueueSettings();
             _allPaused = saved.AllPaused;
+            _account = saved.Account;
             foreach (var item in saved.Items ?? new List<QueueItem>())
             {
                 // A step that was running when the app closed starts again (an upload from its saved offset)
@@ -1199,7 +1238,7 @@ public sealed class ImportQueue : IDisposable
     {
         // Pause all ends with the last file it paused (resumed, finished or removed)
         _allPaused = HeldLocked;
-        AtomicFile.Write(_path, JsonSerializer.Serialize(new Saved(_settings, _items, _allPaused), Json));
+        AtomicFile.Write(_path, JsonSerializer.Serialize(new Saved(_settings, _items, _allPaused, _account), Json));
     }
 
     private sealed class Context : IStepContext

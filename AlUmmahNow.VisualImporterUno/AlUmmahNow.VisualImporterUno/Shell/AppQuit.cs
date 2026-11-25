@@ -1,9 +1,9 @@
 using System.Runtime.InteropServices;
+using AlUmmahNow.ToolsCore;
 using AlUmmahNow.ToolsCore.Import;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Media;
 using Serilog;
 
 namespace AlUmmahNow.VisualImporterUno.Shell;
@@ -117,12 +117,9 @@ internal sealed class AppQuit
     /// <summary>"Imports are still running": Quit and stop, or Keep running (Esc, or closing the box, keeps running).</summary>
     private async Task<bool> ShowQuestionAsync(int files)
     {
-        var xamlRoot = _window.Content?.XamlRoot ?? throw new InvalidOperationException("The window has no content to show the question in");
-        // A question already open (remove a file, cancel a sync) gives way: a close must never be ignored
-        foreach (var popup in VisualTreeHelper.GetOpenPopupsForXamlRoot(xamlRoot))
-            if (popup.Child is ContentDialog open) open.Hide();
-        var dialog = BuildQuestion(files, xamlRoot, _flow());
-        return await dialog.ShowAsync() == ContentDialogResult.Primary;
+        // A dialog already open (remove a file, cancel a sync) gives way: a close must never be ignored
+        var answer = await AppDialogs.ShowAsync(root => BuildQuestion(files, root, _flow()), DialogKind.Quit, _window.Content?.XamlRoot);
+        return (answer ?? throw new InvalidOperationException("The window has no content to show the question in")) == ContentDialogResult.Primary;
     }
 
     private async Task ShowForScreenshotAsync()
@@ -151,7 +148,7 @@ internal sealed class AppQuit
             FlowDirection = flow,
             XamlRoot = xamlRoot,
         };
-        DialogLook.Apply(dialog);
+        DialogLook.Apply(dialog, danger: true);
         return dialog;
     }
 

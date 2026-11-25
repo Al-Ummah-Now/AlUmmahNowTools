@@ -23,6 +23,25 @@ public sealed partial class ApprovalWorkflowPage : Page
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(RefreshButton, Loc.Get("Watch_Refresh"));
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(SortBox, Loc.Get("Approve_SortLabel"));
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(SortDirection, Loc.Get("Approve_SortReverse"));
+        // Undo goes with the line it is on
+        ViewModel.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(ViewModel.HasDeletedPreset) && !ViewModel.HasDeletedPreset && UndoPreset.FocusState != FocusState.Unfocused) AppDialogs.KeepFocus(PresetBox);
+        };
+        // Review frames of its questions (TOOLS_DEMO_DIALOG), over what the demo scanner lists
+        PendingApprovalDto[] Files(int count) => ViewModel.FilteredApprovals.Where(a => a.Status == ApprovalStatus.Pending).Take(count).ToArray();
+        DemoDialogs.OnLoaded(this, "reject", () => ApprovalViewModel.AskToRejectAsync(Files(1), typed: false));
+        DemoDialogs.OnLoaded(this, "reject-many", () => ApprovalViewModel.AskToRejectAsync(Files(3), typed: false));
+        foreach (var all in new[] { "reject-all", "reject-all-typed" })
+            DemoDialogs.OnLoaded(this, all, () => ApprovalViewModel.AskToRejectAsync(Files(int.MaxValue), typed: true));
+        DemoDialogs.OnLoaded(this, "approve-all", () => ApprovalViewModel.AskToApproveAsync(Files(int.MaxValue).Length));
+        DemoDialogs.OnLoaded(this, "preset-deleted", async () =>
+        {
+            ViewModel.DeletedPreset = new AlUmmahNow.Data.Models.FilterPreset { Name = Loc.IsArabic ? "دروس السيرة" : "Seerah lessons" };
+            FiltersExpander.IsExpanded = true;
+            await System.Threading.Tasks.Task.Delay(800);
+            UndoPreset.StartBringIntoView();
+        });
     }
 
     private void OfflineCard_Connected(object? sender, EventArgs e)
@@ -44,7 +63,11 @@ public sealed partial class ApprovalWorkflowPage : Page
 
     private async void ApproveOne_Click(object sender, RoutedEventArgs e) => await ViewModel.ApproveOneCommand.ExecuteAsync(ItemOf(sender));
 
-    private async void RejectOne_Click(object sender, RoutedEventArgs e) => await ViewModel.RejectOneCommand.ExecuteAsync(ItemOf(sender));
+    private async void RejectOne_Click(object sender, RoutedEventArgs e)
+    {
+        await ViewModel.RejectOneCommand.ExecuteAsync(ItemOf(sender));
+        AppDialogs.KeepFocus(RefreshButton);
+    }
 
     private async void OnSavePresetClick(object sender, RoutedEventArgs e)
     {
@@ -74,7 +97,7 @@ public sealed partial class ApprovalWorkflowPage : Page
             XamlRoot = XamlRoot,
         };
         DialogLook.Apply(dialog);
-        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        if (await AppDialogs.ShowAsync(_ => dialog, AlUmmahNow.ToolsCore.DialogKind.Question, XamlRoot) != ContentDialogResult.Primary) return;
         ViewModel.NewPresetName = nameBox.Text;
         ViewModel.NewPresetDescription = descriptionBox.Text;
         ViewModel.SetAsDefault = defaultBox.IsChecked ?? false;

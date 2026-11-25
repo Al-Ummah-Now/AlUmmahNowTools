@@ -69,6 +69,21 @@ public class RemoveAllTests
     }
 
     [Fact]
+    public void Only_the_files_it_was_asked_about_leave()
+    {
+        using var queue = new ImportQueue(Path.Combine(Temp.Folder(), "queue.json"), ImportQueueTests.All());
+        queue.Add(new[] { Item("a.mp4"), Item("b.mp4", 1) });
+        var asked = queue.Items.Select(i => i.Id).ToList();
+        // While the question is open: one is added, one leaves
+        var late = Item("c.mp4", 2);
+        queue.Add(new[] { late });
+        queue.Remove(asked[0]);
+        Assert.Equal(1, queue.RemoveAll(asked));
+        Assert.Equal(late.Id, Assert.Single(queue.Items).Id);
+        Assert.Equal(0, queue.RemoveAll(asked));
+    }
+
+    [Fact]
     public async Task Files_added_afterwards_run_also_when_all_was_paused()
     {
         using var queue = new ImportQueue(Path.Combine(Temp.Folder(), "queue.json"), ImportQueueTests.All());

@@ -364,11 +364,11 @@ public sealed partial class ImportView : Page
                 deferral.Complete();
             }
         };
-        ContentDialogResult result;
+        ContentDialogResult? result;
         root.Changed += RootChanged;
         try
         {
-            result = await dialog.ShowAsync();
+            result = await AppDialogs.ShowAsync(_ => dialog, AlUmmahNow.ToolsCore.DialogKind.Question, root);
         }
         finally
         {
@@ -442,18 +442,11 @@ public sealed partial class ImportView : Page
     private async void Remove_Click(object sender, RoutedEventArgs e)
     {
         if (RowOf(sender) is not { } row) return;
-        var dialog = new ContentDialog
-        {
-            Title = Loc.Get("Import_RemoveTitle"),
-            Content = DialogText(row.Title, Loc.Get("Import_RemoveBody")),
-            PrimaryButtonText = Loc.Get("Import_RemoveConfirm"),
-            CloseButtonText = Loc.Get("Import_Cancel"),
-            DefaultButton = ContentDialogButton.Close,
-            FlowDirection = FlowDirection,
-            XamlRoot = XamlRoot,
-        };
-        DialogLook.Apply(dialog);
-        if (await dialog.ShowAsync() == ContentDialogResult.Primary) ViewModel.Remove(row);
+        var remove = new ConfirmRequest(Loc.Get("Import_RemoveTitle"), [row.Title, Loc.Get("Import_RemoveBody")], Loc.Get("Import_RemoveConfirm"));
+        if (!await ConfirmDialog.AskAsync(remove, XamlRoot)) return;
+        ViewModel.Remove(row);
+        // Its button went with the row
+        AppDialogs.KeepFocus(ViewModel.QueueIsEmpty ? BrowseButton : RemoveAllButton);
     }
 
     private bool _removeAllAsked;
@@ -465,21 +458,11 @@ public sealed partial class ImportView : Page
         _removeAllAsked = true;
         try
         {
-            var dialog = new ContentDialog
-            {
-                Title = ViewModel.RemoveAllTitle,
-                Content = DialogText(ViewModel.RemoveAllLines().ToArray()),
-                PrimaryButtonText = Loc.Get("Import_RemoveAllConfirm"),
-                CloseButtonText = Loc.Get("Import_Cancel"),
-                DefaultButton = ContentDialogButton.Close,
-                FlowDirection = FlowDirection,
-                XamlRoot = XamlRoot,
-            };
-            DialogLook.Apply(dialog);
-            if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
-            ViewModel.RemoveAll();
+            var (remove, files) = ViewModel.RemoveAllRequest();
+            if (files.Count == 0 || !await ConfirmDialog.AskAsync(remove, XamlRoot)) return;
+            ViewModel.RemoveAll(files);
             // The button went with the queue: the keyboard goes on from the folder
-            BrowseButton.Focus(FocusState.Programmatic);
+            if (ViewModel.QueueIsEmpty) BrowseButton.Focus(FocusState.Programmatic);
         }
         finally
         {
