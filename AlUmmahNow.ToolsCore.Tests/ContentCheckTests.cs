@@ -183,6 +183,27 @@ public sealed class Mp4IndexTests
         Assert.Equal(VideoContent.Video, await Read(open));
     }
 
+    private static byte[] Id(uint id, params byte[][] rest) => Box("tkhd", [new byte[12], U32(id), new byte[68], .. rest]);
+
+    private static byte[] Numbered(uint id, string handler, string codec, uint samples, params uint[] chapters) => Box("trak", Id(id),
+        chapters.Length == 0 ? [] : Box("tref", Box("chap", chapters.Select(U32).ToArray())),
+        Box("mdia", Box("mdhd", new byte[24]), Box("hdlr", new byte[8], Encoding.ASCII.GetBytes(handler), new byte[13]),
+            Box("minf", Box("stbl", Box("stsd", new byte[4], U32(1), U32(86), Encoding.ASCII.GetBytes(codec), new byte[70]), Box("stsz", new byte[4], U32(0), U32(samples))))));
+
+    [Theory]
+    [InlineData("jpeg", 12u)]
+    [InlineData("avc1", 12u)]
+    public async Task The_pictures_of_a_sounds_chapters_are_no_video(string codec, uint pictures)
+    {
+        byte[] Chapters(params byte[][] tracks) => [.. Box("ftyp", "M4A "u8.ToArray(), new byte[4]), .. Data(3000), .. Box("moov", [Box("mvhd", new byte[100]), .. tracks])];
+        // Named by the sound, before it or after it
+        Assert.Equal(VideoContent.NoVideo, await Read(Chapters(Numbered(1, "soun", "mp4a", 900, 2, 3), Numbered(2, "text", "text", 12), Numbered(3, "vide", codec, pictures))));
+        Assert.Equal(VideoContent.NoVideo, await Read(Chapters(Numbered(3, "vide", codec, pictures), Numbered(1, "soun", "mp4a", 900, 3))));
+        // A video with chapter pictures is a video
+        Assert.Equal(VideoContent.Video, await Read(Chapters(Numbered(1, "vide", "avc1", 900, 3), Numbered(2, "soun", "mp4a", 900), Numbered(3, "vide", codec, pictures))));
+        Assert.Equal(VideoContent.Video, await Read(Chapters(Numbered(1, "soun", "mp4a", 900), Numbered(3, "vide", codec, pictures))));
+    }
+
     [Fact]
     public async Task Sound_alone_is_no_video()
     {
@@ -470,11 +491,75 @@ public sealed class ContentCheckTests
     }
 
     [Fact]
+    public async Task A_video_by_its_index_that_ffprobe_finds_no_video_in_is_refused_before_anything_is_opened()
+    {
+        var item = Item(Mp4IndexTests.File("vide", "soun"));
+        item.Sha256 = null;
+        var media = new Probe("no_video");
+        Assert.Equal("no_video", await Refused(() => new HashStep(media: media).RunAsync(item, new RecordingContext(), default)));
+        // Checked by a version that did not ask ffprobe
+        var (checkedBefore, server) = (Item(Mp4IndexTests.File("vide", "soun")), new FakeServer());
+        checkedBefore.VideoChecked = true;
+        Assert.Equal("no_video", await Refused(() => Step(server, media).RunAsync(checkedBefore, new RecordingContext(), default)));
+        Assert.Empty(server.Calls);
+    }
+
+    [Theory]
+    [InlineData("probe_failed")]
+    [InlineData("no_media")]
+    [InlineData("source_read")]
+    [InlineData("ffmpeg_missing")]
+    [InlineData(null)]
+    public async Task Only_no_video_is_taken_from_ffprobe_over_the_index_and_it_is_asked_once(string? probe)
+    {
+        var item = Item(Mp4IndexTests.File("vide", "soun"));
+        var media = new Probe(probe);
+        var context = new RecordingContext();
+        Assert.Equal(StepResult.Done, await new HashStep(media: media).RunAsync(item, context, default));
+        Assert.Equal(StepResult.Done, await Step(new FakeServer(), media).RunAsync(item, context, default));
+        Assert.Equal(1, media.Asked);
+        Assert.DoesNotContain(context.Lines, l => l.Code is "video_unchecked" or "video_undecided");
+    }
+
+    [Theory]
+    [InlineData("no_video", "no_video")]
+    [InlineData("no_media", "not_video")]
+    public async Task The_encodes_own_no_video_is_final_the_server_is_not_asked_to_encode_it(string probe, string code)
+    {
+        var item = Item(Mp4IndexTests.File("vide", "soun"));
+        item.VideoChecked = true;
+        typeof(QueueItem).GetProperty("VideoProbed")?.SetValue(item, true);
+        var server = new RenditionServer();
+        var api = new ImportApiClient(new Uri("https://admin.api.example"), _ => Task.FromResult<string?>("tok"), server);
+        var reported = new List<Exception>();
+        var media = new FakeMedia { Fail = new LocalEncodeException(probe, "The file has sound and no video track") };
+        var step = new EncodeStep(api, new Uri("https://videos.api.example"), media, new FakePackager(), Temp.Folder(), "Tools test", (ex, _) => reported.Add(ex), _ => long.MaxValue);
+        Assert.Equal(code, await Refused(() => step.RunAsync(item, new RecordingContext(), default)));
+        Assert.Empty(reported);
+        Assert.Equal(0, media.Encodes);
+    }
+
+    [Fact]
+    public async Task A_file_refused_after_its_video_was_opened_marks_it_failed_on_the_server()
+    {
+        var server = new FakeServer();
+        var api = new ImportApiClient(new Uri("https://admin.api.example"), _ => Task.FromResult<string?>("t"), server);
+        using var reporter = new ErrorReporter(api.ReportErrorsAsync, "1", () => "en", TimeSpan.FromHours(1));
+        var item = Item(Mp4IndexTests.File("vide", "soun"));
+        item.ServerItemId = "item-9";
+        var refused = new StepFailedException("no_video", "The file has sound and no video", retryable: false);
+        await new ServerFailureSink(api, reporter).ItemFailedAsync(item, item.Steps.Single(s => s.Kind == ImportStepKind.Encode), refused, "ERR-AAAA-BBBB", default);
+        Assert.Contains("sound and no video", server.Calls.Single(c => c.Path.EndsWith("/items/item-9/failed")).Body);
+    }
+
+    [Fact]
     public async Task A_file_whose_index_takes_too_long_goes_up_with_a_line_in_its_log()
     {
         var item = Item(Mp4IndexTests.File("soun"));
         var context = new RecordingContext();
-        await VideoCheck.RunAsync(item, SourceAccess.Default, new Probe("no_video"), context, default, TimeSpan.Zero);
+        // ffprobe answers for it; without one it goes up
+        Assert.Equal("no_video", await Refused(() => VideoCheck.RunAsync(Item(Mp4IndexTests.File("soun")), SourceAccess.Default, new Probe("no_video"), context, default, TimeSpan.Zero)));
+        await VideoCheck.RunAsync(item, SourceAccess.Default, new Probe("ffmpeg_missing"), context, default, TimeSpan.Zero);
         Assert.Contains(context.Lines, l => l.Code == "video_undecided");
         // Stopped, it is no answer
         using var stopped = new CancellationTokenSource();
