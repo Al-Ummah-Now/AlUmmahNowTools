@@ -15,6 +15,9 @@ on:
         required: true
 permissions:
   contents: read
+env:
+  # Production: never asked by this test
+  BLOCKED: alummahnow.net www.alummahnow.net auth.alummahnow.net api.alummahnow.net admin.alummahnow.net admin.api.alummahnow.net videos.alummahnow.net videos.api.alummahnow.net media.alummahnow.net
 jobs:
   windows:
     runs-on: windows-latest
@@ -34,11 +37,12 @@ jobs:
         run: |
           hosts=/c/Windows/System32/drivers/etc/hosts
           echo >> "$hosts"
-          for h in alummahnow.net www.alummahnow.net auth.alummahnow.net api.alummahnow.net admin.alummahnow.net admin.api.alummahnow.net videos.alummahnow.net videos.api.alummahnow.net media.alummahnow.net; do
+          for h in $BLOCKED; do
             printf '0.0.0.0 %s\n:: %s\n' "$h" "$h" >> "$hosts"
           done
           ipconfig //flushdns
-          for v in 4 6; do if curl "-$v" -s -m 10 -o /dev/null https://videos.api.alummahnow.net/; then echo "::error::production is reachable (IPv$v)"; exit 1; fi; done
+          # Proven by looking the names up; nothing is sent to them
+          node scripts/names-blocked.mjs $BLOCKED
       - name: Download the published release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -86,11 +90,12 @@ jobs:
       - name: Production leads nowhere on this runner
         run: |
           echo | sudo tee -a /etc/hosts > /dev/null
-          for h in alummahnow.net www.alummahnow.net auth.alummahnow.net api.alummahnow.net admin.alummahnow.net admin.api.alummahnow.net videos.alummahnow.net videos.api.alummahnow.net media.alummahnow.net; do
+          for h in $BLOCKED; do
             printf '0.0.0.0 %s\n:: %s\n' "$h" "$h" | sudo tee -a /etc/hosts > /dev/null
           done
           sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder || true
-          for v in 4 6; do if curl "-$v" -s -m 10 -o /dev/null https://videos.api.alummahnow.net/; then echo "::error::production is reachable (IPv$v)"; exit 1; fi; done
+          # Proven by looking the names up; nothing is sent to them
+          node scripts/names-blocked.mjs $BLOCKED
       - name: Download the published release
         env:
           GH_TOKEN: ${{ github.token }}
