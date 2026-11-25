@@ -32,6 +32,7 @@ on:
       - scripts/release-files.mjs
       - scripts/no-test-hooks.mjs
       - scripts/vpk-pack.sh
+      - scripts/mac-bundle.sh
   workflow_dispatch:
 concurrency:
   group: release-${{ github.ref }}
@@ -311,8 +312,10 @@ jobs:
             -p:ApplicationVersion=${{ needs.verify.outputs.build }} "${sign[@]}" -o out/publish
           app=$(find out/publish -maxdepth 2 -name '*.app' -type d | head -1)
           [ -n "$app" ] || { echo "::error::no .app bundle"; find out/publish -maxdepth 2; exit 1; }
-          # Without a Developer ID the bundle still needs a (local) signature to run on Apple silicon
-          [ -n "$IDENTITY" ] || codesign --force --deep --sign - "$app"
+          scripts/mac-bundle.sh "$app"
+          # Signed again with what moved; ad hoc without a Developer ID, which Apple silicon needs to run it
+          if [ -n "$IDENTITY" ]; then codesign --force --deep --options runtime --timestamp --entitlements packaging/macos/entitlements.plist --sign "$IDENTITY" "$app"
+          else codesign --force --deep --sign - "$app"; fi
           codesign --verify --deep --strict "$app"
           find "$app" -name THIRD-PARTY-NOTICES.md | grep -q . || { echo "::error::no licences in the app bundle"; exit 1; }
           node scripts/no-test-hooks.mjs "$app"
