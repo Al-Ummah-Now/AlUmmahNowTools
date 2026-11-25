@@ -208,6 +208,31 @@ jobs:
         retention-days: 14
 
   # Merge Cobertura reports from both .NET 8 (AlUmmahNow.Tests) and .NET 9 (ToolsCore + VisualImporterUno.Tests)
+  updates:
+    # The update code's Windows and macOS halves (folder ownership and access, hashes) run only on their own system
+    name: Update tests on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-15]
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+      with:
+        dotnet-version: 9.0.x
+
+    - name: Fetch AlUmmahNow.Core
+      shell: bash
+      run: scripts/fetch-core.sh
+
+    - name: Test updates
+      run: dotnet test AlUmmahNow.ToolsCore.Tests/AlUmmahNow.ToolsCore.Tests.csproj -c Release --filter "FullyQualifiedName~Update|FullyQualifiedName~StagedPackage|FullyQualifiedName~PrivateFolder"
+
   coverage:
     name: Unified coverage report
     runs-on: ubuntu-latest

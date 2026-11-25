@@ -22,14 +22,18 @@ public sealed class VelopackInstaller : IUpdateInstaller
 
     public VelopackInstaller()
     {
+        if (OperatingSystem.IsLinux()) throw new PlatformNotSupportedException("Linux updates are a notice and a link (APPUPD-D9)");
         try
         {
             var manager = new UpdateManager(new VerifiedFileSource());
             // Only a build installed by Velopack's own installer can update itself; the MSI, the zip, the .deb and
             // the .tar.gz can't (they get the notice with a download link instead).
-            _manager = manager.IsInstalled ? manager : null;
+            if (!manager.IsInstalled || VelopackLocator.Current.PackagesDir is not { } folder) return;
+            // Others could swap what is staged here: then this build gets the notice with the link instead
+            PrivateFolder.Ensure(folder, PrivateFolder.UserRoot);
             // Nothing an earlier run left is ever installed
-            if (_manager is not null && VelopackLocator.Current.PackagesDir is { } left) StagedPackage.Clear(left);
+            StagedPackage.Clear(folder);
+            _manager = manager;
         }
         catch (Exception)
         {
