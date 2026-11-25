@@ -54,7 +54,7 @@ public sealed class ImportWorkspace : IDisposable
             ? Path.Combine(Path.GetTempPath(), "aun-tools-demo-" + Guid.NewGuid().ToString("N"), "queue.json")
             : ImportQueue.DefaultPath(Environment);
         WorkFiles.Skipped = text => Serilog.Log.Warning("[Import] {Text}", text);
-        Queue = new ImportQueue(path, steps, new ServerFailureSink(Api, Reporter));
+        Queue = new ImportQueue(path, steps, new ServerFailureSink(Api, Reporter)) { LookAtFile = AlUmmahNow.ToolsCore.Import.Sources.SourceAccess.Default.LookAsync };
         if (IsDemo)
         {
             // Screenshots show a queue in every state; nothing runs and nothing is sent
@@ -360,10 +360,10 @@ internal static class DemoImport
         item.Log.Add(new LogLine(at.AddMinutes(7), LogLevel.Error, "Hash: failed", "failed", new[] { "Hash", "1", step.LastErrorCode, "ERR-7K2M-Q9XD", text, "Windows", "59", text, offset }));
     }
 
-    /// <summary>The first four files: no video in it, not a whole video, not what was checked, and the stopped upload still on the server.</summary>
+    /// <summary>The first four files: sound alone, no readable video, not what was checked, and the stopped upload still on the server.</summary>
     private static void SettleContent(IReadOnlyList<QueueItem> items)
     {
-        var codes = new[] { (ImportStepKind.Hash, "no_video", "The file has no video in it"), (ImportStepKind.Hash, "not_video", "The file is not a whole video"), (ImportStepKind.Upload, "content_changed", "What was read to be sent is not what was checked before"), (ImportStepKind.Upload, "upload_left", "The server still has the upload that was given up") };
+        var codes = new[] { (ImportStepKind.Hash, "no_video", "The file has sound and no video"), (ImportStepKind.Hash, "not_video", "The file cannot be read as a video"), (ImportStepKind.Upload, "content_changed", "What was read to be sent is not what was checked before"), (ImportStepKind.Upload, "upload_left", "The server still has the upload that was given up") };
         for (var i = 0; i < codes.Length; i++)
         {
             var (kind, code, text) = codes[i];

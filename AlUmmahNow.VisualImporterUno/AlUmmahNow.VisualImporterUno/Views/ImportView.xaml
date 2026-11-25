@@ -303,10 +303,13 @@
                                                 <HyperlinkButton Style="{StaticResource ToolsLinkButton}" Padding="8,4" Tag="{x:Bind}" Click="Retry_Click" Visibility="{x:Bind CanRetry, Mode=OneWay}">
                                                     <TextBlock x:Uid="Import_RowRetry" Text="Try again now" />
                                                 </HyperlinkButton>
+                                                <HyperlinkButton Style="{StaticResource ToolsLinkButton}" Padding="8,4" Tag="{x:Bind}" Click="Remove_Click" Visibility="{x:Bind RemoveFirst, Mode=OneWay}">
+                                                    <TextBlock x:Uid="Import_RowRemove" Text="Remove" />
+                                                </HyperlinkButton>
                                                 <HyperlinkButton Style="{StaticResource ToolsLinkButton}" Padding="8,4" Tag="{x:Bind}" Click="Log_Click">
                                                     <TextBlock x:Uid="Import_RowLog" Text="Log" />
                                                 </HyperlinkButton>
-                                                <HyperlinkButton Style="{StaticResource ToolsLinkButton}" Padding="8,4" Tag="{x:Bind}" Click="Remove_Click">
+                                                <HyperlinkButton Style="{StaticResource ToolsLinkButton}" Padding="8,4" Tag="{x:Bind}" Click="Remove_Click" Visibility="{x:Bind RemoveLast, Mode=OneWay}">
                                                     <TextBlock x:Uid="Import_RowRemove" Text="Remove" />
                                                 </HyperlinkButton>
                                             </StackPanel>

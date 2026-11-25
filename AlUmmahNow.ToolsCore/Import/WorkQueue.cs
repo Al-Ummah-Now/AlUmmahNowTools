@@ -204,7 +204,13 @@ public sealed class QueueItem
     /// <summary>What the row offers: exactly one of Pause and Resume for a file that is neither done nor failed.</summary>
     [JsonIgnore] public bool CanPause => Phase is ItemPhase.Waiting or ItemPhase.Running or ItemPhase.RetryWaiting or ItemPhase.ServerWorking;
     [JsonIgnore] public bool CanResume => Phase == ItemPhase.Paused;
-    [JsonIgnore] public bool CanRetry => Phase is ItemPhase.Failed or ItemPhase.RetryWaiting;
+    [JsonIgnore] public bool CanRetry => Phase == ItemPhase.RetryWaiting || (Phase == ItemPhase.Failed && (!NeedsOtherFile || OnDisk is not null));
+
+    /// <summary>The file itself is what is wrong: trying again helps only once there is another one in its place.</summary>
+    [JsonIgnore] public bool NeedsOtherFile => CurrentStep is { Status: StepStatus.Failed, LastErrorCode: "no_video" or "not_video" };
+
+    /// <summary>The other file in its place, once there is one (not saved)</summary>
+    [JsonIgnore] internal Sources.SourceStat? OnDisk { get; set; }
 
     /// <summary>
     /// Pause all takes it: not done, not paused, and not failed for good. Wider than <see cref="CanPause"/>: the row of a file
@@ -549,10 +555,80 @@ public sealed class ImportQueue : IDisposable
         var step = item.CurrentStep;
         if (step is null || step.Status == StepStatus.Running) return false;
         if (step.Status != StepStatus.Failed && step.NextAttemptAt is null) return false;
+        if (item.NeedsOtherFile)
+        {
+            if (item.OnDisk is not { } other) return false;
+            TakeOther(item, other);
+            step = item.CurrentStep!;
+        }
         item.Paused = false;
         Again(item, step);
         return true;
     });
+
+    /// <summary>Another file in the same place: nothing that was found out about the one before holds.</summary>
+    private static void TakeOther(QueueItem item, Sources.SourceStat other)
+    {
+        item.Video = item.Video with { Size = other.Length, LastModifiedMs = other.ModifiedMs };
+        item.OnDisk = null;
+        item.Hashing?.Dispose();
+        item.Hashing = null;
+        item.Sending?.Dispose();
+        item.Sending = null;
+        (item.Sha256, item.FingerprintHash, item.VideoChecked) = (null, null, false);
+        (item.ServerItemId, item.VideoId, item.TusSessionId, item.UploadUrl, item.UploadOffset) = (null, null, null, null, 0);
+        (item.SentTo, item.SentSha256, item.StartOver, item.Renditions) = (0, null, false, null);
+        foreach (var step in item.Steps.Where(s => s.Kind <= ImportStepKind.Upload))
+        {
+            step.Status = StepStatus.Pending;
+            step.Attempts = 0;
+            (step.LastError, step.LastErrorCode, step.ReadError, step.Retryable, step.NextAttemptAt) = (null, null, null, null, null);
+        }
+    }
+
+    /// <summary>What is on the disk at a path now; null when that cannot be told.</summary>
+    public Func<string, CancellationToken, Task<Sources.SourceStat?>>? LookAtFile { get; init; }
+
+    private static readonly TimeSpan LookEvery = TimeSpan.FromSeconds(15);
+    private DateTimeOffset _nextLook;
+    private Task _looking = Task.CompletedTask;
+
+    /// <summary>Now and then, for the files that wait for another one in their place.</summary>
+    private void LookAtFiles(CancellationToken ct)
+    {
+        if (LookAtFile is not { } look || !_looking.IsCompleted || _time.GetUtcNow() < _nextLook) return;
+        List<QueueItem> waiting;
+        lock (_gate) waiting = _items.Where(i => i.NeedsOtherFile).ToList();
+        if (waiting.Count == 0) return;
+        _nextLook = _time.GetUtcNow() + LookEvery;
+        _looking = Task.Run(async () =>
+        {
+            foreach (var item in waiting)
+            {
+                try
+                {
+                    var found = await look(item.Video.Path, ct).ConfigureAwait(false);
+                    var changed = false;
+                    lock (_gate)
+                    {
+                        if (!item.NeedsOtherFile) continue;
+                        var other = found is { IsLink: false } && (found.Length != item.Video.Size || found.ModifiedMs != item.Video.LastModifiedMs) ? found : null;
+                        changed = (other is null) != (item.OnDisk is null);
+                        item.OnDisk = other;
+                    }
+                    if (changed) Notify(item.Id);
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    // Not there, or not to be read: nothing to try again with
+                }
+            }
+        }, CancellationToken.None);
+    }
 
     /// <summary>
     /// Takes the file out of the queue, stopping its running step, and deletes what was made for it here and not sent
@@ -770,6 +846,7 @@ public sealed class ImportQueue : IDisposable
         while (!ct.IsCancellationRequested)
         {
             Pump();
+            LookAtFiles(ct);
             try
             {
                 await _wake.WaitAsync(TimeSpan.FromSeconds(1), ct).ConfigureAwait(false);

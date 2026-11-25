@@ -39,7 +39,7 @@ public sealed class LocalEncodeException : Exception
 {
     public LocalEncodeException(string code, string message, Exception? inner = null) : base(message, inner) => Code = code;
 
-    /// <summary>source_read (the file stopped being readable), ffmpeg_missing, probe_failed, no_video, no_audio, disk_space, ffmpeg_failed, too_short (the encoded video), package_failed, too_large or settings_invalid</summary>
+    /// <summary>source_read (the file stopped being readable), ffmpeg_missing, probe_failed, no_video (sound alone), no_media, no_audio, disk_space, ffmpeg_failed, too_short (the encoded video), package_failed, too_large or settings_invalid</summary>
     public string Code { get; }
 }
 
@@ -209,7 +209,12 @@ public sealed class FfmpegMediaTools : IMediaTools
         }
         var streams = root?["streams"]?.AsArray() ?? new JsonArray();
         var video = streams.FirstOrDefault(s => s?["codec_type"]?.GetValue<string>() == "video" && s?["disposition"]?["attached_pic"]?.GetValue<int>() != 1);
-        if (video is null) throw new LocalEncodeException("no_video", "The file has no video track");
+        if (video is null)
+        {
+            throw streams.Any(s => s?["codec_type"]?.GetValue<string>() == "audio")
+                ? new LocalEncodeException("no_video", "The file has sound and no video track")
+                : new LocalEncodeException("no_media", "The file has neither a video nor a sound track");
+        }
         var rotation = 0;
         foreach (var side in video["side_data_list"]?.AsArray() ?? new JsonArray())
         {

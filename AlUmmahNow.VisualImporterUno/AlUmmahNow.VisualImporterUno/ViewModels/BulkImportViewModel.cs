@@ -945,6 +945,11 @@ public sealed partial class QueueRow : ObservableObject
     [ObservableProperty] private bool _canPause;
     [ObservableProperty] private bool _canResume;
     [ObservableProperty] private bool _canRetry;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(RemoveLast))]
+    private bool _removeFirst;
+
+    public bool RemoveLast => !RemoveFirst;
     [ObservableProperty] private bool _showLog;
     [ObservableProperty] private bool _logCopied;
 
@@ -977,6 +982,8 @@ public sealed partial class QueueRow : ObservableObject
         CanPause = item.CanPause;
         CanResume = item.CanResume;
         CanRetry = item.CanRetry;
+        // There is nothing to try with until another file is in its place: removing it is what can be done
+        RemoveFirst = item.NeedsOtherFile;
         Status = phase switch
         {
             ItemPhase.Done => item.AlreadyImported ? Loc.Get("ImportPhase_AlreadyImported") : Loc.Get("ImportPhase_Done"),

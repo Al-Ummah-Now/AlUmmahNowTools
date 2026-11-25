@@ -8,9 +8,9 @@ public enum VideoContent
 {
     /// <summary>It has a video track.</summary>
     Video,
-    /// <summary>It is complete, and has none (a recording of sound alone, say).</summary>
+    /// <summary>It is complete, and has sound alone.</summary>
     NoVideo,
-    /// <summary>It is not a whole file: empty inside, or cut off before its index.</summary>
+    /// <summary>It is no whole video: nothing in it, empty inside, or cut off before its index.</summary>
     Damaged,
     /// <summary>Not a kind of file this reads.</summary>
     Unknown,
@@ -42,7 +42,9 @@ public static class Mp4Index
             {
                 // Cut off inside its index
                 if (box.End > size) return VideoContent.Damaged;
-                return await HasVideoTrackAsync(file, box, ct).ConfigureAwait(false) is { } video ? video ? VideoContent.Video : VideoContent.NoVideo : VideoContent.Damaged;
+                if (await HasTrackAsync(file, box, "vide", ct).ConfigureAwait(false) is not { } video) return VideoContent.Damaged;
+                if (video) return VideoContent.Video;
+                return await HasTrackAsync(file, box, "soun", ct).ConfigureAwait(false) == true ? VideoContent.NoVideo : VideoContent.Damaged;
             }
             at = box.End;
         }
@@ -50,7 +52,7 @@ public static class Mp4Index
     }
 
     /// <summary>Null when the index itself cannot be read.</summary>
-    private static async Task<bool?> HasVideoTrackAsync(Stream file, Box moov, CancellationToken ct)
+    private static async Task<bool?> HasTrackAsync(Stream file, Box moov, string kind, CancellationToken ct)
     {
         var budget = MaxBoxes;
         return await AnyAsync(moov, "trak", async trak => await AnyAsync(trak, "mdia", async mdia => await AnyAsync(mdia, "hdlr", async hdlr =>
@@ -60,7 +62,7 @@ public static class Mp4Index
             var handler = new byte[12];
             file.Position = hdlr.Content;
             await file.ReadExactlyAsync(handler, ct).ConfigureAwait(false);
-            return Type(handler.AsSpan(8, 4)) == "vide";
+            return Type(handler.AsSpan(8, 4)) == kind;
         }).ConfigureAwait(false)).ConfigureAwait(false)).ConfigureAwait(false);
 
         async Task<bool?> AnyAsync(Box parent, string type, Func<Box, Task<bool?>> look)
@@ -125,9 +127,9 @@ internal static class VideoCheck
         switch (content)
         {
             case VideoContent.NoVideo:
-                throw new StepFailedException("no_video", "The file has no video in it", retryable: false);
+                throw new StepFailedException("no_video", "The file has sound and no video", retryable: false);
             case VideoContent.Damaged:
-                throw new StepFailedException("not_video", "The file is not a whole video: it may have been cut off while it was copied", retryable: false);
+                throw new StepFailedException("not_video", "The file cannot be read as a video: it may have been cut off while it was copied", retryable: false);
             case VideoContent.Unknown:
                 context.Log(LogLevel.Warning, "video_unchecked", "Whether the file has a video in it was not checked: ffprobe is not on this computer");
                 break;
@@ -149,7 +151,7 @@ internal static class VideoCheck
             return probe.Code switch
             {
                 "no_video" => VideoContent.NoVideo,
-                "probe_failed" => VideoContent.Damaged,
+                "probe_failed" or "no_media" => VideoContent.Damaged,
                 "source_read" => throw new StepFailedException("file_read", probe.Message, retryable: true, probe),
                 _ => VideoContent.Unknown,
             };
