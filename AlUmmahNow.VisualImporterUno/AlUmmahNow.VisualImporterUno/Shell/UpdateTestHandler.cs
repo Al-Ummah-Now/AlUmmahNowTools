@@ -5,8 +5,8 @@ namespace AlUmmahNow.VisualImporterUno.Shell;
 
 /// <summary>
 /// CI's update test (scripts/update-test.mjs): every request goes to the local test server with its real host in the
-/// path, so the host rules run on the real URLs and nothing leaves the machine. Writes each state to a log, and exits
-/// the app once an update is staged. Compiled only with -p:UpdateTest=true.
+/// path, so the host rules run on the real URLs and nothing leaves the machine. Writes each state to a log, and closes
+/// the app as its close button does once an update is staged. Compiled only with -p:UpdateTest=true.
 /// </summary>
 internal sealed class UpdateTestHandler : HttpMessageHandler
 {
@@ -29,7 +29,7 @@ internal sealed class UpdateTestHandler : HttpMessageHandler
         {
             if (v.Stage != last) Log($"{v.Stage} {v.Version}");
             last = v.Stage;
-            // The app closing is what installs a staged update; ProcessExit runs AppUpdates' own exit step
+            // The app closing is what installs a staged update: the real quit, not an exit the platform would never make
             if (v.Stage == UpdateStage.Ready) _ = Task.Run(async () =>
             {
                 await Task.Delay(int.TryParse(Environment.GetEnvironmentVariable("TOOLS_UPDATE_TEST_EXIT_MS"), out var ms) ? ms : 1000);
@@ -38,7 +38,7 @@ internal sealed class UpdateTestHandler : HttpMessageHandler
                     await service.CheckAsync(userAsked: true);
                     Log($"rechecked {service.View.Stage}");
                 }
-                Environment.Exit(0);
+                await AppQuit.RequestQuitAsync("update test");
             });
         };
     }
