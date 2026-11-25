@@ -162,6 +162,9 @@ internal sealed class AppQuit
         // Here and not only on ProcessExit: a quit on macOS ends through the system, which never raises it
         if (installUpdate) AppUpdates.InstallOnQuit();
         await App.Current.ShutdownServicesAsync().ConfigureAwait(false);
+#if UPDATE_TEST
+        UpdateTestHandler.Log("stopped");
+#endif
         Log.Information("[Quit] Work stopped and saved ({Ms} ms after the request)", quit?._since.ElapsedMilliseconds);
     }
 

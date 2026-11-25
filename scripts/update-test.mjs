@@ -6,26 +6,29 @@
  *   update-test.mjs --exe <installed app> --package <N+1 nupkg> --platform windows|macos --arch x64|arm64
  *                   --from <version N> --to <version N+1> --packages <Velopack's package folder> --package-name <its file name there>
  *                   --state <the app's updates.json>
- *                   [--case ok|tampered|bad-signature|foreign-host|planted|swapped|yanked|second-copy]
+ *                   [--case ok|tampered|bad-signature|foreign-host|planted|swapped|yanked|second-copy|log-out]
+ *                   [--close quit|close-button|window-close|cmd-q|dock-quit|restart]
  *
- * `ok` must end on N+1. Every other case must stay on N through a second start:
+ * `ok` must end on N+1, however the app is closed (Shell/UpdateTestClose.cs); `restart` presses Restart now, and N+1 must start by itself. Every other case must stay on N through a second start:
  *  - tampered, bad-signature, foreign-host: the download is refused and the reason reported;
  *  - planted: a good N+1 package is already in the package folder, but this run verified none;
  *  - swapped: the staged file is replaced (same size) before the app closes;
+ *  - log-out: the session ends: the work is stopped first, and no update is started (the session would cut it off);
  *  - second-copy: another copy runs from the same install (as if importing): it must not be ended, so nothing installs;
  *  - yanked: after staging, a newer key list yanks N+1; the app learns it on a check and then closes.
  */
 import { createHash } from 'node:crypto';
 import { createServer } from 'node:http';
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { generateKey, signBytes, buildKeyList } from './app-release.mjs';
 
 const a = {};
 for (let i = 2; i < process.argv.length; i += 2) a[process.argv[i].slice(2)] = process.argv[i + 1];
 const kase = a.case ?? 'ok';
+const close = kase === 'log-out' ? 'log-out' : (a.close ?? 'quit');
 const REPO = 'AlUmmahNowTools';
 const tag = `v${a.to}`;
 const base = `https://github.com/Al-Ummah-Now/${REPO}/releases/download/${tag}/`;
@@ -84,7 +87,7 @@ const server = createServer((req, res) => {
 	res.end();
 });
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
-const env = { ...process.env, TOOLS_DEMO: '1', TOOLS_DEMO_IMPORT: 'empty', TOOLS_DEMO_LANG: 'en', TOOLS_UPDATE_TEST_ROOT: root.publicKey, TOOLS_UPDATE_TEST_SERVER: `http://127.0.0.1:${server.address().port}`, TOOLS_UPDATE_TEST_LOG: log, TOOLS_DEMO_INSTANCE: join(dir, 'queue'), ...(kase === 'swapped' || kase === 'yanked' ? { TOOLS_UPDATE_TEST_EXIT_MS: '8000' } : {}), ...(kase === 'yanked' ? { TOOLS_UPDATE_TEST_RECHECK: '1' } : {}) };
+const env = { ...process.env, TOOLS_DEMO: '1', TOOLS_DEMO_IMPORT: 'empty', TOOLS_DEMO_LANG: 'en', TOOLS_UPDATE_TEST_ROOT: root.publicKey, TOOLS_UPDATE_TEST_SERVER: `http://127.0.0.1:${server.address().port}`, TOOLS_UPDATE_TEST_LOG: log, TOOLS_UPDATE_TEST_CLOSE: close, TOOLS_DEMO_INSTANCE: join(dir, 'queue'), ...(kase === 'swapped' || kase === 'yanked' ? { TOOLS_UPDATE_TEST_EXIT_MS: '8000' } : {}), ...(kase === 'yanked' ? { TOOLS_UPDATE_TEST_RECHECK: '1' } : {}) };
 // Each case starts as a new install: a yank is remembered for good, so an earlier case's would count here
 rmSync(a.state, { force: true });
 if (kase === 'planted') {
@@ -92,7 +95,16 @@ if (kase === 'planted') {
 	writeFileSync(stagedFile, pkg);
 }
 const start = () => spawn(a.exe, [], { env, stdio: 'inherit' });
-const exited = (p) => new Promise((r) => (p.exitCode !== null ? r() : p.once('exit', r)));
+const exited = (p) =>
+	new Promise((r) => {
+		if (p.exitCode !== null || p.signalCode !== null) return r();
+		const late = setTimeout(() => (p.kill('SIGKILL'), fail('the app did not end')), 90_000);
+		p.once('exit', () => (clearTimeout(late), r()));
+	});
+const setGuiEnv = (set) => {
+	if (a.platform !== 'macos') return;
+	for (const [k, v] of Object.entries(env)) if (k.startsWith('TOOLS_')) execFileSync('launchctl', set ? ['setenv', k, v] : ['unsetenv', k]);
+};
 async function until(what, ms, test) {
 	const end = Date.now() + ms;
 	while (Date.now() < end) {
@@ -112,7 +124,7 @@ async function unchanged() {
 	if (lines().slice(before).find((l) => l.startsWith('started ')) !== `started ${a.from} self=true`) fail('the version changed');
 }
 function fail(why) {
-	console.error(`::error::update test (${kase}): ${why}\nlog:\n${lines().join('\n')}\ncalls:\n${calls.join('\n')}\nreported: ${JSON.stringify(reported)}`);
+	console.error(`::error::update test (${kase}, ${close}): ${why}\nlog:\n${lines().join('\n')}\ncalls:\n${calls.join('\n')}\nreported: ${JSON.stringify(reported)}`);
 	process.exit(1);
 }
 
@@ -129,16 +141,37 @@ const first = start();
 if (!(await until('the app starts', 60_000, () => lines().some((l) => l === `started ${a.from} self=true`)))) fail(`the installed app is not a self-updating ${a.from}`);
 if (kase === 'ok') {
 	if (!(await until('the update is staged', 180_000, () => lines().some((l) => l === `Ready ${a.to}`)))) fail('never staged');
+	// Started by the updater, not by this script: macOS gives such an app the session's environment, not ours
+	if (close === 'restart') setGuiEnv(true);
 	await exited(first);
-	// Velopack's updater runs after the exit; starting again before it's done would race it
-	await sleep(20_000);
-	const before = lines().length;
-	const second = start();
-	if (!(await until('the app starts again', 60_000, () => lines().slice(before).some((l) => l.startsWith('started '))))) fail('did not start after the update');
-	second.kill();
+	if (!lines().includes('stopped')) fail('the work was not stopped');
+	const before = lines().indexOf('stopped') + 1;
+	if (close === 'restart') {
+		const again = await until('the updater starts the app', 120_000, () => lines().slice(before).some((l) => l.startsWith('started ')));
+		await sleep(5_000);
+		setGuiEnv(false);
+		try {
+			if (a.platform === 'macos') execFileSync('pkill', ['-f', a.exe]);
+			else execFileSync('taskkill', ['/F', '/IM', basename(a.exe)]);
+		} catch (e) {
+			fail(`the app the updater started is not running: ${e.message}`);
+		}
+		if (!again) fail('was not started again');
+	} else {
+		// Velopack's updater runs after the exit; starting again before it's done would race it
+		await sleep(20_000);
+		const second = start();
+		if (!(await until('the app starts again', 60_000, () => lines().slice(before).some((l) => l.startsWith('started '))))) fail('did not start after the update');
+		second.kill();
+	}
 	const started = lines().slice(before).find((l) => l.startsWith('started '));
 	if (started !== `started ${a.to} self=true`) fail(`after the update: ${started}`);
 	if (reported) fail('a good update was reported as failed');
+} else if (kase === 'log-out') {
+	if (!(await until('the update is staged', 180_000, () => lines().some((l) => l === `Ready ${a.to}`)))) fail('never staged');
+	await exited(first);
+	if (!lines().includes('stopped')) fail('the work was not stopped');
+	await unchanged();
 } else if (kase === 'second-copy') {
 	if (!(await until('the update is staged', 180_000, () => lines().some((l) => l === `Ready ${a.to}`)))) fail('never staged');
 	await exited(first);
@@ -172,6 +205,6 @@ if (kase === 'ok') {
 	await unchanged();
 }
 if (!existsSync(a.state)) fail(`no state at ${a.state}`);
-console.log(`update test (${kase}) passed:\n${lines().join('\n')}`);
+console.log(`update test (${kase}, ${close}) passed:\n${lines().join('\n')}`);
 server.close();
 process.exit(0);
