@@ -231,13 +231,13 @@
                         </StackPanel>
                         <StackPanel x:Name="QueueActions" Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
                             <Button Style="{StaticResource ToolsSecondaryButton}" Command="{x:Bind ViewModel.PauseAllCommand}"
-                                    Visibility="{x:Bind ViewModel.AllPaused, Mode=OneWay, Converter={StaticResource InverseBoolToVisibility}}">
+                                    Visibility="{x:Bind ViewModel.CanPauseAll, Mode=OneWay}">
                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                     <FontIcon Glyph="&#xE769;" FontSize="14" />
                                     <TextBlock x:Uid="Import_PauseAll" Text="Pause all" />
                                 </StackPanel>
                             </Button>
-                            <Button Style="{StaticResource ToolsPrimaryButton}" Command="{x:Bind ViewModel.ResumeAllCommand}" Visibility="{x:Bind ViewModel.AllPaused, Mode=OneWay}">
+                            <Button Style="{StaticResource ToolsPrimaryButton}" Command="{x:Bind ViewModel.ResumeAllCommand}" Visibility="{x:Bind ViewModel.CanResumeAll, Mode=OneWay}">
                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                     <FontIcon Glyph="&#xE768;" FontSize="14" />
                                     <TextBlock x:Uid="Import_ResumeAll" Text="Resume all" />
