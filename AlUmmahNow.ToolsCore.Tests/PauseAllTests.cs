@@ -148,9 +148,11 @@ public class PauseAllTests
         Assert.Equal(PhaseOf(state), rig.Item.Phase);
         var before = (rig.State.Attempts, rig.State.NextAttemptAt, rig.State.LastErrorCode);
 
+        Assert.Equal((true, false), (rig.Queue.CanPauseAll, rig.Queue.CanResumeAll));
         // Pressed twice quickly
         rig.Queue.PauseAll();
         AssertPaused(rig.Item);
+        Assert.Equal((false, true), (rig.Queue.CanPauseAll, rig.Queue.CanResumeAll));
         rig.Queue.PauseAll();
         AssertPaused(rig.Item);
         Assert.True(rig.Queue.AllPaused);
@@ -249,7 +251,8 @@ public class PauseAllTests
 
         rig.Run = (_, _) => Task.FromResult(StepResult.Done);
         rig.Queue.Resume(rig.Id);
-        // Still all paused for the rest, and for files added now
+        // Still all paused for the rest, and for files added now; both buttons are offered
+        Assert.Equal((true, true), (rig.Queue.CanPauseAll, rig.Queue.CanResumeAll));
         Assert.True(rig.Queue.AllPaused);
         AssertPaused(other);
         var third = QueueItem.For(Video("c.mp4"), "b1", "ch1", rig.Clock.Now);
@@ -435,10 +438,84 @@ public class PauseAllTests
     }
 
     [Fact]
-    public void A_queue_saved_by_an_older_app_reads_its_failures_by_their_code()
+    public async Task A_step_that_fails_for_good_just_as_it_is_paused_reads_failed_and_is_not_resumed()
     {
-        Assert.True(new StepState { LastErrorCode = "videos_unreachable" }.CanTryAgain);
-        Assert.False(new StepState { LastErrorCode = "file_missing" }.CanTryAgain);
-        Assert.False(new StepState { LastErrorCode = "file_read", Retryable = false }.CanTryAgain);
+        using var rig = new Rig(ImportStepKind.Hash);
+        using var failing = new ManualResetEventSlim();
+        // The failure is already on its way when Pause all comes: it is recorded while the file is paused
+        rig.Run = (_, _) =>
+        {
+            failing.Wait();
+            throw new FileNotFoundException("gone");
+        };
+        var other = QueueItem.For(Video("b.mp4"), "b1", "ch1", rig.Clock.Now);
+        rig.Queue.Add(new[] { other });
+        rig.Queue.Pause(other.Id);
+        await rig.Until(() => rig.Step.Running == 1);
+        rig.Item.Paused = true; // paused, with the step's stop too late to matter
+        failing.Set();
+        await Temp.WaitUntil(() => rig.Item.Phase == ItemPhase.Failed);
+        Assert.False(rig.Item.Paused);
+        rig.Queue.ResumeAll();
+        Assert.DoesNotContain(rig.Queue.LogLines(rig.Id), l => l.Code == "resumed");
+        Assert.Equal((false, false, true), (rig.Item.CanPause, rig.Item.CanResume, rig.Item.CanRetry));
+    }
+
+    [Theory]
+    [InlineData("admin_unreachable", 6, true)]
+    [InlineData("videos_unreachable", 6, true)]
+    [InlineData("upload_gone", 6, true)]
+    [InlineData("file_read", 6, true)]
+    [InlineData("renditions_incomplete", 6, true)]
+    [InlineData("server", 6, true)]
+    [InlineData("server", 1, false)]
+    [InlineData("upload_refused", 6, true)]
+    [InlineData("upload_refused", 1, false)]
+    [InlineData("unexpected", 6, true)]
+    [InlineData("unexpected", 1, false)]
+    [InlineData("file_missing", 1, false)]
+    [InlineData("file_changed", 6, false)]
+    public void A_queue_saved_by_an_older_app_is_read_and_paused(string code, int attempts, bool again)
+    {
+        // As v2026.11.24 wrote it: no allPaused, no retryable
+        var path = Path.Combine(Temp.Folder(), "queue.json");
+        var steps = string.Join(",", Enum.GetValues<ImportStepKind>().Select(k => k == ImportStepKind.Hash
+            ? $$"""{"kind":"Hash","status":"Failed","attempts":{{attempts}},"nextAttemptAt":null,"lastError":"x","lastErrorCode":"{{code}}","waitingOnServer":false}"""
+            : $$"""{"kind":"{{k}}","status":"Pending","attempts":0,"nextAttemptAt":null,"lastError":null,"lastErrorCode":null,"waitingOnServer":false}"""));
+        File.WriteAllText(path, $$$"""
+            {"settings":{"parallel":{"Hash":2},"maxAttempts":6},"items":[{"id":"i1","batchId":"b1","channelId":"ch1",
+             "video":{"path":"/v/a.mp4","size":10,"lastModifiedMs":0,"mimeType":"video/mp4","captions":[],"chaptersPath":null,"thumbnailPath":null,"metadataPath":null,"metadata":{"fallbackTitle":"a"},"notes":[]},
+             "paused":false,"steps":[{{{steps}}}],"createdAt":"2026-11-24T09:42:00+00:00","log":[]}]}
+            """);
+        using var queue = new ImportQueue(path, ImportQueueTests.All());
+        var item = Assert.Single(queue.Items);
+        Assert.False(queue.AllPaused);
+        Assert.Equal(ItemPhase.Failed, item.Phase);
+        Assert.Equal(again, queue.CanPauseAll);
+        queue.PauseAll();
+        Assert.Equal(again ? ItemPhase.Paused : ItemPhase.Failed, item.Phase);
+        Assert.Equal(again, queue.AllPaused);
+    }
+
+    [Fact]
+    public async Task Closing_while_a_paused_step_is_still_stopping_counts_no_attempt()
+    {
+        using var rig = new Rig(ImportStepKind.Encode);
+        var stopping = new TaskCompletionSource();
+        rig.Run = async (_, ct) =>
+        {
+            try { await Task.Delay(Timeout.Infinite, ct); }
+            finally { await stopping.Task; }
+            return StepResult.Done;
+        };
+        await rig.Until(() => rig.Step.Running == 1);
+        rig.Queue.PauseAll();
+        using (var second = rig.Open(new ScriptedStep(ImportStepKind.Encode)))
+        {
+            AssertPaused(second.Items[0]);
+            Assert.Equal(0, second.Items[0].Steps.Single(s => s.Kind == ImportStepKind.Encode).Attempts);
+        }
+        stopping.SetResult();
+        await Temp.WaitUntil(() => rig.Step.Running == 0 && rig.State.Status != StepStatus.Running);
     }
 }

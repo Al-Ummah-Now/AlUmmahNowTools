@@ -51,7 +51,13 @@ public sealed class StepState
     public bool? Retryable { get; set; }
 
     [JsonIgnore]
-    public bool CanTryAgain => Retryable ?? LastErrorCode is "admin_unreachable" or "videos_unreachable" or "upload_gone" or "file_read";
+    public bool CanTryAgain => Retryable ?? LastErrorCode switch
+    {
+        "admin_unreachable" or "videos_unreachable" or "upload_gone" or "file_read" or "renditions_incomplete" => true,
+        // Either kind: one that retrying cannot fix gave up at once
+        "server" or "upload_refused" or "unexpected" => Attempts > 1,
+        _ => false,
+    };
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter))]
@@ -155,8 +161,11 @@ public sealed class QueueItem
     [JsonIgnore] public bool CanResume => Phase == ItemPhase.Paused;
     [JsonIgnore] public bool CanRetry => Phase is ItemPhase.Failed or ItemPhase.RetryWaiting;
 
-    /// <summary>Pause all takes it: not done, not paused, and not failed for good.</summary>
-    [JsonIgnore] internal bool Pausable => !Paused && Phase != ItemPhase.Done && CurrentStep is not { Status: StepStatus.Failed, CanTryAgain: false };
+    /// <summary>
+    /// Pause all takes it: not done, not paused, and not failed for good. Wider than <see cref="CanPause"/>: the row of a file
+    /// that gave up on something trying again may fix offers Retry, and Pause all still holds it.
+    /// </summary>
+    [JsonIgnore] public bool Pausable => !Paused && Phase != ItemPhase.Done && CurrentStep is not { Status: StepStatus.Failed, CanTryAgain: false };
 
     public static QueueItem For(ScannedVideo video, string batchId, string channelId, DateTimeOffset now, bool serverEncodes = false, TranscribeChoice? transcribe = null, bool translate = false) => new()
     {
@@ -327,6 +336,18 @@ public sealed class ImportQueue : IDisposable
         get { lock (_gate) return HeldLocked; }
     }
 
+    /// <summary>Pause all has something to pause.</summary>
+    public bool CanPauseAll
+    {
+        get { lock (_gate) return _items.Any(i => i.Pausable); }
+    }
+
+    /// <summary>Resume all has something to resume.</summary>
+    public bool CanResumeAll
+    {
+        get { lock (_gate) return _items.Any(i => i.CanResume); }
+    }
+
     private bool HeldLocked => _allPaused && _items.Any(i => i.Phase == ItemPhase.Paused);
 
     public QueueSettings Settings
@@ -438,9 +459,8 @@ public sealed class ImportQueue : IDisposable
 
     private bool ResumeLocked(QueueItem item)
     {
-        if (!item.Paused) return false;
+        if (item.Phase != ItemPhase.Paused) return false;
         item.Paused = false;
-        if (item.CurrentStep is null) return false;
         AppendLog(item, LogLevel.Info, "resumed", "Resumed");
         // It had given up: Resume is another go at it
         if (item.CurrentStep is { Status: StepStatus.Failed, CanTryAgain: true } step) Again(item, step);
@@ -691,6 +711,8 @@ public sealed class ImportQueue : IDisposable
                 else
                 {
                     step.Status = StepStatus.Failed;
+                    // Failed for good just as it was paused: it reads Failed, and Resume all has nothing to do with it
+                    if (!step.CanTryAgain) item.Paused = false;
                     reference = ErrorReport.NewRef();
                     AppendLog(item, LogLevel.Error, "failed", $"{step.Kind}: failed after {step.Attempts} attempt(s): {message} (reference {reference})", step.Kind.ToString(), attempts, code, reference, message);
                 }
@@ -787,8 +809,14 @@ public sealed class ImportQueue : IDisposable
             foreach (var item in saved.Items ?? new List<QueueItem>())
             {
                 // A step that was running when the app closed starts again (an upload from its saved offset)
-                foreach (var step in item.Steps.Where(s => s.Status == StepStatus.Running)) step.Status = StepStatus.Pending;
+                foreach (var step in item.Steps.Where(s => s.Status == StepStatus.Running))
+                {
+                    step.Status = StepStatus.Pending;
+                    // The app closed while the paused step was stopping: that was no attempt
+                    if (item.Paused) step.Attempts = Math.Max(0, step.Attempts - 1);
+                }
                 item.AddMissingSteps();
+                if (item.Phase != ItemPhase.Paused) item.Paused = false;
                 _items.Add(item);
             }
         }
