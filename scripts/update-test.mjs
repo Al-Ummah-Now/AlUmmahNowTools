@@ -5,6 +5,7 @@
  *
  *   update-test.mjs --exe <installed app> --package <N+1 nupkg> --platform windows|macos --arch x64|arm64
  *                   --from <version N> --to <version N+1> --packages <Velopack's package folder> --package-name <its file name there>
+ *                   --state <the app's updates.json>
  *                   [--case ok|tampered|bad-signature|foreign-host|planted|swapped|yanked]
  *
  * `ok` must end on N+1. Every other case must stay on N through a second start:
@@ -16,7 +17,7 @@
 import { createHash } from 'node:crypto';
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { generateKey, signBytes, buildKeyList } from './app-release.mjs';
@@ -83,6 +84,8 @@ const server = createServer((req, res) => {
 });
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const env = { ...process.env, TOOLS_DEMO: '1', TOOLS_DEMO_LANG: 'en', TOOLS_UPDATE_TEST_ROOT: root.publicKey, TOOLS_UPDATE_TEST_SERVER: `http://127.0.0.1:${server.address().port}`, TOOLS_UPDATE_TEST_LOG: log, ...(kase === 'swapped' || kase === 'yanked' ? { TOOLS_UPDATE_TEST_EXIT_MS: '8000' } : {}), ...(kase === 'yanked' ? { TOOLS_UPDATE_TEST_RECHECK: '1' } : {}) };
+// Each case starts as a new install: a yank is remembered for good, so an earlier case's would count here
+rmSync(a.state, { force: true });
 if (kase === 'planted') {
 	mkdirSync(a.packages, { recursive: true });
 	writeFileSync(stagedFile, pkg);
@@ -149,6 +152,7 @@ if (kase === 'ok') {
 	if (kase === 'foreign-host' && calls.some((c) => c.startsWith('/downloads.example.com'))) fail('asked the foreign host');
 	await unchanged();
 }
+if (!existsSync(a.state)) fail(`no state at ${a.state}`);
 console.log(`update test (${kase}) passed:\n${lines().join('\n')}`);
 server.close();
 process.exit(0);
