@@ -8,9 +8,17 @@ namespace AlUmmahNow.VisualImporterUno.Shell;
 /// A row of buttons, each as wide as its words, that goes on in a next row where the width ends. Hidden ones take no place.
 /// Right-to-left mirrors the order through the usual FlowDirection.
 /// </summary>
-public sealed class WrapRow : Panel
+public sealed partial class WrapRow : Panel
 {
-    public double Spacing { get; set; } = 8;
+    public static readonly DependencyProperty SpacingProperty = DependencyProperty.Register(
+        nameof(Spacing), typeof(double), typeof(WrapRow), new PropertyMetadata(8d, (row, _) => ((WrapRow)row).InvalidateMeasure()));
+
+    /// <summary>Between the buttons of a row, and between the rows</summary>
+    public double Spacing
+    {
+        get => (double)GetValue(SpacingProperty);
+        set => SetValue(SpacingProperty, value);
+    }
 
     protected override Size MeasureOverride(Size availableSize)
     {

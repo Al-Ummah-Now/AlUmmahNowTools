@@ -233,6 +233,27 @@ jobs:
     - name: Test updates
       run: dotnet test AlUmmahNow.ToolsCore.Tests/AlUmmahNow.ToolsCore.Tests.csproj -c Release --filter "FullyQualifiedName~Update|FullyQualifiedName~StagedPackage|FullyQualifiedName~PrivateFolder|FullyQualifiedName~PauseAll|FullyQualifiedName~RemoveAll|FullyQualifiedName~NetworkShare|FullyQualifiedName~Instance|FullyQualifiedName~QueueStop|FullyQualifiedName~SettingsFile"
 
+  windows-target:
+    # The project's other target (WinUI); only net9.0-desktop is released, and nothing else compiles this one
+    name: Windows target build
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+      with:
+        dotnet-version: 9.0.x
+
+    - name: Fetch AlUmmahNow.Core
+      shell: bash
+      run: scripts/fetch-core.sh
+
+    - name: Build
+      run: dotnet build AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno.csproj -f net9.0-windows10.0.26100 -c Release
+
   coverage:
     name: Unified coverage report
     runs-on: ubuntu-latest
