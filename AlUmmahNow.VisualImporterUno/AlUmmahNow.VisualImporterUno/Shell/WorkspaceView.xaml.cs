@@ -46,6 +46,7 @@ namespace AlUmmahNow.VisualImporterUno.Shell
             SocialSourcesItem.Visibility = ShellState.Current?.Session.Profile?.Can(ViewModels.SocialSourcesViewModel.Permission) == true ? Visibility.Visible : Visibility.Collapsed;
             var start = Pages.FirstOrDefault(p => string.Equals(p.Key, startPage, StringComparison.OrdinalIgnoreCase));
             Select(start.Page == null ? ViewState.Dashboard : start.View);
+            DemoSuggest.Start(ContentFrame, DispatcherQueue);
         }
 
         public ViewState CurrentView => _currentView;
