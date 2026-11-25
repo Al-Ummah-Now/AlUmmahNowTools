@@ -419,7 +419,7 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
     public ObservableCollection<QueueRow> QueueRows { get; } = new();
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasQueue), nameof(RemoveAllTitle))]
+    [NotifyPropertyChangedFor(nameof(HasQueue))]
     private int _queueCount;
 
     public bool HasQueue => QueueCount > 0;
@@ -488,23 +488,25 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
     public void LeaveToServer(QueueRow row) => _workspace.Queue.SetServerEncodes(true, row.Id);
     public void Remove(QueueRow row) => _workspace.Queue.Remove(row.Id);
 
-    /// <summary>The Remove all dialog's title: how many files leave the queue.</summary>
-    public string RemoveAllTitle => Loc.Plural("Import_RemoveAllTitle", QueueCount);
-
-    /// <summary>The Remove all dialog's lines: what stays, and how many uploads it stops when there are any.</summary>
-    public IReadOnlyList<string> RemoveAllLines()
+    /// <summary>The Remove all question, and the files it is about: what is added or finishes meanwhile is not in it.</summary>
+    public (ConfirmRequest Request, IReadOnlyList<string> Files) RemoveAllRequest()
     {
-        var uploads = _workspace.Queue.Items.Count(i => i.UploadUnfinished);
+        var items = _workspace.Queue.Items;
+        var uploads = items.Count(i => i.UploadUnfinished);
         var stays = Loc.Get("Import_RemoveAllBody");
-        return uploads == 0 ? [stays] : [stays, Loc.Plural("Import_RemoveAllUploads", uploads)];
+        return (new ConfirmRequest(Loc.Plural("Import_RemoveAllTitle", items.Count), uploads == 0 ? [stays] : [stays, Loc.Plural("Import_RemoveAllUploads", uploads)], Loc.Get("Import_RemoveAllConfirm")),
+            items.Select(i => i.Id).ToList());
     }
 
-    /// <summary>Empties the queue (after the dialog).</summary>
-    public void RemoveAll()
+    /// <summary>Removes these files (after the dialog).</summary>
+    public void RemoveAll(IReadOnlyCollection<string> files)
     {
         EncodeChanged = "";
-        _workspace.Queue.RemoveAll();
+        _workspace.Queue.RemoveAll(files);
     }
+
+    /// <summary>Now, not once the page has followed.</summary>
+    public bool QueueIsEmpty => _workspace.Queue.Items.Count == 0;
 
     /// <summary>Shows or hides the file's log under its row.</summary>
     public void ToggleLog(QueueRow row)

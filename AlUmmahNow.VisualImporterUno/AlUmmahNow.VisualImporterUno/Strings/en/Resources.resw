@@ -975,12 +975,6 @@
   <data name="Watch_StopFailed" xml:space="preserve">
     <value>Couldn’t stop watching</value>
   </data>
-  <data name="Watch_Deleting" xml:space="preserve">
-    <value>Removing…</value>
-  </data>
-  <data name="Watch_DeleteFailed" xml:space="preserve">
-    <value>Couldn’t remove the watched folder</value>
-  </data>
   <data name="Watch_Refreshing" xml:space="preserve">
     <value>Refreshing…</value>
   </data>
@@ -1293,14 +1287,8 @@
   <data name="Approve_Approving" xml:space="preserve">
     <value>Approving…</value>
   </data>
-  <data name="Approve_Rejecting" xml:space="preserve">
-    <value>Rejecting…</value>
-  </data>
   <data name="Approve_ApprovedOne" xml:space="preserve">
     <value>Approved</value>
-  </data>
-  <data name="Approve_RejectedOne" xml:space="preserve">
-    <value>Rejected</value>
   </data>
   <data name="Approve_ApproveFailed" xml:space="preserve">
     <value>Couldn’t approve</value>
@@ -1476,7 +1464,8 @@ The list shows it once the scanner is back.</value>
     <value>These videos were already decided.</value>
   </data>
   <data name="Approve_NotAccepted" xml:space="preserve">
-    <value>The scanner didn’t accept the decision. Try again.</value>
+    <value>The scanner didn’t accept the decision.
+Try again.</value>
   </data>
   <data name="Stats_LegendWaiting.Text" xml:space="preserve">
     <value>Waiting</value>
@@ -1840,6 +1829,84 @@ The list shows it once the scanner is back.</value>
   </data>
   <data name="Import_Cancel" xml:space="preserve">
     <value>Cancel</value>
+  </data>
+  <data name="Confirm_TypeNumber" xml:space="preserve">
+    <value>Type {0} to confirm.</value>
+  </data>
+  <data name="Approve_RejectOneTitle" xml:space="preserve">
+    <value>Reject this video?</value>
+  </data>
+  <data name="Approve_RejectOneBody" xml:space="preserve">
+    <value>It isn’t uploaded, and leaves this list.</value>
+  </data>
+  <data name="Approve_RejectOneBody2" xml:space="preserve">
+    <value>The file stays in its folder.</value>
+  </data>
+  <data name="Approve_RejectManyTitle_One" xml:space="preserve">
+    <value>Reject {0} video?</value>
+  </data>
+  <data name="Approve_RejectManyTitle_Other" xml:space="preserve">
+    <value>Reject {0} videos?</value>
+  </data>
+  <data name="Approve_RejectManyBody" xml:space="preserve">
+    <value>They aren’t uploaded, and leave this list.</value>
+  </data>
+  <data name="Approve_RejectManyBody2" xml:space="preserve">
+    <value>The files stay in their folders.</value>
+  </data>
+  <data name="Approve_ApproveManyTitle_One" xml:space="preserve">
+    <value>Approve {0} video?</value>
+  </data>
+  <data name="Approve_ApproveManyTitle_Other" xml:space="preserve">
+    <value>Approve {0} videos?</value>
+  </data>
+  <data name="Approve_ApproveManyBody" xml:space="preserve">
+    <value>They’re uploaded and published on their channels.</value>
+  </data>
+  <data name="Approve_ApproveConfirm" xml:space="preserve">
+    <value>Approve</value>
+  </data>
+  <data name="Approve_PresetRestored" xml:space="preserve">
+    <value>Preset restored</value>
+  </data>
+  <data name="Approve_PresetUndo.Text" xml:space="preserve">
+    <value>Undo</value>
+  </data>
+  <data name="Settings_ResetTitle" xml:space="preserve">
+    <value>Restore the default settings?</value>
+  </data>
+  <data name="Settings_ResetBody" xml:space="preserve">
+    <value>The scanner’s settings change once they’re saved.</value>
+  </data>
+  <data name="Settings_ResetBody2" xml:space="preserve">
+    <value>Notifications are turned on at once.</value>
+  </data>
+  <data name="Settings_ResetConfirm" xml:space="preserve">
+    <value>Restore</value>
+  </data>
+  <data name="Scanner_ClearTitle" xml:space="preserve">
+    <value>Clear the activity and the problems?</value>
+  </data>
+  <data name="Scanner_ClearBody" xml:space="preserve">
+    <value>Both lists are emptied.</value>
+  </data>
+  <data name="Scanner_ClearBody2" xml:space="preserve">
+    <value>The problems can’t be tried again from here after that.</value>
+  </data>
+  <data name="Scanner_ClearConfirm" xml:space="preserve">
+    <value>Clear</value>
+  </data>
+  <data name="Scanner_StopTitle" xml:space="preserve">
+    <value>Turn the scanner off?</value>
+  </data>
+  <data name="Scanner_StopScans_One" xml:space="preserve">
+    <value>{0} scan is running, and stops.</value>
+  </data>
+  <data name="Scanner_StopScans_Other" xml:space="preserve">
+    <value>{0} scans are running, and stop.</value>
+  </data>
+  <data name="Scanner_StopBody" xml:space="preserve">
+    <value>The scanner can be turned on again.</value>
   </data>
   <data name="Import_NewChannelTitle" xml:space="preserve">
     <value>New channel</value>
@@ -3162,7 +3229,8 @@ The list shows it once the scanner is back.</value>
     <value>Remove this source?</value>
   </data>
   <data name="Social_RemoveBody" xml:space="preserve">
-    <value>Nothing more is imported from it. The posts and videos it already brought stay on the channel.</value>
+    <value>Nothing more is imported from it.
+The posts and videos it already brought stay on the channel.</value>
   </data>
   <data name="Social_RemoveConfirm" xml:space="preserve">
     <value>Remove</value>
@@ -3589,6 +3657,33 @@ The list shows it once the scanner is back.</value>
   </data>
   <data name="Update_SettingsCheckFailed" xml:space="preserve">
     <value>Couldn't check for updates. Try again later.</value>
+  </data>
+  <data name="Leave_SignOutTitle" xml:space="preserve">
+    <value>Sign out while imports are running?</value>
+  </data>
+  <data name="Leave_SwitchTitle" xml:space="preserve">
+    <value>Switch while imports are running?</value>
+  </data>
+  <data name="Leave_SignOut" xml:space="preserve">
+    <value>Sign out and stop</value>
+  </data>
+  <data name="Leave_Switch" xml:space="preserve">
+    <value>Switch and stop</value>
+  </data>
+  <data name="Leave_StaySignedIn" xml:space="preserve">
+    <value>Stay signed in</value>
+  </data>
+  <data name="Leave_Files_One" xml:space="preserve">
+    <value>The import of 1 video stops.</value>
+  </data>
+  <data name="Leave_Files_Other" xml:space="preserve">
+    <value>The import of {0} videos stops.</value>
+  </data>
+  <data name="Leave_SignOutResume" xml:space="preserve">
+    <value>This account’s next sign-in resumes it.</value>
+  </data>
+  <data name="Leave_SwitchResume" xml:space="preserve">
+    <value>Switching back resumes it.</value>
   </data>
   <data name="Quit_Title" xml:space="preserve">
     <value>Imports are still running</value>

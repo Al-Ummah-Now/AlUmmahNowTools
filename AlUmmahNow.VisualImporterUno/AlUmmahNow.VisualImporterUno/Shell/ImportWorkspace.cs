@@ -66,7 +66,7 @@ public sealed class ImportWorkspace : IDisposable
         {
             // Whatever the app was closed in the middle of, the switch on the page holds for the whole queue
             if (!shell.Preferences.EncodeHere) Queue.SetServerEncodes(true);
-            Queue.Start();
+            Follow();
         }
 #if UPDATE_TEST
         if (UpdateTestStep.On)
@@ -162,7 +162,11 @@ public sealed class ImportWorkspace : IDisposable
                 if (!_watching)
                 {
                     // Stop the old environment's queue as soon as the environment changes, not when the page is next opened
-                    shell.Changed += (_, _) => DropIfStale();
+                    shell.Changed += (_, _) =>
+                    {
+                        DropIfStale();
+                        IfStarted?.Follow();
+                    };
                     _watching = true;
                 }
                 if (_current is not null && ReferenceEquals(_current.Session, shell.Session)) return _current;
@@ -197,7 +201,55 @@ public sealed class ImportWorkspace : IDisposable
     }
 
     /// <summary>Files being imported now (running, queued, waiting to try again), for the quit question (Tools #78).</summary>
-    public static int ActiveFiles => IfStarted is { } workspace ? QuitGuard.ActiveFiles(workspace.Queue.Items) : 0;
+    public static int ActiveFiles => IfStarted is { } workspace && (workspace.IsDemo || workspace.Queue.IsStarted) ? QuitGuard.ActiveFiles(workspace.Queue.Items) : 0;
+
+    /// <summary>Uploads that began and have not finished, for the question before signing out.</summary>
+    public static int UnfinishedUploads => ActiveFiles > 0 && IfStarted is { } workspace ? workspace.Queue.Items.Count(i => !i.Paused && i.UploadUnfinished) : 0;
+
+    private Task _following = Task.CompletedTask;
+
+    /// <summary>The queue runs while a staff account is signed in, for that account, and stops when nobody is (or it is not staff).</summary>
+    private void Follow()
+    {
+        if (IsDemo || !AppInstance.OwnsQueue) return;
+#if UPDATE_TEST
+        // Runs signed out
+        if (UpdateTestStep.On) return;
+#endif
+        lock (Gate) _following = _following.ContinueWith(_ => FollowAsync(), TaskScheduler.Default).Unwrap();
+    }
+
+    private async Task FollowAsync()
+    {
+        try
+        {
+            switch (QueueSessions.For(Session.State, Session.Account?.UserId))
+            {
+                case QueueSession.Run:
+                    lock (Gate)
+                    {
+                        if (!_disposed && Session.Account?.UserId is { } account) Queue.StartFor(account);
+                    }
+                    break;
+                case QueueSession.Stop when !_disposed:
+                    await Queue.StopAsync().ConfigureAwait(false);
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Warning(ex, "[Import] The queue could not follow the sign-in");
+        }
+    }
+
+    /// <summary>After <see cref="HoldAsync"/>: whoever still is signed in goes on.</summary>
+    public static void Resume() => IfStarted?.Follow();
+
+    /// <summary>Before signing out or leaving the environment: running steps stop and the queue is saved, while its account still may.</summary>
+    public static async Task HoldAsync()
+    {
+        if (IfStarted is { IsDemo: false } workspace) await workspace.Queue.StopAsync().ConfigureAwait(false);
+    }
 
     /// <summary>
     /// Stops the queue for good: running steps stop (ffmpeg and the other child processes with them), the queue is saved so
@@ -207,9 +259,12 @@ public sealed class ImportWorkspace : IDisposable
     public static async Task<bool> StopForQuitAsync()
     {
         ImportWorkspace? workspace;
-        lock (Gate) workspace = _current;
+        lock (Gate)
+        {
+            workspace = _current;
+            if (workspace is not null) workspace._disposed = true;
+        }
         if (workspace is null) return true;
-        workspace._disposed = true;
         var ended = await workspace.Queue.StopAsync(EndLimits.Queue).ConfigureAwait(false);
         try { await workspace.Reporter.FlushAsync().WaitAsync(EndLimits.Reports).ConfigureAwait(false); }
         catch (Exception ex) when (ex is TimeoutException or OperationCanceledException) { }
@@ -411,7 +466,7 @@ internal static class DemoImport
                 continue;
             }
             step.Status = StepStatus.Failed;
-            item.Log.Add(new LogLine(at.AddMinutes(1), LogLevel.Error, $"{kind}: failed", "failed", new[] { kind.ToString(), "1", code, "ERR-7K2M-Q9XD", text }));
+            item.Log.Add(new LogLine(at.AddMinutes(1), LogLevel.Error, $"{kind}: failed", "failed", new[] { kind.ToString(), "1", code, code is "no_video" or "not_video" or "content_changed" ? "" : "ERR-7K2M-Q9XD", text }));
         }
     }
 

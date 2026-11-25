@@ -197,7 +197,7 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private async Task ApproveOneAsync(PendingApprovalDto? approval)
     {
-        if (approval == null) return;
+        if (approval == null || !CanDecide) return;
         SetSelection(new[] { approval });
         if (ApproveSelectedCommand.CanExecute(null)) await ApproveSelectedAsync();
     }
@@ -205,7 +205,7 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private async Task RejectOneAsync(PendingApprovalDto? approval)
     {
-        if (approval == null) return;
+        if (approval == null || !CanDecide) return;
         SetSelection(new[] { approval });
         if (RejectSelectedCommand.CanExecute(null)) await RejectSelectedAsync();
     }
@@ -501,6 +501,7 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
     {
         var files = SelectedApprovals.Where(a => a.Status == ApprovalStatus.Pending).ToList();
         if (files.Count == 0) return;
+        if (decision == ApprovalStatus.Rejected && !await AskToRejectAsync(files, typed: false)) return;
         try
         {
             IsProcessingApproval = true;
@@ -516,6 +517,7 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
     {
         var files = Listed();
         if (files.Count == 0) return;
+        if (!await (decision == ApprovalStatus.Approved ? AskToApproveAsync(files.Count) : AskToRejectAsync(files, typed: true))) return;
         try
         {
             IsProcessingBulkApproval = true;
@@ -532,6 +534,15 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
     /// page's (priority), and a file that came after the list was loaded was not seen.
     /// </summary>
     private List<PendingApprovalDto> Listed() => FilteredApprovals.Where(a => a.Status == ApprovalStatus.Pending).ToList();
+
+    internal static Task<bool> AskToRejectAsync(IReadOnlyList<PendingApprovalDto> files, bool typed) => ConfirmDialog.AskAsync(new ConfirmRequest(
+        files.Count == 1 ? Loc.Get("Approve_RejectOneTitle") : Loc.Plural("Approve_RejectManyTitle", files.Count),
+        files.Count == 1 ? [files[0].FileName, Loc.Get("Approve_RejectOneBody"), Loc.Get("Approve_RejectOneBody2")] : [Loc.Get("Approve_RejectManyBody"), Loc.Get("Approve_RejectManyBody2")],
+        Loc.Get("Approve_Reject"),
+        TypeNumber: typed && files.Count >= AlUmmahNow.ToolsCore.TypedNumber.AskFrom ? files.Count : null));
+
+    internal static Task<bool> AskToApproveAsync(int files) => ConfirmDialog.AskAsync(new ConfirmRequest(
+        Loc.Plural("Approve_ApproveManyTitle", files), [Loc.Get("Approve_ApproveManyBody")], Loc.Get("Approve_ApproveConfirm"), Danger: false));
 
     /// <summary>How many ids go in one message: the scanner takes 32 KB, and an id is about 39 bytes of it</summary>
     private const int DecisionBatch = 500;
@@ -844,6 +855,8 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
         {
             await _filterPresetService.DeletePresetAsync(preset.Id);
             await LoadPresetsAsync();
+            // Put back with one press, until another is deleted
+            DispatcherExecute(() => DeletedPreset = preset);
 
             DispatcherExecute(() =>
             {
@@ -862,6 +875,44 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
             });
         }
     }
+
+    /// <summary>The preset deleted last, which Undo puts back</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasDeletedPreset), nameof(DeletedPresetText))]
+    private FilterPreset? _deletedPreset;
+
+    public bool HasDeletedPreset => DeletedPreset is not null;
+
+    public string DeletedPresetText => DeletedPreset is { } preset ? Loc.GetWithDetail("Approve_PresetDeleted", preset.Name) : "";
+
+    [RelayCommand]
+    private async Task UndoDeletePresetAsync()
+    {
+        // A second click while the first is at it
+        if (DeletedPreset is not { } preset || _undoing) return;
+        _undoing = true;
+        try
+        {
+            await _filterPresetService.SavePresetAsync(preset);
+            DispatcherExecute(() => DeletedPreset = null);
+            await LoadPresetsAsync();
+            DispatcherExecute(() =>
+            {
+                SelectedPreset = SavedPresets.FirstOrDefault(p => p.Id == preset.Id) ?? SelectedPreset;
+                AddLog(Loc.GetWithDetail("Approve_PresetRestored", preset.Name), LogType.Success);
+            });
+        }
+        catch (Exception ex)
+        {
+            DispatcherExecute(() => AddLog(Loc.GetWithDetail("Approve_PresetSaveFailed", ex.Message), LogType.Error));
+        }
+        finally
+        {
+            _undoing = false;
+        }
+    }
+
+    private bool _undoing;
 
     private bool CanDeletePreset(FilterPreset? preset) =>
         preset != null && !preset.IsBuiltIn && !IsLoadingPresets;

@@ -963,12 +963,6 @@
   <data name="Watch_StopFailed" xml:space="preserve">
     <value>تعذّر إيقاف المراقبة</value>
   </data>
-  <data name="Watch_Deleting" xml:space="preserve">
-    <value>جار الإزالة…</value>
-  </data>
-  <data name="Watch_DeleteFailed" xml:space="preserve">
-    <value>تعذّرت إزالة المجلد المراقب</value>
-  </data>
   <data name="Watch_Refreshing" xml:space="preserve">
     <value>جار التحديث…</value>
   </data>
@@ -1281,14 +1275,8 @@
   <data name="Approve_Approving" xml:space="preserve">
     <value>جار الموافقة…</value>
   </data>
-  <data name="Approve_Rejecting" xml:space="preserve">
-    <value>جار الرفض…</value>
-  </data>
   <data name="Approve_ApprovedOne" xml:space="preserve">
     <value>تمت الموافقة</value>
-  </data>
-  <data name="Approve_RejectedOne" xml:space="preserve">
-    <value>تم الرفض</value>
   </data>
   <data name="Approve_ApproveFailed" xml:space="preserve">
     <value>تعذّرت الموافقة</value>
@@ -1464,7 +1452,8 @@
     <value>سبق القرار في هذه المرئيات.</value>
   </data>
   <data name="Approve_NotAccepted" xml:space="preserve">
-    <value>لم يقبل الفاحص القرار. حاول مجددًا.</value>
+    <value>لم يقبل الفاحص القرار.
+يمكن تكرار المحاولة.</value>
   </data>
   <data name="Stats_LegendWaiting.Text" xml:space="preserve">
     <value>بانتظار القرار</value>
@@ -2089,6 +2078,120 @@
   </data>
   <data name="Import_Cancel" xml:space="preserve">
     <value>إلغاء</value>
+  </data>
+  <data name="Confirm_TypeNumber" xml:space="preserve">
+    <value>للتأكيد، يُكتب العدد {0}.</value>
+  </data>
+  <data name="Approve_RejectOneTitle" xml:space="preserve">
+    <value>رفض هذا المرئي؟</value>
+  </data>
+  <data name="Approve_RejectOneBody" xml:space="preserve">
+    <value>لن يُرفع، ويخرج من هذه القائمة.</value>
+  </data>
+  <data name="Approve_RejectOneBody2" xml:space="preserve">
+    <value>يبقى الملف في مجلده.</value>
+  </data>
+  <data name="Approve_RejectManyTitle_Zero" xml:space="preserve">
+    <value>رفض {0} مرئي؟</value>
+  </data>
+  <data name="Approve_RejectManyTitle_One" xml:space="preserve">
+    <value>رفض مرئي واحد؟</value>
+  </data>
+  <data name="Approve_RejectManyTitle_Two" xml:space="preserve">
+    <value>رفض مرئيين؟</value>
+  </data>
+  <data name="Approve_RejectManyTitle_Few" xml:space="preserve">
+    <value>رفض {0} مرئيات؟</value>
+  </data>
+  <data name="Approve_RejectManyTitle_Many" xml:space="preserve">
+    <value>رفض {0} مرئيًا؟</value>
+  </data>
+  <data name="Approve_RejectManyTitle_Other" xml:space="preserve">
+    <value>رفض {0} مرئي؟</value>
+  </data>
+  <data name="Approve_RejectManyBody" xml:space="preserve">
+    <value>لن تُرفع، وتخرج من هذه القائمة.</value>
+  </data>
+  <data name="Approve_RejectManyBody2" xml:space="preserve">
+    <value>تبقى الملفات في مجلداتها.</value>
+  </data>
+  <data name="Approve_ApproveManyTitle_Zero" xml:space="preserve">
+    <value>الموافقة على {0} مرئي؟</value>
+  </data>
+  <data name="Approve_ApproveManyTitle_One" xml:space="preserve">
+    <value>الموافقة على مرئي واحد؟</value>
+  </data>
+  <data name="Approve_ApproveManyTitle_Two" xml:space="preserve">
+    <value>الموافقة على مرئيين؟</value>
+  </data>
+  <data name="Approve_ApproveManyTitle_Few" xml:space="preserve">
+    <value>الموافقة على {0} مرئيات؟</value>
+  </data>
+  <data name="Approve_ApproveManyTitle_Many" xml:space="preserve">
+    <value>الموافقة على {0} مرئيًا؟</value>
+  </data>
+  <data name="Approve_ApproveManyTitle_Other" xml:space="preserve">
+    <value>الموافقة على {0} مرئي؟</value>
+  </data>
+  <data name="Approve_ApproveManyBody" xml:space="preserve">
+    <value>تُرفع وتُنشر في قنواتها.</value>
+  </data>
+  <data name="Approve_ApproveConfirm" xml:space="preserve">
+    <value>موافقة</value>
+  </data>
+  <data name="Approve_PresetRestored" xml:space="preserve">
+    <value>استُعيد الإعداد</value>
+  </data>
+  <data name="Approve_PresetUndo.Text" xml:space="preserve">
+    <value>تراجع</value>
+  </data>
+  <data name="Settings_ResetTitle" xml:space="preserve">
+    <value>استعادة الإعدادات الافتراضية؟</value>
+  </data>
+  <data name="Settings_ResetBody" xml:space="preserve">
+    <value>تتغير إعدادات الفاحص بعد حفظها.</value>
+  </data>
+  <data name="Settings_ResetBody2" xml:space="preserve">
+    <value>تُشغَّل الإشعارات فورًا.</value>
+  </data>
+  <data name="Settings_ResetConfirm" xml:space="preserve">
+    <value>استعادة</value>
+  </data>
+  <data name="Scanner_ClearTitle" xml:space="preserve">
+    <value>مسح النشاط والمشكلات؟</value>
+  </data>
+  <data name="Scanner_ClearBody" xml:space="preserve">
+    <value>تُفرَّغ القائمتان.</value>
+  </data>
+  <data name="Scanner_ClearBody2" xml:space="preserve">
+    <value>لا يمكن بعد ذلك إعادة محاولة المشكلات من هنا.</value>
+  </data>
+  <data name="Scanner_ClearConfirm" xml:space="preserve">
+    <value>مسح</value>
+  </data>
+  <data name="Scanner_StopTitle" xml:space="preserve">
+    <value>إيقاف الفاحص؟</value>
+  </data>
+  <data name="Scanner_StopScans_Zero" xml:space="preserve">
+    <value>{0} عملية فحص جارية، وتتوقف.</value>
+  </data>
+  <data name="Scanner_StopScans_One" xml:space="preserve">
+    <value>عملية فحص واحدة جارية، وتتوقف.</value>
+  </data>
+  <data name="Scanner_StopScans_Two" xml:space="preserve">
+    <value>عمليتا فحص جاريتان، وتتوقفان.</value>
+  </data>
+  <data name="Scanner_StopScans_Few" xml:space="preserve">
+    <value>{0} عمليات فحص جارية، وتتوقف.</value>
+  </data>
+  <data name="Scanner_StopScans_Many" xml:space="preserve">
+    <value>{0} عملية فحص جارية، وتتوقف.</value>
+  </data>
+  <data name="Scanner_StopScans_Other" xml:space="preserve">
+    <value>{0} عملية فحص جارية، وتتوقف.</value>
+  </data>
+  <data name="Scanner_StopBody" xml:space="preserve">
+    <value>يمكن تشغيل الفاحص مجددًا.</value>
   </data>
   <data name="Import_NewChannelTitle" xml:space="preserve">
     <value>قناة جديدة</value>
@@ -3531,10 +3634,11 @@
     <value>إزالة هذا المصدر؟</value>
   </data>
   <data name="Social_RemoveBody" xml:space="preserve">
-    <value>لن يُستورد منه شيء بعد الآن. وتبقى المنشورات والمرئيات التي جاءت منه على القناة.</value>
+    <value>لن يُستورد منه شيء بعد الآن.
+تبقى المنشورات والمرئيات التي جاءت منه على القناة.</value>
   </data>
   <data name="Social_RemoveConfirm" xml:space="preserve">
-    <value>أزِل</value>
+    <value>إزالة</value>
   </data>
   <data name="SocialError_channel_missing" xml:space="preserve">
     <value>اختر قناة أولًا.</value>
@@ -3603,10 +3707,10 @@
     <value>تتوقف قبل عنصرها التالي، ويبقى ما نشرته على القناة.</value>
   </data>
   <data name="Social_CancelConfirm" xml:space="preserve">
-    <value>ألغِ المزامنة</value>
+    <value>إلغاء المزامنة</value>
   </data>
   <data name="Social_CancelKeep" xml:space="preserve">
-    <value>أبقِها تعمل</value>
+    <value>استمرار المزامنة</value>
   </data>
   <data name="Social_StatusCancelled" xml:space="preserve">
     <value>أُلغيت آخر مزامنة. «زامِن الآن» تبدأ مزامنة جديدة</value>
@@ -3959,6 +4063,45 @@
   <data name="Update_SettingsCheckFailed" xml:space="preserve">
     <value>تعذّر البحث عن تحديثات. حاول مرة أخرى لاحقًا.</value>
   </data>
+  <data name="Leave_SignOutTitle" xml:space="preserve">
+    <value>تسجيل الخروج والاستيراد جارٍ؟</value>
+  </data>
+  <data name="Leave_SwitchTitle" xml:space="preserve">
+    <value>تغيير البيئة والاستيراد جارٍ؟</value>
+  </data>
+  <data name="Leave_SignOut" xml:space="preserve">
+    <value>الخروج والإيقاف</value>
+  </data>
+  <data name="Leave_Switch" xml:space="preserve">
+    <value>التغيير والإيقاف</value>
+  </data>
+  <data name="Leave_StaySignedIn" xml:space="preserve">
+    <value>البقاء</value>
+  </data>
+  <data name="Leave_Files_Zero" xml:space="preserve">
+    <value>سيتوقف استيراد {0} مرئي.</value>
+  </data>
+  <data name="Leave_Files_One" xml:space="preserve">
+    <value>سيتوقف استيراد مرئي واحد.</value>
+  </data>
+  <data name="Leave_Files_Two" xml:space="preserve">
+    <value>سيتوقف استيراد مرئيين.</value>
+  </data>
+  <data name="Leave_Files_Few" xml:space="preserve">
+    <value>سيتوقف استيراد {0} مرئيات.</value>
+  </data>
+  <data name="Leave_Files_Many" xml:space="preserve">
+    <value>سيتوقف استيراد {0} مرئيًا.</value>
+  </data>
+  <data name="Leave_Files_Other" xml:space="preserve">
+    <value>سيتوقف استيراد {0} مرئي.</value>
+  </data>
+  <data name="Leave_SignOutResume" xml:space="preserve">
+    <value>سيتواصل ذلك بعد تسجيل الدخول بالحساب نفسه.</value>
+  </data>
+  <data name="Leave_SwitchResume" xml:space="preserve">
+    <value>سيتواصل ذلك بعد العودة إلى هذه البيئة.</value>
+  </data>
   <data name="Quit_Title" xml:space="preserve">
     <value>عمليات الاستيراد ما زالت جارية</value>
   </data>
@@ -3984,9 +4127,9 @@
     <value>إذا خرجت فستتوقف هنا، وتكمل من حيث توقفت عند فتح التطبيق في المرة القادمة.</value>
   </data>
   <data name="Quit_Confirm" xml:space="preserve">
-    <value>اخرج وأوقف العمل</value>
+    <value>الخروج وإيقاف العمل</value>
   </data>
   <data name="Quit_Keep" xml:space="preserve">
-    <value>أبقِ العمل جاريًا</value>
+    <value>استمرار العمل</value>
   </data>
 </root>

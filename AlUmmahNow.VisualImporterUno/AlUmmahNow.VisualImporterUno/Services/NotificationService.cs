@@ -399,64 +399,26 @@ public class NotificationService : INotificationService, IDisposable
     {
         try
         {
-            // Must be executed on UI thread
-            var dispatcherQueue = App.Current.MainWindow?.DispatcherQueue;
-            if (dispatcherQueue == null)
+            ContentDialog Build(XamlRoot root)
             {
-                _logger.LogWarning("DispatcherQueue is not available");
-                return;
+                var lines = new StackPanel { Spacing = 6 };
+                foreach (var line in (notification.Message ?? string.Empty).Split('\n').Where(l => !string.IsNullOrWhiteSpace(l)))
+                    lines.Children.Add(new TextBlock { Text = Shell.Loc.PopupLine(Shell.Loc.KeepLastWords(line)), TextWrapping = TextWrapping.Wrap });
+                var dialog = new ContentDialog
+                {
+                    Title = notification.Title,
+                    Content = lines.Children.Count > 0 ? lines : null,
+                    CloseButtonText = Shell.Loc.Get("Notify_Ok"),
+                    DefaultButton = ContentDialogButton.Close,
+                    FlowDirection = Shell.Loc.IsArabic ? FlowDirection.RightToLeft : FlowDirection.LeftToRight,
+                    XamlRoot = root,
+                };
+                Shell.DialogLook.Apply(dialog);
+                return dialog;
             }
-
-            var tcs = new TaskCompletionSource<bool>();
-
-            dispatcherQueue.TryEnqueue(async () =>
-            {
-                try
-                {
-                    var lines = new StackPanel { Spacing = 6 };
-                    foreach (var line in (notification.Message ?? string.Empty).Split('\n').Where(l => l.Length > 0))
-                        lines.Children.Add(new TextBlock { Text = Shell.Loc.PopupLine(Shell.Loc.KeepLastWords(line)), TextWrapping = TextWrapping.Wrap });
-                    var dialog = new ContentDialog
-                    {
-                        Title = notification.Title,
-                        Content = lines.Children.Count > 0 ? lines : null,
-                        CloseButtonText = Shell.Loc.Get("Notify_Ok"),
-                        DefaultButton = ContentDialogButton.Close,
-                        FlowDirection = Shell.Loc.IsArabic ? FlowDirection.RightToLeft : FlowDirection.LeftToRight,
-                        XamlRoot = App.Current.MainWindow?.Content?.XamlRoot
-                    };
-
-                    Shell.DialogLook.Apply(dialog);
-
-                    // Show dialog with timeout (auto-dismiss after 5 seconds for non-error notifications)
-                    if (notification.Type != NotificationType.Error)
-                    {
-                        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-                        try
-                        {
-                            await dialog.ShowAsync().AsTask(cts.Token);
-                        }
-                        catch (OperationCanceledException)
-                        {
-                            // Auto-dismissed, this is expected
-                        }
-                    }
-                    else
-                    {
-                        await dialog.ShowAsync();
-                    }
-
-                    _logger.LogDebug("ContentDialog notification shown: {Title}", notification.Title);
-                    tcs.TrySetResult(true);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to show ContentDialog notification");
-                    tcs.TrySetException(ex);
-                }
-            });
-
-            await tcs.Task;
+            // In its turn; one that is not an error closes by itself
+            var shown = await Shell.AppDialogs.ShowAsync(Build, AlUmmahNow.ToolsCore.DialogKind.Notice, closeAfter: notification.Type == NotificationType.Error ? null : TimeSpan.FromSeconds(5));
+            if (shown is null) _logger.LogWarning("The notification could not be shown: {Title}", notification.Title);
         }
         catch (Exception ex)
         {

@@ -129,15 +129,19 @@ public sealed partial class UpdateBar : UserControl
     private async Task ShowNotesAsync()
     {
         var v = _service.View;
-        var dialog = new ContentDialog
+        ContentDialog Build(XamlRoot root)
         {
-            XamlRoot = XamlRoot,
-            Title = Loc.Format("Update_NotesTitle", Loc.Version(v.Version)),
-            Content = new ScrollViewer { MaxHeight = 360, Content = new TextBlock { Text = (Loc.IsArabic ? v.NotesAr : v.NotesEn) ?? string.Empty, TextWrapping = TextWrapping.Wrap } },
-            CloseButtonText = Loc.Get("Update_NotesClose"),
-            FlowDirection = Loc.IsArabic ? FlowDirection.RightToLeft : FlowDirection.LeftToRight,
-        };
-        DialogLook.Apply(dialog);
-        await dialog.ShowAsync();
+            var dialog = new ContentDialog
+            {
+                XamlRoot = root,
+                Title = Loc.Format("Update_NotesTitle", Loc.Version(v.Version)),
+                Content = new ScrollViewer { MaxHeight = 360, Content = new TextBlock { Text = (Loc.IsArabic ? v.NotesAr : v.NotesEn) ?? string.Empty, TextWrapping = TextWrapping.Wrap } },
+                CloseButtonText = Loc.Get("Update_NotesClose"),
+                FlowDirection = Loc.IsArabic ? FlowDirection.RightToLeft : FlowDirection.LeftToRight,
+            };
+            DialogLook.Apply(dialog);
+            return dialog;
+        }
+        await AppDialogs.ShowAsync(Build, AlUmmahNow.ToolsCore.DialogKind.Question, XamlRoot);
     }
 }

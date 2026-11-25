@@ -100,6 +100,13 @@
         <Setter Property="Height" Value="40" />
     </Style>
 
+    <!-- What is lost by it (Shell/ConfirmDialog): the theme's error text, at 4.5:1 or more on the dialog in both themes -->
+    <Style x:Key="ToolsDialogDangerButton" TargetType="Button" BasedOn="{StaticResource ToolsDialogButton}">
+        <Setter Property="Foreground" Value="{ThemeResource FanousErrorTextBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource FanousErrorTextBrush}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
     <Style x:Key="ToolsDialogDefaultButton" TargetType="Button" BasedOn="{StaticResource ToolsPrimaryButton}">
         <Setter Property="HorizontalAlignment" Value="Stretch" />
         <Setter Property="Height" Value="40" />

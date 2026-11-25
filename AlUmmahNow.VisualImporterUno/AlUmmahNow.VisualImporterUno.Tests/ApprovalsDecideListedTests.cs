@@ -3,6 +3,7 @@ using AlUmmahNow.Data.Models.FileScanning;
 using AlUmmahNow.Data.Services;
 using AlUmmahNow.Data.Video;
 using AlUmmahNow.VisualImporterUno.Services;
+using AlUmmahNow.VisualImporterUno.Shell;
 using AlUmmahNow.VisualImporterUno.ViewModels;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -12,8 +13,13 @@ using Xunit;
 namespace AlUmmahNow.VisualImporterUno.Tests;
 
 /// <summary>Approve all and Reject all decide exactly what the page lists under its filters, and nothing else.</summary>
-public sealed class ApprovalsDecideListedTests
+[Collection("CultureSensitive")]
+public sealed class ApprovalsDecideListedTests : IDisposable
 {
+    public ApprovalsDecideListedTests() => ConfirmDialog.Answer = _ => Task.FromResult(true);
+
+    public void Dispose() => ConfirmDialog.Answer = null;
+
     private const int High = 1, Normal = 3, Low = 5;
 
     /// <summary>The scanner as it decides: by id, or everything waiting that its own filters (which have no priority) match.</summary>
@@ -22,6 +28,7 @@ public sealed class ApprovalsDecideListedTests
         public readonly List<PendingApprovalDto> Files = new();
         public readonly Mock<FileScanSignalRClient> Client = new("http://127.0.0.1:59998");
         public readonly List<int> Batches = new();
+        public readonly Mock<INotificationService> Notifications = new();
         public int RefuseAfter = int.MaxValue;
         /// <summary>The part that fails inside the scanner, which answers false then.</summary>
         public int FailPart = -1;
@@ -73,7 +80,7 @@ public sealed class ApprovalsDecideListedTests
         /// <summary>The page, having loaded what the scanner has now (its own copies, as over the wire).</summary>
         public ApprovalViewModel Page()
         {
-            var page = new ApprovalViewModel(Client.Object, new Mock<IFilterPresetService>().Object, new Mock<INotificationService>().Object, new VideoThumbnailService(NullLogger<VideoThumbnailService>.Instance), start: false) { EnableNotifications = false };
+            var page = new ApprovalViewModel(Client.Object, new Mock<IFilterPresetService>().Object, Notifications.Object, new VideoThumbnailService(NullLogger<VideoThumbnailService>.Instance), start: false) { EnableNotifications = false };
             foreach (var f in Files) page.PendingApprovals.Add(Copy(f));
             return page;
         }
@@ -176,6 +183,22 @@ public sealed class ApprovalsDecideListedTests
         page.FilteredApprovals.Should().HaveCount(500);
         page.StatusMessage.Should().Contain("Approve_ApprovedMany").And.Contain("Approve_ApproveManyFailed");
         page.ActivityLog[0].Type.Should().Be(LogType.Error);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task OneDecision_IsOneNotification(bool whole)
+    {
+        var scanner = new Scanner { FailPart = whole ? -1 : 1 };
+        for (var i = 0; i < 1050; i++) scanner.Add($"f{i}.mp4", High);
+        var page = scanner.Page();
+        page.EnableNotifications = true;
+        page.PriorityFilter = High;
+        await RunAsync(page, approve: true);
+        scanner.Notifications.Verify(n => n.ShowApprovalProcessedAsync(string.Empty, true, 1050), Times.Exactly(whole ? 1 : 0));
+        scanner.Notifications.Verify(n => n.ShowErrorAsync("Approve_ApproveFailed", It.Is<string>(t => t.Contains("Approve_ApprovedMany") && t.Contains("Approve_ApproveManyFailed"))), Times.Exactly(whole ? 0 : 1));
+        scanner.Notifications.VerifyNoOtherCalls();
     }
 
     [Fact]

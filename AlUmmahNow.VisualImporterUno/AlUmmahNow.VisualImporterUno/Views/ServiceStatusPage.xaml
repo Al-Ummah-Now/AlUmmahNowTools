@@ -43,7 +43,7 @@
                                 <TextBlock Text="{x:Bind ViewModel.ScannerActionText, Mode=OneWay}" />
                             </StackPanel>
                         </Button>
-                        <Button Style="{StaticResource ToolsSecondaryButton}" Command="{x:Bind ViewModel.RefreshStatusCommand}">
+                        <Button x:Name="CheckButton" Style="{StaticResource ToolsSecondaryButton}" Command="{x:Bind ViewModel.RefreshStatusCommand}">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <FontIcon Glyph="&#xE72C;" FontSize="14" />
                                 <TextBlock x:Uid="Scanner_CheckAgain" Text="Check again" />
@@ -129,7 +129,7 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <TextBlock x:Uid="Scanner_ActivityTitle" Text="Activity" Style="{StaticResource ToolsCardTitle}" VerticalAlignment="Center" />
-                        <Button Grid.Column="1" Style="{StaticResource ToolsSecondaryButton}" Command="{x:Bind ViewModel.ClearActivityCommand}"
+                        <Button Grid.Column="1" Style="{StaticResource ToolsSecondaryButton}" Click="Clear_Click"
                                 Visibility="{x:Bind ViewModel.HasActivity, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
                             <TextBlock x:Uid="Scanner_ClearActivity" Text="Clear" />
                         </Button>

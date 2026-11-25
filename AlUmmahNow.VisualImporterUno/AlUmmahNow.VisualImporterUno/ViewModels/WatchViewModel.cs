@@ -624,39 +624,6 @@ public partial class WatchViewModel : ObservableObject, IDisposable
         }
     }
 
-    [RelayCommand(CanExecute = nameof(HasSelectedWatch))]
-    private async Task DeleteWatchAsync()
-    {
-        if (SelectedWatch == null) return;
-
-        try
-        {
-            IsLoading = true;
-            StatusMessage = Loc.GetWithDetail("Watch_Deleting", SelectedWatch.ChannelName);
-
-            var result = await _signalRClient.DeleteWatchAsync(SelectedWatch.WatchId);
-
-            if (result)
-            {
-                StatusMessage = Loc.GetWithDetail("Watch_Deleted", SelectedWatch.ChannelName);
-                SelectedWatch = null;
-                await RefreshWatchesAsync();
-            }
-            else
-            {
-                StatusMessage = Loc.GetWithDetail("Watch_DeleteFailed", SelectedWatch.ChannelName);
-            }
-        }
-        catch (Exception ex)
-        {
-            StatusMessage = Loc.GetWithDetail("Watch_DeleteFailed", ex.Message);
-        }
-        finally
-        {
-            IsLoading = false;
-        }
-    }
-
     [RelayCommand]
     private async Task RefreshWatchesAsync()
     {
@@ -806,61 +773,6 @@ public partial class WatchViewModel : ObservableObject, IDisposable
         }
     }
 
-    [RelayCommand(CanExecute = nameof(HasSelectedApproval))]
-    private async Task RejectSelectedAsync()
-    {
-        if (SelectedApproval == null) return;
-
-        try
-        {
-            IsLoading = true;
-            StatusMessage = Loc.Get("Approve_Rejecting");
-
-            var fileName = SelectedApproval.FileName;
-            var request = new ApprovalDecisionRequest
-            {
-                ApprovalIds = new List<Guid> { SelectedApproval.Id },
-                Decision = ApprovalStatus.Rejected,
-                ApprovedBy = Environment.UserName
-            };
-
-            var result = await _signalRClient.ProcessApprovalDecisionAsync(request);
-
-            if (result)
-            {
-                StatusMessage = Loc.GetWithDetail("Approve_RejectedOne", fileName);
-
-                // Show notification if enabled
-                if (EnableNotifications)
-                {
-                    await _notificationService.ShowApprovalProcessedAsync(fileName, approved: false, count: 1);
-                }
-
-                await RefreshPendingApprovalsAsync();
-            }
-            else
-            {
-                StatusMessage = Loc.GetWithDetail("Approve_RejectFailed", fileName);
-                if (EnableNotifications)
-                {
-                    await _notificationService.ShowErrorAsync(Loc.Get("Approve_RejectFailed"), fileName);
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            StatusMessage = Loc.GetWithDetail("Approve_RejectFailed", ex.Message);
-            if (EnableNotifications)
-            {
-                await _notificationService.ShowErrorAsync(Loc.Get("Approve_RejectFailed"), ex.Message);
-            }
-        }
-        finally
-        {
-            IsLoading = false;
-        }
-    }
-
     [RelayCommand(CanExecute = nameof(HasSelectedApprovals))]
     private async Task ApproveSelectedItemsAsync()
     {
@@ -907,60 +819,6 @@ public partial class WatchViewModel : ObservableObject, IDisposable
             if (EnableNotifications)
             {
                 await _notificationService.ShowErrorAsync(Loc.Get("Approve_ApproveFailed"), ex.Message);
-            }
-        }
-        finally
-        {
-            IsLoading = false;
-        }
-    }
-
-    [RelayCommand(CanExecute = nameof(HasSelectedApprovals))]
-    private async Task RejectSelectedItemsAsync()
-    {
-        try
-        {
-            IsLoading = true;
-            var count = _selectedApprovalIds.Count;
-            StatusMessage = Loc.Format("Approve_RejectingMany", count);
-
-            var request = new ApprovalDecisionRequest
-            {
-                ApprovalIds = _selectedApprovalIds.ToList(),
-                Decision = ApprovalStatus.Rejected,
-                ApprovedBy = Environment.UserName
-            };
-
-            var result = await _signalRClient.ProcessApprovalDecisionAsync(request);
-
-            if (result)
-            {
-                StatusMessage = Loc.Format("Approve_RejectedMany", count);
-
-                // Show notification if enabled
-                if (EnableNotifications)
-                {
-                    await _notificationService.ShowApprovalProcessedAsync(string.Empty, approved: false, count: count);
-                }
-
-                _selectedApprovalIds.Clear();
-                await RefreshPendingApprovalsAsync();
-            }
-            else
-            {
-                StatusMessage = Loc.Format("Approve_RejectManyFailed", count);
-                if (EnableNotifications)
-                {
-                    await _notificationService.ShowErrorAsync(Loc.Get("Approve_RejectFailed"), Loc.Format("Approve_RejectManyFailed", count));
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            StatusMessage = Loc.GetWithDetail("Approve_RejectFailed", ex.Message);
-            if (EnableNotifications)
-            {
-                await _notificationService.ShowErrorAsync(Loc.Get("Approve_RejectFailed"), ex.Message);
             }
         }
         finally
@@ -1443,7 +1301,6 @@ public partial class WatchViewModel : ObservableObject, IDisposable
     {
         HasSelectedWatch = value != null;
         StopWatchCommand.NotifyCanExecuteChanged();
-        DeleteWatchCommand.NotifyCanExecuteChanged();
         ViewWatchDetailsCommand.NotifyCanExecuteChanged();
     }
 
@@ -1451,7 +1308,6 @@ public partial class WatchViewModel : ObservableObject, IDisposable
     {
         HasSelectedApproval = value != null;
         ApproveSelectedCommand.NotifyCanExecuteChanged();
-        RejectSelectedCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnShowOnlyPendingChanged(bool value)
@@ -1524,7 +1380,6 @@ public partial class WatchViewModel : ObservableObject, IDisposable
         HasSelectedApprovals = _selectedApprovalIds.Count > 0;
         SelectedApprovalsCount = _selectedApprovalIds.Count;
         ApproveSelectedItemsCommand.NotifyCanExecuteChanged();
-        RejectSelectedItemsCommand.NotifyCanExecuteChanged();
     }
 
     // Helper Methods - UI Thread Safety

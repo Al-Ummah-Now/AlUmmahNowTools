@@ -31,6 +31,9 @@ public sealed partial class ToolsShell : UserControl
             SetMenuFont(AccountMenu.Items, font);
         }
         ApplyTheme();
+        // Review frames of its questions, once the demo queue is there
+        DemoDialogs.OnLoaded(this, "sign-out", () => AskToLeaveAsync(null));
+        DemoDialogs.OnLoaded(this, "switch", () => AskToLeaveAsync(ToolsEnvironmentKind.Production));
         if (AppUpdates.Service is { } updates)
         {
             UpdateBarHost.Content = new UpdateBar(updates, AppUpdates.IsBusy);
@@ -256,7 +259,36 @@ public sealed partial class ToolsShell : UserControl
 
     private void OnReopenBrowserClick(object sender, RoutedEventArgs e) => _state.Session.ReopenSignInPage();
 
-    private async void OnSignOutClick(object sender, RoutedEventArgs e) => await _state.Session.SignOutAsync();
+    private async void OnSignOutClick(object sender, RoutedEventArgs e)
+    {
+        if (!await AskToLeaveAsync(null)) return;
+        // While its tokens still are valid: what was sent is saved as sent
+        await ImportWorkspace.HoldAsync();
+        try { await _state.Session.SignOutAsync(); }
+        finally { ImportWorkspace.Resume(); }
+    }
+
+    /// <summary>Asks before the imports that are running stop: signing out, or another environment.</summary>
+    internal static async Task<bool> AskToLeaveAsync(ToolsEnvironmentKind? to)
+    {
+        var files = ImportWorkspace.ActiveFiles;
+        if (files == 0) return true;
+        var uploads = ImportWorkspace.UnfinishedUploads;
+        var lines = new List<string> { Loc.Plural("Leave_Files", files) };
+        if (uploads > 0) lines.Add(Loc.Plural("Import_RemoveAllUploads", uploads));
+        lines.Add(Loc.Get(to is null ? "Leave_SignOutResume" : "Leave_SwitchResume"));
+        return await ConfirmDialog.AskAsync(new ConfirmRequest(
+            Loc.Get(to is null ? "Leave_SignOutTitle" : "Leave_SwitchTitle"), lines,
+            Loc.Get(to is null ? "Leave_SignOut" : "Leave_Switch"), Loc.Get(to is null ? "Leave_StaySignedIn" : "Import_Cancel")));
+    }
+
+    private async Task SwitchAsync(ToolsEnvironmentKind kind)
+    {
+        if (kind == _state.Session.Environment.Kind || !await AskToLeaveAsync(kind)) return;
+        await ImportWorkspace.HoldAsync();
+        try { await _state.SwitchEnvironmentAsync(kind); }
+        finally { ImportWorkspace.Resume(); }
+    }
 
     private async void OnGatePrimaryClick(object sender, RoutedEventArgs e)
     {
@@ -275,12 +307,14 @@ public sealed partial class ToolsShell : UserControl
 
     private async void OnEnvironmentSegmentClick(object sender, RoutedEventArgs e)
     {
-        if (sender is Button { Tag: string tag } && Enum.TryParse<ToolsEnvironmentKind>(tag, out var kind)) await _state.SwitchEnvironmentAsync(kind);
+        if (sender is Button { Tag: string tag } && Enum.TryParse<ToolsEnvironmentKind>(tag, out var kind)) await SwitchAsync(kind);
         Render();
     }
 
     private async void OnEnvironmentMenuClick(object sender, RoutedEventArgs e)
     {
-        if (sender is RadioMenuFlyoutItem { Tag: string tag } && Enum.TryParse<ToolsEnvironmentKind>(tag, out var kind)) await _state.SwitchEnvironmentAsync(kind);
+        if (sender is RadioMenuFlyoutItem { Tag: string tag } && Enum.TryParse<ToolsEnvironmentKind>(tag, out var kind)) await SwitchAsync(kind);
+        // Not left: the menu shows where one is
+        Render();
     }
 }

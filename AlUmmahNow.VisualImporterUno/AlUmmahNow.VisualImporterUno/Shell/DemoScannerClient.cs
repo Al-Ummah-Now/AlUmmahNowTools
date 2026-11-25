@@ -109,6 +109,9 @@ public sealed class DemoScannerClient : FileScanSignalRClient
             (11, 9, 2, "surah-maryam.mp4", 1020, ApprovalStatus.Approved, 1),
             (13, 15, 3, "youth-circle-duplicate.mp4", 640, ApprovalStatus.Rejected, 3),
         };
+        // The questions about many files are shown over as many
+        if (DemoDialogs.Name is "approve-all" or "reject-all" or "reject-all-typed")
+            rows = rows.Concat(Enumerable.Range(1, 19).Select(i => (14 + i, 10, 0, $"seerah-lesson-{i:00}.mp4", 700 + 10 * i, ApprovalStatus.Pending, 2))).ToArray();
         var now = DateTime.Now;
         var today = now.Date;
         return rows.Select((r, i) =>

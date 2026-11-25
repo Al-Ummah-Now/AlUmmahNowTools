@@ -58,7 +58,7 @@
 
             <!-- Filters, folded away until wanted -->
             <Border Style="{StaticResource ToolsCard}" Padding="0">
-                <Expander HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Background="Transparent" BorderThickness="0">
+                <Expander x:Name="FiltersExpander" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Background="Transparent" BorderThickness="0">
                     <Expander.Header>
                         <TextBlock x:Uid="Approve_FiltersTitle" Text="Filters and presets" Style="{StaticResource ToolsCardTitle}" />
                     </Expander.Header>
@@ -115,7 +115,7 @@
                         <Border Height="1" Background="{ThemeResource FanousDividerBrush}" />
 
                         <TextBlock x:Uid="Approve_PresetsTitle" Text="Presets" Style="{StaticResource ToolsLabel}" />
-                        <ComboBox x:Uid="Approve_PresetBox" PlaceholderText="Choose a preset" ItemsSource="{x:Bind ViewModel.SavedPresets, Mode=OneWay}"
+                        <ComboBox x:Name="PresetBox" x:Uid="Approve_PresetBox" PlaceholderText="Choose a preset" ItemsSource="{x:Bind ViewModel.SavedPresets, Mode=OneWay}"
                                   SelectedItem="{x:Bind ViewModel.SelectedPreset, Mode=TwoWay}" DisplayMemberPath="Name" HorizontalAlignment="Stretch" MaxWidth="460" />
                         <TextBlock Text="{x:Bind ViewModel.SelectedPreset.Description, Mode=OneWay}" Style="{StaticResource ToolsMuted}"
                                    Visibility="{x:Bind ViewModel.SelectedPreset, Mode=OneWay, Converter={StaticResource NullToVisibility}}" />
@@ -134,6 +134,14 @@
                                     Visibility="{x:Bind ViewModel.SelectedPreset, Mode=OneWay, Converter={StaticResource NullToVisibility}}">
                                 <TextBlock x:Uid="Approve_PresetDelete" Text="Delete" />
                             </Button>
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" Spacing="12" Visibility="{x:Bind ViewModel.HasDeletedPreset, Mode=OneWay}">
+                            <TextBlock Text="{x:Bind ViewModel.DeletedPresetText, Mode=OneWay}" Style="{StaticResource ToolsMuted}" VerticalAlignment="Center"
+                                       AutomationProperties.LiveSetting="Polite" />
+                            <HyperlinkButton x:Name="UndoPreset" Style="{StaticResource ToolsLinkButton}" Command="{x:Bind ViewModel.UndoDeletePresetCommand}">
+                                <TextBlock x:Uid="Approve_PresetUndo" Text="Undo" />
+                            </HyperlinkButton>
                         </StackPanel>
 
                         <Border Height="1" Background="{ThemeResource FanousDividerBrush}" />
