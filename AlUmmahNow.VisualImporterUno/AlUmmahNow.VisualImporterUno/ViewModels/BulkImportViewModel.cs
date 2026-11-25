@@ -518,8 +518,8 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
             if (row.ShowLog) row.SetLog(_workspace.Queue.LogLines(item.Id));
         }
         QueueCount = QueueRows.Count;
-        CanPauseAll = items.Any(i => i.CanPause);
-        CanResumeAll = items.Any(i => i.CanResume);
+        CanPauseAll = _workspace.Queue.CanPauseAll;
+        CanResumeAll = _workspace.Queue.CanResumeAll;
         HasFinished = items.Any(i => i.Phase == ItemPhase.Done);
         QueueSummary = Summary(items);
         OnPropertyChanged(nameof(ShowEmptyReview));
