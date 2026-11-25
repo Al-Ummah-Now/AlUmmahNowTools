@@ -11,22 +11,29 @@ public sealed class StagedPackage
 {
     private readonly byte[] _sha256;
     private readonly long _size;
+    private readonly string _root;
 
-    private StagedPackage(string path, CoreArtifact artifact)
+    private StagedPackage(string path, string root, CoreArtifact artifact)
     {
         Path = path;
+        _root = root;
         _sha256 = Convert.FromHexString(artifact.Sha256);
         _size = (long)artifact.Size;
     }
 
     public string Path { get; }
 
-    /// <summary>Clears every package the folder holds and describes the one about to be written there.</summary>
-    public static StagedPackage Prepare(string folder, string fileName, CoreArtifact artifact)
+    /// <summary>
+    /// Makes the folder this user's alone (<see cref="PrivateFolder"/>), clears every package it holds and describes the
+    /// one about to be written there.
+    /// </summary>
+    /// <exception cref="IOException">the folder isn't private</exception>
+    public static StagedPackage Prepare(string folder, string fileName, CoreArtifact artifact, string? root = null)
     {
-        Directory.CreateDirectory(folder);
+        root ??= PrivateFolder.UserRoot;
+        PrivateFolder.Ensure(folder, root);
         Clear(folder);
-        return new StagedPackage(System.IO.Path.Combine(folder, fileName), artifact);
+        return new StagedPackage(System.IO.Path.Combine(folder, fileName), root, artifact);
     }
 
     /// <summary>Removes packages (and half-written ones) an earlier run or anything else left: nothing is installed from them.</summary>
@@ -42,6 +49,7 @@ public sealed class StagedPackage
     {
         try
         {
+            PrivateFolder.Ensure(System.IO.Path.GetDirectoryName(Path)!, _root);
             using var file = new FileStream(Path, FileMode.Open, FileAccess.Read, FileShare.Read);
             // A link would let the updater read something else than was checked
             if (new FileInfo(Path).LinkTarget is not null || file.Length != _size || !CryptographicOperations.FixedTimeEquals(SHA256.HashData(file), _sha256))

@@ -20,7 +20,7 @@ public sealed class StagedPackageTests : IDisposable
     [Fact]
     public void The_verified_file_passes_and_discarding_removes_it()
     {
-        var staged = StagedPackage.Prepare(_dir, "a-full.nupkg", Artifact);
+        var staged = StagedPackage.Prepare(_dir, "a-full.nupkg", Artifact, _dir);
         File.WriteAllBytes(staged.Path, Good);
         staged.Verify();
         staged.Discard();
@@ -35,7 +35,7 @@ public sealed class StagedPackageTests : IDisposable
         File.WriteAllText(Path.Combine(_dir, "AlUmmahNow.Tools-9999.1.1-full.nupkg"), "planted");
         File.WriteAllText(Path.Combine(_dir, "b.nupkg.partial"), "half");
         File.WriteAllText(Path.Combine(_dir, ".betaId"), "kept");
-        var staged = StagedPackage.Prepare(_dir, "a-full.nupkg", Artifact);
+        var staged = StagedPackage.Prepare(_dir, "a-full.nupkg", Artifact, _dir);
         Assert.Equal(new[] { ".betaId" }, Directory.GetFiles(_dir).Select(Path.GetFileName));
         Assert.Equal("hash", Reason(staged));
     }
@@ -43,7 +43,7 @@ public sealed class StagedPackageTests : IDisposable
     [Fact]
     public void A_file_swapped_after_staging_is_refused()
     {
-        var staged = StagedPackage.Prepare(_dir, "a-full.nupkg", Artifact);
+        var staged = StagedPackage.Prepare(_dir, "a-full.nupkg", Artifact, _dir);
         File.WriteAllBytes(staged.Path, Good);
         staged.Verify();
         var other = (byte[])Good.Clone();
@@ -60,7 +60,7 @@ public sealed class StagedPackageTests : IDisposable
         if (OperatingSystem.IsWindows()) return; // needs a privilege there
         var elsewhere = Path.Combine(_dir, "elsewhere");
         File.WriteAllBytes(elsewhere, Good);
-        var staged = StagedPackage.Prepare(_dir, "a-full.nupkg", Artifact);
+        var staged = StagedPackage.Prepare(_dir, "a-full.nupkg", Artifact, _dir);
         File.CreateSymbolicLink(staged.Path, elsewhere);
         Assert.Equal("hash", Reason(staged));
     }
