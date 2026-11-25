@@ -43,7 +43,8 @@ public static class Mp4Index
         if (size < 8 || !FileBoxes.Contains(Type(start.Span.Slice(4, 4)))) return VideoContent.Unknown;
 
         var tracks = new Tracks();
-        var (index, data, fragments) = (false, (Start: 0L, End: 0L), false);
+        var (index, fragments) = (false, false);
+        var data = new List<(long Start, long End)>();
         long at = 0;
         while (size - at >= 8)
         {
@@ -51,7 +52,7 @@ public static class Mp4Index
             if (await reader.HeaderAsync(at, size, ct).ConfigureAwait(false) is not { } box)
             {
                 // No box: what comes after the index and the data is nobody's (some apps leave padding there)
-                if (index && data.End > 0) break;
+                if (index && data.Count > 0) break;
                 return VideoContent.Damaged;
             }
             if (box.End > size)
@@ -68,7 +69,7 @@ public static class Mp4Index
                     if (tracks.Packed) return VideoContent.Undecided;
                     break;
                 case "mdat":
-                    if (box.End - box.Content > data.End - data.Start) data = (box.Content, box.End);
+                    data.Add((box.Content, box.End));
                     break;
                 case "moof":
                     fragments = true;
@@ -77,19 +78,30 @@ public static class Mp4Index
             at = box.End;
         }
         // No index, or nothing it could be about
-        if (!index || (data.End == 0 && (fragments || !tracks.Elsewhere))) return VideoContent.Damaged;
+        if (!index || (data.Count == 0 && (fragments || !tracks.Elsewhere))) return VideoContent.Damaged;
         if (!tracks.Video) return tracks.Sound ? VideoContent.NoVideo : VideoContent.Damaged;
-        return await EmptyAsync(reader, data.End - data.Start > size / 2 ? data : (0, size), ct).ConfigureAwait(false) ? VideoContent.Damaged : VideoContent.Video;
+        return await EmptyAsync(reader, data, ct).ConfigureAwait(false) ? VideoContent.Damaged : VideoContent.Video;
     }
 
-    /// <summary>Its data is nothing but zeros at the middle, at three quarters and at the end.</summary>
-    private static async Task<bool> EmptyAsync(Reader reader, (long Start, long End) data, CancellationToken ct)
+    /// <summary>
+    /// Its data, all of it together, is nothing but zeros at the middle, at three quarters and at the end. Only the data: room left
+    /// free in a file, however large, is meant to be empty.
+    /// </summary>
+    private static async Task<bool> EmptyAsync(Reader reader, List<(long Start, long End)> data, CancellationToken ct)
     {
-        var length = data.End - data.Start;
+        var length = data.Sum(d => d.End - d.Start);
         if (length < 4 * Sample) return false;
-        foreach (var at in new[] { data.Start + (length / 2), data.Start + (length / 4 * 3), data.End - Sample })
+        foreach (var place in new[] { length / 2, length / 4 * 3, length - Sample })
         {
-            if ((await reader.ReadAsync(at, Sample, ct).ConfigureAwait(false)).Span.ContainsAnyExcept((byte)0)) return false;
+            var before = place;
+            var piece = data.First(d =>
+            {
+                if (before < d.End - d.Start) return true;
+                before -= d.End - d.Start;
+                return false;
+            });
+            var count = (int)Math.Min(Sample, piece.End - piece.Start - before);
+            if ((await reader.ReadAsync(piece.Start + before, count, ct).ConfigureAwait(false)).Span.ContainsAnyExcept((byte)0)) return false;
         }
         return true;
     }

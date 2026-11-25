@@ -75,6 +75,22 @@ public sealed class Mp4IndexTests
     }
 
     [Fact]
+    public async Task Room_left_free_is_meant_to_be_empty_and_the_data_is_looked_at_wherever_it_is()
+    {
+        var free = Box("free", new byte[2_000_000]);
+        // At the end, at the start, between the index and the data
+        Assert.Equal(VideoContent.Video, await Read([.. IndexFirst(100_000), .. free]));
+        Assert.Equal(VideoContent.Video, await Read([.. IndexFirst(3000), .. free]));
+        Assert.Equal(VideoContent.Video, await Read([.. Box("ftyp", new byte[8]), .. free, .. Data(100_000), .. Moov("vide")]));
+        Assert.Equal(VideoContent.Video, await Read([.. Box("ftyp", new byte[8]), .. Moov("vide"), .. free, .. Data(100_000)]));
+        // The data in many pieces
+        byte[] Pieces(byte[] piece) => [.. Box("ftyp", new byte[8]), .. Moov("vide"), .. Enumerable.Repeat((byte[])[.. Box("moof", new byte[16]), .. piece], 100).SelectMany(b => b), .. free];
+        Assert.Equal(VideoContent.Video, await Read(Pieces(Data(1000))));
+        Assert.Equal(VideoContent.Damaged, await Read(Pieces(Box("mdat", new byte[1000]))));
+        Assert.Equal(VideoContent.Damaged, await Read([.. Box("ftyp", new byte[8]), .. Moov("vide"), .. Box("mdat", new byte[100_000]), .. free]));
+    }
+
+    [Fact]
     public async Task A_fragmented_file_is_whole_to_its_last_fragment()
     {
         byte[] Fragment() => [.. Box("moof", Box("mfhd", new byte[8])), .. Data(2000)];
