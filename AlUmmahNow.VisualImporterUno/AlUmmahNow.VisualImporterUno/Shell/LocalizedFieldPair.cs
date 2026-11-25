@@ -19,6 +19,10 @@ internal sealed class LocalizedFieldPair
     /// <summary>The pair's width under which its two languages are stacked.</summary>
     private const double StackBelow = 420;
 
+    /// <summary>The two fonts differ in line height: the same header and box heights keep the two columns level.</summary>
+    private const double HeaderHeight = 20;
+    private const double BoxHeight = 36;
+
     private readonly string _field;
     private readonly int _maxLength;
     private readonly TranslateDelegate _translate;
@@ -68,7 +72,7 @@ internal sealed class LocalizedFieldPair
             AcceptsReturn = multiline,
             TextWrapping = multiline ? TextWrapping.Wrap : TextWrapping.NoWrap,
         };
-        if (multiline) _enBox.MinHeight = 76;
+        _enBox.MinHeight = multiline ? 76 : BoxHeight;
         AutomationProperties.SetName(_enBox, Loc.Format("Localized_FieldIn", label, Loc.Get("Localized_LangEnglish")));
 
         _arBox = new TextBox
@@ -81,7 +85,7 @@ internal sealed class LocalizedFieldPair
             TextWrapping = multiline ? TextWrapping.Wrap : TextWrapping.NoWrap,
         };
         if (arabicFont is not null) _arBox.FontFamily = arabicFont;
-        if (multiline) _arBox.MinHeight = 76;
+        _arBox.MinHeight = multiline ? 76 : BoxHeight;
         AutomationProperties.SetName(_arBox, Loc.Format("Localized_FieldIn", label, Loc.Get("Localized_LangArabic")));
 
         _enError = new TextBlock
@@ -182,15 +186,21 @@ internal sealed class LocalizedFieldPair
             Style = mutedStyle,
             FlowDirection = FlowDirection.LeftToRight,
             HorizontalAlignment = HorizontalAlignment.Left,
+            Height = HeaderHeight,
         };
-        var arHeader = new TextBlock
+        var arName = new TextBlock { Text = Loc.PopupLine(Loc.Get("Localized_Arabic")), Style = mutedStyle };
+        if (arabicFont is not null) arName.FontFamily = arabicFont;
+        // The star is its own block, so Uno's text order can't move it: it follows the Arabic word, on its left
+        var arHeader = new StackPanel
         {
-            Text = Loc.PopupLine(Loc.Get("Localized_Arabic") + suffix),
-            Style = mutedStyle,
+            Orientation = Orientation.Horizontal,
             FlowDirection = FlowDirection.LeftToRight,
             HorizontalAlignment = HorizontalAlignment.Right,
+            Spacing = 4,
+            Height = HeaderHeight,
         };
-        if (arabicFont is not null) arHeader.FontFamily = arabicFont;
+        if (required) arHeader.Children.Add(new TextBlock { Text = "*", Style = mutedStyle });
+        arHeader.Children.Add(arName);
 
         var enCol = new StackPanel { Spacing = 6 };
         enCol.Children.Add(enHeader);

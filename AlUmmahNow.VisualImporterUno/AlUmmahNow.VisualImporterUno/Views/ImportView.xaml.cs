@@ -281,8 +281,13 @@ public sealed partial class ImportView : Page
 
         var error = new TextBlock { Style = (Style)Application.Current.Resources["ToolsMuted"], Visibility = Visibility.Collapsed };
         error.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["FanousErrorTextBrush"];
-        // The window has no smallest size: the dialog's content never asks for more than the window has
-        var panel = new StackPanel { Spacing = 14, MinWidth = Math.Min(520, Math.Max(0, XamlRoot.Size.Width - 96)) };
+        // A definite width, so the two languages are equally wide whatever they hold; the window has no smallest size,
+        // so it is never more than the window has
+        var panel = new StackPanel { Spacing = 14 };
+        var root = XamlRoot;
+        void FitPanel() => panel.Width = Math.Min(560, Math.Max(200, root.Size.Width - 96));
+        void RootChanged(XamlRoot sender, XamlRootChangedEventArgs args) => FitPanel();
+        FitPanel();
         panel.Children.Add(DialogText(Loc.Get("Import_NewChannelBody")));
         panel.Children.Add(namePair.Element);
         panel.Children.Add(handleLabel);
@@ -308,6 +313,8 @@ public sealed partial class ImportView : Page
             XamlRoot = XamlRoot,
         };
         dialog.Resources["ContentDialogMaxWidth"] = 660.0;
+        root.Changed += RootChanged;
+        dialog.Closed += (_, _) => root.Changed -= RootChanged;
         if (Loc.IsArabic && ShellState.TextFontFor("ar") is { } arFont) dialog.FontFamily = arFont;
         DialogLook.Apply(dialog);
         dialog.PrimaryButtonClick += async (d, args) =>
