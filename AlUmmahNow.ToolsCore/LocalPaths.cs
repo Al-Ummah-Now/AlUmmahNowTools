@@ -10,9 +10,14 @@ namespace AlUmmahNow.ToolsCore;
 public static class LocalPaths
 {
     /// <summary>A backslash, a drive, the home folder, a slash that no word is before; also written as in an address.</summary>
-    private static readonly Regex Absolute = new(@"\\|(?<!\p{L})[a-z]:/|~/|(?<!\w)/(?!\s|$)|%2f|%5c", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
+    private static readonly Regex Absolute = new(@"\\|(?<!\p{L})[a-z]:/|(?<!\w)~(?:[a-z_][a-z0-9._-]*)?/|(?<!\w)/(?!\s|$)|%2f|%5c", Options, Time);
 
-    private static readonly Regex WebAddress = new(@"\bhttps?://[^\s\\]+", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
+    private static readonly Regex WebAddress = new(@"\bhttps?://[^\s\\]+", Options, Time);
+
+    private const RegexOptions Options = RegexOptions.CultureInvariant | RegexOptions.IgnoreCase;
+
+    /// <summary>However long a line is; one that takes longer is not sent</summary>
+    private static readonly TimeSpan Time = TimeSpan.FromSeconds(1);
 
     private static readonly string[] Own =
     [
@@ -25,13 +30,14 @@ public static class LocalPaths
 
     /// <param name="files">The files it may be about, with their whole paths</param>
     /// <param name="instead">What is sent in place of a line that may still name a folder</param>
-    public static string Clean(string text, string instead, IEnumerable<string>? files = null)
+    public static string Clean(string? text, string instead, IEnumerable<string>? files = null)
     {
-        var known = (files ?? []).Where(f => f.Length > 0).Distinct().OrderByDescending(f => f.Length).ToList();
-        var names = known.Select(f => (Pattern: new Regex(Exactly(f) + @"(?![\\/\w])", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase), Name: Segments(f)[^1])).ToList();
+        text ??= "";
+        var known = (files ?? []).Where(f => Segments(f).Length > 0).Distinct().OrderByDescending(f => f.Length).ToList();
+        var names = known.Select(f => (Pattern: new Regex(Exactly(f) + @"(?![\\/\w])", Options, Time), Name: Segments(f)[^1])).ToList();
         // A folder alone, at the end of what is said or before a colon or a quote
         var folders = known.SelectMany(Parents).Concat(Own.SelectMany(o => Parents(o).Prepend(o))).Where(f => Segments(f) is { Length: > 0 } s && !(s.Length == 1 && s[0].EndsWith(':'))).Distinct().OrderByDescending(f => f.Length)
-            .Select(f => new Regex(Exactly(f) + @"[\\/]*(?=$|[:""])", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase)).ToList();
+            .Select(f => new Regex(Exactly(f) + @"(?>[\\/]*)(?=$|[:""])", Options, Time)).ToList();
         return string.Join("\n", text.Split('\n').Select(line => Line(line) ?? instead).Distinct());
 
         string? Line(string line)
@@ -44,12 +50,19 @@ public static class LocalPaths
             {
                 return null;
             }
-            foreach (var (pattern, name) in names) line = pattern.Replace(line, _ => name);
-            var before = line;
-            foreach (var folder in folders) line = folder.Replace(line, "…");
-            var rest = WebAddress.Replace(line, " ");
-            // With a folder taken out, any separator left may be the rest of a longer path
-            return Absolute.IsMatch(rest) || (line != before && rest.IndexOfAny(['/', '\\']) >= 0) ? null : line;
+            try
+            {
+                foreach (var (pattern, name) in names) line = pattern.Replace(line, _ => name);
+                var before = line;
+                foreach (var folder in folders) line = folder.Replace(line, "…");
+                var rest = WebAddress.Replace(line, " ");
+                // With a folder taken out, any separator left may be the rest of a longer path
+                return Absolute.IsMatch(rest) || (line != before && rest.IndexOfAny(['/', '\\']) >= 0) ? null : line;
+            }
+            catch (RegexMatchTimeoutException)
+            {
+                return null;
+            }
         }
     }
 
@@ -67,6 +80,7 @@ public static class LocalPaths
 
     /// <summary>With every separator, doubled or not, and the prefixes Windows puts before a long path; quotes and spaces as they may be written.</summary>
     private static string Exactly(string path) =>
-        (path[0] is '/' or '\\' ? @"(?:[\\/]+\?[\\/]+UNC[\\/]+|[\\/]+)" : @"(?:[\\/]+\?[\\/]+)?")
-        + string.Join(@"[\\/]+", Segments(path).Select(s => Regex.Escape(s).Replace("'", "['’‘]").Replace(@"\ ", @"(?:\ |%20)")));
+        // Atomic: a line of thousands of slashes is no reason to try every way of splitting them
+        (path[0] is '/' or '\\' ? @"(?>[\\/]+\?[\\/]+UNC[\\/]+|[\\/]+)" : @"(?>[\\/]+\?[\\/]+)?")
+        + string.Join(@"(?>[\\/]+)", Segments(path).Select(s => Regex.Escape(s).Replace("'", "['’‘]").Replace(@"\ ", @"(?:\ |%20)")));
 }
