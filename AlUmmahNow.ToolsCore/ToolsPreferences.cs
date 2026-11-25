@@ -53,9 +53,6 @@ public sealed class ToolsPreferences
 
     public void Save(string path)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        var temp = path + ".tmp";
-        File.WriteAllText(temp, JsonSerializer.Serialize(this, Json));
-        File.Move(temp, path, overwrite: true);
+        AtomicFile.Write(path, JsonSerializer.Serialize(this, Json));
     }
 }

@@ -116,9 +116,16 @@ internal static class AppInstance
         return FrontAnswer.Shown;
     }
 
+    /// <summary>Whichever comes first ends this copy, closing its window or starting again; the other finds it ended.</summary>
+    public static bool TryEnd() => Interlocked.Exchange(ref _ended, 1) == 0;
+
+    private static int _ended;
+
     /// <summary>Starts the app again, for Try again in the "already open" window and after an update, and ends this one.</summary>
     public static void StartAgain(string? argument = null)
     {
+        // The window was closed meanwhile: closed it stays
+        if (!TryEnd()) return;
         _restarting = true;
         // The new one takes the queue at once; this one's pipe goes first (on macOS and Linux closing it later would take the new one's away)
         Ending.Cancel();

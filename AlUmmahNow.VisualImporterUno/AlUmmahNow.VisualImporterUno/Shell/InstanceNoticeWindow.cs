@@ -26,6 +26,7 @@ internal sealed partial class InstanceNoticeWindow : Window
         close.Click += (_, _) => Close();
         Closed += (_, _) =>
         {
+            AppInstance.TryEnd();
             Application.Current.Exit();
             ExitBackstop.EndSoon();
         };

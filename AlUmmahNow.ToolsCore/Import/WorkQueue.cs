@@ -530,7 +530,8 @@ public sealed class ImportQueue : IDisposable
     }
 
     /// <summary>Off this thread: what a step does when it is cancelled must not run under the queue's lock.</summary>
-    private static void Cancel(CancellationTokenSource cts) => _ = cts.CancelAsync();
+    private static void Cancel(CancellationTokenSource cts) =>
+        _ = cts.CancelAsync().ContinueWith(t => _ = t.Exception, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
 
     /// <summary>A failed (or waiting-to-retry) step starts again now, with its attempts counted from zero.</summary>
     public void Retry(string id) => Update(id, item =>
@@ -654,22 +655,26 @@ public sealed class ImportQueue : IDisposable
     public async Task StopAsync(TimeSpan? grace = null)
     {
         Task? loop;
+        CancellationTokenSource? stopping;
         lock (_gate)
         {
             // Nothing starts from here on, so what is awaited below is all there will be
             _stopped = true;
-            _loop?.Cancel();
+            stopping = _loop;
             foreach (var cts in _running.Values.ToList()) Cancel(cts);
             loop = _loopTask;
             _loop = null;
             _loopTask = null;
         }
+        // Not under the lock: what waits on it may need it
+        stopping?.Cancel();
         // One grace for all of it: the loop ending, and every step (one a Pump started a moment ago included) ending
         var settled = Task.Run(async () =>
         {
             if (loop is not null)
             {
                 try { await loop.ConfigureAwait(false); } catch (OperationCanceledException) { }
+                stopping?.Dispose();
             }
             while (true)
             {
@@ -725,7 +730,9 @@ public sealed class ImportQueue : IDisposable
                 if (step.WaitingOnServer) { }
                 else if (step.Attempts == 1) AppendLog(item, LogLevel.Info, "started", $"{step.Kind}: started", step.Kind.ToString());
                 else AppendLog(item, LogLevel.Info, "attempt", $"{step.Kind}: attempt {step.Attempts}", step.Kind.ToString(), step.Attempts.ToString(System.Globalization.CultureInfo.InvariantCulture));
-                var cts = CancellationTokenSource.CreateLinkedTokenSource(_loop?.Token ?? CancellationToken.None);
+                // Of its own, not linked to the loop's: StopAsync cancels each, and nothing starts after it. Letting go of a linked one
+                // waits for a cancellation in flight, which may be waiting for the lock this is under
+                var cts = new CancellationTokenSource();
                 _running[item.Id] = cts;
                 started.Add((item, step, cts));
             }
@@ -873,7 +880,8 @@ public sealed class ImportQueue : IDisposable
 
         void Finish(QueueItem i)
         {
-            if (_running.Remove(i.Id, out var c)) c.Dispose();
+            // Not let go of: it has no timer and no handle, and its cancellation may still be running
+            _running.Remove(i.Id);
             i.Wait = StepWait.None;
             // Removed while it ran: its files are free now
             if (!_items.Contains(i)) DeleteWork(new[] { i });
@@ -974,11 +982,7 @@ public sealed class ImportQueue : IDisposable
     {
         // Pause all ends with the last file it paused (resumed, finished or removed)
         _allPaused = HeldLocked;
-        Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
-        // Of this process alone: another one's save must never take it away (Tools #89)
-        var temp = $"{_path}.{Environment.ProcessId.ToString(CultureInfo.InvariantCulture)}.tmp";
-        File.WriteAllText(temp, JsonSerializer.Serialize(new Saved(_settings, _items, _allPaused), Json));
-        File.Move(temp, _path, overwrite: true);
+        AtomicFile.Write(_path, JsonSerializer.Serialize(new Saved(_settings, _items, _allPaused), Json));
     }
 
     private sealed class Context : IStepContext

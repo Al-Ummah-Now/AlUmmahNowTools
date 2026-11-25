@@ -72,6 +72,52 @@ public class InstanceLockTests
     }
 }
 
+/// <summary>A file written whole or not at all.</summary>
+public class InstanceAtomicFileTests
+{
+    [Fact]
+    public void A_save_that_cannot_take_its_place_leaves_nothing_beside_the_file()
+    {
+        var folder = Temp.Folder();
+        var path = Path.Combine(folder, "state.json");
+        AtomicFile.Write(path, "1");
+        AtomicFile.Write(path, "2");
+        Assert.Equal("2", File.ReadAllText(path));
+        Assert.Single(Directory.GetFileSystemEntries(folder));
+
+        // A folder in its place: nothing can be moved over it
+        var blocked = Path.Combine(folder, "blocked.json");
+        Directory.CreateDirectory(Path.Combine(blocked, "x"));
+        Assert.ThrowsAny<Exception>(() => AtomicFile.Write(blocked, "3"));
+        Assert.Equal(new[] { blocked, path }, Directory.GetFileSystemEntries(folder).Order());
+    }
+}
+
+/// <summary>Saves from several threads at once (the update state is saved by the interface and by the check).</summary>
+public class InstanceAtomicFileRaceTests
+{
+    [Fact]
+    public async Task Saves_at_the_same_moment_are_all_whole_and_leave_nothing()
+    {
+        var folder = Temp.Folder();
+        var path = Path.Combine(folder, "state.json");
+        var texts = Enumerable.Range(0, 8).Select(i => new string((char)('a' + i), 200_000)).ToArray();
+        var failures = new System.Collections.Concurrent.ConcurrentQueue<Exception>();
+        await Task.WhenAll(texts.Select(t => Task.Run(() =>
+        {
+            for (var n = 0; n < 25; n++)
+            {
+                // Two moves onto one file at the same moment may be refused on Windows: that save fails whole
+                try { AtomicFile.Write(path, t); }
+                catch (Exception ex) when (OperatingSystem.IsWindows() && ex is UnauthorizedAccessException or IOException) { failures.Enqueue(ex); }
+            }
+        })));
+        Assert.Contains(File.ReadAllText(path), texts);
+        Assert.Single(Directory.GetFileSystemEntries(folder));
+        if (!OperatingSystem.IsWindows()) Assert.Empty(failures);
+    }
+}
+
 /// <summary>A second copy asks the first to come forward.</summary>
 public class InstanceChannelTests
 {
