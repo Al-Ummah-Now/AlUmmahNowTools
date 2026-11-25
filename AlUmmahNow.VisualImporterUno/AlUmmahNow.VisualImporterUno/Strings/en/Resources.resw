@@ -1467,6 +1467,12 @@
   <data name="Offline_Detail" xml:space="preserve">
     <value>This page needs it running. Turn it on from the Folder scanner page, and this page fills in by itself.</value>
   </data>
+  <data name="Approve_RestUnknown" xml:space="preserve">
+    <value>The scanner stopped answering, and the rest may or may not have been decided. The list shows it once the scanner is back.</value>
+  </data>
+  <data name="Approve_DecidedAlready" xml:space="preserve">
+    <value>These videos were already decided.</value>
+  </data>
   <data name="Approve_NotAccepted" xml:space="preserve">
     <value>The scanner didn’t accept the decision. Try again.</value>
   </data>

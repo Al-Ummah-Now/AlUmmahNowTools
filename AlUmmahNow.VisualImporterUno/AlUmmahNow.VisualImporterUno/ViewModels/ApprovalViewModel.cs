@@ -228,6 +228,12 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
     #endregion
 
     public ApprovalViewModel(FileScanSignalRClient signalRClient, IFilterPresetService filterPresetService, INotificationService notificationService, VideoThumbnailService videoThumbnailService)
+        : this(signalRClient, filterPresetService, notificationService, videoThumbnailService, start: true)
+    {
+    }
+
+    /// <param name="start">Connects and loads the list by itself; tests load what they need</param>
+    internal ApprovalViewModel(FileScanSignalRClient signalRClient, IFilterPresetService filterPresetService, INotificationService notificationService, VideoThumbnailService videoThumbnailService, bool start)
     {
         _signalRClient = signalRClient ?? throw new ArgumentNullException(nameof(signalRClient));
         _filterPresetService = filterPresetService ?? throw new ArgumentNullException(nameof(filterPresetService));
@@ -255,6 +261,11 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
         // Subscribe to SignalR events for real-time updates
         SubscribeToSignalREvents();
 
+        // Subscribe to property changes for filter application
+        PropertyChanged += OnPropertyChanged;
+        _signalRClient.ServiceStatusChanged += OnScannerStatusChanged;
+        if (!start) return;
+
         // Initialize with background data load
         _ = Task.Run(async () =>
         {
@@ -273,9 +284,6 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
                 });
             }
         });
-
-        // Subscribe to property changes for filter application
-        PropertyChanged += OnPropertyChanged;
     }
 
     #region Initialization
@@ -398,7 +406,10 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
     #region Commands
 
     [RelayCommand(CanExecute = nameof(CanRefreshApprovals))]
-    private async Task RefreshApprovalsAsync()
+    private Task RefreshApprovalsAsync() => LoadApprovalsAsync();
+
+    /// <summary>Loads the list; null when it could not be.</summary>
+    private async Task<IReadOnlyList<PendingApprovalDto>?> LoadApprovalsAsync()
     {
         try
         {
@@ -437,6 +448,7 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
                 StatusMessage = Loc.Format("Approve_Loaded", approvals.Count(a => a.Status == ApprovalStatus.Pending));
                 AddLog(Loc.Format("Approve_Loaded", approvals.Count(a => a.Status == ApprovalStatus.Pending)), LogType.Success);
             });
+            return approvals;
         }
         catch (Exception ex)
         {
@@ -445,6 +457,7 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
                 StatusMessage = Loc.GetWithDetail("Approve_LoadFailed", ex.Message);
                 AddLog(Loc.GetWithDetail("Approve_LoadFailed", ex.Message), LogType.Error);
             });
+            return null;
         }
         finally
         {
@@ -454,61 +467,44 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
 
     private bool CanRefreshApprovals => !IsLoading && _signalRClient.IsConnected;
 
-    [RelayCommand(CanExecute = nameof(CanApproveSelected))]
-    private async Task ApproveSelectedAsync()
+    [RelayCommand(CanExecute = nameof(CanDecideSelected))]
+    private Task ApproveSelectedAsync() => DecideSelectedAsync(ApprovalStatus.Approved, "Manually approved");
+
+    [RelayCommand(CanExecute = nameof(CanDecideSelected))]
+    private Task RejectSelectedAsync() => DecideSelectedAsync(ApprovalStatus.Rejected, "Manually rejected");
+
+    [RelayCommand(CanExecute = nameof(CanDecideAll))]
+    private Task BulkApproveAsync() => DecideAllAsync(ApprovalStatus.Approved);
+
+    [RelayCommand(CanExecute = nameof(CanDecideAll))]
+    private Task BulkRejectAsync() => DecideAllAsync(ApprovalStatus.Rejected);
+
+    /// <summary>One decision at a time, whichever button it came from.</summary>
+    private bool CanDecide => !IsProcessingApproval && !IsProcessingBulkApproval && _signalRClient.IsConnected;
+
+    private bool CanDecideSelected => CanDecide && HasSelection;
+
+    private bool CanDecideAll => CanDecide && HasActiveFilters;
+
+    private void NotifyDecisions()
     {
+        ApproveSelectedCommand.NotifyCanExecuteChanged();
+        RejectSelectedCommand.NotifyCanExecuteChanged();
+        BulkApproveCommand.NotifyCanExecuteChanged();
+        BulkRejectCommand.NotifyCanExecuteChanged();
+        RefreshApprovalsCommand.NotifyCanExecuteChanged();
+    }
+
+    private void OnScannerStatusChanged(object? sender, ServiceStatusEventArgs e) => DispatcherExecute(NotifyDecisions);
+
+    private async Task DecideSelectedAsync(ApprovalStatus decision, string notes)
+    {
+        var files = SelectedApprovals.Where(a => a.Status == ApprovalStatus.Pending).ToList();
+        if (files.Count == 0) return;
         try
         {
             IsProcessingApproval = true;
-            var selectedIds = SelectedApprovals.Select(a => a.Id).ToList();
-            StatusMessage = Loc.Format("Approve_ApprovingMany", selectedIds.Count);
-
-            var request = new ApprovalDecisionRequest
-            {
-                ApprovalIds = selectedIds,
-                Decision = ApprovalStatus.Approved,
-                Notes = "Manually approved",
-                ApprovedBy = Environment.UserName
-            };
-
-            var success = await _signalRClient.ProcessApprovalDecisionAsync(request);
-
-            if (success)
-            {
-                var count = selectedIds.Count;
-                var fileName = count == 1 ? SelectedApprovals.First().FileName : string.Empty;
-
-                DispatcherExecute(() =>
-                {
-                    StatusMessage = Loc.Format("Approve_ApprovedMany", count);
-                    AddLog(Loc.Format("Approve_ApprovedMany", count), LogType.Success);
-                });
-
-                // Show notification if enabled
-                if (EnableNotifications)
-                {
-                    await _notificationService.ShowApprovalProcessedAsync(fileName, approved: true, count: count);
-                }
-
-                await RefreshApprovalsAsync();
-            }
-            else
-            {
-                throw new InvalidOperationException(Loc.Get("Approve_NotAccepted"));
-            }
-        }
-        catch (Exception ex)
-        {
-            DispatcherExecute(() =>
-            {
-                StatusMessage = Loc.GetWithDetail("Approve_ApproveFailed", ex.Message);
-                AddLog(Loc.GetWithDetail("Approve_ApproveFailed", ex.Message), LogType.Error);
-            });
-
-            if (EnableNotifications)
-            {
-                await _notificationService.ShowErrorAsync(Loc.Get("Approve_ApproveFailed"), ex.Message);
-            }
+            await DecideAsync(files, decision, notes);
         }
         finally
         {
@@ -516,110 +512,14 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
         }
     }
 
-    private bool CanApproveSelected => HasSelection && !IsProcessingApproval && _signalRClient.IsConnected;
-
-    [RelayCommand(CanExecute = nameof(CanRejectSelected))]
-    private async Task RejectSelectedAsync()
+    private async Task DecideAllAsync(ApprovalStatus decision)
     {
-        try
-        {
-            IsProcessingApproval = true;
-            var selectedIds = SelectedApprovals.Select(a => a.Id).ToList();
-            StatusMessage = Loc.Format("Approve_RejectingMany", selectedIds.Count);
-
-            var request = new ApprovalDecisionRequest
-            {
-                ApprovalIds = selectedIds,
-                Decision = ApprovalStatus.Rejected,
-                Notes = "Manually rejected",
-                ApprovedBy = Environment.UserName
-            };
-
-            var success = await _signalRClient.ProcessApprovalDecisionAsync(request);
-
-            if (success)
-            {
-                var count = selectedIds.Count;
-                var fileName = count == 1 ? SelectedApprovals.First().FileName : string.Empty;
-
-                DispatcherExecute(() =>
-                {
-                    StatusMessage = Loc.Format("Approve_RejectedMany", count);
-                    AddLog(Loc.Format("Approve_RejectedMany", count), LogType.Warning);
-                });
-
-                // Show notification if enabled
-                if (EnableNotifications)
-                {
-                    await _notificationService.ShowApprovalProcessedAsync(fileName, approved: false, count: count);
-                }
-
-                await RefreshApprovalsAsync();
-            }
-            else
-            {
-                throw new InvalidOperationException(Loc.Get("Approve_NotAccepted"));
-            }
-        }
-        catch (Exception ex)
-        {
-            DispatcherExecute(() =>
-            {
-                StatusMessage = Loc.GetWithDetail("Approve_RejectFailed", ex.Message);
-                AddLog(Loc.GetWithDetail("Approve_RejectFailed", ex.Message), LogType.Error);
-            });
-
-            if (EnableNotifications)
-            {
-                await _notificationService.ShowErrorAsync(Loc.Get("Approve_RejectFailed"), ex.Message);
-            }
-        }
-        finally
-        {
-            IsProcessingApproval = false;
-        }
-    }
-
-    private bool CanRejectSelected => HasSelection && !IsProcessingApproval && _signalRClient.IsConnected;
-
-    [RelayCommand(CanExecute = nameof(CanProcessBulkApproval))]
-    private async Task BulkApproveAsync()
-    {
+        var files = Listed();
+        if (files.Count == 0) return;
         try
         {
             IsProcessingBulkApproval = true;
-            StatusMessage = Loc.Get("Approve_Approving");
-
-            var request = BuildBulkApprovalRequest(ApprovalStatus.Approved);
-
-            var processedCount = await _signalRClient.ProcessBulkApprovalAsync(request);
-
-            DispatcherExecute(() =>
-            {
-                StatusMessage = Loc.Format("Approve_ApprovedMany", processedCount);
-                AddLog(Loc.Format("Approve_ApprovedMany", processedCount), LogType.Success);
-            });
-
-            // Show notification if enabled
-            if (EnableNotifications)
-            {
-                await _notificationService.ShowApprovalProcessedAsync(string.Empty, approved: true, count: processedCount);
-            }
-
-            await RefreshApprovalsAsync();
-        }
-        catch (Exception ex)
-        {
-            DispatcherExecute(() =>
-            {
-                StatusMessage = Loc.GetWithDetail("Approve_ApproveFailed", ex.Message);
-                AddLog(Loc.GetWithDetail("Approve_ApproveFailed", ex.Message), LogType.Error);
-            });
-
-            if (EnableNotifications)
-            {
-                await _notificationService.ShowErrorAsync(Loc.Get("Approve_ApproveFailed"), ex.Message);
-            }
+            await DecideAsync(files, decision, $"Bulk {decision} via approval workflow");
         }
         finally
         {
@@ -627,52 +527,67 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
         }
     }
 
-    [RelayCommand(CanExecute = nameof(CanProcessBulkApproval))]
-    private async Task BulkRejectAsync()
+    /// <summary>
+    /// What is listed and waiting now. Approve all and Reject all decide these by id: the scanner's own filters lack some of the
+    /// page's (priority), and a file that came after the list was loaded was not seen.
+    /// </summary>
+    private List<PendingApprovalDto> Listed() => FilteredApprovals.Where(a => a.Status == ApprovalStatus.Pending).ToList();
+
+    /// <summary>How many ids go in one message: the scanner takes 32 KB, and an id is about 39 bytes of it</summary>
+    private const int DecisionBatch = 500;
+
+    /// <summary>
+    /// Decides these files, in parts, then loads the list again and says what came of it: how many were decided, how many still
+    /// wait and why. The scanner answers a part with false both when none of it was waiting any more and when it failed; the list
+    /// loaded again tells them apart.
+    /// </summary>
+    private async Task DecideAsync(IReadOnlyList<PendingApprovalDto> files, ApprovalStatus decision, string notes)
     {
-        try
+        var approve = decision == ApprovalStatus.Approved;
+        StatusMessage = Loc.Format(approve ? "Approve_ApprovingMany" : "Approve_RejectingMany", files.Count);
+        var accepted = new List<PendingApprovalDto>();
+        PendingApprovalDto[] unanswered = [];
+        Exception? error = null;
+        foreach (var part in files.Chunk(DecisionBatch))
         {
-            IsProcessingBulkApproval = true;
-            StatusMessage = Loc.Get("Approve_Rejecting");
-
-            var request = BuildBulkApprovalRequest(ApprovalStatus.Rejected);
-
-            var processedCount = await _signalRClient.ProcessBulkApprovalAsync(request);
-
-            DispatcherExecute(() =>
+            try
             {
-                StatusMessage = Loc.Format("Approve_RejectedMany", processedCount);
-                AddLog(Loc.Format("Approve_RejectedMany", processedCount), LogType.Warning);
-            });
-
-            // Show notification if enabled
-            if (EnableNotifications)
-            {
-                await _notificationService.ShowApprovalProcessedAsync(string.Empty, approved: false, count: processedCount);
+                var request = new ApprovalDecisionRequest { ApprovalIds = part.Select(f => f.Id).ToList(), Decision = decision, Notes = notes, ApprovedBy = Environment.UserName };
+                if (await _signalRClient.ProcessApprovalDecisionAsync(request)) accepted.AddRange(part);
             }
-
-            await RefreshApprovalsAsync();
-        }
-        catch (Exception ex)
-        {
-            DispatcherExecute(() =>
+            catch (Exception ex)
             {
-                StatusMessage = Loc.GetWithDetail("Approve_RejectFailed", ex.Message);
-                AddLog(Loc.GetWithDetail("Approve_RejectFailed", ex.Message), LogType.Error);
-            });
-
-            if (EnableNotifications)
-            {
-                await _notificationService.ShowErrorAsync(Loc.Get("Approve_RejectFailed"), ex.Message);
+                (error, unanswered) = (ex, part);
+                break;
             }
         }
-        finally
+
+        // Also when the list cannot be loaded again, what was decided leaves it
+        foreach (var file in accepted) file.Status = decision;
+        var ids = files.Select(f => f.Id).ToHashSet();
+        var loaded = await LoadApprovalsAsync();
+        if (loaded is null) DispatcherExecute(ApplyFiltersAndSorting);
+        var waiting = loaded?.Where(a => a.Status == ApprovalStatus.Pending && ids.Contains(a.Id)).Select(a => a.Id).ToHashSet();
+        var decided = waiting is null ? accepted : accepted.Concat(unanswered).Where(f => !waiting.Contains(f.Id)).ToList();
+
+        // Unknown without the list: what the scanner did not accept may have been decided all the same
+        var left = waiting?.Count ?? files.Count - accepted.Count;
+        var reason = error?.Message ?? Loc.Get("Approve_NotAccepted");
+        var done = decided.Count > 0 ? Loc.Plural(approve ? "Approve_ApprovedMany" : "Approve_RejectedMany", decided.Count) : "";
+        var rest = left == 0 ? ""
+            : waiting is null ? Loc.GetWithDetail("Approve_RestUnknown", reason)
+            : Loc.WithDetail(Loc.Plural(approve ? "Approve_ApproveManyFailed" : "Approve_RejectManyFailed", left), reason);
+        var said = string.Join(" ", new[] { done, rest }.Where(t => t.Length > 0));
+        if (said.Length == 0) said = Loc.Get("Approve_DecidedAlready");
+        DispatcherExecute(() =>
         {
-            IsProcessingBulkApproval = false;
-        }
+            StatusMessage = said;
+            AddLog(said, rest.Length > 0 ? LogType.Error : decided.Count == 0 ? LogType.Information : approve ? LogType.Success : LogType.Warning);
+        });
+        if (!EnableNotifications) return;
+        if (decided.Count > 0) await _notificationService.ShowApprovalProcessedAsync(decided.Count == 1 ? decided[0].FileName : string.Empty, approve, decided.Count);
+        if (rest.Length > 0) await _notificationService.ShowErrorAsync(Loc.Get(approve ? "Approve_ApproveFailed" : "Approve_RejectFailed"), rest);
     }
-
-    private bool CanProcessBulkApproval => !IsProcessingBulkApproval && _signalRClient.IsConnected && HasActiveFilters;
 
     [RelayCommand]
     private void PreviewFile(PendingApprovalDto? approval)
@@ -1109,7 +1024,7 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
     }
 
     private bool HasActiveFilters =>
-        !string.IsNullOrWhiteSpace(ChannelFilter) ||
+        (!string.IsNullOrWhiteSpace(ChannelFilter) && ChannelFilter != MainViewModel.AllChannels) ||
         PriorityFilter.HasValue ||
         MinSizeFilter.HasValue ||
         MaxSizeFilter.HasValue ||
@@ -1139,6 +1054,13 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
             e.PropertyName == nameof(ShowOnlyPending))
         {
             DispatcherExecute(() => ApplyFiltersAndSorting());
+        }
+
+        // Every button that decides follows the filters, the selection and a decision under way
+        if (e.PropertyName is nameof(ChannelFilter) or nameof(PriorityFilter) or nameof(MinSizeFilter) or nameof(MaxSizeFilter) or nameof(DateFromFilter) or nameof(DateToFilter)
+            or nameof(ExtensionFilter) or nameof(HasSelection) or nameof(IsProcessingApproval) or nameof(IsProcessingBulkApproval) or nameof(IsLoading))
+        {
+            DispatcherExecute(NotifyDecisions);
         }
     }
 
@@ -1247,51 +1169,6 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
 
     #region Helper Methods
 
-    private BulkApprovalRequest BuildBulkApprovalRequest(ApprovalStatus decision)
-    {
-        var request = new BulkApprovalRequest
-        {
-            Decision = decision,
-            ApprovedBy = Environment.UserName,
-            Notes = $"Bulk {decision} via approval workflow"
-        };
-
-        // Apply current filters to bulk request
-        if (!string.IsNullOrWhiteSpace(ChannelFilter) && ChannelFilter != MainViewModel.AllChannels)
-        {
-            request.ChannelName = ChannelFilter;
-        }
-
-        if (MinSizeFilter.HasValue)
-        {
-            request.MinFileSize = MinSizeFilter.Value;
-        }
-
-        if (MaxSizeFilter.HasValue)
-        {
-            request.MaxFileSize = MaxSizeFilter.Value;
-        }
-
-        if (DateFromFilter.HasValue)
-        {
-            request.DetectedAfter = DateFromFilter.Value;
-        }
-
-        if (DateToFilter.HasValue)
-        {
-            request.DetectedBefore = DateToFilter.Value;
-        }
-
-        if (!string.IsNullOrWhiteSpace(ExtensionFilter))
-        {
-            request.FileExtensions = ExtensionFilter.Split(',', StringSplitOptions.RemoveEmptyEntries)
-                .Select(e => e.Trim())
-                .ToList();
-        }
-
-        return request;
-    }
-
     private void UpdateAvailableChannels()
     {
         var channels = PendingApprovals
@@ -1314,8 +1191,7 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
         HasSelection = SelectedApprovals.Count > 0;
 
         // Notify commands that selection changed
-        ApproveSelectedCommand.NotifyCanExecuteChanged();
-        RejectSelectedCommand.NotifyCanExecuteChanged();
+        NotifyDecisions();
     }
 
     private void AddLog(string message, LogType type)
@@ -1372,6 +1248,7 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
 
             // Unsubscribe from property changes
             PropertyChanged -= OnPropertyChanged;
+            _signalRClient.ServiceStatusChanged -= OnScannerStatusChanged;
 
             // Unsubscribe from SignalR events
             // _signalRClient.NewFileForApproval -= OnNewFileForApproval;

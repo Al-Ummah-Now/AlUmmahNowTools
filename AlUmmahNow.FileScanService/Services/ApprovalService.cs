@@ -53,8 +53,9 @@ public class ApprovalService : IApprovalService
         }
         catch (Exception ex)
         {
+            // Never as "none is waiting": Tools tells by the list what a decision came to
             _logger.LogError(ex, "Failed to get pending approvals");
-            return new List<PendingApprovalDto>();
+            throw;
         }
     }
 

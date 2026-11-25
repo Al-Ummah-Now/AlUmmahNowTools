@@ -1455,6 +1455,12 @@
   <data name="Offline_Detail" xml:space="preserve">
     <value>تحتاج هذه الصفحة إلى تشغيله. شغّله من صفحة فاحص المجلدات، وستمتلئ هذه الصفحة تلقائيًا.</value>
   </data>
+  <data name="Approve_RestUnknown" xml:space="preserve">
+    <value>توقف الفاحص عن الاستجابة، وقد يكون القرار في البقية نُفّذ أو لم يُنفّذ. تُظهر القائمة ذلك بعد عودة الفاحص.</value>
+  </data>
+  <data name="Approve_DecidedAlready" xml:space="preserve">
+    <value>سبق القرار في هذه المرئيات.</value>
+  </data>
   <data name="Approve_NotAccepted" xml:space="preserve">
     <value>لم يقبل الفاحص القرار. حاول مجددًا.</value>
   </data>

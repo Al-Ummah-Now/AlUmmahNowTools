@@ -403,10 +403,10 @@ public class FileWatchServiceIntegrationTests : FileSystemTestBase
         // Act - Use a pre-cancelled token
         cts.Cancel();
 
-        // Assert - Operation completes but respects cancellation
-        var result = await approvalService.GetPendingApprovalsAsync(cts.Token);
+        // Assert - Cancelled is never "none is waiting"
+        var load = () => approvalService.GetPendingApprovalsAsync(cts.Token);
+        await load.Should().ThrowAsync<OperationCanceledException>();
 
-        // The operation may complete before checking cancellation in EF Core
         // Verify database state is still consistent regardless
         var remainingApprovals = await _dbContext.PendingApprovals.CountAsync();
         remainingApprovals.Should().Be(10); // All approvals should still be there
