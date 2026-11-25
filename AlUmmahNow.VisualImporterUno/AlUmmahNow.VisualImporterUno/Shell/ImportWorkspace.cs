@@ -541,7 +541,11 @@ internal sealed class DemoImportServer : HttpMessageHandler
         string body;
         if (path == "/api/content/channels")
         {
-            body = "{\"success\":true,\"result\":{\"items\":[" + string.Join(",", DemoImport.Channels.Select(c =>
+            // As the server: by name or handle, after a while (TOOLS_DEMO_CHANNELS_MS)
+            if (int.TryParse(Environment.GetEnvironmentVariable("TOOLS_DEMO_CHANNELS_MS"), out var wait)) await Task.Delay(wait, cancellationToken);
+            var q = System.Web.HttpUtility.ParseQueryString(request.RequestUri.Query)["q"] ?? "";
+            var found = DemoImport.Channels.Where(c => new[] { c.Name, c.Handle }.Concat(c.NameLocalized?.Values ?? []).Any(t => t?.Contains(q, StringComparison.OrdinalIgnoreCase) == true));
+            body = "{\"success\":true,\"result\":{\"items\":[" + string.Join(",", found.Select(c =>
             {
                 var locJson = c.NameLocalized is null ? "" : ",\"nameLocalized\":" + System.Text.Json.JsonSerializer.Serialize(c.NameLocalized);
                 return $"{{\"id\":\"{c.Id}\",\"name\":\"{c.Name}\",\"handle\":\"{c.Handle}\",\"ownerEmail\":\"{c.OwnerEmail}\"{locJson}}}";
