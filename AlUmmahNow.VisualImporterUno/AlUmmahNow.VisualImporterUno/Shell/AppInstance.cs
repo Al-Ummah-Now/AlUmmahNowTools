@@ -126,6 +126,14 @@ internal static class AppInstance
     {
         // The window was closed meanwhile: closed it stays
         if (!TryEnd()) return;
+        Relaunch(argument);
+        Application.Current.Exit();
+        ExitBackstop.EndSoon();
+    }
+
+    /// <summary>Starts the app again beside this one, which is ending.</summary>
+    public static void Relaunch(string? argument = null)
+    {
         _restarting = true;
         // The new one takes the queue at once; this one's pipe goes first (on macOS and Linux closing it later would take the new one's away)
         Ending.Cancel();
@@ -147,8 +155,6 @@ internal static class AppInstance
             try { Process.Start(start)?.Dispose(); }
             catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException) { Console.Error.WriteLine("[Instance] " + ex.Message); }
         }
-        Application.Current.Exit();
-        ExitBackstop.EndSoon();
     }
 
     private static void AllowForeground(int pid)

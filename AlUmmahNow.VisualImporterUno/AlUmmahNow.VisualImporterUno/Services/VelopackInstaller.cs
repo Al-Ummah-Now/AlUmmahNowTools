@@ -87,6 +87,7 @@ public sealed class VelopackInstaller : IUpdateInstaller
     {
         if (_manager is null || _staged is null) return;
 #if UPDATE_TEST
+        if (Environment.GetEnvironmentVariable("TOOLS_UPDATE_TEST_NO_UPDATER") == "1") throw new IOException("update test: the updater does not start");
         Shell.UpdateTestHandler.Log($"handed over {DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}");
 #endif
         // Not Velopack's own "and restart", which ends this process at once: the quit has stopped the work, and ends it

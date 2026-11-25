@@ -117,7 +117,9 @@ public sealed class UpdateService : IDisposable
     private UpdateView _view = UpdateView.None;
     private CorePrompt? _lastPrompt;
     private Staged? _staged;
-    private int _applying;
+    // One at a time checks the staged update and hands it over
+    private readonly SemaphoreSlim _applying = new(1, 1);
+    private volatile bool _handedOver;
     private int _restarting;
     private readonly Func<Task<bool>>? _quit;
     private bool _autoInstallDefault = true;
@@ -344,7 +346,8 @@ public sealed class UpdateService : IDisposable
             {
                 EndApply();
             }
-            quitting = _quit is null ? OnExit() : await _quit().ConfigureAwait(false);
+            // A quit that came meanwhile may have handed it over already
+            quitting = _quit is null ? OnExit() || _handedOver : await _quit().ConfigureAwait(false);
             return quitting;
         }
         finally
@@ -355,10 +358,16 @@ public sealed class UpdateService : IDisposable
     }
 
     /// <summary>Only one hand-over to the updater at a time: a second click, or the exit during the first, finds it taken.</summary>
-    private bool TryBeginApply() => Interlocked.CompareExchange(ref _applying, 1, 0) == 0;
+    private bool TryBeginApply(TimeSpan wait = default)
+    {
+        if (!_applying.Wait(wait)) return false;
+        if (!_handedOver) return true;
+        _applying.Release();
+        return false;
+    }
 
     /// <summary>The hand-over did not happen: it may be tried again.</summary>
-    private void EndApply() => Interlocked.Exchange(ref _applying, 0);
+    private void EndApply() => _applying.Release();
 
     /// <summary>The × on the bar: hidden for this version.</summary>
     public void Dismiss()
@@ -369,29 +378,30 @@ public sealed class UpdateService : IDisposable
         Publish(UpdateView.None);
     }
 
+    /// <summary>Restart now was pressed, and the app is to be open again when all is done.</summary>
+    public bool RestartAsked => _restarting == 1;
+
+    /// <summary>How long the end waits for a check of the staged file that is under way; well inside what it has for the hand-over</summary>
+    private static readonly TimeSpan CheckWait = TimeSpan.FromSeconds(6);
+
     /// <summary>The work has ended: the staged update is handed to the updater, which installs it as the app goes. False: nothing was.</summary>
     public bool OnExit()
     {
-        if (_staged is null || _otherCopy() || !TryBeginApply()) return false;
-        var handedOver = false;
+        // Restart now may be checking the file this moment: it is waited for
+        if (_staged is null || _otherCopy() || !TryBeginApply(CheckWait)) return false;
         try
         {
             // A copy that started during the check counts: the update is staged again at the next start
             if (!StillGoodAsync(CancellationToken.None, report: false).GetAwaiter().GetResult() || _otherCopy()) return false;
-            handedOver = true;
             if (_restarting == 1) _installer.ApplyAndRestart();
             else _installer.ApplyOnExit();
+            // Not when that threw: the updater did not start
+            _handedOver = true;
             return true;
-        }
-        catch when (handedOver)
-        {
-            // The updater did not start
-            handedOver = false;
-            throw;
         }
         finally
         {
-            if (!handedOver) EndApply();
+            EndApply();
         }
     }
 

@@ -61,15 +61,18 @@ public static class AppUpdates
     /// <summary>The work has ended (<see cref="AppQuit"/> alone calls this): hands a staged update to the updater, once.</summary>
     public static void InstallOnQuit()
     {
+        var handedOver = false;
         try
         {
-            Service?.OnExit();
+            handedOver = Service?.OnExit() == true;
         }
         catch (Exception ex)
         {
             // Not handed over: staged again at the next start
             Serilog.Log.Warning(ex, "[Update] The staged update was not handed over");
         }
+        // The updater would have started the app again: without it, the app does
+        if (!handedOver && Service?.RestartAsked == true) AppInstance.Relaunch();
     }
 
     private static UpdateView DemoView(string state)
