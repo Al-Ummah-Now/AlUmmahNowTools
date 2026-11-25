@@ -24,6 +24,11 @@ internal static class DialogLook
         dialog.CloseButtonStyle = For(ContentDialogButton.Close);
         if (chosen == ContentDialogButton.None) return;
         dialog.DefaultButton = ContentDialogButton.None;
+        // Cancel as the default also has the focus, so Enter and Space right away never press the other button
+        if (chosen == ContentDialogButton.Close)
+        {
+            dialog.Opened += (_, _) => (FindChild(dialog, "CloseButton") as Button)?.Focus(FocusState.Programmatic);
+        }
         var name = chosen switch { ContentDialogButton.Primary => "PrimaryButton", ContentDialogButton.Secondary => "SecondaryButton", _ => "CloseButton" };
         dialog.AddHandler(UIElement.KeyDownEvent, new KeyEventHandler((_, e) =>
         {

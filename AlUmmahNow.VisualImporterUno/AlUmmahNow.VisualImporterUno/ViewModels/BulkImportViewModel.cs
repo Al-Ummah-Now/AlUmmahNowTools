@@ -415,7 +415,7 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
     public ObservableCollection<QueueRow> QueueRows { get; } = new();
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasQueue))]
+    [NotifyPropertyChangedFor(nameof(HasQueue), nameof(RemoveAllTitle))]
     private int _queueCount;
 
     public bool HasQueue => QueueCount > 0;
@@ -478,6 +478,20 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
     public void Resume(QueueRow row) => _workspace.Queue.Resume(row.Id);
     public void Retry(QueueRow row) => _workspace.Queue.Retry(row.Id);
     public void Remove(QueueRow row) => _workspace.Queue.Remove(row.Id);
+
+    /// <summary>The Remove all dialog's title: how many files leave the queue.</summary>
+    public string RemoveAllTitle => Loc.Plural("Import_RemoveAllTitle", QueueCount);
+
+    /// <summary>The Remove all dialog's lines: what stays, and how many uploads it stops when there are any.</summary>
+    public IReadOnlyList<string> RemoveAllLines()
+    {
+        var uploads = _workspace.Queue.Items.Count(i => i.UploadUnfinished);
+        var stays = Loc.Get("Import_RemoveAllBody");
+        return uploads == 0 ? [stays] : [stays, Loc.Plural("Import_RemoveAllUploads", uploads)];
+    }
+
+    /// <summary>Empties the queue (after the dialog).</summary>
+    public void RemoveAll() => _workspace.Queue.RemoveAll();
 
     /// <summary>Shows or hides the file's log under its row.</summary>
     public void ToggleLog(QueueRow row)

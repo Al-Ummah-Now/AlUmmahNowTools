@@ -2103,6 +2103,45 @@
   <data name="Import_NewChannelTaken" xml:space="preserve">
     <value>هذا المعرّف مستخدم. اختر غيره.</value>
   </data>
+  <data name="Import_RemoveAll.Text" xml:space="preserve">
+    <value>إزالة الكل</value>
+  </data>
+  <data name="Import_RemoveAllTitle_One" xml:space="preserve">
+    <value>إزالة ملف واحد من قائمة الرفع؟</value>
+  </data>
+  <data name="Import_RemoveAllTitle_Two" xml:space="preserve">
+    <value>إزالة ملفين من قائمة الرفع؟</value>
+  </data>
+  <data name="Import_RemoveAllTitle_Few" xml:space="preserve">
+    <value>إزالة {0} ملفات من قائمة الرفع؟</value>
+  </data>
+  <data name="Import_RemoveAllTitle_Many" xml:space="preserve">
+    <value>إزالة {0} ملفًا من قائمة الرفع؟</value>
+  </data>
+  <data name="Import_RemoveAllTitle_Other" xml:space="preserve">
+    <value>إزالة {0} ملف من قائمة الرفع؟</value>
+  </data>
+  <data name="Import_RemoveAllBody" xml:space="preserve">
+    <value>المرئيات التي رُفعت تبقى على الموقع، وملفات هذا الجهاز لا تُمس.</value>
+  </data>
+  <data name="Import_RemoveAllUploads_One" xml:space="preserve">
+    <value>يتوقف رفع واحد لم يكتمل.</value>
+  </data>
+  <data name="Import_RemoveAllUploads_Two" xml:space="preserve">
+    <value>يتوقف رفعان لم يكتملا.</value>
+  </data>
+  <data name="Import_RemoveAllUploads_Few" xml:space="preserve">
+    <value>تتوقف {0} عمليات رفع لم تكتمل.</value>
+  </data>
+  <data name="Import_RemoveAllUploads_Many" xml:space="preserve">
+    <value>تتوقف {0} عملية رفع لم تكتمل.</value>
+  </data>
+  <data name="Import_RemoveAllUploads_Other" xml:space="preserve">
+    <value>تتوقف {0} عملية رفع لم تكتمل.</value>
+  </data>
+  <data name="Import_RemoveAllConfirm" xml:space="preserve">
+    <value>إزالة الكل</value>
+  </data>
   <data name="Import_RemoveTitle" xml:space="preserve">
     <value>إزالة من قائمة الرفع؟</value>
   </data>

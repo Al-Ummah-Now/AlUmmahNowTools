@@ -167,6 +167,11 @@ public sealed class QueueItem
     /// </summary>
     [JsonIgnore] public bool Pausable => !Paused && Phase != ItemPhase.Done && CurrentStep is not { Status: StepStatus.Failed, CanTryAgain: false };
 
+    /// <summary>Its upload began and did not finish: removing the file stops it.</summary>
+    [JsonIgnore]
+    public bool UploadUnfinished => Steps.FirstOrDefault(s => s.Kind == ImportStepKind.Upload) is { Status: not (StepStatus.Done or StepStatus.Skipped) } upload
+        && (upload.Status == StepStatus.Running || UploadUrl is not null);
+
     public static QueueItem For(ScannedVideo video, string batchId, string channelId, DateTimeOffset now, bool serverEncodes = false, TranscribeChoice? transcribe = null, bool translate = false) => new()
     {
         BatchId = batchId,
@@ -494,18 +499,55 @@ public sealed class ImportQueue : IDisposable
         return true;
     });
 
-    /// <summary>Takes the file out of the queue, stopping its running step. Nothing on the server is deleted.</summary>
-    public void Remove(string id)
+    /// <summary>
+    /// Takes the file out of the queue, stopping its running step, and deletes what was made for it here and not sent
+    /// yet. Nothing on the server is deleted, and the person's own files are not touched.
+    /// </summary>
+    public void Remove(string id) => RemoveWhere(i => i.Id == id);
+
+    /// <summary>The same for every file, in one go; answers how many left the queue.</summary>
+    public int RemoveAll() => RemoveWhere(_ => true);
+
+    private int RemoveWhere(Func<QueueItem, bool> which)
     {
+        var idle = new List<QueueItem>();
+        int removed;
         lock (_gate)
         {
-            var item = _items.FirstOrDefault(i => i.Id == id);
-            if (item is null) return;
-            if (_running.TryGetValue(id, out var cts)) Cancel(cts);
-            _items.Remove(item);
+            var items = _items.Where(which).ToHashSet();
+            removed = items.Count;
+            if (removed == 0) return 0;
+            // Out of the queue first, so nothing of them starts while the running ones stop
+            _items.RemoveAll(items.Contains);
+            foreach (var item in items)
+            {
+                // A running step lets go of its files first (RunStepAsync)
+                if (_running.TryGetValue(item.Id, out var cts)) Cancel(cts);
+                else idle.Add(item);
+            }
             SaveLocked();
         }
         Notify(null);
+        DeleteWork(idle);
+        return removed;
+    }
+
+    /// <summary>The renditions and the transcript made here for files that left the queue before the server had them.</summary>
+    private static void DeleteWork(IReadOnlyList<QueueItem> items)
+    {
+        var folders = items.Select(i => i.Renditions?.Directory).Where(d => !string.IsNullOrEmpty(d)).ToList();
+        var transcripts = items.Select(i => i.Transcript?.Path).Where(p => !string.IsNullOrEmpty(p)).ToList();
+        if (folders.Count == 0 && transcripts.Count == 0) return;
+        // Thousands of segments: not on the app's own thread
+        _ = Task.Run(() =>
+        {
+            foreach (var folder in folders) EncodeStep.DeleteFolder(folder);
+            foreach (var transcript in transcripts)
+            {
+                try { File.Delete(transcript!); }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+            }
+        });
     }
 
     /// <summary>Removes the files that are done.</summary>
@@ -737,6 +779,8 @@ public sealed class ImportQueue : IDisposable
         void Finish(QueueItem i)
         {
             if (_running.Remove(i.Id, out var c)) c.Dispose();
+            // Removed while it ran: its files are free now
+            if (!_items.Contains(i)) DeleteWork(new[] { i });
             SaveLocked();
         }
     }
