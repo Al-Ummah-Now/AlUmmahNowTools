@@ -1,3 +1,7 @@
+Closing the window now quits the app. While videos are still being imported it asks first, and they carry on the next time you open it.
+Pause all pauses every unfinished file, and Resume all starts them again. Remove all clears the queue: what is already uploaded stays on the site, and the files on your computer are not touched.
+Videos on a network share are read by their network path, so a mapped drive works. If the share stops answering, the app waits, tries again and shows the real error.
+On a phone-sized or narrow window the queue's buttons and its log fit.
 Tools now checks for updates and tells you when a new version is out.
 On Windows, install the new Setup file once and Tools then updates itself. If you use the MSI or the portable zip, you still get the notice with a download link.
 On a Mac, drag the app from the new disk image to Applications once and it then updates itself.
