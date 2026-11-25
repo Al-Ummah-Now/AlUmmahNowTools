@@ -53,7 +53,7 @@ jobs:
         run: |
           powershell -Command "Start-Process (Resolve-Path keep/1/*-Setup.exe).Path -ArgumentList '--silent' -Wait"
           test -f "$LOCALAPPDATA/AlUmmahNow.Tools/current/AlUmmahNow.VisualImporterUno.exe"
-          powershell -Command "Get-Process AlUmmahNow.VisualImporterUno -ErrorAction SilentlyContinue | Stop-Process -Force"; sleep 3
+          powershell -Command "Get-Process AlUmmahNow.VisualImporterUno -ErrorAction SilentlyContinue | Stop-Process -Force; exit 0"; sleep 3
           cp -r "$LOCALAPPDATA/AlUmmahNow.Tools" keep/installed
       - name: Refused updates change nothing
         run: |
