@@ -328,34 +328,44 @@ public sealed class UpdateService : IDisposable
     {
         if (_view.Stage != UpdateStage.Ready || _busy() || _otherCopy()) return false;
         if (Interlocked.CompareExchange(ref _restarting, 1, 0) != 0) return false;
+        if (!TryBeginApply())
+        {
+            NotRestarting();
+            return false;
+        }
+        var goesOn = false;
+        try
+        {
+            if (!await StillGoodAsync(cancel).ConfigureAwait(false))
+            {
+                Publish(_view.Required ? new UpdateView(UpdateStage.RequiredSoon, MessageEn: _view.MessageEn, MessageAr: _view.MessageAr) : UpdateView.None);
+                return false;
+            }
+            // Once more, after the check of the file: work or a copy may have started meanwhile
+            if (_busy() || _otherCopy()) return false;
+            goesOn = true;
+        }
+        finally
+        {
+            // Before an end that waits for this check goes on: it is not to start the app again for a Restart now that was refused
+            if (!goesOn) NotRestarting();
+            EndApply();
+        }
         var quitting = false;
         try
         {
-            if (!TryBeginApply()) return false;
-            try
-            {
-                if (!await StillGoodAsync(cancel).ConfigureAwait(false))
-                {
-                    Publish(_view.Required ? new UpdateView(UpdateStage.RequiredSoon, MessageEn: _view.MessageEn, MessageAr: _view.MessageAr) : UpdateView.None);
-                    return false;
-                }
-                // Once more, after the check of the file: work or a copy may have started meanwhile
-                if (_busy() || _otherCopy()) return false;
-            }
-            finally
-            {
-                EndApply();
-            }
             // A quit that came meanwhile may have handed it over already
             quitting = _quit is null ? OnExit() || _handedOver : await _quit().ConfigureAwait(false);
             return quitting;
         }
         finally
         {
-            // The app goes on, and can try again
-            if (!quitting) Interlocked.Exchange(ref _restarting, 0);
+            if (!quitting) NotRestarting();
         }
     }
+
+    /// <summary>The app goes on, and can try again.</summary>
+    private void NotRestarting() => Interlocked.Exchange(ref _restarting, 0);
 
     /// <summary>Only one hand-over to the updater at a time: a second click, or the exit during the first, finds it taken.</summary>
     private bool TryBeginApply(TimeSpan wait = default)

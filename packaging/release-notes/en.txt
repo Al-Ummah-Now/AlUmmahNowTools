@@ -1,2 +1,4 @@
 Encoding on this computer works again.
 The paths set on the Video tools page and what the Settings page saves are kept.
+A file with no picture, one cut off or never filled isn’t uploaded; the list says why, and lets it be tried again once the file is replaced.
+What is uploaded is checked against the file before the upload ends.
