@@ -154,6 +154,8 @@ public sealed partial class ImportView : Page
             row.ColumnSpacing = narrow ? 0 : 12;
         }
         Grid.SetRow(QueueActions, narrow ? 1 : 0);
+        // Pause all, Resume all and Clear finished do not fit side by side on the narrowest windows
+        QueueActions.Orientation = e.NewSize.Width < 480 ? Orientation.Vertical : Orientation.Horizontal;
         Grid.SetColumn(QueueActions, narrow ? 0 : 1);
         if (QueueActions.Parent is Grid header && header.RowDefinitions.Count < 2)
         {

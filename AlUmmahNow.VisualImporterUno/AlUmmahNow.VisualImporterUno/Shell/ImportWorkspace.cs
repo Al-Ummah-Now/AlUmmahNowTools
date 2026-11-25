@@ -56,6 +56,7 @@ public sealed class ImportWorkspace : IDisposable
             // Screenshots show a queue in every state; nothing runs and nothing is sent
             Queue.Add(DemoImport.QueueItems(Environment));
             DemoImport.Settle(Queue);
+            if (System.Environment.GetEnvironmentVariable("TOOLS_DEMO_IMPORT") == "paused") Queue.PauseAll();
         }
         else
         {
@@ -193,7 +194,7 @@ public sealed class ImportWorkspace : IDisposable
     }
 }
 
-/// <summary>The import's demo data for screenshots (<c>TOOLS_DEMO=1</c>; <c>TOOLS_DEMO_IMPORT=empty</c> for a fresh page).</summary>
+/// <summary>The import's demo data for screenshots (<c>TOOLS_DEMO=1</c>; <c>TOOLS_DEMO_IMPORT=empty</c> for a fresh page, <c>paused</c> for the queue after Pause all).</summary>
 internal static class DemoImport
 {
     public static bool Empty => System.Environment.GetEnvironmentVariable("TOOLS_DEMO_IMPORT") == "empty";

@@ -202,7 +202,7 @@ public sealed class TranscribeStep : IImportStep
                 transcript.Language, Num(state.Segments), Num(state.QuranSpans), where, model);
             return await SendAsync(item, state, context, ct).ConfigureAwait(false);
         }
-        catch (OperationCanceledException)
+        catch (Exception ex) when (ex is OperationCanceledException || ct.IsCancellationRequested)
         {
             DeleteFile(wav);
             if (item.Transcript is null) DeleteFile(upload);

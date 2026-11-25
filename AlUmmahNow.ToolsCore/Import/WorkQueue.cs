@@ -44,6 +44,14 @@ public sealed class StepState
     public string? LastErrorCode { get; set; }
     /// <summary>The step is waiting on the server's own work (its transcode), not on a retry</summary>
     public bool WaitingOnServer { get; set; }
+    /// <summary>
+    /// The step gave up on a failure that trying again may fix (the network, a busy server), so it can be paused and
+    /// resumed. Null in queues saved by older apps: <see cref="CanTryAgain"/> then reads the failure's code.
+    /// </summary>
+    public bool? Retryable { get; set; }
+
+    [JsonIgnore]
+    public bool CanTryAgain => Retryable ?? LastErrorCode is "admin_unreachable" or "videos_unreachable" or "upload_gone" or "file_read";
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter))]
@@ -131,13 +139,24 @@ public sealed class QueueItem
         {
             var step = CurrentStep;
             if (step is null) return ItemPhase.Done;
+            // A failure that trying again cannot fix stays in sight, paused or not
+            if (step.Status == StepStatus.Failed && !step.CanTryAgain) return ItemPhase.Failed;
+            // Paused at once, also while a running step is still stopping: nothing of the file starts until Resume
+            if (Paused) return ItemPhase.Paused;
             if (step.Status == StepStatus.Failed) return ItemPhase.Failed;
             if (step.Status == StepStatus.Running) return ItemPhase.Running;
-            if (Paused) return ItemPhase.Paused;
             if (step.WaitingOnServer) return ItemPhase.ServerWorking;
             return step.NextAttemptAt is not null ? ItemPhase.RetryWaiting : ItemPhase.Waiting;
         }
     }
+
+    /// <summary>What the row offers: exactly one of Pause and Resume for a file that is neither done nor failed.</summary>
+    [JsonIgnore] public bool CanPause => Phase is ItemPhase.Waiting or ItemPhase.Running or ItemPhase.RetryWaiting or ItemPhase.ServerWorking;
+    [JsonIgnore] public bool CanResume => Phase == ItemPhase.Paused;
+    [JsonIgnore] public bool CanRetry => Phase is ItemPhase.Failed or ItemPhase.RetryWaiting;
+
+    /// <summary>Pause all takes it: not done, not paused, and not failed for good.</summary>
+    [JsonIgnore] internal bool Pausable => !Paused && Phase != ItemPhase.Done && CurrentStep is not { Status: StepStatus.Failed, CanTryAgain: false };
 
     public static QueueItem For(ScannedVideo video, string batchId, string channelId, DateTimeOffset now, bool serverEncodes = false, TranscribeChoice? transcribe = null, bool translate = false) => new()
     {
@@ -299,10 +318,16 @@ public sealed class ImportQueue : IDisposable
         get { lock (_gate) return _items.ToList(); }
     }
 
+    /// <summary>
+    /// Pause all was pressed and something is still paused by it: files added meanwhile come in paused too. Resume all
+    /// ends it, and so does resuming, finishing or removing the last paused file.
+    /// </summary>
     public bool AllPaused
     {
-        get { lock (_gate) return _allPaused; }
+        get { lock (_gate) return HeldLocked; }
     }
+
+    private bool HeldLocked => _allPaused && _items.Any(i => i.Phase == ItemPhase.Paused);
 
     public QueueSettings Settings
     {
@@ -346,10 +371,13 @@ public sealed class ImportQueue : IDisposable
     {
         lock (_gate)
         {
+            var held = HeldLocked;
             foreach (var item in items)
             {
                 if (_items.Any(i => i.Id == item.Id)) continue;
                 AppendLog(item, LogLevel.Info, "added", $"Added: {item.Video.FileName}", item.Video.FileName);
+                // Nothing starts while all is paused
+                if (held && item.Pausable) PauseLocked(item);
                 _items.Add(item);
             }
             SaveLocked();
@@ -360,37 +388,80 @@ public sealed class ImportQueue : IDisposable
     /// <summary>Pauses the file: a running step stops (an upload keeps its offset) and nothing starts until Resume.</summary>
     public void Pause(string id) => Update(id, item =>
     {
-        if (item.Paused || item.Phase == ItemPhase.Done) return false;
-        item.Paused = true;
-        AppendLog(item, LogLevel.Info, "paused", "Paused");
-        if (_running.TryGetValue(id, out var cts)) cts.Cancel();
+        if (!item.Pausable) return false;
+        PauseLocked(item);
         return true;
     });
 
-    public void Resume(string id) => Update(id, item =>
-    {
-        if (!item.Paused) return false;
-        item.Paused = false;
-        AppendLog(item, LogLevel.Info, "resumed", "Resumed");
-        return true;
-    });
+    /// <summary>The file goes on from its step (an upload from its offset). Only this file: the others paused by Pause all stay paused.</summary>
+    public void Resume(string id) => Update(id, item => ResumeLocked(item));
 
+    /// <summary>
+    /// Pauses every file that is not finished: queued, running (its step and child processes stop), waiting to try again,
+    /// waiting for the server, or given up on something trying again may fix. Each then reads Paused and keeps its step,
+    /// its offset and the time of its next try. A failure that trying again cannot fix stays failed. Kept over a restart.
+    /// </summary>
     public void PauseAll()
     {
         lock (_gate)
         {
+            var pausable = _items.Where(i => i.Pausable).ToList();
+            if (pausable.Count == 0 && (_allPaused || _items.All(i => i.Phase != ItemPhase.Paused))) return;
+            foreach (var item in pausable) PauseLocked(item);
             _allPaused = true;
-            foreach (var cts in _running.Values) cts.Cancel();
+            SaveLocked();
         }
         Notify(null);
     }
 
+    /// <summary>Every paused file goes on from its own step.</summary>
     public void ResumeAll()
     {
-        lock (_gate) _allPaused = false;
+        lock (_gate)
+        {
+            var resumed = false;
+            foreach (var item in _items) resumed |= ResumeLocked(item);
+            if (!resumed && !_allPaused) return;
+            _allPaused = false;
+            SaveLocked();
+        }
         Notify(null);
         _wake.Release();
     }
+
+    private void PauseLocked(QueueItem item)
+    {
+        item.Paused = true;
+        AppendLog(item, LogLevel.Info, "paused", "Paused");
+        if (_running.TryGetValue(item.Id, out var cts)) Cancel(cts);
+    }
+
+    private bool ResumeLocked(QueueItem item)
+    {
+        if (!item.Paused) return false;
+        item.Paused = false;
+        if (item.CurrentStep is null) return false;
+        AppendLog(item, LogLevel.Info, "resumed", "Resumed");
+        // It had given up: Resume is another go at it
+        if (item.CurrentStep is { Status: StepStatus.Failed, CanTryAgain: true } step) Again(item, step);
+        return true;
+    }
+
+    /// <summary>The step starts from its first attempt.</summary>
+    private static void Again(QueueItem item, StepState step)
+    {
+        step.Status = StepStatus.Pending;
+        step.Attempts = 0;
+        step.NextAttemptAt = null;
+        step.LastError = null;
+        step.LastErrorCode = null;
+        step.Retryable = null;
+        step.WaitingOnServer = false;
+        AppendLog(item, LogLevel.Info, "retry", $"Retry: {step.Kind}", step.Kind.ToString());
+    }
+
+    /// <summary>Off this thread: what a step does when it is cancelled must not run under the queue's lock.</summary>
+    private static void Cancel(CancellationTokenSource cts) => _ = cts.CancelAsync();
 
     /// <summary>A failed (or waiting-to-retry) step starts again now, with its attempts counted from zero.</summary>
     public void Retry(string id) => Update(id, item =>
@@ -398,14 +469,8 @@ public sealed class ImportQueue : IDisposable
         var step = item.CurrentStep;
         if (step is null || step.Status == StepStatus.Running) return false;
         if (step.Status != StepStatus.Failed && step.NextAttemptAt is null) return false;
-        step.Status = StepStatus.Pending;
-        step.Attempts = 0;
-        step.NextAttemptAt = null;
-        step.LastError = null;
-        step.LastErrorCode = null;
-        step.WaitingOnServer = false;
         item.Paused = false;
-        AppendLog(item, LogLevel.Info, "retry", $"Retry: {step.Kind}", step.Kind.ToString());
+        Again(item, step);
         return true;
     });
 
@@ -416,7 +481,7 @@ public sealed class ImportQueue : IDisposable
         {
             var item = _items.FirstOrDefault(i => i.Id == id);
             if (item is null) return;
-            if (_running.TryGetValue(id, out var cts)) cts.Cancel();
+            if (_running.TryGetValue(id, out var cts)) Cancel(cts);
             _items.Remove(item);
             SaveLocked();
         }
@@ -469,7 +534,7 @@ public sealed class ImportQueue : IDisposable
         lock (_gate)
         {
             _loop?.Cancel();
-            foreach (var cts in _running.Values) cts.Cancel();
+            foreach (var cts in _running.Values.ToList()) Cancel(cts);
             loop = _loopTask;
             _loop = null;
             _loopTask = null;
@@ -493,7 +558,6 @@ public sealed class ImportQueue : IDisposable
         var started = new List<(QueueItem Item, StepState Step, CancellationTokenSource Cts)>();
         lock (_gate)
         {
-            if (_allPaused) return 0;
             var now = _time.GetUtcNow();
             var busy = Enum.GetValues<ImportStepKind>().ToDictionary(k => k, k => _items.Count(i => i.CurrentStep is { Status: StepStatus.Running } s && s.Kind == k));
             foreach (var item in _items.OrderBy(i => i.CreatedAt))
@@ -553,9 +617,9 @@ public sealed class ImportQueue : IDisposable
         {
             result = await _steps[step.Kind].RunAsync(item, context, cts.Token).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (cts.IsCancellationRequested)
+        catch (Exception) when (cts.IsCancellationRequested)
         {
-            failure = null;
+            // Whatever it stopped with: a request or a file cut short by the stop is no failure of the file's
             lock (_gate)
             {
                 // Paused, stopped or removed: the attempt does not count, and the step waits to run again
@@ -592,6 +656,7 @@ public sealed class ImportQueue : IDisposable
                 step.Status = result == StepResult.Skipped ? StepStatus.Skipped : StepStatus.Done;
                 step.LastError = null;
                 step.LastErrorCode = null;
+                step.Retryable = null;
                 item.Progress = 1;
                 if (result == StepResult.Skipped) AppendLog(item, LogLevel.Info, "skipped", $"{step.Kind}: nothing to do", step.Kind.ToString());
                 else AppendLog(item, LogLevel.Info, "done", $"{step.Kind}: done", step.Kind.ToString());
@@ -599,7 +664,11 @@ public sealed class ImportQueue : IDisposable
                 {
                     foreach (var later in item.Steps.Where(s => s.Status == StepStatus.Pending)) later.Status = StepStatus.Skipped;
                 }
-                if (item.CurrentStep is null) AppendLog(item, LogLevel.Info, "finished", "Finished");
+                if (item.CurrentStep is null)
+                {
+                    item.Paused = false;
+                    AppendLog(item, LogLevel.Info, "finished", "Finished");
+                }
             }
             else
             {
@@ -607,6 +676,7 @@ public sealed class ImportQueue : IDisposable
                 var code = ErrorCode(failure);
                 step.LastError = message;
                 step.LastErrorCode = code;
+                step.Retryable = IsRetryable(failure);
                 var attempts = step.Attempts.ToString(System.Globalization.CultureInfo.InvariantCulture);
                 if (IsRetryable(failure) && step.Attempts < _settings.MaxAttempts)
                 {
@@ -703,7 +773,7 @@ public sealed class ImportQueue : IDisposable
         if (item.Log.Count > MaxLogLines) item.Log.RemoveRange(0, item.Log.Count - MaxLogLines);
     }
 
-    private sealed record Saved(QueueSettings Settings, List<QueueItem> Items);
+    private sealed record Saved(QueueSettings Settings, List<QueueItem> Items, bool AllPaused = false);
 
     private void Load()
     {
@@ -713,6 +783,7 @@ public sealed class ImportQueue : IDisposable
             var saved = JsonSerializer.Deserialize<Saved>(File.ReadAllText(_path), Json);
             if (saved is null) return;
             _settings = saved.Settings ?? new QueueSettings();
+            _allPaused = saved.AllPaused;
             foreach (var item in saved.Items ?? new List<QueueItem>())
             {
                 // A step that was running when the app closed starts again (an upload from its saved offset)
@@ -730,9 +801,11 @@ public sealed class ImportQueue : IDisposable
 
     private void SaveLocked()
     {
+        // Pause all ends with the last file it paused (resumed, finished or removed)
+        _allPaused = HeldLocked;
         Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
         var temp = _path + ".tmp";
-        File.WriteAllText(temp, JsonSerializer.Serialize(new Saved(_settings, _items), Json));
+        File.WriteAllText(temp, JsonSerializer.Serialize(new Saved(_settings, _items, _allPaused), Json));
         File.Move(temp, _path, overwrite: true);
     }
 

@@ -423,8 +423,13 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private string _queueSummary = "";
 
+    /// <summary>A file can be paused: Pause all is offered.</summary>
     [ObservableProperty]
-    private bool _allPaused;
+    private bool _canPauseAll;
+
+    /// <summary>A file is paused: Resume all is offered (with Pause all when others still run).</summary>
+    [ObservableProperty]
+    private bool _canResumeAll;
 
     [ObservableProperty]
     private bool _hasFinished;
@@ -513,7 +518,8 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
             if (row.ShowLog) row.SetLog(_workspace.Queue.LogLines(item.Id));
         }
         QueueCount = QueueRows.Count;
-        AllPaused = _workspace.Queue.AllPaused;
+        CanPauseAll = items.Any(i => i.CanPause);
+        CanResumeAll = items.Any(i => i.CanResume);
         HasFinished = items.Any(i => i.Phase == ItemPhase.Done);
         QueueSummary = Summary(items);
         OnPropertyChanged(nameof(ShowEmptyReview));
@@ -875,9 +881,9 @@ public sealed partial class QueueRow : ObservableObject
         IsPaused = phase == ItemPhase.Paused;
         ShowProgress = phase == ItemPhase.Running;
         Progress = Math.Round(item.Progress * 100, 1);
-        CanPause = phase is ItemPhase.Waiting or ItemPhase.Running or ItemPhase.RetryWaiting or ItemPhase.ServerWorking;
-        CanResume = phase == ItemPhase.Paused;
-        CanRetry = phase is ItemPhase.Failed or ItemPhase.RetryWaiting;
+        CanPause = item.CanPause;
+        CanResume = item.CanResume;
+        CanRetry = item.CanRetry;
         Status = phase switch
         {
             ItemPhase.Done => item.AlreadyImported ? Loc.Get("ImportPhase_AlreadyImported") : Loc.Get("ImportPhase_Done"),

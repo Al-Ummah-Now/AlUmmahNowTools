@@ -348,7 +348,16 @@ public sealed class FfmpegMediaTools : IMediaTools
         }
         catch (OperationCanceledException)
         {
-            try { process.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
+            try
+            {
+                process.Kill(entireProcessTree: true);
+                // Gone, with its files let go, before the step says it has stopped
+                await process.WaitForExitAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or NotSupportedException or AggregateException or TimeoutException)
+            {
+                // It had already ended, or is ending
+            }
             throw;
         }
         return (process.ExitCode, output.ToString(), error.ToString());
@@ -462,8 +471,9 @@ public sealed class EncodeStep : IImportStep
             context.Log(LogLevel.Info, "encoded", $"Encoded {item.Renditions.Rungs.Count} rungs here ({size} MB); they go with the upload", item.Renditions.Rungs.Count.ToString(CultureInfo.InvariantCulture), bytes.ToString(CultureInfo.InvariantCulture), item.Video.Size.ToString(CultureInfo.InvariantCulture));
             return StepResult.Done;
         }
-        catch (OperationCanceledException)
+        catch (Exception ex) when (ex is OperationCanceledException || ct.IsCancellationRequested)
         {
+            // Stopped (paused, removed or the app closing), whatever it stopped with: encoded from the start next time
             DeleteFolder(directory);
             throw;
         }
