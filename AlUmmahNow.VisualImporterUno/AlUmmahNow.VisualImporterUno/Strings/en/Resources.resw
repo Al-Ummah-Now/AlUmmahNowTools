@@ -2133,6 +2133,12 @@
   <data name="ImportLog_video_unchecked" xml:space="preserve">
     <value>Not checked for a video: ffprobe isn’t on this computer</value>
   </data>
+  <data name="ImportLog_video_undecided" xml:space="preserve">
+    <value>Couldn’t tell whether it has a video, so it goes up</value>
+  </data>
+  <data name="ImportLog_upload_kept" xml:space="preserve">
+    <value>The server kept the stopped upload ({0}), so another one is begun</value>
+  </data>
   <data name="ImportLog_cloud_download" xml:space="preserve">
     <value>Downloading from your cloud storage first</value>
   </data>
@@ -2426,6 +2432,12 @@
   </data>
   <data name="ImportEncodeError_no_video" xml:space="preserve">
     <value>the file has no picture</value>
+  </data>
+  <data name="ImportEncodeError_no_media" xml:space="preserve">
+    <value>the file has neither picture nor sound</value>
+  </data>
+  <data name="ImportEncodeError_too_short" xml:space="preserve">
+    <value>the encoded video is shorter than the file</value>
   </data>
   <data name="ImportEncodeError_disk_space" xml:space="preserve">
     <value>there isn’t enough free disk space</value>

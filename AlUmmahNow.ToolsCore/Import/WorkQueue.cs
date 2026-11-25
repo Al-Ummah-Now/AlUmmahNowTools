@@ -143,6 +143,8 @@ public sealed class QueueItem
     public string? SentSha256 { get; set; }
     /// <summary>What was sent is not what was checked: the server's copy goes, and the upload starts from nothing</summary>
     public bool StartOver { get; set; }
+    /// <summary>The server would not give up this upload of the file: it is never gone on with</summary>
+    public string? LeftUploadUrl { get; set; }
     public string? AttachJobId { get; set; }
     /// <summary>The channel already had this file: nothing was uploaded</summary>
     public bool AlreadyImported { get; set; }
@@ -577,7 +579,7 @@ public sealed class ImportQueue : IDisposable
         item.Sending = null;
         (item.Sha256, item.FingerprintHash, item.VideoChecked) = (null, null, false);
         (item.ServerItemId, item.VideoId, item.TusSessionId, item.UploadUrl, item.UploadOffset) = (null, null, null, null, 0);
-        (item.SentTo, item.SentSha256, item.StartOver, item.Renditions) = (0, null, false, null);
+        (item.SentTo, item.SentSha256, item.StartOver, item.LeftUploadUrl, item.Renditions) = (0, null, false, null, null);
         foreach (var step in item.Steps.Where(s => s.Kind <= ImportStepKind.Upload))
         {
             step.Status = StepStatus.Pending;

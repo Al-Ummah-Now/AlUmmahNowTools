@@ -146,6 +146,8 @@ public sealed class UploadStep : IImportStep
             item.TusSessionId = opened.Upload.TusSessionId;
             item.ChunkSize = opened.Upload.ChunkSize > 0 ? opened.Upload.ChunkSize : DefaultChunk;
             item.UploadUrl = string.IsNullOrEmpty(opened.Upload.TusUploadId) ? null : new Uri(tusEndpoint, tusEndpoint.AbsolutePath.TrimEnd('/') + "/" + opened.Upload.TusUploadId).ToString();
+            // One that was given up and is still there is not gone on with: its bytes are not the file's
+            if (item.UploadUrl is not null && item.UploadUrl == item.LeftUploadUrl) item.UploadUrl = null;
             // A resumed upload keeps its offset until the server's HEAD says where it is
             if (item.UploadUrl is null) item.UploadOffset = 0;
             context.Save();
@@ -186,8 +188,9 @@ public sealed class UploadStep : IImportStep
 
         var url = new Uri(item.UploadUrl);
         var offset = await _tus.OffsetAsync(url, token, ct).ConfigureAwait(false);
+        if (offset > size) throw new TusException(502, "The server has more than the file");
         item.UploadOffset = offset;
-        if (item.StartOver)
+        if (item.StartOver || item.UploadUrl == item.LeftUploadUrl)
         {
             if (offset > 0) throw new StepFailedException("upload_left", "The server still has the upload that was given up", retryable: true);
             item.StartOver = false;
@@ -215,13 +218,15 @@ public sealed class UploadStep : IImportStep
             try
             {
                 offset = await _tus.PatchAsync(url, token, part, offset, ct).ConfigureAwait(false);
-                if (offset == sent.Offset) (item.SentTo, item.SentSha256) = (offset, sent.Sha256);
             }
             catch (TusException conflict) when (conflict.Status == 409)
             {
                 // The server holds a different offset (a chunk landed but its answer was lost): continue from its offset
                 offset = await _tus.OffsetAsync(url, token, ct).ConfigureAwait(false);
             }
+            // Also when only the answer was lost
+            if (offset == sent.Offset) (item.SentTo, item.SentSha256) = (offset, sent.Sha256);
+            if (offset > size) throw new TusException(502, "The server has more than the file");
             item.UploadOffset = offset;
             context.Save();
             context.Progress(from + ((1 - from) * (size == 0 ? 1 : (double)offset / size)));
@@ -284,6 +289,13 @@ public sealed class UploadStep : IImportStep
             catch (TusGoneException)
             {
                 // Gone already
+            }
+            catch (TusException refused) when (refused.Status is >= 400 and < 500 and not (401 or 408 or 423 or 429))
+            {
+                // Trying again would be refused again: the upload is left to the server, and another one begun
+                item.LeftUploadUrl = url;
+                var status = refused.Status.ToString(CultureInfo.InvariantCulture);
+                context.Log(LogLevel.Warning, "upload_kept", $"The server kept the stopped upload ({status}); another one is begun", status);
             }
         }
         (item.UploadUrl, item.TusSessionId, item.UploadOffset) = (null, null, 0);

@@ -39,6 +39,8 @@ public sealed class ImportLinesTests
         yield return L("hash_resumed", "123456");
         yield return L("sent_check", "123456");
         yield return L("video_unchecked");
+        yield return L("video_undecided");
+        yield return L("upload_kept", "409");
         yield return L("cloud_download");
         yield return L("read_failed", "share_lost", "Windows", "59", System59, "123456", Share);
         yield return L("attempt_failed", "Hash", "1", "share_lost", "10", "x", "Windows", "59", System59, "123456");

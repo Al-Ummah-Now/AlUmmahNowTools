@@ -2400,6 +2400,12 @@
   <data name="ImportLog_video_unchecked" xml:space="preserve">
     <value>لم يُفحص وجود مرئي في الملف، لأن ffprobe غير موجود على هذا الجهاز</value>
   </data>
+  <data name="ImportLog_video_undecided" xml:space="preserve">
+    <value>تعذّرت معرفة ما إذا كان فيه مرئي، فيُرفع</value>
+  </data>
+  <data name="ImportLog_upload_kept" xml:space="preserve">
+    <value>أبقى الخادم الرفع الموقوف ({0})، فيبدأ رفع آخر</value>
+  </data>
   <data name="ImportLog_cloud_download" xml:space="preserve">
     <value>جار التنزيل من التخزين السحابي أولًا</value>
   </data>
@@ -2750,6 +2756,12 @@
   </data>
   <data name="ImportEncodeError_no_video" xml:space="preserve">
     <value>الملف بلا صورة</value>
+  </data>
+  <data name="ImportEncodeError_no_media" xml:space="preserve">
+    <value>الملف بلا صورة ولا صوت</value>
+  </data>
+  <data name="ImportEncodeError_too_short" xml:space="preserve">
+    <value>المرئي المرمّز أقصر من الملف</value>
   </data>
   <data name="ImportEncodeError_disk_space" xml:space="preserve">
     <value>لا توجد مساحة كافية على القرص</value>

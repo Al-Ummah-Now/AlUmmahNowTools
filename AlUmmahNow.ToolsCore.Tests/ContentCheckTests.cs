@@ -29,7 +29,123 @@ public sealed class Mp4IndexTests
         return box;
     }
 
-    private static byte[] Track(string handler) => Box("trak", Box("tkhd", new byte[84]), Box("mdia", Box("mdhd", new byte[24]), Box("hdlr", new byte[8], Encoding.ASCII.GetBytes(handler), new byte[13])));
+    private static byte[] Track(string handler) => Track(handler, "avc1", 250);
+
+    private static byte[] U32(uint value)
+    {
+        var bytes = new byte[4];
+        BinaryPrimitives.WriteUInt32BigEndian(bytes, value);
+        return bytes;
+    }
+
+    private static byte[] Track(string handler, string codec, uint samples) => Box("trak", Box("tkhd", new byte[84]), Box("mdia", Box("mdhd", new byte[24]),
+        Box("hdlr", new byte[8], Encoding.ASCII.GetBytes(handler), new byte[13]),
+        // QuickTime has a second handler here, which is not the track's
+        Box("minf", Box("hdlr", new byte[8], "url "u8.ToArray(), new byte[13]),
+            Box("stbl", Box("stsd", new byte[4], U32(1), U32(86), Encoding.ASCII.GetBytes(codec), new byte[70]), Box("stsz", new byte[4], U32(0), U32(samples))))));
+
+    private static byte[] Data(int length) => Box("mdat", Enumerable.Range(0, length).Select(i => (byte)(i % 251)).ToArray());
+
+    /// <summary>The index first, as for the web: the rest is cut off or never filled after it.</summary>
+    private static byte[] IndexFirst(int data = 300_000) => [.. Box("ftyp", "isom"u8.ToArray(), new byte[4]), .. Moov("vide", "soun"), .. Data(data)];
+
+    [Fact]
+    public async Task With_the_index_first_a_file_cut_off_in_its_data_is_damaged()
+    {
+        var whole = IndexFirst();
+        Assert.Equal(VideoContent.Video, await Read(whole));
+        foreach (var length in new[] { whole.Length - 1, whole.Length / 2, whole.Length - 299_990 }) Assert.Equal(VideoContent.Damaged, await Read(whole[..length]));
+        // Not one byte of its data
+        Assert.Equal(VideoContent.Damaged, await Read(whole[..(whole.Length - Data(300_000).Length)]));
+    }
+
+    [Fact]
+    public async Task With_the_index_first_a_file_that_was_never_filled_is_damaged()
+    {
+        var empty = IndexFirst();
+        empty.AsSpan(empty.Length / 3).Clear();
+        Assert.Equal(VideoContent.Damaged, await Read(empty));
+        // A quiet stretch is not an empty file
+        var quiet = IndexFirst();
+        quiet.AsSpan(quiet.Length / 2, 60_000).Clear();
+        Assert.Equal(VideoContent.Video, await Read(quiet));
+        var tail = IndexFirst();
+        tail.AsSpan(tail.Length - 40_000).Clear();
+        Assert.Equal(VideoContent.Video, await Read(tail));
+    }
+
+    [Fact]
+    public async Task A_fragmented_file_is_whole_to_its_last_fragment()
+    {
+        byte[] Fragment() => [.. Box("moof", Box("mfhd", new byte[8])), .. Data(2000)];
+        byte[] start = [.. Box("ftyp", "isom"u8.ToArray(), new byte[4]), .. Moov("vide", "soun")];
+        byte[] whole = [.. start, .. Fragment(), .. Fragment(), .. Fragment()];
+        Assert.Equal(VideoContent.Video, await Read(whole));
+        Assert.Equal(VideoContent.Damaged, await Read(whole[..^500]));
+        Assert.Equal(VideoContent.Damaged, await Read(start));
+        Assert.Equal(VideoContent.Damaged, await Read([.. start, .. Fragment()[..10]]));
+    }
+
+    [Fact]
+    public async Task What_follows_a_whole_file_is_not_looked_into()
+    {
+        // Padding, text, a box that says more than there is
+        foreach (var tail in new byte[][] { new byte[5000], "some app's own words, after the end"u8.ToArray(), Box("free", new byte[100])[..50] })
+        {
+            Assert.Equal(VideoContent.Video, await Read([.. IndexFirst(3000), .. tail]));
+            Assert.Equal(VideoContent.Video, await Read([.. File("vide"), .. tail]));
+        }
+    }
+
+    [Fact]
+    public async Task A_cover_is_not_a_video_and_one_frame_or_a_film_of_stills_is()
+    {
+        Task<VideoContent> With(params byte[][] tracks) => Read([.. Box("ftyp", new byte[8]), .. Data(3000), .. Box("moov", tracks)]);
+        Assert.Equal(VideoContent.NoVideo, await With(Track("soun"), Track("vide", "jpeg", 1)));
+        Assert.Equal(VideoContent.NoVideo, await With(Track("vide", "png ", 1), Track("soun")));
+        Assert.Equal(VideoContent.Damaged, await With(Track("vide", "jpeg", 1)));
+        Assert.Equal(VideoContent.Video, await With(Track("soun"), Track("vide", "jpeg", 400)));
+        Assert.Equal(VideoContent.Video, await With(Track("soun"), Track("vide", "avc1", 1)));
+        Assert.Equal(VideoContent.Video, await With(Track("vide", "jpeg", 1), Track("vide"), Track("soun")));
+    }
+
+    [Fact]
+    public async Task A_packed_index_is_never_a_reason_to_refuse()
+    {
+        Assert.Equal(VideoContent.Undecided, await Read([.. Box("ftyp", new byte[8]), .. Data(3000), .. Box("moov", Box("cmov", Box("dcom", new byte[4]), Box("cmvd", new byte[200])))]));
+    }
+
+    /// <summary>Counts what is asked of the disk.</summary>
+    private sealed class Counting(byte[] bytes) : MemoryStream(bytes)
+    {
+        public int Reads;
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken ct = default)
+        {
+            Reads++;
+            return base.ReadAsync(buffer, ct);
+        }
+    }
+
+    [Fact]
+    public async Task A_file_of_countless_boxes_is_undecided_after_a_bounded_number_of_small_reads()
+    {
+        var crumb = Box("free");
+        byte[] Crumbs(int count) => Enumerable.Repeat(crumb, count).SelectMany(b => b).ToArray();
+        foreach (var bytes in new byte[][]
+        {
+            [.. Box("ftyp", new byte[8]), .. Crumbs(200_000), .. Data(100), .. Moov("vide")],
+            [.. Box("ftyp", new byte[8]), .. Data(100), .. Box("moov", Crumbs(200_000), Track("vide"))],
+            [.. Box("ftyp", new byte[8]), .. Data(100), .. Box("moov", Enumerable.Repeat(Box("trak", Box("mdia")), 100_000).ToArray())],
+        })
+        {
+            var file = new Counting(bytes);
+            Assert.Equal(VideoContent.Undecided, await Mp4Index.ReadAsync(file, bytes.Length, default));
+            Assert.InRange(file.Reads, 1, 200);
+        }
+        // A long fragmented recording is well inside the bound
+        byte[] fragments = Enumerable.Repeat((byte[])[.. Box("moof", Box("mfhd", new byte[8])), .. Data(300)], 5000).SelectMany(b => b).ToArray();
+        Assert.Equal(VideoContent.Video, await Read([.. Box("ftyp", new byte[8]), .. Moov("vide", "soun"), .. fragments]));
+    }
 
     internal static byte[] File(params string[] handlers) =>
         [.. Box("ftyp", "isom"u8.ToArray(), new byte[4]), .. Box("mdat", Enumerable.Range(0, 3000).Select(i => (byte)(i % 251)).ToArray()), .. Moov(handlers)];
@@ -43,7 +159,7 @@ public sealed class Mp4IndexTests
     {
         Assert.Equal(VideoContent.Video, await Read(File("vide", "soun")));
         Assert.Equal(VideoContent.Video, await Read(File("soun", "vide")));
-        Assert.Equal(VideoContent.Video, await Read([.. Box("ftyp", new byte[8]), .. Moov("vide"), .. Box("mdat", new byte[100])]));
+        Assert.Equal(VideoContent.Video, await Read([.. Box("ftyp", new byte[8]), .. Moov("vide"), .. Data(100)]));
         Assert.Equal(VideoContent.Video, await Read([.. Box("ftyp", new byte[8]), .. Wide("mdat", new byte[100]), .. Moov("vide")]));
         // A moov to the end of the file
         var open = File("vide");
@@ -95,7 +211,7 @@ public sealed class Mp4IndexTests
             BinaryPrimitives.WriteUInt32BigEndian(bad.AsSpan(16), size);
             Assert.Equal(VideoContent.Damaged, await Read(bad));
         }
-        // A track larger than the index that holds it
+        // A track larger than the index that holds it (after the index's header and its mvhd)
         var track = File("vide");
         BinaryPrimitives.WriteUInt32BigEndian(track.AsSpan(track.Length - Moov("vide").Length + 8 + 108), 1_000_000);
         Assert.Equal(VideoContent.Damaged, await Read(track));
@@ -335,6 +451,69 @@ public sealed class ContentCheckTests
         Assert.Equal(Temp.Sha(path), item.Sha256);
         Assert.Equal(File.ReadAllBytes(path), Assert.Single(server.Uploads).Value.Data.ToArray());
         await queue.StopAsync();
+    }
+
+    [Fact]
+    public async Task A_file_whose_index_takes_too_long_goes_up_with_a_line_in_its_log()
+    {
+        var item = Item(Mp4IndexTests.File("soun"));
+        var context = new RecordingContext();
+        await VideoCheck.RunAsync(item, SourceAccess.Default, new Probe("no_video"), context, default, TimeSpan.Zero);
+        Assert.Contains(context.Lines, l => l.Code == "video_undecided");
+        // Stopped, it is no answer
+        using var stopped = new CancellationTokenSource();
+        await stopped.CancelAsync();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => VideoCheck.RunAsync(Item(Mp4IndexTests.File("soun")), SourceAccess.Default, null, context, stopped.Token));
+    }
+
+    [Theory]
+    [InlineData(403)]
+    [InlineData(409)]
+    [InlineData(400)]
+    public async Task An_upload_the_server_will_not_give_up_is_left_and_another_begun(int status)
+    {
+        var item = Item(Mp4IndexTests.File("vide"));
+        Change(item, 100);
+        var server = new FakeServer { DeleteStatus = status };
+        var context = new RecordingContext();
+        Assert.Equal("content_changed", await Refused(() => Step(server).RunAsync(item, context, default)));
+        Assert.Contains(context.Lines, l => l.Code == "upload_kept");
+        var kept = Assert.Single(server.Uploads).Key;
+        Assert.Null(item.UploadUrl);
+        Change(item, 100);
+        item = Restarted(item);
+        // The server offers the kept one to go on with: it is not taken
+        Assert.Equal(StepResult.Done, await Step(server).RunAsync(item, new RecordingContext(), default));
+        Assert.Equal(2, server.Uploads.Count);
+        Assert.Equal(File.ReadAllBytes(item.Video.Path), server.Uploads.Single(u => u.Key != kept).Value.Data.ToArray());
+    }
+
+    [Fact]
+    public async Task A_lost_answer_that_the_server_remembers_costs_no_second_reading()
+    {
+        var item = Item(Mp4IndexTests.File("vide"));
+        // The part is kept and its answer is a conflict, as when it was sent twice
+        var server = new FakeServer { LoseAt = 2000, LoseKeeps = true, LoseStatus = 409 };
+        var context = new RecordingContext();
+        Assert.Equal(StepResult.Done, await Step(server).RunAsync(item, context, default));
+        Assert.DoesNotContain(context.Lines, l => l.Code == "sent_check");
+        Assert.Equal(item.Video.Size, item.SentTo);
+    }
+
+    [Fact]
+    public async Task A_file_hashed_by_a_version_that_did_not_check_opens_nothing_on_the_server()
+    {
+        var item = Item(Mp4IndexTests.File("soun"));
+        var server = new RenditionServer();
+        var api = new ImportApiClient(new Uri("https://admin.api.example"), _ => Task.FromResult<string?>("tok"), server);
+        var work = Temp.Folder();
+        // Left by the file that was in its place
+        var left = Path.Combine(work, item.Id, "360p");
+        Directory.CreateDirectory(left);
+        var step = new EncodeStep(api, new Uri("https://videos.api.example"), new FakeMedia(), new FakePackager(), work, "Tools test", (_, _) => { }, _ => long.MaxValue);
+        Assert.Equal("no_video", await Refused(() => step.RunAsync(item, new RecordingContext(), default)));
+        Assert.Equal(0, server.Inner.OpenCount);
+        Assert.False(Directory.Exists(left));
     }
 
     [Fact]

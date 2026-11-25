@@ -241,6 +241,9 @@ internal sealed class FakeServer : HttpMessageHandler
     /// <summary>The answer to the PATCH at this offset is lost, once; what it sent is kept or not</summary>
     public long? LoseAt;
     public bool LoseKeeps;
+    public int LoseStatus = 502;
+    /// <summary>Answer this to every DELETE</summary>
+    public int? DeleteStatus;
     /// <summary>Answer 503 to this many DELETEs first</summary>
     public int DeleteFailures;
     /// <summary>Answer 503 to this many sidecar calls first</summary>
@@ -296,6 +299,7 @@ internal sealed class FakeServer : HttpMessageHandler
             var answer = new HttpResponseMessage(HttpStatusCode.NoContent);
             if (request.Method == HttpMethod.Delete)
             {
+                if (DeleteStatus is { } refused) return new HttpResponseMessage((HttpStatusCode)refused);
                 if (DeleteFailures-- > 0) return new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);
                 Uploads.Remove(id);
                 return answer;
@@ -319,7 +323,7 @@ internal sealed class FakeServer : HttpMessageHandler
                 if (lost)
                 {
                     LoseAt = null;
-                    return new HttpResponseMessage(HttpStatusCode.BadGateway);
+                    return new HttpResponseMessage((HttpStatusCode)LoseStatus);
                 }
             }
             answer.Headers.Add("Upload-Offset", up.Data.Length.ToString());
