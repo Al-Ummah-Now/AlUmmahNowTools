@@ -698,7 +698,9 @@ public class ImportQueueTests
         await pump;
 
         queue.Pause(item.Id);
-        await Temp.WaitUntil(() => queue.Items[0].Phase == ItemPhase.Paused);
+        // It reads Paused at once; the step itself stops a moment later
+        Assert.Equal(ItemPhase.Paused, queue.Items[0].Phase);
+        await Temp.WaitUntil(() => S(queue.Items[0], ImportStepKind.Upload).Status == StepStatus.Pending);
         Assert.Equal(0, S(queue.Items[0], ImportStepKind.Upload).Attempts);
         Assert.Equal(0, queue.Pump());
 
