@@ -49,7 +49,15 @@ internal static class AppDialogs
     private static async Task CloseAfterAsync(ContentDialog dialog, TimeSpan time)
     {
         await Task.Delay(time).ConfigureAwait(true);
-        dialog.Hide();
+        try
+        {
+            dialog.Hide();
+        }
+        catch (Exception ex)
+        {
+            // It went with its window
+            Serilog.Log.Debug(ex, "[Dialog] Could not be closed");
+        }
     }
 
     /// <summary>The control a keyboard goes on from when the one it was on has gone (with what was removed).</summary>

@@ -52,7 +52,11 @@ internal sealed class ChannelBoxes
         // Its list is placed where the box was when it opened
         box.SizeChanged += (_, e) =>
         {
-            if (e.PreviousSize.Width > 0 && e.NewSize.Width != e.PreviousSize.Width) boxes.Close();
+            if (e.PreviousSize.Width > 0 && e.NewSize.Width != e.PreviousSize.Width)
+            {
+                boxes.BackToTyped();
+                boxes.Close();
+            }
         };
         return boxes;
     }

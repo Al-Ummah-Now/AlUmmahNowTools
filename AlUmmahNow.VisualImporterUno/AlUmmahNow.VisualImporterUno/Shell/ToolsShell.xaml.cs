@@ -261,11 +261,28 @@ public sealed partial class ToolsShell : UserControl
 
     private async void OnSignOutClick(object sender, RoutedEventArgs e)
     {
-        if (!await AskToLeaveAsync(null)) return;
-        // While its tokens still are valid: what was sent is saved as sent
-        await ImportWorkspace.HoldAsync();
-        try { await _state.Session.SignOutAsync(); }
-        finally { ImportWorkspace.Resume(); }
+        await LeaveAsync(null, _state.Session.SignOutAsync);
+    }
+
+    private bool _leaving;
+
+    /// <summary>One at a time: while the queue is stopping there is nothing left to ask about.</summary>
+    private async Task LeaveAsync(ToolsEnvironmentKind? to, Func<Task> leave)
+    {
+        if (_leaving) return;
+        _leaving = true;
+        try
+        {
+            if (!await AskToLeaveAsync(to)) return;
+            // While its tokens still are valid: what was sent is saved as sent
+            await ImportWorkspace.HoldAsync();
+            try { await leave(); }
+            finally { ImportWorkspace.Resume(); }
+        }
+        finally
+        {
+            _leaving = false;
+        }
     }
 
     /// <summary>Asks before the imports that are running stop: signing out, or another environment.</summary>
@@ -284,10 +301,7 @@ public sealed partial class ToolsShell : UserControl
 
     private async Task SwitchAsync(ToolsEnvironmentKind kind)
     {
-        if (kind == _state.Session.Environment.Kind || !await AskToLeaveAsync(kind)) return;
-        await ImportWorkspace.HoldAsync();
-        try { await _state.SwitchEnvironmentAsync(kind); }
-        finally { ImportWorkspace.Resume(); }
+        if (kind != _state.Session.Environment.Kind) await LeaveAsync(kind, () => _state.SwitchEnvironmentAsync(kind));
     }
 
     private async void OnGatePrimaryClick(object sender, RoutedEventArgs e)

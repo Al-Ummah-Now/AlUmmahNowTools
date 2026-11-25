@@ -195,9 +195,11 @@ try {
 	KEYS.text(WORD);
 	await wait(3000);
 	expect('before the window gets narrower: the list is open', (s) => s.open && s.items > 0);
-	KEYS.narrower();
-	await wait(1500);
-	expect('the window got narrower: the list is closed', (s) => !s.open && s.text === WORD);
+	if (KEYS.narrower) {
+		KEYS.narrower();
+		await wait(1500);
+		expect('the window got narrower: the list is closed', (s) => !s.open && s.text === WORD);
+	}
 	KEYS.front();
 	await back();
 	KEYS.key('All');

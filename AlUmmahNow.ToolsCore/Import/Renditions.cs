@@ -879,7 +879,7 @@ public sealed class EncodeStep : IImportStep
                 var copy = await CopyAsync(item, directory, context, time).ConfigureAwait(false);
                 var read = plan is not null;
                 plan = await PlanAsync(await _media.ProbeAsync(copy, time).ConfigureAwait(false)).ConfigureAwait(false);
-                if (_space.Take(directory, video.Size + plan.Bytes) != SpaceReservations.Answer.Yes) throw NoRoom(plan.Bytes);
+                if (_space.Take(directory, video.Size + plan.Bytes) != SpaceReservations.Answer.Yes) throw NoRoom(video.Size + plan.Bytes);
                 if (!read)
                 {
                     limit.CancelAfter(Limit(plan.Info.Seconds, video.Size));
