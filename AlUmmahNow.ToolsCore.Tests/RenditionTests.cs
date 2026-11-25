@@ -113,7 +113,11 @@ internal sealed class FakeMedia : IMediaTools
     public string? Encoder = "libx264";
     public int Encodes;
 
-    public Task<SourceInfo> ProbeAsync(string path, CancellationToken ct) => Fail is LocalEncodeException { Code: "probe_failed" } ? throw Fail : Task.FromResult(Info);
+    /// <summary>How long what was encoded is, when not as long as the file</summary>
+    public double? Encoded;
+
+    public Task<SourceInfo> ProbeAsync(string path, CancellationToken ct) => Fail is LocalEncodeException { Code: "probe_failed" or "no_video" } ? throw Fail
+        : Task.FromResult(Encoded is { } seconds && Encodes > 0 ? Info with { DurationSeconds = seconds } : Info);
 
     public Task<string?> PickEncoderAsync(CancellationToken ct) => Task.FromResult(Encoder);
 
@@ -216,7 +220,7 @@ public class EncodeStepTests
         Temp.Bytes(dir, "lesson.mp4", 2500);
         var scan = FolderScanner.Scan(dir, false, null).Videos[0];
         var item = QueueItem.For(scan, "b1", "ch1", DateTimeOffset.UtcNow, serverEncodes);
-        item.Sha256 = new string('a', 64);
+        item.Sha256 = Temp.Sha(scan.Path);
         item.FingerprintHash = new string('c', 64);
         var server = new RenditionServer();
         var api = new ImportApiClient(new Uri("https://admin.api.example"), _ => Task.FromResult<string?>("tok"), server);
@@ -243,6 +247,18 @@ public class EncodeStepTests
         Assert.Equal("Tools test, ffmpeg libx264", set.Encoder);
         Assert.Contains(context.Lines, l => l.Code == "encoded");
         Assert.Equal(1, context.LastProgress, 3);
+    }
+
+    [Theory]
+    [InlineData(11.0, true)]
+    [InlineData(9.9, false)]
+    public async Task An_encode_that_stopped_before_the_files_end_is_not_sent(double seconds, bool sent)
+    {
+        var (item, _, api, work) = Setup();
+        var context = new RecordingContext();
+        Assert.Equal(sent ? StepResult.Done : StepResult.Skipped, await Step(api, work, new FakeMedia { Encoded = seconds }).RunAsync(item, context, default));
+        Assert.Equal(sent, item.Renditions is not null);
+        Assert.Equal(!sent, context.Lines.Any(l => l.Code == "encode_failed" && l.Text.Contains("9.9 s long", StringComparison.Ordinal)));
     }
 
     [Fact]

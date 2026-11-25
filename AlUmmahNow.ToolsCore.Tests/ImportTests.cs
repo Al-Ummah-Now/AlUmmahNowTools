@@ -31,6 +31,8 @@ internal static class Temp
         return path;
     }
 
+    public static string Sha(string path) => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path))).ToLowerInvariant();
+
     public static string Bytes(string dir, string name, int length, int seed = 1)
     {
         var path = Path.Combine(dir, name);
@@ -236,6 +238,11 @@ internal sealed class FakeServer : HttpMessageHandler
     /// <summary>Answer 404 to a PATCH at or after this offset (the proxy session expired), <see cref="ExpireCount"/> times</summary>
     public long? ExpireAt;
     public int ExpireCount = 1;
+    /// <summary>The answer to the PATCH at this offset is lost, once; what it sent is kept or not</summary>
+    public long? LoseAt;
+    public bool LoseKeeps;
+    /// <summary>Answer 503 to this many DELETEs first</summary>
+    public int DeleteFailures;
     /// <summary>Answer 503 to this many sidecar calls first</summary>
     public int SidecarFailures;
     public JsonNode? LastItemBody;
@@ -287,6 +294,12 @@ internal sealed class FakeServer : HttpMessageHandler
             var id = path["/api/videos/tus/".Length..];
             if (!Uploads.TryGetValue(id, out var up)) return new HttpResponseMessage(HttpStatusCode.NotFound);
             var answer = new HttpResponseMessage(HttpStatusCode.NoContent);
+            if (request.Method == HttpMethod.Delete)
+            {
+                if (DeleteFailures-- > 0) return new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);
+                Uploads.Remove(id);
+                return answer;
+            }
             if (request.Method == HttpMethod.Head)
             {
                 answer = new HttpResponseMessage(HttpStatusCode.OK);
@@ -301,7 +314,13 @@ internal sealed class FakeServer : HttpMessageHandler
                 }
                 if (offset != up.Data.Length) return new HttpResponseMessage(HttpStatusCode.Conflict);
                 var chunk = await request.Content!.ReadAsByteArrayAsync(ct);
-                up.Data.Write(chunk);
+                var lost = LoseAt == offset;
+                if (!lost || LoseKeeps) up.Data.Write(chunk);
+                if (lost)
+                {
+                    LoseAt = null;
+                    return new HttpResponseMessage(HttpStatusCode.BadGateway);
+                }
             }
             answer.Headers.Add("Upload-Offset", up.Data.Length.ToString());
             return answer;
@@ -519,7 +538,7 @@ public class UploadStepTests
         var path = Temp.Bytes(dir, "lesson.mp4", bytes);
         var scan = FolderScanner.Scan(dir, false, null).Videos[0];
         var item = QueueItem.For(scan, "b1", "ch1", DateTimeOffset.UtcNow);
-        item.Sha256 = sha ?? new string('a', 64);
+        item.Sha256 = sha ?? Temp.Sha(path);
         item.FingerprintHash = new string('c', 64);
         return (item, path);
     }
@@ -578,7 +597,7 @@ public class UploadStepTests
     public async Task A_file_the_channel_already_has_is_not_uploaded_and_skips_the_rest()
     {
         var server = new FakeServer { AlreadyImportedSha = new string('a', 64) };
-        var (item, _) = Item(100);
+        var (item, _) = Item(100, new string('a', 64));
         Assert.Equal(StepResult.SkipRest, await Step(server).RunAsync(item, new RecordingContext(), default));
         Assert.True(item.AlreadyImported);
         Assert.Equal("vid-old", item.VideoId);

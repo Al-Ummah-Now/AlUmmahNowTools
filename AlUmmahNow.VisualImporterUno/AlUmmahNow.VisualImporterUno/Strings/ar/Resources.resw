@@ -2334,6 +2334,18 @@
   <data name="ImportError_file_writing" xml:space="preserve">
     <value>ما زال تطبيق آخر يكتب في الملف. يلزم البحث في المجلد مجددًا بعد اكتماله.</value>
   </data>
+  <data name="ImportError_no_video" xml:space="preserve">
+    <value>لا مرئي في الملف، فلا يُرفع.</value>
+  </data>
+  <data name="ImportError_not_video" xml:space="preserve">
+    <value>الملف ليس مرئيًا كاملًا، وربما انقطع نسخه. يلزم نسخه مجددًا، ثم البحث في المجلد مجددًا.</value>
+  </data>
+  <data name="ImportError_content_changed" xml:space="preserve">
+    <value>ما قُرئ للرفع يختلف عما فُحص من قبل، فأُوقف الرفع. يمكن إعادة المحاولة، وإن تكرر ذلك يلزم نسخ الملف مجددًا، ثم البحث في المجلد مجددًا.</value>
+  </data>
+  <data name="ImportError_upload_left" xml:space="preserve">
+    <value>ما زال الرفع الموقوف قيد الإزالة من الخادم.</value>
+  </data>
   <data name="ImportError_disk_read" xml:space="preserve">
     <value>تعذّرت على القرص قراءة الملف.</value>
   </data>
@@ -2378,6 +2390,12 @@
   </data>
   <data name="ImportLog_hash_resumed" xml:space="preserve">
     <value>يُستأنف الفحص من البايت {0}</value>
+  </data>
+  <data name="ImportLog_sent_check" xml:space="preserve">
+    <value>أُرسلت أول {0} بايت من قبل، ويُعاد فحصها</value>
+  </data>
+  <data name="ImportLog_video_unchecked" xml:space="preserve">
+    <value>لم يُفحص وجود مرئي في الملف، لأن ffprobe غير موجود على هذا الجهاز</value>
   </data>
   <data name="ImportLog_cloud_download" xml:space="preserve">
     <value>جار التنزيل من التخزين السحابي أولًا</value>
