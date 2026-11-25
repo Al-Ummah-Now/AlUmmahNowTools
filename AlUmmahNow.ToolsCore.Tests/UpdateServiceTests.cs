@@ -34,6 +34,7 @@ public sealed class UpdateServiceTests : IDisposable
         {
             if (Refuse is not null) throw new UpdateVerificationException(Refuse);
             Assert.Equal(Tag, tag);
+            Verified++;
             return new CoreRelease("2026.11.23", Tag, "Faster.", "أسرع.", new[] { new CoreArtifact("tools", "windows", "x64", "velopack-full", PackageUrl, Sha, Size) });
         }
         public bool AllowedDownloadUrl(string url) => url.StartsWith("https://github.com/Al-Ummah-Now/AlUmmahNowTools/releases/download/", StringComparison.Ordinal) || url.StartsWith("https://release-assets.githubusercontent.com/", StringComparison.Ordinal);
@@ -42,7 +43,8 @@ public sealed class UpdateServiceTests : IDisposable
         public void MarkChecked(long atMs) => LastCheckMs = atMs;
         public long? LastCheckMs { get; private set; }
         public string OfflinePromptKind() => "None";
-        public string StateJson() => "{}";
+        public int Verified;
+        public string StateJson() => $"{{\"verified\":{Verified}}}";
     }
 
     private sealed class FakeInstaller : IUpdateInstaller
@@ -52,6 +54,7 @@ public sealed class UpdateServiceTests : IDisposable
         public int Restarts;
         public Task StageAsync(string packagePath, CoreRelease release, CoreArtifact artifact, CancellationToken cancel)
         {
+            OnHandOver?.Invoke();
             if (Broken is not null) return Task.FromException(Broken);
             Staged = packagePath;
             return Task.CompletedTask;
@@ -66,11 +69,17 @@ public sealed class UpdateServiceTests : IDisposable
         }
         public void Discard() => Discarded++;
         public int Exits;
-        public void ApplyOnExit() => Exits++;
+        public Action? OnHandOver;
+        public void ApplyOnExit()
+        {
+            OnHandOver?.Invoke();
+            Exits++;
+        }
         public Action? OnVerify;
         public Exception? RestartFails;
         public void ApplyAndRestart()
         {
+            OnHandOver?.Invoke();
             if (RestartFails is not null) throw RestartFails;
             Interlocked.Increment(ref Restarts);
         }
@@ -564,6 +573,60 @@ public sealed class UpdateServiceTests : IDisposable
         Assert.Equal(0, installer.Exits);
         service.OnExit();
         Assert.Equal(1, installer.Exits);
+    }
+
+    [Theory]
+    [InlineData("restart")]
+    [InlineData("exit")]
+    public async Task The_update_state_is_saved_after_every_check_of_a_manifest(string how)
+    {
+        var (service, _, installer, _) = Make();
+        var path = Path.Combine(_dir, "updates.json");
+        var saved = new List<string>();
+        installer.OnHandOver = () => saved.Add(File.ReadAllText(path));
+        await service.CheckAsync(userAsked: false);
+        // A save lost meanwhile (another copy's, a full disk) is made good before the hand-over
+        File.Delete(path);
+        if (how == "restart") Assert.True(await service.RestartNowAsync());
+        else service.OnExit();
+        Assert.Equal(new[] { "{\"verified\":1}", "{\"verified\":2}" }, saved);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task What_a_check_learns_is_there_after_a_restart_even_if_the_update_was_never_staged(bool downloads)
+    {
+        var v = System.Text.Json.JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "fixtures", "app-updates-signed-vector.json"))).RootElement;
+        string Text(string name) => v.GetProperty(name).GetString()!;
+        AlUmmahNow.Core.UpdateChecker Checker(string? state) => new("AlUmmahNowTools", new[] { Text("rootPublicKey") }, "2026.11.22", false, state, Text("keyList"), Text("keyListSig"));
+        var http = new FakeHttp();
+        http.Routes["config"] = () => Ok(Encoding.UTF8.GetBytes($"{{\"update\":{{\"enabled\":true,\"status\":\"recommended\",\"minimumVersion\":\"0.0.0\",\"latestVersion\":\"2026.11.23\",\"channel\":\"stable\",\"action\":\"install\",\"manifestUrl\":\"{ManifestUrl}\",\"tag\":\"{Tag}\",\"signed\":true,\"available\":true,\"checkHours\":6}}}}"));
+        http.Routes[ManifestUrl] = () => Ok(Encoding.UTF8.GetBytes(Text("manifest")));
+        http.Routes[ManifestUrl + ".sig"] = () => Ok(Encoding.UTF8.GetBytes(Text("manifestSig")));
+        var path = Path.Combine(_dir, "updates.json");
+        string? during = null;
+        var package = System.Text.Json.JsonDocument.Parse(Text("manifest")).RootElement.GetProperty("artifacts")[0].GetProperty("url").GetString()!;
+        // The app ends here: what is on the disk by now is all the next start has
+        http.Routes[package] = () =>
+        {
+            during = File.ReadAllText(path);
+            return downloads ? Ok(new byte[34]) : new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);
+        };
+        using (var core = new CoreUpdateChecker(Checker(null)))
+        {
+            using var service = new UpdateService(http, () => new Uri("https://videos.api.example.com"), core, new FakeInstaller(), path, Path.Combine(_dir, "dl"), "2026.11.22", "windows", "x64", () => false, true);
+            await service.CheckAsync(userAsked: true);
+            Assert.NotEqual(UpdateStage.Ready, service.View.Stage);
+        }
+        Assert.NotNull(during);
+        foreach (var saved in new[] { during, File.ReadAllText(path) })
+        {
+            using var restarted = Checker(saved);
+            var state = System.Text.Json.JsonDocument.Parse(restarted.StateJson()).RootElement;
+            Assert.Equal("2026.11.23", state.GetProperty("floor").GetString());
+            Assert.Contains("2026.11.21", state.GetProperty("yanked").EnumerateArray().Select(y => y.GetString()));
+        }
     }
 
     [Fact]

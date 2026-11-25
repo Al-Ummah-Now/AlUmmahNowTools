@@ -389,7 +389,7 @@ public sealed class UpdateService : IDisposable
         if (_staged is not { } staged) return false;
         try
         {
-            _core.VerifyManifest(staged.Manifest, staged.Signature, staged.Tag);
+            Verify(staged.Manifest, staged.Signature, staged.Tag);
             _installer.VerifyStaged();
             return true;
         }
@@ -426,12 +426,19 @@ public sealed class UpdateService : IDisposable
         }
     }
 
+    /// <summary>The update state is saved after every check of a manifest, before anything is done with what it says.</summary>
+    private CoreRelease Verify(byte[] manifest, string signature, string tag)
+    {
+        var release = _core.VerifyManifest(manifest, signature, tag);
+        SaveState();
+        return release;
+    }
+
     private async Task<(CoreRelease Release, Staged Proof)> FetchReleaseAsync(string manifestUrl, string tag, CancellationToken cancel)
     {
         var manifest = await FetchAsync(manifestUrl, 256 * 1024, null, cancel).ConfigureAwait(false);
         var signature = Encoding.UTF8.GetString(await FetchAsync(manifestUrl + ".sig", 4096, null, cancel).ConfigureAwait(false));
-        var release = _core.VerifyManifest(manifest, signature, tag);
-        SaveState();
+        var release = Verify(manifest, signature, tag);
         return (release, new Staged(release.Version, tag, manifest, signature));
     }
 

@@ -47,6 +47,8 @@ public sealed class CoreUpdateChecker : IUpdateCore, IDisposable
         }
     }
 
+    internal CoreUpdateChecker(UpdateChecker checker) => _checker = checker;
+
     public static CoreUpdateChecker Load(string installedVersion, string statePath) =>
         new(installedVersion, File.Exists(statePath) ? SafeRead(statePath) : null);
 
