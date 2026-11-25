@@ -42,6 +42,10 @@ internal static class UpdateTestClose
                     case "dock-quit": SendQuitEvent(reason: 0); break;
                     case "log-out": SendQuitEvent(reason: 0x6C6F676F); break; // 'logo'
                     case "restart": Press(window.Content!); break;
+                    // With work running: the question, then the window goes under it, or Quit and stop is pressed
+                    case "ask-then-close": _ = AppQuit.RequestQuitAsync("update test"); Later(window, window.Close); break;
+                    case "quit-confirm": _ = AppQuit.RequestQuitAsync("update test"); Later(window, () => Confirm(window)); break;
+                    case "none": break;
                     default: throw new ArgumentException(mode);
                 }
             }
@@ -50,6 +54,27 @@ internal static class UpdateTestClose
                 UpdateTestHandler.Log($"could not close: {ex.Message}");
             }
         });
+    }
+
+    private static void Later(Window window, Action act) => _ = Task.Run(async () =>
+    {
+        await Task.Delay(2500);
+        window.DispatcherQueue.TryEnqueue(() =>
+        {
+            try { act(); }
+            catch (Exception ex) { UpdateTestHandler.Log($"could not close: {ex.Message}"); }
+        });
+    });
+
+    private static void Confirm(Window window)
+    {
+        foreach (var popup in VisualTreeHelper.GetOpenPopupsForXamlRoot(window.Content!.XamlRoot!))
+        {
+            if (popup.Child is not { } dialog || Find<Button>(dialog, b => Equals(b.Content, Loc.Get("Quit_Confirm"))) is not { } button) continue;
+            new ButtonAutomationPeer(button).Invoke();
+            return;
+        }
+        throw new InvalidOperationException("no quit question");
     }
 
     private static void Press(DependencyObject root)

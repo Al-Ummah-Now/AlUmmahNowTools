@@ -47,6 +47,9 @@ public sealed class ImportWorkspace : IDisposable
             new CheckStep(Api),
             new TranslateStep(Api),
         };
+#if UPDATE_TEST
+        if (UpdateTestStep.On) steps[0] = new UpdateTestStep();
+#endif
         var path = IsDemo
             ? Path.Combine(Path.GetTempPath(), "aun-tools-demo-" + Guid.NewGuid().ToString("N"), "queue.json")
             : ImportQueue.DefaultPath(Environment);
@@ -63,6 +66,13 @@ public sealed class ImportWorkspace : IDisposable
         {
             Queue.Start();
         }
+#if UPDATE_TEST
+        if (UpdateTestStep.On)
+        {
+            Queue.Add([UpdateTestStep.Item()]);
+            Queue.Start();
+        }
+#endif
     }
 
     public ToolsEnvironment Environment { get; }

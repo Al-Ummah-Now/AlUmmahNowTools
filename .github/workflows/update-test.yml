@@ -7,6 +7,7 @@ on:
       - .github/workflows/update-test.yml
       - .github/workflows/release.yml
       - scripts/update-test.mjs
+      - scripts/update-test-child.mjs
       - scripts/app-release.mjs
       - scripts/vpk-pack.sh
       - scripts/mac-bundle.sh
@@ -17,6 +18,9 @@ on:
       - AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno/Shell/AppInstance.cs
       - AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno/Shell/UpdateTestHandler.cs
       - AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno/Shell/UpdateTestClose.cs
+      - AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno/Shell/UpdateTestBusy.cs
+      - AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno/Services/FileScanServiceManager.cs
+      - AlUmmahNow.ToolsCore/Import/QuitCoordinator.cs
       - AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno/Shell/UpdateBar.cs
       - AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno/Shell/AppQuit.cs
       - AlUmmahNow.VisualImporterUno/AlUmmahNow.VisualImporterUno/Program.cs
@@ -31,7 +35,7 @@ env:
 jobs:
   windows:
     runs-on: windows-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     defaults:
       run:
         shell: bash
@@ -67,10 +71,18 @@ jobs:
             rm -rf "$LOCALAPPDATA/AlUmmahNow.Tools"; cp -r keep/installed "$LOCALAPPDATA/AlUmmahNow.Tools"
             node scripts/update-test.mjs --exe "$LOCALAPPDATA/AlUmmahNow.Tools/current/AlUmmahNow.VisualImporterUno.exe" --package keep/2/*-full.nupkg --packages "$LOCALAPPDATA/AlUmmahNow.Tools/packages" --package-name AlUmmahNow.Tools-2026.1.201-full.nupkg --state "$LOCALAPPDATA/AlUmmahNow/Tools/updates.json" --platform windows --arch x64 --from 2026.01.01 --to 2026.01.02 --close $c
           done
+      - name: Work that is running is stopped before the updater is started
+        run: |
+          failed=
+          for c in window-close ask-then-close quit-confirm; do
+            rm -rf "$LOCALAPPDATA/AlUmmahNow.Tools"; cp -r keep/installed "$LOCALAPPDATA/AlUmmahNow.Tools"
+            node scripts/update-test.mjs --exe "$LOCALAPPDATA/AlUmmahNow.Tools/current/AlUmmahNow.VisualImporterUno.exe" --package keep/2/*-full.nupkg --packages "$LOCALAPPDATA/AlUmmahNow.Tools/packages" --package-name AlUmmahNow.Tools-2026.1.201-full.nupkg --state "$LOCALAPPDATA/AlUmmahNow/Tools/updates.json" --platform windows --arch x64 --from 2026.01.01 --to 2026.01.02 --busy true --close $c || failed="$failed $c"
+          done
+          [ -z "$failed" ] || { echo "::error::failed:$failed"; exit 1; }
 
   macos:
     runs-on: macos-15
-    timeout-minutes: 60
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
@@ -108,6 +120,16 @@ jobs:
             node scripts/update-test.mjs --exe "$EXE" --package keep/2/*-full.nupkg --packages "$HOME/Library/Caches/velopack/AlUmmahNow.Tools/packages" --package-name AlUmmahNow.Tools-2026.1.201-full.nupkg --state "$HOME/Library/Application Support/AlUmmahNow/Tools/updates.json" --platform macos --arch arm64 --from 2026.01.01 --to 2026.01.02 --close $c
             codesign --verify --deep --strict "${EXE%/Contents/MacOS/*}"
           done
+      - name: Work that is running is stopped before the updater is started
+        run: |
+          failed=
+          rm -rf "${EXE%/Contents/MacOS/*}"; ditto -x -k keep/1/*-Portable.zip /Applications
+          node scripts/update-test.mjs --exe "$EXE" --package keep/2/*-full.nupkg --packages "$HOME/Library/Caches/velopack/AlUmmahNow.Tools/packages" --package-name AlUmmahNow.Tools-2026.1.201-full.nupkg --state "$HOME/Library/Application Support/AlUmmahNow/Tools/updates.json" --platform macos --arch arm64 --from 2026.01.01 --to 2026.01.02 --case sigterm || failed="$failed sigterm"
+          for c in window-close ask-then-close quit-confirm; do
+            rm -rf "${EXE%/Contents/MacOS/*}"; ditto -x -k keep/1/*-Portable.zip /Applications
+            node scripts/update-test.mjs --exe "$EXE" --package keep/2/*-full.nupkg --packages "$HOME/Library/Caches/velopack/AlUmmahNow.Tools/packages" --package-name AlUmmahNow.Tools-2026.1.201-full.nupkg --state "$HOME/Library/Application Support/AlUmmahNow/Tools/updates.json" --platform macos --arch arm64 --from 2026.01.01 --to 2026.01.02 --busy true --close $c || failed="$failed $c"
+          done
+          [ -z "$failed" ] || { echo "::error::failed:$failed"; exit 1; }
       - name: Velopack log
         if: always()
         run: tail -n 60 ~/Library/Logs/velopack*.log || true
