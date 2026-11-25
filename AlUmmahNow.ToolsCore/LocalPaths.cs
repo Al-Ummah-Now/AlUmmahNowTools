@@ -9,15 +9,15 @@ namespace AlUmmahNow.ToolsCore;
 /// </summary>
 public static class LocalPaths
 {
+    private const RegexOptions Options = RegexOptions.CultureInvariant | RegexOptions.IgnoreCase;
+
+    /// <summary>However long a line is; one that takes longer is not sent. Before the expressions that use it: fields start in order</summary>
+    private static readonly TimeSpan Time = TimeSpan.FromSeconds(1);
+
     /// <summary>A backslash, a drive, the home folder, a slash that no word is before; also written as in an address.</summary>
     private static readonly Regex Absolute = new(@"\\|(?<!\p{L})[a-z]:/|(?<!\w)~(?:[a-z_][a-z0-9._-]*)?/|(?<!\w)/(?!\s|$)|%2f|%5c", Options, Time);
 
     private static readonly Regex WebAddress = new(@"\bhttps?://[^\s\\]+", Options, Time);
-
-    private const RegexOptions Options = RegexOptions.CultureInvariant | RegexOptions.IgnoreCase;
-
-    /// <summary>However long a line is; one that takes longer is not sent</summary>
-    private static readonly TimeSpan Time = TimeSpan.FromSeconds(1);
 
     private static readonly string[] Own =
     [
