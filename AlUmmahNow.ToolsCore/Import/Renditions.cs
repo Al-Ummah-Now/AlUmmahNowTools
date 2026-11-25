@@ -39,7 +39,7 @@ public sealed class LocalEncodeException : Exception
 {
     public LocalEncodeException(string code, string message, Exception? inner = null) : base(message, inner) => Code = code;
 
-    /// <summary>source_read (the file stopped being readable), ffmpeg_missing, probe_failed, no_video, no_audio, disk_space, ffmpeg_failed, package_failed, too_large or settings_invalid</summary>
+    /// <summary>source_read (the file stopped being readable), ffmpeg_missing, probe_failed, no_video, no_audio, disk_space, ffmpeg_failed, too_short (the encoded video), package_failed, too_large or settings_invalid</summary>
     public string Code { get; }
 }
 
@@ -486,6 +486,7 @@ public sealed class EncodeStep : IImportStep
                 return true;
             }, ct).ConfigureAwait(false);
             await _source.CheckUnchangedAsync(item.Video, context, ct, read: true).ConfigureAwait(false);
+            foreach (var output in outputs) await CheckLengthAsync(info, output, ct).ConfigureAwait(false);
             for (var i = 0; i < rungs.Count; i++)
             {
                 await _packager.PackageAsync(outputs[i], Path.Combine(directory, rungs[i].Name), settings.Ladder.SegmentSeconds, ct).ConfigureAwait(false);
@@ -537,6 +538,17 @@ public sealed class EncodeStep : IImportStep
             context.Log(LogLevel.Warning, "encode_failed", $"Could not encode here: {why}. The server encodes this file", code, why);
             _report?.Invoke(ex, item);
             return StepResult.Skipped;
+        }
+    }
+
+    /// <summary>A read that stops half way ends ffmpeg well, with a short video.</summary>
+    private async Task CheckLengthAsync(SourceInfo source, string output, CancellationToken ct)
+    {
+        if (source.DurationSeconds <= 0) return;
+        var made = (await _media.ProbeAsync(output, ct).ConfigureAwait(false)).DurationSeconds;
+        if (made < source.DurationSeconds - Math.Max(2, source.DurationSeconds * 0.01))
+        {
+            throw new LocalEncodeException("too_short", string.Create(CultureInfo.InvariantCulture, $"The encoded video is {made:0.#} s long and the file {source.DurationSeconds:0.#} s"));
         }
     }
 

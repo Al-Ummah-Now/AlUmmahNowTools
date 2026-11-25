@@ -29,6 +29,48 @@ internal sealed class HashSoFar : IDisposable
     public void Dispose() => Hash.Dispose();
 }
 
+/// <summary>The hash of what an upload sent, with its last part, which may have to be sent again.</summary>
+internal sealed class SentSoFar : IDisposable
+{
+    private readonly IncrementalHash _hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+
+    public SentSoFar(long size, long modifiedMs)
+    {
+        Size = size;
+        ModifiedMs = modifiedMs;
+    }
+
+    public long Size { get; }
+    public long ModifiedMs { get; }
+    /// <summary>Hashed up to here</summary>
+    public long Offset { get; private set; }
+    public long PartStart { get; private set; }
+    private byte[]? _part;
+
+    public string Sha256 => Convert.ToHexString(_hash.GetCurrentHash()).ToLowerInvariant();
+
+    /// <summary>An upload may go on at <paramref name="offset"/>: where this is, or the last part again.</summary>
+    public bool Covers(long offset) => offset == Offset || (_part is not null && offset == PartStart);
+
+    public void Append(ReadOnlySpan<byte> bytes)
+    {
+        _hash.AppendData(bytes);
+        Offset += bytes.Length;
+        _part = null;
+    }
+
+    public void AppendPart(ReadOnlySpan<byte> part)
+    {
+        PartStart = Offset;
+        Append(part);
+        _part = SHA256.HashData(part);
+    }
+
+    public bool IsLastPart(ReadOnlySpan<byte> part) => _part is not null && SHA256.HashData(part).AsSpan().SequenceEqual(_part);
+
+    public void Dispose() => _hash.Dispose();
+}
+
 /// <summary>The file's SHA-256 (admin-api dedupes a channel's files on it) and its upload fingerprint.</summary>
 public static class FileHasher
 {
@@ -61,6 +103,8 @@ public static class FileHasher
         {
             ArrayPool<byte>.Shared.Return(buffer);
         }
+
+        if (state.Offset != length) throw Sources.SourceAccess.Changed(read: true);
 
         // The whole file when it is at most 2 MiB, else the first MiB then the last
         using var edges = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
@@ -146,18 +190,33 @@ public class TusClient
     }
 
     /// <summary>Sends <paramref name="count"/> bytes from <paramref name="file"/> at <paramref name="offset"/>; answers the new offset.</summary>
-    public virtual async Task<long> PatchAsync(Uri upload, string token, Stream file, long offset, int count, CancellationToken ct)
+    public async Task<long> PatchAsync(Uri upload, string token, Stream file, long offset, int count, CancellationToken ct)
     {
-        var buffer = new byte[count];
+        var part = new byte[count];
         file.Position = offset;
-        await file.ReadExactlyAsync(buffer, ct).ConfigureAwait(false);
-        using var request = new HttpRequestMessage(HttpMethod.Patch, upload) { Content = new ByteArrayContent(buffer) };
+        await file.ReadExactlyAsync(part, ct).ConfigureAwait(false);
+        return await PatchAsync(upload, token, part, offset, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>Gives up the upload, what it has with it. One that has ended cannot be given up (409).</summary>
+    public virtual async Task DeleteAsync(Uri upload, string token, CancellationToken ct)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, upload);
+        Headers(request, token);
+        using var response = await SendAsync(request, ct).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode) throw Failure(response, "DELETE");
+    }
+
+    /// <summary>Sends <paramref name="part"/> at <paramref name="offset"/>; answers the new offset.</summary>
+    public virtual async Task<long> PatchAsync(Uri upload, string token, byte[] part, long offset, CancellationToken ct)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Patch, upload) { Content = new ByteArrayContent(part) };
         Headers(request, token);
         request.Headers.Add("Upload-Offset", offset.ToString(System.Globalization.CultureInfo.InvariantCulture));
         request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/offset+octet-stream");
         using var response = await SendAsync(request, ct).ConfigureAwait(false);
         if (response.StatusCode != HttpStatusCode.NoContent && !response.IsSuccessStatusCode) throw Failure(response, "PATCH");
-        return Offset(response) ?? offset + count;
+        return Offset(response) ?? offset + part.Length;
     }
 
     public static string EncodeMetadata(IReadOnlyDictionary<string, string> metadata) =>

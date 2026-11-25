@@ -136,6 +136,13 @@ public sealed class QueueItem
     public string? UploadUrl { get; set; }
     public long UploadOffset { get; set; }
     public long ChunkSize { get; set; }
+    /// <summary>The file has a video in it (or what would tell is not on this computer)</summary>
+    public bool VideoChecked { get; set; }
+    /// <summary>How much was sent, and that much's SHA-256: an upload that goes on later goes on from the same bytes</summary>
+    public long SentTo { get; set; }
+    public string? SentSha256 { get; set; }
+    /// <summary>What was sent is not what was checked: the server's copy goes, and the upload starts from nothing</summary>
+    public bool StartOver { get; set; }
     public string? AttachJobId { get; set; }
     /// <summary>The channel already had this file: nothing was uploaded</summary>
     public bool AlreadyImported { get; set; }
@@ -169,6 +176,9 @@ public sealed class QueueItem
 
     /// <summary>The hash so far, kept over a failed attempt and a pause (not saved: a restart hashes from the start)</summary>
     [JsonIgnore] internal HashSoFar? Hashing { get; set; }
+
+    /// <summary>The hash of what is being sent (not saved: after a restart what was sent is read again)</summary>
+    [JsonIgnore] internal SentSoFar? Sending { get; set; }
 
     [JsonIgnore] public StepState? CurrentStep => Steps.FirstOrDefault(s => s.Status is StepStatus.Pending or StepStatus.Running or StepStatus.Failed);
     [JsonIgnore] public DateTimeOffset? NextAttemptAt => CurrentStep?.NextAttemptAt;
@@ -261,7 +271,7 @@ public sealed class StepFailedException : Exception
         Retryable = retryable;
     }
 
-    /// <summary>file_missing, file_link, file_changed, not_hashed or not_uploaded</summary>
+    /// <summary>file_missing, file_link, file_changed, file_writing, not_hashed, not_uploaded, no_video, not_video, content_changed or upload_left</summary>
     public string Code { get; }
     public bool Retryable { get; }
 }

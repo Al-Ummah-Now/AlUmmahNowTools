@@ -39,9 +39,9 @@ public sealed class ImportWorkspace : IDisposable
         Transcriber = IsDemo ? new DemoTranscriber() : new CoreTranscriber(CoreTranscriber.DefaultModelsDirectory);
         var steps = new IImportStep[]
         {
-            new HashStep(),
+            new HashStep(media: Media),
             new EncodeStep(Api, Environment.VideosApi, Media, new CoreRenditionPackager(), EncodeStep.DefaultWorkRoot, "Al Ummah Now Tools " + Release, ReportEncodeFailure),
-            new UploadStep(Api, new TusClient(), Environment.VideosApi, token),
+            new UploadStep(Api, new TusClient(), Environment.VideosApi, token, media: Media),
             new AttachStep(Api),
             new TranscribeStep(Api, Transcriber, Media, new QuranIndexSource(Api), TranscribeStep.DefaultWorkRoot, ReportTranscribeFailure),
             new CheckStep(Api),

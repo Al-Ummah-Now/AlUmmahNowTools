@@ -320,9 +320,9 @@ public class TakeoutTests
             return Task.FromResult(_offset);
         }
 
-        public override Task<long> PatchAsync(Uri upload, string token, Stream file, long offset, int count, CancellationToken ct)
+        public override Task<long> PatchAsync(Uri upload, string token, byte[] part, long offset, CancellationToken ct)
         {
-            _offset = offset + count;
+            _offset = offset + part.Length;
             return Task.FromResult(_offset);
         }
     }
@@ -341,9 +341,9 @@ public class TakeoutTests
 
         public override Task<long> OffsetAsync(Uri upload, string token, CancellationToken ct) => Task.FromResult(_offset);
 
-        public override Task<long> PatchAsync(Uri upload, string token, Stream file, long offset, int count, CancellationToken ct)
+        public override Task<long> PatchAsync(Uri upload, string token, byte[] part, long offset, CancellationToken ct)
         {
-            _offset = offset + count;
+            _offset = offset + part.Length;
             Offsets.Add(_offset);
             return Task.FromResult(_offset);
         }

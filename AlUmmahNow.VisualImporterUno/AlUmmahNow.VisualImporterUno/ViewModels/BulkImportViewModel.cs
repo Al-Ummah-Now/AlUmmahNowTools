@@ -633,7 +633,7 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
         {
             // A file name, hash, id or reference goes on its own line: Uno only reverses the Arabic runs of a mixed line
             "added" or "sha" or "upload_opened" or "upload_reopened" or "uploaded" or "already_imported" => Loc.WithDetail(Loc.Get("ImportLog_" + line.Code), Arg(0)),
-            "paused" or "resumed" or "finished" or "session_ended" => Loc.Get("ImportLog_" + line.Code),
+            "paused" or "resumed" or "finished" or "session_ended" or "video_unchecked" => Loc.Get("ImportLog_" + line.Code),
             "report_failed" => Loc.WithDetail(Loc.Get("ImportLog_report_failed"), ErrorText(Arg(0), Arg(1))),
             "retry" or "started" or "stopped" or "done" or "skipped" => Loc.Format("ImportLog_" + line.Code, StepName(Arg(0))),
             "attempt" => Loc.Format("ImportLog_attempt", StepName(Arg(0)), Num(1)),
@@ -641,7 +641,7 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
             "failed" => Loc.WithDetail(Loc.WithDetail(Loc.Format("ImportLog_failed", StepName(Arg(0)), Loc.Plural("ImportCount_attempts", Count(Arg(1)))), Loc.WithDetail(ErrorText(Arg(2), Arg(4)), ReadText(Arg(5), Arg(6), Arg(7), Arg(8)))), Reference(Arg(3))),
             // Reading the file itself: a share, a cloud placeholder
             "share_path" or "share_chosen" => Loc.WithDetail(Loc.Get("ImportLog_" + line.Code), Arg(0)),
-            "share_back" or "hash_resumed" => Loc.Format("ImportLog_" + line.Code, Num(0)),
+            "share_back" or "hash_resumed" or "sent_check" => Loc.Format("ImportLog_" + line.Code, Num(0)),
             "share_tool" => Loc.WithDetail(Loc.Get("ImportLog_share_tool"), Arg(0)),
             "cloud_download" => Loc.Get("ImportLog_cloud_download"),
             "read_failed" => Loc.WithDetail(Loc.WithDetail(ErrorText(Arg(0), null), ReadText(Arg(1), Arg(2), Arg(3), Arg(4))), Arg(5)),

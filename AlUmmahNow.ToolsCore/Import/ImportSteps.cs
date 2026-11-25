@@ -9,8 +9,13 @@ namespace AlUmmahNow.ToolsCore.Import;
 public sealed class HashStep : IImportStep
 {
     private readonly SourceAccess _source;
+    private readonly IMediaTools? _media;
 
-    public HashStep(SourceAccess? source = null) => _source = source ?? SourceAccess.Default;
+    public HashStep(SourceAccess? source = null, IMediaTools? media = null)
+    {
+        _source = source ?? SourceAccess.Default;
+        _media = media;
+    }
 
     public ImportStepKind Kind => ImportStepKind.Hash;
 
@@ -18,6 +23,7 @@ public sealed class HashStep : IImportStep
     {
         var video = item.Video;
         await _source.CheckUnchangedAsync(video, context, ct).ConfigureAwait(false);
+        await VideoCheck.RunAsync(item, _source, _media, context, ct).ConfigureAwait(false);
         if (item.Hashing is { } kept && (kept.Size != video.Size || kept.ModifiedMs != video.LastModifiedMs))
         {
             kept.Dispose();
@@ -60,9 +66,11 @@ public sealed class UploadStep : IImportStep
     private readonly Func<CancellationToken, Task<string?>> _token;
     private readonly RenditionSender _renditions;
     private readonly SourceAccess _source;
+    private readonly IMediaTools? _media;
 
-    public UploadStep(ImportApiClient api, TusClient tus, Uri videosApi, Func<CancellationToken, Task<string?>> token, string? workRoot = null, SourceAccess? source = null)
+    public UploadStep(ImportApiClient api, TusClient tus, Uri videosApi, Func<CancellationToken, Task<string?>> token, string? workRoot = null, SourceAccess? source = null, IMediaTools? media = null)
     {
+        _media = media;
         _source = source ?? SourceAccess.Default;
         _api = api;
         _tus = tus;
@@ -77,6 +85,9 @@ public sealed class UploadStep : IImportStep
     {
         if (item.Sha256 is null || item.FingerprintHash is null) throw new StepFailedException("not_hashed", "The file has not been checked yet", retryable: false);
         await _source.CheckUnchangedAsync(item.Video, context, ct).ConfigureAwait(false);
+        // Hashed by a version that did not check
+        await VideoCheck.RunAsync(item, _source, _media, context, ct).ConfigureAwait(false);
+        if (item.StartOver) await DropAsync(item, context, ct).ConfigureAwait(false);
         if (item.ServerItemId is null || item.TusSessionId is null)
         {
             if (!await OpenAsync(_api, _tusEndpoint, item, context, ct).ConfigureAwait(false)) return StepResult.SkipRest;
@@ -109,6 +120,8 @@ public sealed class UploadStep : IImportStep
             }
         }
 
+        item.Sending?.Dispose();
+        item.Sending = null;
         await _api.MarkUploadedAsync(item.ServerItemId!, ct).ConfigureAwait(false);
         context.Log(LogLevel.Info, "uploaded", $"Uploaded: video {item.VideoId}", item.VideoId ?? "");
         return StepResult.Done;
@@ -167,23 +180,42 @@ public sealed class UploadStep : IImportStep
             };
             item.UploadUrl = (await _tus.CreateAsync(_tusEndpoint, token, size, metadata, ct).ConfigureAwait(false)).ToString();
             item.UploadOffset = 0;
+            (item.SentTo, item.SentSha256) = (0, null);
             context.Save();
         }
 
         var url = new Uri(item.UploadUrl);
         var offset = await _tus.OffsetAsync(url, token, ct).ConfigureAwait(false);
         item.UploadOffset = offset;
+        if (item.StartOver)
+        {
+            if (offset > 0) throw new StepFailedException("upload_left", "The server still has the upload that was given up", retryable: true);
+            item.StartOver = false;
+            context.Save();
+        }
         await using var file = _source.Open(item.Video.Path, size, item.Video.LastModifiedMs, context);
         while (offset < size)
         {
             ct.ThrowIfCancellationRequested();
-            var count = (int)Math.Min(item.ChunkSize, size - offset);
-            // Other apps may write to the file while it is sent: the last part only goes when it is still the one that was checked
-            if (offset + count >= size) await _source.CheckUnchangedAsync(item.Video, context, ct, read: true).ConfigureAwait(false);
+            var sent = await SentAsync(item, file, offset, context, ct).ConfigureAwait(false);
+            var again = sent.Offset > offset;
+            var part = new byte[again ? sent.Offset - offset : Math.Min(item.ChunkSize, size - offset)];
+            file.Position = offset;
+            await file.ReadExactlyAsync(part, ct).ConfigureAwait(false);
+            if (!again) sent.AppendPart(part);
+            else if (!sent.IsLastPart(part)) throw await DifferentAsync(item, context, ct).ConfigureAwait(false);
+            if (sent.Offset >= size)
+            {
+                // Other apps may write to the file while it is sent, and a share may read differently the second time: the last
+                // part only goes when the file is the one that was checked, and what was sent has its SHA-256
+                await _source.CheckUnchangedAsync(item.Video, context, ct, read: true).ConfigureAwait(false);
+                if (sent.Sha256 != item.Sha256) throw await DifferentAsync(item, context, ct).ConfigureAwait(false);
+            }
             token = await Token(ct).ConfigureAwait(false);
             try
             {
-                offset = await _tus.PatchAsync(url, token, file, offset, count, ct).ConfigureAwait(false);
+                offset = await _tus.PatchAsync(url, token, part, offset, ct).ConfigureAwait(false);
+                if (offset == sent.Offset) (item.SentTo, item.SentSha256) = (offset, sent.Sha256);
             }
             catch (TusException conflict) when (conflict.Status == 409)
             {
@@ -194,6 +226,69 @@ public sealed class UploadStep : IImportStep
             context.Save();
             context.Progress(from + ((1 - from) * (size == 0 ? 1 : (double)offset / size)));
         }
+    }
+
+    /// <summary>The hash of what the server has. What was sent before this start of the app is read again, and must be the same.</summary>
+    private async Task<SentSoFar> SentAsync(QueueItem item, Stream file, long offset, IStepContext context, CancellationToken ct)
+    {
+        var video = item.Video;
+        if (item.Sending is { } kept)
+        {
+            if (kept.Size == video.Size && kept.ModifiedMs == video.LastModifiedMs && kept.Covers(offset)) return kept;
+            kept.Dispose();
+        }
+        var sent = item.Sending = new SentSoFar(video.Size, video.LastModifiedMs);
+        if (offset == 0) return sent;
+        var from = offset.ToString(CultureInfo.InvariantCulture);
+        context.Log(LogLevel.Info, "sent_check", $"The first {from} bytes were sent before; they are checked again", from);
+        var known = item.SentSha256 is not null && item.SentTo > 0 && item.SentTo <= offset ? item.SentTo : 0;
+        var buffer = new byte[1 << 20];
+        file.Position = 0;
+        while (sent.Offset < offset)
+        {
+            var until = sent.Offset < known ? known : offset;
+            var n = await file.ReadAsync(buffer.AsMemory(0, (int)Math.Min(buffer.Length, until - sent.Offset)), ct).ConfigureAwait(false);
+            if (n == 0) throw SourceAccess.Changed(read: true);
+            sent.Append(buffer.AsSpan(0, n));
+            if (sent.Offset == known && sent.Sha256 != item.SentSha256) throw await DifferentAsync(item, context, ct).ConfigureAwait(false);
+        }
+        return sent;
+    }
+
+    /// <summary>What was sent is not the file that was checked: the server's copy is given up, now or at the next try.</summary>
+    private async Task<StepFailedException> DifferentAsync(QueueItem item, IStepContext context, CancellationToken ct)
+    {
+        item.StartOver = true;
+        context.Save();
+        try
+        {
+            await DropAsync(item, context, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is TusException or ImportApiException)
+        {
+            // Its next try begins with it
+        }
+        return new StepFailedException("content_changed", "What was read to be sent is not what was checked before", retryable: false);
+    }
+
+    private async Task DropAsync(QueueItem item, IStepContext context, CancellationToken ct)
+    {
+        item.Sending?.Dispose();
+        item.Sending = null;
+        if (item.UploadUrl is { } url)
+        {
+            try
+            {
+                await _tus.DeleteAsync(new Uri(url), await Token(ct).ConfigureAwait(false), ct).ConfigureAwait(false);
+            }
+            catch (TusGoneException)
+            {
+                // Gone already
+            }
+        }
+        (item.UploadUrl, item.TusSessionId, item.UploadOffset) = (null, null, 0);
+        (item.SentTo, item.SentSha256) = (0, null);
+        context.Save();
     }
 
     private async Task<string> Token(CancellationToken ct) =>
