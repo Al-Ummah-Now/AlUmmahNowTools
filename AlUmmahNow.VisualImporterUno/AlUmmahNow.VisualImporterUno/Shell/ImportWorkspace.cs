@@ -57,7 +57,7 @@ public sealed class ImportWorkspace : IDisposable
             // Screenshots show a queue in every state; nothing runs and nothing is sent
             Queue.Add(DemoImport.QueueItems(Environment));
             DemoImport.Settle(Queue);
-            if (System.Environment.GetEnvironmentVariable("TOOLS_DEMO_IMPORT") == "paused") Queue.PauseAll();
+            DemoImport.SettleState(Queue);
         }
         else
         {
@@ -195,10 +195,14 @@ public sealed class ImportWorkspace : IDisposable
     }
 }
 
-/// <summary>The import's demo data for screenshots (<c>TOOLS_DEMO=1</c>; <c>TOOLS_DEMO_IMPORT=empty</c> for a fresh page, <c>paused</c> for the queue after Pause all).</summary>
+/// <summary>The import's demo data for screenshots (<c>TOOLS_DEMO=1</c>; <c>TOOLS_DEMO_IMPORT=empty</c> for a fresh page, 
+/// <c>paused</c> for the queue after Pause all, <c>resumed</c> with one file resumed after it, <c>remove-all</c> for its dialog,
+/// <c>share-waiting</c>, <c>share-failed</c> and <c>damaged</c> for a file on a network share, in the fourth row).</summary>
 internal static class DemoImport
 {
     public static bool Empty => System.Environment.GetEnvironmentVariable("TOOLS_DEMO_IMPORT") == "empty";
+
+    public static string State => System.Environment.GetEnvironmentVariable("TOOLS_DEMO_IMPORT") ?? "";
 
     public const string ChannelId = "ch_demo_fiqh";
 
@@ -284,6 +288,53 @@ internal static class DemoImport
             // The ninth file's batch was added with "Let the server encode"; the last two were transcribed here
             yield return QueueItem.For(files[i], "batch_demo", ChannelId, start.AddSeconds(i), serverEncodes: i == 8, transcribe: i >= 9 ? new TranscribeChoice(null, CoreTranscriber.DefaultModel) : null, translate: i >= 9);
         }
+    }
+
+    /// <summary>What <c>TOOLS_DEMO_IMPORT</c> asks for beyond the settled queue.</summary>
+    public static void SettleState(ImportQueue queue)
+    {
+        var items = queue.Items;
+        if (items.Count < 9) return;
+        if (State is "paused" or "resumed") queue.PauseAll();
+        // Queued: it goes on as queued, beside the others, all paused
+        if (State == "resumed") queue.Resume(items[8].Id);
+        if (State is not ("share-waiting" or "share-failed" or "damaged")) return;
+
+        // The fourth file, on a share: checked as far as 41%
+        var item = items[3];
+        foreach (var s in item.Steps)
+        {
+            s.Status = StepStatus.Pending;
+            s.Attempts = 0;
+            s.NextAttemptAt = null;
+            s.LastError = s.LastErrorCode = null;
+        }
+        item.Log.RemoveRange(1, item.Log.Count - 1);
+        item.VideoId = null;
+        var step = item.Steps.First(s => s.Kind == ImportStepKind.Hash);
+        step.Attempts = 1;
+        const string offset = "440401920";
+        const string text = "An unexpected network error occurred";
+        var path = @"\\nas\media\Lessons\Fiqh of Fasting\" + item.Video.FileName;
+        var at = Now.AddMinutes(-8);
+        item.Log.AddRange(new[]
+        {
+            new LogLine(at, LogLevel.Info, "Hash: started", "started", new[] { "Hash" }),
+            new LogLine(at, LogLevel.Info, "Reading through the network path", "share_path", new[] { path }),
+            new LogLine(at.AddMinutes(2), LogLevel.Warning, "Reading failed", "read_failed", new[] { "share_lost", "Windows", "59", text, offset, path }),
+        });
+        if (State == "share-waiting")
+        {
+            step.Status = StepStatus.Running;
+            typeof(QueueItem).GetProperty(nameof(QueueItem.Progress))!.SetValue(item, 0.41);
+            typeof(QueueItem).GetProperty(nameof(QueueItem.Wait))!.SetValue(item, StepWait.Share);
+            return;
+        }
+        step.Status = StepStatus.Failed;
+        step.LastErrorCode = State == "damaged" ? "share_damaged" : "share_lost";
+        step.LastError = text;
+        step.ReadError = new ReadError("Windows", 59, text, 440401920);
+        item.Log.Add(new LogLine(at.AddMinutes(7), LogLevel.Error, "Hash: failed", "failed", new[] { "Hash", "1", step.LastErrorCode, "ERR-7K2M-Q9XD", text, "Windows", "59", text, offset }));
     }
 
     /// <summary>

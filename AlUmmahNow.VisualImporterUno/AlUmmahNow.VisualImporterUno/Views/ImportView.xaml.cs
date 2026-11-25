@@ -62,7 +62,7 @@ public sealed partial class ImportView : Page
                 PageScroll.ChangeView(null, Math.Max(0, top - 8), null, true);
             });
         }
-        var dialog = Environment.GetEnvironmentVariable("TOOLS_DEMO_IMPORT_DIALOG");
+        var dialog = Environment.GetEnvironmentVariable("TOOLS_DEMO_IMPORT_DIALOG") ?? (DemoImport.State == "remove-all" ? "remove-all" : null);
         // No caret in a frame unless it shows typing: focus rests on a button, without its keyboard ring
         if (dialog != "suggest") DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => BrowseButton.Focus(FocusState.Programmatic));
         if (dialog is null) return;
