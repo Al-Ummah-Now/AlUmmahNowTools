@@ -680,8 +680,8 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>"Reference ERR-…"; in Arabic the reference on a line of its own (Uno swaps the halves of a mixed line).</summary>
-    private static string Reference(string reference) =>
-        Loc.IsArabic ? Loc.GetWithDetail("ImportLog_reference", reference) : Loc.Format("ImportLog_reference", reference);
+    private static string Reference(string reference) => reference.Length == 0 ? ""
+        : Loc.IsArabic ? Loc.GetWithDetail("ImportLog_reference", reference) : Loc.Format("ImportLog_reference", reference);
 
     private static long Count(string value) => long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var n) ? n : 0;
 

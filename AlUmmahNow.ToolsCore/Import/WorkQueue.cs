@@ -282,6 +282,14 @@ public sealed class StepFailedException : Exception
     /// <summary>file_missing, file_link, file_changed, file_writing, not_hashed, not_uploaded, no_video, not_video, content_changed or upload_left</summary>
     public string Code { get; }
     public bool Retryable { get; }
+
+    /// <summary>
+    /// What the app was asked to find out about a file, told to the admin on its row: not a fault of the app's, so the Errors page
+    /// gets no report and the log no reference to one.
+    /// </summary>
+    public bool IsAnswer => Code is "no_video" or "not_video" or "content_changed" or "file_changed" or "file_writing" or "file_missing" or "file_link";
+
+    public static bool Answers(Exception error) => error is StepFailedException { IsAnswer: true };
 }
 
 /// <summary>What a running step may do besides its work.</summary>
@@ -304,7 +312,7 @@ public interface IImportStep
     Task<StepResult> RunAsync(QueueItem item, IStepContext context, CancellationToken ct);
 }
 
-/// <summary>Told when a file's step has failed for good, with the reference shown in its log.</summary>
+/// <summary>Told when a file's step has failed for good, with the reference shown in its log (not for <see cref="StepFailedException.IsAnswer"/>).</summary>
 public interface IImportFailureSink
 {
     Task ItemFailedAsync(QueueItem item, StepState step, Exception error, string reference, CancellationToken ct);
@@ -951,7 +959,8 @@ public sealed class ImportQueue : IDisposable
                     // Failed for good just as it was paused: it reads Failed, and Resume all has nothing to do with it
                     if (!step.CanTryAgain) item.Paused = false;
                     reference = ErrorReport.NewRef();
-                    AppendLog(item, LogLevel.Error, "failed", $"{step.Kind}: failed after {step.Attempts} attempt(s): {message} (reference {reference})", [step.Kind.ToString(), attempts, code, reference, message, .. read]);
+                    var shown = StepFailedException.Answers(failure) ? "" : reference;
+                    AppendLog(item, LogLevel.Error, "failed", $"{step.Kind}: failed after {step.Attempts} attempt(s): {message}" + (shown.Length > 0 ? $" (reference {shown})" : ""), [step.Kind.ToString(), attempts, code, shown, message, .. read]);
                 }
             }
             Finish(item);
