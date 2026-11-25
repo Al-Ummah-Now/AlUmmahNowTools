@@ -50,6 +50,8 @@ namespace AlUmmahNow.VisualImporterUno.Views
             UpdatesCheckNow.IsEnabled = true;
             UpdatesStatus.Text = !reached
                 ? Loc.Get("Update_SettingsCheckFailed")
+                // Too old with nothing to update to: not "the latest version"
+                : updates.View.Stage == UpdateStage.RequiredSoon ? Loc.Get("Update_RequiredSoon")
                 : updates.View is { Stage: not UpdateStage.Hidden, Version: { } v } ? Loc.Format("Update_SettingsFound", Loc.Version(v)) : Loc.Get("Update_SettingsUpToDate");
             UpdatesLastChecked.Text = updates.LastChecked is { } at ? Loc.Format("Update_SettingsLastChecked", Loc.When(at.LocalDateTime)) : Loc.Get("Update_SettingsNeverChecked");
         }
