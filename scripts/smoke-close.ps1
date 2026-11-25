@@ -51,6 +51,8 @@ try {
     Stop-Process -Id $app.Id -Force
     throw "smoke-close ($Mode): the app was still running after the close"
   }
+  # The app may end between two looks: its marker says it was closed, and when
+  if ($null -eq $closedAt -and (Test-Path "$ready.closing")) { $closedAt = (Get-Item "$ready.closing").LastWriteTime }
   if ($null -eq $closedAt) { throw "smoke-close ($Mode): the app ended without being closed (exit $($app.ExitCode))" }
   $took = [math]::Round(((Get-Date) - $closedAt).TotalSeconds)
   if ($took -gt $Seconds) { throw "smoke-close ($Mode): the app took ${took}s to end after the close (limit ${Seconds}s)" }
