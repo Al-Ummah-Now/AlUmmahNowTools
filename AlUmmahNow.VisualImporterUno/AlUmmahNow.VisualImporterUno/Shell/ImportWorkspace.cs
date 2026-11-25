@@ -339,7 +339,17 @@ internal static class DemoImport
         Video(Folder, "fiqh-of-fasting-09.mp4", 1_181_116_006, "فقه الصيام، الدرس التاسع: ليلة القدر", new[] { "ar", "en" }, true, true),
         Video(Folder, "fiqh-of-fasting-10.mp4", 1_395_864_371, "فقه الصيام، الدرس العاشر: صيام التطوع", new[] { "ar" }, true, true),
         Video(Folder, "fiqh-of-fasting-11.mp4", 966_367_641, "فقه الصيام، الدرس الحادي عشر: أسئلة وأجوبة", Array.Empty<string>(), false, false, new[] { new ScanNote(ScanNoteCode.CaptionLanguageUnknown, "fiqh-of-fasting-11.srt") }),
-    }, Array.Empty<ScanNote>());
+    }, Array.Empty<ScanNote>())
+    {
+        Unfinished = State is "unfinished" or "unfinished-open"
+            ? new[]
+            {
+                Video(Folder, "fiqh-of-fasting-12.temp.webm", 785_386_291, null, Array.Empty<string>(), false, false),
+                Video(Folder, "fiqh-of-fasting-13.f137.mp4", 412_090_368, null, Array.Empty<string>(), false, false),
+                Video(Folder, "fiqh-of-fasting-14.mp4.part", 96_468_992, null, Array.Empty<string>(), false, false),
+            }
+            : Array.Empty<ScannedVideo>(),
+    };
 
     public static IEnumerable<QueueItem> QueueItems(ToolsEnvironment environment)
     {

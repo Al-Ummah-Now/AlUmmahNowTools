@@ -47,6 +47,7 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
             FolderPath = DemoImport.Folder;
             CaptionLanguageIndex = 1;
             ShowScan(DemoImport.Scan());
+            UnfinishedShown = DemoImport.State == "unfinished-open";
         }
         _ = CheckEncodingAsync();
         SetUpTranscription();
@@ -332,9 +333,52 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
     /// <summary>"Copy as path" on Windows puts quotes around it; \\server\share works as it is.</summary>
     internal static string CleanFolder(string path) => path.Trim().Trim('"').Trim();
 
+    /// <summary>What the scan left out: unfinished downloads.</summary>
+    public ObservableCollection<UnfinishedRow> UnfinishedRows { get; } = new();
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasUnfinished), nameof(UnfinishedText))]
+    private int _unfinishedCount;
+
+    public bool HasUnfinished => UnfinishedCount > 0;
+
+    public string UnfinishedText => Loc.Plural("Import_Unfinished", UnfinishedCount);
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(UnfinishedToggle))]
+    private bool _unfinishedShown;
+
+    public string UnfinishedToggle => Loc.Get(UnfinishedShown ? "Import_UnfinishedHide" : "Import_UnfinishedShow");
+
+    /// <summary>Joins the videos found, selected: it was asked for by name.</summary>
+    public void AddUnfinished(UnfinishedRow row)
+    {
+        if (!UnfinishedRows.Remove(row)) return;
+        UnfinishedCount = UnfinishedRows.Count;
+        AddReviewRow(row.Video);
+        SumReview();
+    }
+
+    private void AddReviewRow(ScannedVideo video)
+    {
+        var row = new ReviewRow(video);
+        row.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(ReviewRow.IsSelected)) CountSelected(); };
+        ReviewRows.Add(row);
+    }
+
+    private void SumReview()
+    {
+        ReviewCount = ReviewRows.Count;
+        CountSelected();
+        ReviewSummary = ReviewRows.Count == 0 ? "" : Loc.Format("Import_FoundSummary", Loc.Plural("Import_VideoCount", ReviewRows.Count), Loc.Bytes(ReviewRows.Sum(r => r.Video.Size)));
+        OnPropertyChanged(nameof(ShowEmptyReview));
+    }
+
     private void ShowScan(ScanResult result)
     {
         ReviewRows.Clear();
+        UnfinishedRows.Clear();
+        UnfinishedShown = false;
         // A file already in the queue is not offered again
         var queued = _workspace.Queue.Items.Select(i => i.Video.Path).ToHashSet(StringComparer.Ordinal);
         var skipped = 0;
@@ -345,20 +389,16 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
                 skipped++;
                 continue;
             }
-            var row = new ReviewRow(video);
-            row.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(ReviewRow.IsSelected)) CountSelected(); };
-            ReviewRows.Add(row);
+            AddReviewRow(video);
         }
-        ReviewCount = ReviewRows.Count;
-        CountSelected();
-        var size = ReviewRows.Sum(r => r.Video.Size);
-        ReviewSummary = ReviewRows.Count == 0 ? "" : Loc.Format("Import_FoundSummary", Loc.Plural("Import_VideoCount", ReviewRows.Count), Loc.Bytes(size));
+        foreach (var download in result.Unfinished.Where(v => !queued.Contains(v.Path))) UnfinishedRows.Add(new UnfinishedRow(download));
+        UnfinishedCount = UnfinishedRows.Count;
+        SumReview();
         var lines = new List<string>();
         if (result.Videos.Count == 0) lines.Add(Loc.Get("Import_NoVideos"));
         if (skipped > 0) lines.Add(Loc.Plural("Import_AlreadyQueued", skipped));
         lines.AddRange(result.Notes.Select(NoteText));
         ScanMessage = string.Join("\n", lines);
-        OnPropertyChanged(nameof(ShowEmptyReview));
     }
 
     private void CountSelected()
@@ -645,6 +685,7 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
             "left_out_size" => Loc.WithDetail(Loc.Format("ImportLog_left_out_size", Num(1)), Arg(0)),
             "left_out_unreadable" => Loc.WithDetail(Loc.WithDetail(Loc.Get("ImportLog_left_out_unreadable"), Arg(0)), Arg(1)),
             // Encoding here and the server's verdict (TA-12); sizes, encoder names and the server's raw words on their own lines
+            "unreadable" => Loc.WithDetail(Loc.Get("ImportLog_unreadable"), Arg(0)),
             "server_encode_chosen" or "encode_here_chosen" or "server_encodes_target" or "server_encodes_started" or "renditions_sent" or "renditions_used" or "check_gave_up" => Loc.Get("ImportLog_" + line.Code),
             "encode_plan" => Loc.Format("ImportLog_encode_plan", RungList(Arg(1)), EncoderName(Arg(0))),
             "encode_hdr" => Loc.WithDetail(Loc.Get("ImportLog_encode_hdr"), Arg(0)),
@@ -822,6 +863,14 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
         Detach();
         _disposed = true;
     }
+}
+
+/// <summary>An unfinished download the scan left out.</summary>
+public sealed record UnfinishedRow(ScannedVideo Video)
+{
+    public string FileName => Video.FileName;
+    public string Size => Loc.Bytes(Video.Size);
+    public string AddName => Loc.GetWithDetail("Import_UnfinishedAdd", Video.FileName);
 }
 
 /// <summary>A video the scan found, in the review table.</summary>

@@ -416,6 +416,17 @@ public sealed partial class ImportView : Page
         return panel;
     }
 
+    private void Unfinished_Click(object sender, RoutedEventArgs e) => ViewModel.UnfinishedShown = !ViewModel.UnfinishedShown;
+
+    private void AddUnfinished_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.Tag is not UnfinishedRow row) return;
+        ViewModel.AddUnfinished(row);
+        // Its button went with the row
+        if (ViewModel.HasUnfinished) UnfinishedButton.Focus(FocusState.Programmatic);
+        else BrowseButton.Focus(FocusState.Programmatic);
+    }
+
     private static QueueRow? RowOf(object sender) => (sender as FrameworkElement)?.Tag as QueueRow;
 
     private void Pause_Click(object sender, RoutedEventArgs e)

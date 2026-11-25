@@ -1815,6 +1815,30 @@ Try again.</value>
   <data name="Import_FoundSummary" xml:space="preserve">
     <value>{0}, {1} in all</value>
   </data>
+  <data name="Import_Unfinished_One" xml:space="preserve">
+    <value>Left out: 1 unfinished download</value>
+  </data>
+  <data name="Import_Unfinished_Other" xml:space="preserve">
+    <value>Left out: {0} unfinished downloads</value>
+  </data>
+  <data name="Import_UnfinishedShow" xml:space="preserve">
+    <value>Show the list</value>
+  </data>
+  <data name="Import_UnfinishedHide" xml:space="preserve">
+    <value>Hide the list</value>
+  </data>
+  <data name="Import_UnfinishedAdd" xml:space="preserve">
+    <value>Add anyway</value>
+  </data>
+  <data name="Import_UnfinishedAddText.Text" xml:space="preserve">
+    <value>Add anyway</value>
+  </data>
+  <data name="ImportNote_UnfinishedDownload" xml:space="preserve">
+    <value>Its name says it is an unfinished download:</value>
+  </data>
+  <data name="ImportLog_unreadable" xml:space="preserve">
+    <value>The video tools can’t read the file as a video</value>
+  </data>
   <data name="Import_NoVideos" xml:space="preserve">
     <value>No videos in this folder.</value>
   </data>

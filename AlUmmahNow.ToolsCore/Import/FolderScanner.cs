@@ -19,6 +19,8 @@ public enum ScanNoteCode
     CsvUnreadable,
     /// <summary>The file is larger than an upload may be (5 GB)</summary>
     TooLarge,
+    /// <summary>Its name is one a downloader gives a file it has not finished</summary>
+    UnfinishedDownload,
 }
 
 public sealed record ScanNote(ScanNoteCode Code, string Detail);
@@ -41,7 +43,11 @@ public sealed record ScannedVideo(
     public string FileName => System.IO.Path.GetFileName(Path);
 }
 
-public sealed record ScanResult(IReadOnlyList<ScannedVideo> Videos, IReadOnlyList<ScanNote> Notes);
+public sealed record ScanResult(IReadOnlyList<ScannedVideo> Videos, IReadOnlyList<ScanNote> Notes)
+{
+    /// <summary>Left out: unfinished downloads (<see cref="UnfinishedDownloads"/>), which can be added all the same</summary>
+    public IReadOnlyList<ScannedVideo> Unfinished { get; init; } = Array.Empty<ScannedVideo>();
+}
 
 /// <summary>
 /// Finds the videos in a folder and their sidecars, named after the video (<c>lesson-01.mp4</c>):
@@ -104,15 +110,17 @@ public static class FolderScanner
         string Show(string path) => root == folder ? path : Path.Combine(folder, Path.GetRelativePath(root, path));
         var videos = new List<ScannedVideo>();
         var notes = new List<ScanNote>();
+        var unfinished = new List<ScannedVideo>();
         var folders = includeSubfolders
             ? new[] { root }.Concat(Directory.EnumerateDirectories(root, "*", new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true, AttributesToSkip = Skipped }))
             : new[] { root };
         foreach (var dir in folders)
         {
             ct.ThrowIfCancellationRequested();
-            ScanOne(source, dir, Show, batchLanguage, videos, notes);
+            var downloads = dir != root && Path.GetRelativePath(root, dir).Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar).Any(UnfinishedDownloads.IsFolder);
+            ScanOne(source, dir, Show, batchLanguage, downloads ? unfinished : videos, unfinished, notes);
         }
-        return new ScanResult(videos, notes);
+        return new ScanResult(videos, notes) { Unfinished = unfinished };
     }
 
     /// <summary>That file alone: a share that drops is the scan's to try again.</summary>
@@ -121,7 +129,7 @@ public static class FolderScanner
 
     private static string Why(Exception ex) => ex is FormatException ? ex.Message : ImportQueue.Describe(ex);
 
-    private static void ScanOne(SourceAccess source, string dir, Func<string, string> show, string? batchLanguage, List<ScannedVideo> videos, List<ScanNote> notes)
+    private static void ScanOne(SourceAccess source, string dir, Func<string, string> show, string? batchLanguage, List<ScannedVideo> videos, List<ScannedVideo> unfinished, List<ScanNote> notes)
     {
         var files = Directory.EnumerateFiles(dir, "*", new EnumerationOptions { IgnoreInaccessible = true, AttributesToSkip = Skipped })
             .Where(f => !Path.GetFileName(f).StartsWith('.'))
@@ -143,12 +151,14 @@ public static class FolderScanner
             }
         }
 
-        var videoFiles = files.Where(IsVideo).ToList();
+        var names = files.Select(f => Path.GetFileName(f)!).ToList();
+        var downloads = files.Where(f => UnfinishedDownloads.Is(Path.GetFileName(f), names)).ToHashSet();
+        var videoFiles = files.Where(f => downloads.Contains(f) ? UnfinishedDownloads.VideoName(Path.GetFileName(f)) is not null : IsVideo(f)).ToList();
         var bases = videoFiles.ToDictionary(v => v, v => Path.GetFileNameWithoutExtension(v));
         var sidecars = videoFiles.ToDictionary(v => v, _ => new List<(string Path, string Remainder)>());
         foreach (var file in files)
         {
-            if (IsVideo(file)) continue;
+            if (bases.ContainsKey(file)) continue;
             var name = Path.GetFileName(file);
             // The video whose name is the longest prefix: "talk.part2.ar.srt" belongs to "talk.part2.mp4", not "talk.mp4"
             var owner = videoFiles
@@ -220,11 +230,14 @@ public static class FolderScanner
             }
             if (info.Length > MaxUploadBytes) own.Add(new ScanNote(ScanNoteCode.TooLarge, info.Name));
 
-            videos.Add(new ScannedVideo(
+            var isDownload = downloads.Contains(video) || ReferenceEquals(videos, unfinished);
+            if (isDownload) own.Add(new ScanNote(ScanNoteCode.UnfinishedDownload, info.Name));
+
+            (isDownload ? unfinished : videos).Add(new ScannedVideo(
                 show(video),
                 info.Length,
                 new DateTimeOffset(info.LastWriteTimeUtc).ToUnixTimeMilliseconds(),
-                MimeTypeOf(video),
+                MimeTypeOf(isDownload ? UnfinishedDownloads.VideoName(info.Name) ?? video : video),
                 captions,
                 chaptersPath is null ? null : show(chaptersPath),
                 thumbnailPath is null ? null : show(thumbnailPath),

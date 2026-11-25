@@ -310,7 +310,7 @@ public sealed class ContentCheckTests
 
     [Theory]
     [InlineData("no_video", "no_video")]
-    [InlineData("probe_failed", "not_video")]
+    [InlineData("probe_failed", null)]
     [InlineData("no_media", "not_video")]
     [InlineData("ffmpeg_missing", null)]
     [InlineData(null, null)]
@@ -322,6 +322,7 @@ public sealed class ContentCheckTests
         if (code is not null) Assert.Equal(code, await Refused(() => new HashStep(media: media).RunAsync(item, context, default)));
         else Assert.Equal(StepResult.Done, await new HashStep(media: media).RunAsync(item, context, default));
         Assert.Equal(probe == "ffmpeg_missing", context.Lines.Any(l => l.Code == "video_unchecked"));
+        Assert.Equal(probe == "probe_failed", context.Lines.Any(l => l.Code == "video_undecided"));
         Assert.Equal(code is null, item.VideoChecked);
         Assert.Equal(1, media.Asked);
         // Once, not at every step

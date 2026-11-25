@@ -250,7 +250,8 @@ public sealed class FfmpegMediaTools : IMediaTools
         }
         // Also when it ended well: what it could not read is not what the file lacks
         if (await SourceStoppedAsync(path, error, code, ct).ConfigureAwait(false) is { } stopped) throw stopped;
-        if (code != 0) throw new LocalEncodeException("probe_failed", "ffprobe could not read the file: " + Why(error, path));
+        // It says so itself: what it was given is no media file, or not a whole one. Anything else it ends with says nothing of the file
+        if (code != 0) throw new LocalEncodeException(code == 1 && NoMedia.IsMatch(error) ? "no_media" : "probe_failed", "ffprobe could not read the file: " + Why(error, path));
         return ParseProbe(output);
     }
 
@@ -445,6 +446,8 @@ public sealed class FfmpegMediaTools : IMediaTools
 
     private static readonly Regex NetworkReadError = new("(Invalid argument|Bad file descriptor|Permission denied)", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
 
+    private static readonly Regex NoMedia = new("(Invalid data found when processing input|moov atom not found|EBML header parsing failed)", RegexOptions.CultureInvariant);
+
     internal static bool IsReading(string line) => Reading.IsMatch(line);
 
     internal static bool IsError(string line) => line.Contains("[error]", StringComparison.Ordinal) || line.Contains("[fatal]", StringComparison.Ordinal) || line.Contains("[panic]", StringComparison.Ordinal);
@@ -505,7 +508,7 @@ public sealed class FfmpegMediaTools : IMediaTools
 
     private static async Task<(int Code, string Output, string Error)> RunAsync(string exe, IEnumerable<string> args, Action<string>? onLine, CancellationToken ct, string? folder = null)
     {
-        var start = new ProcessStartInfo(exe) { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
+        var start = new ProcessStartInfo(exe) { RedirectStandardOutput = true, RedirectStandardError = true, StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8, UseShellExecute = false, CreateNoWindow = true };
         if (folder is not null) start.WorkingDirectory = folder;
         foreach (var a in args) start.ArgumentList.Add(a);
         using var process = new Process { StartInfo = start };
@@ -772,6 +775,7 @@ public sealed class EncodeStep : IImportStep
         {
             // The server would find the same once everything was sent: refused as when it is checked
             WorkFiles.DeleteFolder(directory, _workRoot, item.Id);
+            if (ex.Code == "no_media") context.Log(LogLevel.Warning, "unreadable", $"ffprobe cannot read it: {ex.Message}", ex.Message);
             throw ex.Code == "no_video"
                 ? new StepFailedException("no_video", "The file has sound and no video", retryable: false, ex)
                 : new StepFailedException("not_video", "The file cannot be read as a video: it may have been cut off while it was copied", retryable: false, ex);
@@ -853,7 +857,7 @@ public sealed class EncodeStep : IImportStep
         {
             try
             {
-                var there = plan = await PlanAsync(await _source.WithPathAsync(video.Path, context, p => _media.ProbeAsync(p, time), time).ConfigureAwait(false)).ConfigureAwait(false);
+                var there = plan = await PlanAsync(await _source.ProbeAsync(_media, video.Path, context, time).ConfigureAwait(false)).ConfigureAwait(false);
                 await RoomAsync(directory, there.Bytes, context, time).ConfigureAwait(false);
                 limit.CancelAfter(Limit(there.Info.Seconds, video.Size));
                 Start(there);
@@ -886,7 +890,16 @@ public sealed class EncodeStep : IImportStep
             // A read that stops half way may end ffmpeg well, with a short video or without its sound
             foreach (var output in plan.Outputs)
             {
-                var made = await _media.ProbeAsync(output, time).ConfigureAwait(false);
+                SourceInfo made;
+                try
+                {
+                    made = await _media.ProbeAsync(output, time).ConfigureAwait(false);
+                }
+                catch (LocalEncodeException unreadable)
+                {
+                    // That is what was made, not the file
+                    throw new LocalEncodeException("ffmpeg_failed", "The encoded video cannot be read: " + unreadable.Message, unreadable);
+                }
                 if (plan.Info.Missing(made) is { } missing) throw new LocalEncodeException("too_short", missing);
                 if (made.Colour is { } colours && SdrPlan.For(plan.Info.Colour).Wrong(colours) is { } wrong) throw new LocalEncodeException("colour_tags", wrong);
             }
