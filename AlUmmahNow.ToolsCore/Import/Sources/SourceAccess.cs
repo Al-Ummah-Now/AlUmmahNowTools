@@ -164,7 +164,7 @@ public sealed class SourceAccess
             // What it opens after all is closed again
             _ = task.ContinueWith(t =>
             {
-                if (t.Status == TaskStatus.RanToCompletion && t.Result is OpenedSource late) late.Stream.Dispose();
+                if (t.Status == TaskStatus.RanToCompletion && t.Result is OpenedSource late) SourceStream.CloseLater(late.Stream);
                 else _ = t.Exception;
             }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
             throw;
@@ -243,6 +243,8 @@ internal sealed class SourceAttempts
     private int _failedPaths;
     private int _rounds;
     private ReadFailure? _roundFailure;
+    /// <summary>In this round a path opened the file and its read stopped</summary>
+    private bool _roundStopped;
     private DateTimeOffset? _since;
     private bool _waiting;
 
@@ -282,6 +284,7 @@ internal sealed class SourceAttempts
         _rounds = 0;
         _failedPaths = 0;
         _roundFailure = null;
+        _roundStopped = false;
         if (_stopOffset is { } stop && offset > stop)
         {
             _stopOffset = null;
@@ -312,6 +315,7 @@ internal sealed class SourceAttempts
             if (_stopOffset == at) _stops++;
             else (_stopOffset, _stops) = (at, 1);
             _carefulUntil = at + (4 << 20);
+            _roundStopped = true;
         }
         Log(failure, path, offset);
 
@@ -322,8 +326,10 @@ internal sealed class SourceAttempts
         if (_failedPaths < _candidates.Count) return;
 
         var round = _roundFailure;
+        var stopped = _roundStopped;
         _failedPaths = 0;
         _roundFailure = null;
+        _roundStopped = false;
         _since ??= _access.Now;
         _rounds++;
         var over = round.Kind switch
@@ -334,8 +340,9 @@ internal sealed class SourceAttempts
         };
         if (over)
         {
-            // The share was there each time and the read stopped at one place each time: the file itself
-            if (round.Kind == ReadKind.Network && offset is not null && _stops >= 3) round = round with { Code = "share_damaged", Kind = ReadKind.Final };
+            // A path opens the file to the last, and its read stops at one place each time: the file itself, whichever path
+            // was tried last (the other may not open at all)
+            if (round.Kind == ReadKind.Network && stopped && _stops >= 3) round = round with { Code = "share_damaged", Kind = ReadKind.Final };
             throw new SourceReadException(round, offset ?? _stopOffset, error);
         }
         if (round.Kind == ReadKind.Network && !_waiting)
@@ -516,9 +523,10 @@ public sealed class SourceStream : Stream
     }
 
     /// <summary>Closing a file on a dead share may block too.</summary>
-    private static void CloseLater(Stream stream) => _ = Task.Run(() =>
+    internal static void CloseLater(Stream stream) => _ = Task.Run(() =>
     {
-        try { stream.Dispose(); } catch (IOException) { }
+        // Nobody waits for it: whatever closing a stream on a dead share throws ends here
+        try { stream.Dispose(); } catch (Exception) { }
     });
 
     public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken ct) => ReadAsync(buffer.AsMemory(offset, count), ct).AsTask();

@@ -94,9 +94,12 @@ public static class FolderScanner
     /// <param name="batchLanguage">The language of caption files named without one, when the video's metadata has none.</param>
     /// <remarks>A folder on a mapped drive is read through its network path; every path in the result is under <paramref name="folder"/>, as it was chosen.</remarks>
     public static ScanResult Scan(string folder, bool includeSubfolders, string? batchLanguage, CancellationToken ct = default, SourceAccess? source = null) =>
-        (source ?? SourceAccess.Default).Scan(folder, root => ScanRoot(root, folder, includeSubfolders, batchLanguage, ct), ct);
+        Scan(source ?? SourceAccess.Default, folder, includeSubfolders, batchLanguage, ct);
 
-    private static ScanResult ScanRoot(string root, string folder, bool includeSubfolders, string? batchLanguage, CancellationToken ct)
+    private static ScanResult Scan(SourceAccess source, string folder, bool includeSubfolders, string? batchLanguage, CancellationToken ct) =>
+        source.Scan(folder, root => ScanRoot(source, root, folder, includeSubfolders, batchLanguage, ct), ct);
+
+    private static ScanResult ScanRoot(SourceAccess source, string root, string folder, bool includeSubfolders, string? batchLanguage, CancellationToken ct)
     {
         string Show(string path) => root == folder ? path : Path.Combine(folder, Path.GetRelativePath(root, path));
         var videos = new List<ScannedVideo>();
@@ -107,18 +110,18 @@ public static class FolderScanner
         foreach (var dir in folders)
         {
             ct.ThrowIfCancellationRequested();
-            ScanOne(dir, Show, batchLanguage, videos, notes);
+            ScanOne(source, dir, Show, batchLanguage, videos, notes);
         }
         return new ScanResult(videos, notes);
     }
 
     /// <summary>That file alone: a share that drops is the scan's to try again.</summary>
-    private static bool Unreadable(Exception ex, string path) => ex is FormatException
-        || (ex is IOException or UnauthorizedAccessException && ReadFailure.Of(ex, SourceAccess.Default.IsNetwork(path)).Kind != ReadKind.Network);
+    private static bool Unreadable(SourceAccess source, Exception ex, string path) => ex is FormatException
+        || (ex is IOException or UnauthorizedAccessException && ReadFailure.Of(ex, source.IsNetwork(path)).Kind != ReadKind.Network);
 
     private static string Why(Exception ex) => ex is FormatException ? ex.Message : ImportQueue.Describe(ex);
 
-    private static void ScanOne(string dir, Func<string, string> show, string? batchLanguage, List<ScannedVideo> videos, List<ScanNote> notes)
+    private static void ScanOne(SourceAccess source, string dir, Func<string, string> show, string? batchLanguage, List<ScannedVideo> videos, List<ScanNote> notes)
     {
         var files = Directory.EnumerateFiles(dir, "*", new EnumerationOptions { IgnoreInaccessible = true, AttributesToSkip = Skipped })
             .Where(f => !Path.GetFileName(f).StartsWith('.'))
@@ -134,7 +137,7 @@ public static class FolderScanner
             {
                 csv = MetadataCsv.Parse(File.ReadAllText(csvPath, Encoding.UTF8));
             }
-            catch (Exception ex) when (Unreadable(ex, csvPath))
+            catch (Exception ex) when (Unreadable(source, ex, csvPath))
             {
                 notes.Add(new ScanNote(ScanNoteCode.CsvUnreadable, $"{Path.GetFileName(csvPath)}: {Why(ex)}"));
             }
@@ -175,7 +178,7 @@ public static class FolderScanner
                     {
                         fromJson = MetadataJson.Parse(File.ReadAllText(path, Encoding.UTF8));
                     }
-                    catch (Exception ex) when (Unreadable(ex, path))
+                    catch (Exception ex) when (Unreadable(source, ex, path))
                     {
                         own.Add(new ScanNote(ScanNoteCode.MetadataUnreadable, $"{Path.GetFileName(path)}: {Why(ex)}"));
                     }

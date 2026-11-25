@@ -7,6 +7,7 @@ using LogLevel = AlUmmahNow.ToolsCore.Import.LogLevel;
 using AlUmmahNow.VisualImporterUno.Shell;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Dispatching;
 
 namespace AlUmmahNow.VisualImporterUno.ViewModels;
@@ -305,8 +306,7 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
     {
         IsScanning = true;
         ScanMessage = Loc.Get("Import_Scanning");
-        // "Copy as path" on Windows puts quotes around it; \\server\share works as it is
-        var folder = FolderPath.Trim().Trim('"').Trim();
+        var folder = CleanFolder(FolderPath);
         var subfolders = IncludeSubfolders;
         var language = CaptionLanguageIndex switch { 1 => "ar", 2 => "en", _ => null };
         try
@@ -330,6 +330,9 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
             IsScanning = false;
         }
     }
+
+    /// <summary>"Copy as path" on Windows puts quotes around it; \\server\share works as it is.</summary>
+    internal static string CleanFolder(string path) => path.Trim().Trim('"').Trim();
 
     private void ShowScan(ScanResult result)
     {
@@ -390,7 +393,7 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
         AddToQueueCommand.NotifyCanExecuteChanged();
         try
         {
-            var name = Path.GetFileName(FolderPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+            var name = Path.GetFileName(CleanFolder(FolderPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
             var serverEncodes = ServerEncodesShown;
             var transcribe = Transcription();
             var translate = TranslateCaptions;
@@ -595,13 +598,10 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
         var lines = new List<string>();
         // An error number is a name, not a count: never grouped
         if (number.Length > 0) lines.Add(Loc.Format("ImportRead_" + system, Loc.IsArabic ? Loc.ToArabicDigits(number) : number));
-        if (text.Length > 0) lines.Add(Isolate(text));
+        if (text.Length > 0) lines.Add(text);
         if (offset.Length > 0) lines.Add(Loc.Format("ImportRead_offset", Num(offset)));
         return string.Join("\n", lines);
     }
-
-    /// <summary>A path or the system's words, kept left to right (or in their own direction) whatever the line around them.</summary>
-    internal static string Isolate(string text) => text.Length == 0 ? "" : (text[0] is '\\' or '/' || (text.Length > 1 && text[1] == ':') ? '\u2066' : '\u2068') + text + '\u2069';
 
     internal static string ErrorText(Exception ex) => ErrorText(ImportQueue.ErrorCode(ex), ex.Message);
 
@@ -624,11 +624,11 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
             "attempt_failed" => Loc.WithDetail(Loc.Format("ImportLog_attempt_failed", StepName(Arg(0)), Num(1), Num(3)), Loc.WithDetail(ErrorText(Arg(2), Arg(4)), ReadText(Arg(5), Arg(6), Arg(7), Arg(8)))),
             "failed" => Loc.WithDetail(Loc.WithDetail(Loc.Format("ImportLog_failed", StepName(Arg(0)), Num(1)), Loc.WithDetail(ErrorText(Arg(2), Arg(4)), ReadText(Arg(5), Arg(6), Arg(7), Arg(8)))), Loc.Format("ImportLog_reference", Arg(3))),
             // Reading the file itself: a share, a cloud placeholder
-            "share_path" or "share_chosen" => Loc.WithDetail(Loc.Get("ImportLog_" + line.Code), Isolate(Arg(0))),
+            "share_path" or "share_chosen" => Loc.WithDetail(Loc.Get("ImportLog_" + line.Code), Arg(0)),
             "share_back" or "hash_resumed" => Loc.Format("ImportLog_" + line.Code, Num(0)),
-            "share_tool" => Loc.WithDetail(Loc.Get("ImportLog_share_tool"), Isolate(Arg(0))),
+            "share_tool" => Loc.WithDetail(Loc.Get("ImportLog_share_tool"), Arg(0)),
             "cloud_download" => Loc.Get("ImportLog_cloud_download"),
-            "read_failed" => Loc.WithDetail(Loc.WithDetail(ErrorText(Arg(0), null), ReadText(Arg(1), Arg(2), Arg(3), Arg(4))), Isolate(Arg(5))),
+            "read_failed" => Loc.WithDetail(Loc.WithDetail(ErrorText(Arg(0), null), ReadText(Arg(1), Arg(2), Arg(3), Arg(4))), Arg(5)),
             "sent" => Loc.Format("ImportLog_sent", Loc.Groups(a.Skip(1).Select(Part))),
             "left_out_size" => Loc.WithDetail(Loc.Format("ImportLog_left_out_size", Num(1)), Arg(0)),
             "left_out_unreadable" => Loc.WithDetail(Loc.WithDetail(Loc.Get("ImportLog_left_out_unreadable"), Arg(0)), Arg(1)),
@@ -853,6 +853,30 @@ public sealed partial class ReviewRow : ObservableObject
 public sealed record LogEntry(string Time, string Utc, IReadOnlyList<string> Lines, bool IsProblem)
 {
     public string Text => string.Join("\n", Lines);
+
+    public IReadOnlyList<ShownLine> Shown => ShownLine.Of(Text);
+}
+
+/// <summary>
+/// One line of a text whose lines have their own directions. A path reads left to right with its first marks in place
+/// (<see cref="PathText"/>), the system's words (no Arabic in them) left to right, and the app's words with the page. No bidi
+/// isolate marks: Uno's Skia text draws them as boxes.
+/// </summary>
+public sealed record ShownLine(string Text)
+{
+    public static IReadOnlyList<ShownLine> Of(string text) => text.Length == 0 ? [] : text.Split('\n').Select(l => new ShownLine(l)).ToList();
+
+    public bool IsPath => Text.StartsWith(@"\\", StringComparison.Ordinal) || Text.StartsWith('/')
+        || (Text.Length > 2 && char.IsAsciiLetter(Text[0]) && Text[1] == ':' && Text[2] is '\\' or '/');
+
+    public bool IsText => !IsPath;
+    public string? Path => IsPath ? Text : null;
+
+    /// <summary>Latin words on an Arabic page: left to right, from the page's start edge.</summary>
+    private bool OwnDirection => Loc.IsArabic && !Text.Any(c => c is >= '\u0600' and <= '\u06FF');
+
+    public FlowDirection Direction => Loc.IsArabic && !OwnDirection ? FlowDirection.RightToLeft : FlowDirection.LeftToRight;
+    public HorizontalAlignment Align => OwnDirection ? HorizontalAlignment.Left : HorizontalAlignment.Stretch;
 }
 
 /// <summary>A file in the queue, as the queue's table shows it.</summary>
@@ -879,6 +903,10 @@ public sealed partial class QueueRow : ObservableObject
     [ObservableProperty] private string? _statusTip;
     [ObservableProperty] private string _detail = "";
     [ObservableProperty] private bool _hasDetail;
+    /// <summary>The detail's lines, each with its own direction</summary>
+    [ObservableProperty] private IReadOnlyList<ShownLine> _detailLines = [];
+
+    partial void OnDetailChanged(string value) => DetailLines = ShownLine.Of(value);
     [ObservableProperty] private string _note = "";
     [ObservableProperty] private bool _showNote;
     /// <summary>A transcript made here is with the server (TA-13), under the encoding note.</summary>

@@ -269,6 +269,7 @@ public class NetworkShareReadingTests
         public bool Root = true;
         /// <summary>The opened file says it is this much longer than it is</summary>
         public int Longer;
+        public bool CloseFails;
         public Func<string, Exception?> OnOpen = _ => null;
         public Func<string, Exception?> OnStat = _ => null;
         /// <summary>Path, offset and length: null reads</summary>
@@ -292,6 +293,12 @@ public class NetworkShareReadingTests
 
     private sealed class FaultyStream(Faults faults, string path) : MemoryStream(faults.Bytes, writable: false)
     {
+        protected override void Dispose(bool disposing)
+        {
+            base.Dispose(disposing);
+            if (disposing && faults.CloseFails) throw new InvalidOperationException("x");
+        }
+
         public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken ct = default)
         {
             var offset = Position;
@@ -421,6 +428,38 @@ public class NetworkShareReadingTests
         // To the nearest short read before the bad place
         Assert.InRange(error.Offset!.Value, bad - (1 << 16), bad);
         Assert.False(ImportQueue.IsRetryable(error));
+    }
+
+    [Fact]
+    public async Task A_damaged_file_is_found_out_when_the_other_path_does_not_open_at_all()
+    {
+        var rig = new Rig();
+        rig.Files.OnRead = (_, offset, _) => offset >= 1 << 20 ? Dropped() : null;
+        // A drive mapped only in the other session: the round, and the patience, end on this path
+        rig.Files.OnOpen = path => path == Chosen ? Dropped() : null;
+        var error = await Assert.ThrowsAsync<SourceReadException>(() => rig.ReadAll());
+        Assert.Equal(("share_damaged", 1L << 20), (error.Failure.Code, error.Offset));
+        Assert.Equal(Chosen, rig.Files.Opens[^1]);
+    }
+
+    [Fact]
+    public async Task A_share_that_is_gone_at_the_end_is_no_damaged_file_however_often_it_stopped_before()
+    {
+        var rig = new Rig();
+        rig.Files.OnRead = (_, offset, _) => offset >= 1 << 20 ? Dropped() : null;
+        // It stopped at one place for four rounds, then went away
+        rig.Files.OnOpen = _ => rig.Delays.Count >= 4 ? Dropped() : null;
+        var error = await Assert.ThrowsAsync<SourceReadException>(() => rig.ReadAll());
+        Assert.Equal(("share_lost", 1L << 20), (error.Failure.Code, error.Offset));
+    }
+
+    [Fact]
+    public async Task A_stream_that_cannot_be_closed_does_not_matter()
+    {
+        var rig = new Rig();
+        rig.Files.CloseFails = true;
+        rig.Files.OnRead = (path, offset, _) => path == Network && offset >= 1 << 20 ? Dropped() : null;
+        Assert.Equal(rig.Files.Bytes, await rig.ReadAll());
     }
 
     [Fact]
