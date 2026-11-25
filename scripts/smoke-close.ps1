@@ -11,6 +11,9 @@ $ready = Join-Path $work 'ready'
 Remove-Item Env:TOOLS_SCREENSHOT -ErrorAction SilentlyContinue
 $env:TOOLS_DEMO = '1'; $env:TOOLS_DEMO_LANG = 'en'; $env:TOOLS_DEMO_IMPORT = 'empty'
 $env:TOOLS_SMOKE_CLOSE = $Mode; $env:TOOLS_SMOKE_CLOSE_DELAY_MS = '8000'; $env:TOOLS_SMOKE_READY = $ready
+# Windows gives a process the id of one that has ended, and never changes a child's parent id: an older process whose parent
+# had this id (a build server's) is none of the app's
+$since = Get-Date
 $app = Start-Process $Exe -PassThru -RedirectStandardOutput (Join-Path $work 'out.log') -RedirectStandardError (Join-Path $work 'err.log')
 
 function Get-Descendants([int]$RootId) {
@@ -20,7 +23,7 @@ function Get-Descendants([int]$RootId) {
   $queue.Enqueue($RootId)
   while ($queue.Count -gt 0) {
     $id = $queue.Dequeue()
-    foreach ($child in $all | Where-Object { $_.ParentProcessId -eq $id -and $_.ProcessId -ne $id }) { $found.Add($child); $queue.Enqueue([int]$child.ProcessId) }
+    foreach ($child in $all | Where-Object { $_.ParentProcessId -eq $id -and $_.ProcessId -ne $id -and $_.CreationDate -ge $since }) { $found.Add($child); $queue.Enqueue([int]$child.ProcessId) }
   }
   $found.ToArray()
 }
