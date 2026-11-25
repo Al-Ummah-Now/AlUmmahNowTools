@@ -589,6 +589,47 @@ public class NetworkShareReadingTests
     }
 
     [Fact]
+    public async Task An_answer_that_comes_as_its_time_is_up_is_the_answer()
+    {
+        var rig = new Rig();
+        rig.Paths.OnShare = false;
+        var access = new SourceAccess(rig.Paths, rig.Files)
+        {
+            // Out of time, and answered before anybody looks
+            Wait = async (answer, _, _) =>
+            {
+                await answer;
+                throw new TimeoutException();
+            },
+        };
+        Assert.False(await access.IsNetworkAsync("/y/nas/a.mp4", default));
+        Assert.Equal(["/nas/nas/a.mp4", "/y/nas/a.mp4"], await access.CandidatesAsync("/y/nas/a.mp4", default));
+    }
+
+    [Fact]
+    public async Task The_next_question_is_asked_when_the_one_before_is_answered_as_its_time_is_up()
+    {
+        using var answers = new ManualResetEventSlim();
+        var rig = new Rig();
+        rig.Paths.OnShare = false;
+        rig.Paths.Silent = answers;
+        var waits = 0;
+        var access = new SourceAccess(rig.Paths, rig.Files)
+        {
+            Wait = async (answer, _, _) =>
+            {
+                if (Interlocked.Increment(ref waits) == 2) answers.Set();
+                await answer;
+                throw new TimeoutException();
+            },
+        };
+        var first = access.IsNetworkAsync("/y/nas/a.mp4", default);
+        Assert.False(await access.IsNetworkAsync("/y/nas/b.mp4", default).WaitAsync(TimeSpan.FromSeconds(30)));
+        Assert.False(await first);
+        Assert.Equal(["/y/nas/a.mp4", "/y/nas/b.mp4"], rig.Paths.Asked);
+    }
+
+    [Fact]
     public async Task A_step_waiting_for_a_silent_mount_stops_at_once()
     {
         using var answers = new ManualResetEventSlim();
