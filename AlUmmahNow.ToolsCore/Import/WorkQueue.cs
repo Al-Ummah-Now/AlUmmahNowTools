@@ -87,6 +87,8 @@ public enum StepWait
     Share,
     /// <summary>The file comes down from cloud storage first</summary>
     Cloud,
+    /// <summary>The disk's free space is another encode's</summary>
+    Space,
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter))]
@@ -184,6 +186,9 @@ public sealed class QueueItem
 
     /// <summary>What the running step is waiting for (not saved)</summary>
     [JsonIgnore] public StepWait Wait { get; internal set; }
+
+    /// <summary>The running step copies the file here first; its progress is the copy's (not saved)</summary>
+    [JsonIgnore] public bool Copying { get; internal set; }
 
     /// <summary>The hash so far, kept over a failed attempt and a pause (not saved: a restart hashes from the start)</summary>
     [JsonIgnore] internal HashSoFar? Hashing { get; set; }
@@ -340,6 +345,8 @@ public interface IStepContext
     void Later(TimeSpan delay);
     /// <summary>The step waits for something before it can go on.</summary>
     void Waiting(StepWait wait) { }
+    /// <summary>The step copies the file here first: its progress is the copy's.</summary>
+    void Copying(bool copying) { }
 }
 
 public interface IImportStep
@@ -411,6 +418,8 @@ public sealed class ImportQueue : IDisposable
     private QueueSettings _settings = new();
     private bool _allPaused;
     private readonly WorkFolders _work;
+    /// <summary>Only where it was told which folders are its own</summary>
+    private readonly bool _sweeps;
     private readonly object _cleanGate = new();
     private Task _cleaning = Task.CompletedTask;
     private bool _stopped;
@@ -418,6 +427,7 @@ public sealed class ImportQueue : IDisposable
     public ImportQueue(string path, IEnumerable<IImportStep> steps, IImportFailureSink? sink = null, TimeProvider? time = null, Func<int, TimeSpan>? backoff = null, WorkFolders? work = null)
     {
         _work = work ?? WorkFolders.Default;
+        _sweeps = work is not null;
         _path = path;
         _steps = steps.ToDictionary(s => s.Kind);
         _sink = sink;
@@ -754,13 +764,13 @@ public sealed class ImportQueue : IDisposable
     /// </summary>
     private void DeleteWork(IReadOnlyCollection<QueueItem> items)
     {
-        var made = items.Where(i => i.Renditions is not null || i.Transcript is not null).ToList();
-        if (made.Count == 0) return;
+        if (items.Count == 0) return;
         void Delete()
         {
-            foreach (var item in made)
+            foreach (var item in items)
             {
-                WorkFiles.DeleteFolder(item.Renditions?.Directory, _work.Renditions, item.Id);
+                // What an encode that never ended left has no renditions: its own folder all the same
+                WorkFiles.DeleteFolder(item.Renditions?.Directory ?? Path.Combine(_work.Renditions, item.Id), _work.Renditions, item.Id);
                 WorkFiles.DeleteFile(item.Transcript?.Path, _work.Transcripts, item.Id, ".json");
             }
         }
@@ -927,8 +937,21 @@ public sealed class ImportQueue : IDisposable
         return started.Count;
     }
 
+    private bool _swept;
+
+    /// <summary>Once, before anything runs: what an encode left that the app's end (or a crash) cut short.</summary>
+    private void Sweep()
+    {
+        if (!_sweeps || _swept) return;
+        _swept = true;
+        HashSet<string> unfinished;
+        lock (_gate) unfinished = _items.Where(i => i.Renditions is null && !_running.ContainsKey(i.Id)).Select(i => i.Id).ToHashSet();
+        WorkFiles.Sweep(_work.Renditions, unfinished);
+    }
+
     private async Task LoopAsync(CancellationToken ct)
     {
+        Sweep();
         while (!ct.IsCancellationRequested)
         {
             Pump();
@@ -1071,6 +1094,7 @@ public sealed class ImportQueue : IDisposable
             // Not let go of: it has no timer and no handle, and its cancellation may still be running
             _running.Remove(i.Id);
             i.Wait = StepWait.None;
+            i.Copying = false;
             // Removed while it ran: its files are free now
             if (!_items.Contains(i)) DeleteWork(new[] { i });
             SaveLocked();
@@ -1214,6 +1238,12 @@ public sealed class ImportQueue : IDisposable
         {
             if (_item.Wait == wait) return;
             _item.Wait = wait;
+            _queue.Notify(_item.Id);
+        }
+
+        public void Copying(bool copying)
+        {
+            _item.Copying = copying;
             _queue.Notify(_item.Id);
         }
 

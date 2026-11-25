@@ -2468,6 +2468,18 @@ The list shows it once the scanner is back.</value>
   <data name="ImportEncodeError_no_media" xml:space="preserve">
     <value>the file has neither picture nor sound</value>
   </data>
+  <data name="ImportPhase_WaitingSpace" xml:space="preserve">
+    <value>Waiting for free disk space…</value>
+  </data>
+  <data name="ImportPhase_Copying" xml:space="preserve">
+    <value>Copying the file here, {0}</value>
+  </data>
+  <data name="ImportEncodeError_copy_differs" xml:space="preserve">
+    <value>the file read differently the second time</value>
+  </data>
+  <data name="ImportEncodeError_took_too_long" xml:space="preserve">
+    <value>it took too long</value>
+  </data>
   <data name="ImportEncodeError_too_short" xml:space="preserve">
     <value>the encoded video is shorter than the file</value>
   </data>

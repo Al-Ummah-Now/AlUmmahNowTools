@@ -40,6 +40,32 @@ public static class WorkFiles
     }
 
     /// <summary>
+    /// What was left half made: the folders of these files, and every other file's copy of its source (what else is in its folder
+    /// may be another environment's queue's).
+    /// </summary>
+    internal static void Sweep(string root, IReadOnlySet<string> unfinished)
+    {
+        try
+        {
+            foreach (var folder in Directory.EnumerateDirectories(root).ToList())
+            {
+                var id = Path.GetFileName(folder);
+                if (!Id.IsMatch(id)) continue;
+                var path = Path.Combine(root, id);
+                if (unfinished.Contains(id)) DeleteFolder(path, root, id);
+                else if (Check(path, root, id, id))
+                {
+                    foreach (var copy in Directory.EnumerateFiles(path, EncodeStep.CopyName + ".*").ToList()) File.Delete(copy);
+                }
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // No folder yet, or another app holds a copy: the next start
+        }
+    }
+
+    /// <summary>
     /// Links are removed themselves, never followed. Not .NET's own recursive delete: on Windows it takes a junction for a
     /// mounted volume, and stops with an error after removing it.
     /// </summary>

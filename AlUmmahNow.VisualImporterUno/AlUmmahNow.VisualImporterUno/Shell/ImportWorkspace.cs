@@ -54,7 +54,7 @@ public sealed class ImportWorkspace : IDisposable
             ? Path.Combine(Path.GetTempPath(), "aun-tools-demo-" + Guid.NewGuid().ToString("N"), "queue.json")
             : ImportQueue.DefaultPath(Environment);
         WorkFiles.Skipped = text => Serilog.Log.Warning("[Import] {Text}", text);
-        Queue = new ImportQueue(path, steps, new ServerFailureSink(Api, Reporter)) { LookAtFile = AlUmmahNow.ToolsCore.Import.Sources.SourceAccess.Default.LookAsync };
+        Queue = new ImportQueue(path, steps, new ServerFailureSink(Api, Reporter), work: IsDemo ? null : WorkFolders.Default) { LookAtFile = AlUmmahNow.ToolsCore.Import.Sources.SourceAccess.Default.LookAsync };
         if (IsDemo)
         {
             // Screenshots show a queue in every state; nothing runs and nothing is sent
@@ -330,6 +330,13 @@ internal static class DemoImport
                 typeof(QueueItem).GetProperty("OnDisk", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
                     .SetValue(copied, new AlUmmahNow.ToolsCore.Import.Sources.SourceStat(copied.Video.Size + 1, 1));
             }
+        }
+        if (State is "copying" or "space-waiting")
+        {
+            // The fifth, which is being encoded
+            typeof(QueueItem).GetProperty(nameof(QueueItem.Progress))!.SetValue(items[4], 0.41);
+            if (State == "copying") typeof(QueueItem).GetProperty(nameof(QueueItem.Copying))!.SetValue(items[4], true);
+            else typeof(QueueItem).GetProperty(nameof(QueueItem.Wait))!.SetValue(items[4], StepWait.Space);
         }
         if (State is not ("share-waiting" or "share-failed" or "damaged")) return;
 

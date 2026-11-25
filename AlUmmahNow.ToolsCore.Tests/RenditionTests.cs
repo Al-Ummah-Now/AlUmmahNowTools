@@ -254,14 +254,14 @@ public class EncodeStepTests
 
     [Theory]
     [InlineData(11.0, true)]
-    [InlineData(9.9, false)]
+    [InlineData(10.9, false)]
     public async Task An_encode_that_stopped_before_the_files_end_is_not_sent(double seconds, bool sent)
     {
         var (item, _, api, work) = Setup();
         var context = new RecordingContext();
         Assert.Equal(sent ? StepResult.Done : StepResult.Skipped, await Step(api, work, new FakeMedia { Encoded = seconds }).RunAsync(item, context, default));
         Assert.Equal(sent, item.Renditions is not null);
-        Assert.Equal(!sent, context.Lines.Any(l => l.Code == "encode_failed" && l.Text.Contains("9.9 s long", StringComparison.Ordinal)));
+        Assert.Equal(!sent, context.Lines.Any(l => l.Code == "encode_failed" && l.Text.Contains("10.9 s long", StringComparison.Ordinal)));
     }
 
     [Fact]

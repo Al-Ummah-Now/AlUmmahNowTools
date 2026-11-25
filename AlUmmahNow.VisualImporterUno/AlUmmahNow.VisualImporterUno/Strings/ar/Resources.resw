@@ -2816,6 +2816,18 @@
   <data name="ImportEncodeError_no_media" xml:space="preserve">
     <value>الملف بلا صورة ولا صوت</value>
   </data>
+  <data name="ImportPhase_WaitingSpace" xml:space="preserve">
+    <value>في انتظار مساحة على القرص…</value>
+  </data>
+  <data name="ImportPhase_Copying" xml:space="preserve">
+    <value>جار نسخ الملف إلى هنا، {0}</value>
+  </data>
+  <data name="ImportEncodeError_copy_differs" xml:space="preserve">
+    <value>اختلف الملف عند قراءته مرة ثانية</value>
+  </data>
+  <data name="ImportEncodeError_took_too_long" xml:space="preserve">
+    <value>استغرق الترميز وقتًا طويلًا</value>
+  </data>
   <data name="ImportEncodeError_too_short" xml:space="preserve">
     <value>المرئي المرمّز أقصر من الملف</value>
   </data>
