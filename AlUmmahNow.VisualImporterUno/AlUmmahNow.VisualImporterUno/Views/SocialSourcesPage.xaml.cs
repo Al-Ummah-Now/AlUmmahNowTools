@@ -22,6 +22,7 @@ public sealed partial class SocialSourcesPage : Page
         DataContext = ViewModel;
         if (ViewModel.SelectedChannel is { } channel) ChannelBox.Text = channel.Name;
         SuggestionsUnderBox.Attach(ChannelBox);
+        ChannelBoxes.Attach(ChannelBox, ViewModel.ChannelSearch, channel => ViewModel.SelectedChannel = channel);
         // Typed values start at the start edge in Arabic (the Import page's rule, TA-13): Arabic text runs right to left, a
         // Latin value (an address, a Latin name) keeps its order but starts at the right edge. An empty field starts on the
         // right (Uno places its caret by its alignment). Two Latin lines under a channel's name end at the right edge too.
@@ -216,26 +217,7 @@ public sealed partial class SocialSourcesPage : Page
 
     // ------------------------------------------------------------ Channel
 
-    private void ChannelBox_TextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)
-    {
-        SetChannelValueDirection();
-        if (args.Reason != AutoSuggestionBoxTextChangeReason.UserInput) return;
-        _ = ViewModel.SearchChannelsAsync(sender.Text);
-        sender.IsSuggestionListOpen = true;
-    }
-
-    private void ChannelBox_GotFocus(object sender, RoutedEventArgs e)
-    {
-        if (ChannelBox.FocusState == FocusState.Programmatic) return;
-        if (ViewModel.Channels.Count == 0) _ = ViewModel.SearchChannelsAsync(ChannelBox.Text);
-    }
-
-    private void ChannelBox_SuggestionChosen(AutoSuggestBox sender, AutoSuggestBoxSuggestionChosenEventArgs args)
-    {
-        if (args.SelectedItem is not ImportChannel channel) return;
-        ViewModel.SelectedChannel = channel;
-        sender.Text = channel.Name;
-    }
+    private void ChannelBox_TextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args) => SetChannelValueDirection();
 
     private void ShowAll_Click(object sender, RoutedEventArgs e)
     {

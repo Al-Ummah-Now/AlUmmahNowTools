@@ -27,7 +27,6 @@ public sealed partial class SocialSourcesViewModel : ObservableObject, IDisposab
     private readonly DispatcherQueue? _dispatcher;
     private readonly Dictionary<string, string> _channelNames = new();
     private readonly Dictionary<string, SyncJob> _jobs = new();
-    private CancellationTokenSource? _search;
     private CancellationTokenSource? _poll;
     private bool _disposed;
 
@@ -40,6 +39,8 @@ public sealed partial class SocialSourcesViewModel : ObservableObject, IDisposab
         _workspace = workspace!;
         _dispatcher = workspace is null ? null : App.Current?.MainWindow?.DispatcherQueue ?? DispatcherQueue.GetForCurrentThread();
         var isDemo = workspace?.IsDemo == true;
+        ChannelSearch = new ChannelSearch(FindChannelsAsync, c => c.Name, Loc.Get("Social_NoChannelFound"), TimeSpan.FromMilliseconds(250),
+            ex => ChannelError = ex switch { null => "", ImportApiException known => ErrorText(known), _ => BulkImportViewModel.ErrorText(ex) });
         foreach (var c in DemoImport.Channels.Where(_ => isDemo)) _channelNames[c.Id] = c.Name;
         NetworkChoices = SourceNetworks.All.Select(NetworkName).ToArray();
         ScheduleChoices = SourceSchedules.All.Select(ScheduleName).ToArray();
@@ -47,7 +48,7 @@ public sealed partial class SocialSourcesViewModel : ObservableObject, IDisposab
         UpdateNetworkHelp();
         if (isDemo && DemoSocial.Channel is { } channel)
         {
-            Channels.Add(channel);
+            ChannelSearch.Show([channel]);
             _selectedChannel = channel;
             DemoSocial.FillForm(this);
         }
@@ -74,7 +75,7 @@ public sealed partial class SocialSourcesViewModel : ObservableObject, IDisposab
 
     // ---------------------------------------------------------------- Channel
 
-    public ObservableCollection<ImportChannel> Channels { get; } = new();
+    public ChannelSearch ChannelSearch { get; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasChannel), nameof(ChannelSummary), nameof(ShowAddForm), nameof(ShowPickChannel))]
@@ -89,30 +90,11 @@ public sealed partial class SocialSourcesViewModel : ObservableObject, IDisposab
         ? ""
         : string.Join("\n", new[] { SelectedChannel.Handle is { Length: > 0 } h ? "@" + h : null, SelectedChannel.OwnerEmail }.Where(t => !string.IsNullOrEmpty(t)));
 
-    public async Task SearchChannelsAsync(string query)
+    private async Task<IReadOnlyList<ImportChannel>> FindChannelsAsync(string query, CancellationToken ct)
     {
-        _search?.Cancel();
-        var cts = _search = new CancellationTokenSource();
-        try
-        {
-            await Task.Delay(250, cts.Token).ConfigureAwait(true);
-            var found = await _workspace.Api.ListChannelsAsync(query, 1, cts.Token).ConfigureAwait(true);
-            if (cts.IsCancellationRequested) return;
-            Channels.Clear();
-            foreach (var c in found)
-            {
-                Channels.Add(c);
-                _channelNames[c.Id] = c.Name;
-            }
-            ChannelError = found.Count == 0 && query.Trim().Length > 0 ? Loc.Get("Social_NoChannelFound") : "";
-        }
-        catch (OperationCanceledException)
-        {
-        }
-        catch (ImportApiException ex)
-        {
-            ChannelError = ErrorText(ex);
-        }
+        var found = await _workspace.Api.ListChannelsAsync(query, 1, ct);
+        foreach (var c in found) _channelNames[c.Id] = c.Name;
+        return found;
     }
 
     partial void OnSelectedChannelChanged(ImportChannel? value)
@@ -743,7 +725,7 @@ public sealed partial class SocialSourcesViewModel : ObservableObject, IDisposab
     {
         _disposed = true;
         _poll?.Cancel();
-        _search?.Cancel();
+        ChannelSearch.Cancel();
     }
 }
 

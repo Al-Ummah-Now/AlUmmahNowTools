@@ -32,13 +32,12 @@
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
                         <AutoSuggestBox x:Name="ChannelBox" x:Uid="Import_ChannelBox" PlaceholderText="Search channels"
-                                        ItemsSource="{x:Bind ViewModel.Channels}" TextChanged="ChannelBox_TextChanged"
-                                        SuggestionChosen="ChannelBox_SuggestionChosen" GotFocus="ChannelBox_GotFocus" QueryIcon="Find">
+                                        ItemsSource="{x:Bind ViewModel.ChannelSearch.Rows, Mode=OneWay}" TextChanged="ChannelBox_TextChanged" QueryIcon="Find">
                             <AutoSuggestBox.ItemTemplate>
-                                <DataTemplate x:DataType="core:ImportChannel">
+                                <DataTemplate x:DataType="vm:ChannelSuggestion">
                                     <StackPanel Padding="0,6" Spacing="2">
-                                        <TextBlock Text="{x:Bind LocalizedName}" Style="{StaticResource ToolsBody}" Foreground="{ThemeResource FanousTextPrimaryBrush}" />
-                                        <TextBlock Text="{x:Bind OwnerEmail}" Style="{StaticResource ToolsMuted}" FlowDirection="LeftToRight" HorizontalAlignment="Left" />
+                                        <TextBlock Text="{x:Bind Title}" Style="{StaticResource ToolsBody}" Foreground="{ThemeResource FanousTextPrimaryBrush}" />
+                                        <TextBlock Text="{x:Bind Detail}" Style="{StaticResource ToolsMuted}" FlowDirection="LeftToRight" HorizontalAlignment="Left" Visibility="{x:Bind DetailShown}" />
                                     </StackPanel>
                                 </DataTemplate>
                             </AutoSuggestBox.ItemTemplate>

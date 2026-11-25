@@ -1814,6 +1814,9 @@ The list shows it once the scanner is back.</value>
   <data name="Import_ParallelAttach.Header" xml:space="preserve">
     <value>Captions and extras</value>
   </data>
+  <data name="Channel_Searching" xml:space="preserve">
+    <value>Searching…</value>
+  </data>
   <data name="Import_ChannelNone" xml:space="preserve">
     <value>No channel matches.</value>
   </data>
