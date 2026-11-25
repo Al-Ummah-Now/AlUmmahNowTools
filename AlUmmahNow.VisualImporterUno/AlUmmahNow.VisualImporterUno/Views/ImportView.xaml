@@ -135,7 +135,7 @@
                                                            TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind FileName}" />
                                                 <TextBlock Text="{x:Bind Size}" Style="{StaticResource ToolsMuted}" TextWrapping="NoWrap" />
                                             </StackPanel>
-                                            <HyperlinkButton Grid.Column="1" Style="{StaticResource ToolsLinkButton}" Padding="8,4" VerticalAlignment="Center" Tag="{x:Bind}" Click="AddUnfinished_Click" AutomationProperties.Name="{x:Bind AddName}">
+                                            <HyperlinkButton Grid.Column="1" Style="{StaticResource ToolsLinkButton}" Padding="8,4" Margin="0,0,-8,0" VerticalAlignment="Center" Tag="{x:Bind}" Click="AddUnfinished_Click" AutomationProperties.Name="{x:Bind AddName}">
                                                 <TextBlock x:Uid="Import_UnfinishedAddText" Text="Add anyway" />
                                             </HyperlinkButton>
                                         </Grid>
