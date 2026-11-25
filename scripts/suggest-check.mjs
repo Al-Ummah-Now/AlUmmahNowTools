@@ -6,7 +6,7 @@
  * The keyboard: SendKeys on Windows, System Events on macOS, xdotool on Linux (run under xvfb-run).
  */
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -17,7 +17,7 @@ const env = {
 	...process.env,
 	TOOLS_DEMO: '1', TOOLS_DEMO_LANG: process.env.CHECK_LANG ?? 'en', TOOLS_DEMO_THEME: process.env.CHECK_THEME ?? 'dark', TOOLS_DEMO_UPDATE: 'none',
 	TOOLS_DEMO_PAGE: page, TOOLS_DEMO_ROLE: 'super_admin', TOOLS_DEMO_IMPORT: 'empty', TOOLS_DEMO_SOCIAL: 'all', TOOLS_DEMO_SCANNER: '1',
-	TOOLS_DEMO_CHANNELS_MS: '600', TOOLS_DEMO_SUGGEST_LOG: log,
+	TOOLS_DEMO_CHANNELS_MS: '1500', TOOLS_DEMO_SUGGEST_LOG: log,
 };
 const app = spawn(exe, [], { env, stdio: 'ignore' });
 let ended = false;
@@ -26,9 +26,9 @@ const wait = (ms) => new Promise((done) => setTimeout(done, ms));
 
 const lines = () => (existsSync(log) ? readFileSync(log, 'utf8').trim().split('\n').filter(Boolean) : []);
 const state = () => {
-	const [ms, open, items, focus, text, first, row, under] = (lines().at(-1) ?? '').split('\t');
+	const [ms, open, items, focus, text, first, row, under, chosen] = (lines().at(-1) ?? '').split('\t');
 	const of = (field) => (field ?? '').split('=').slice(1).join('=');
-	return { ms: Number(ms), open: of(open) === '1', items: Number(of(items) || 0), focus: of(focus), text: of(text), first: of(first), row: of(row), under: of(under) };
+	return { ms: Number(ms), open: of(open) === '1', items: Number(of(items) || 0), focus: of(focus), text: of(text), first: of(first), row: of(row), under: of(under), chosen: of(chosen) };
 };
 
 function run(command, args, timeout = 30_000) {
@@ -39,13 +39,13 @@ function run(command, args, timeout = 30_000) {
 
 const powershell = (script) => run('powershell', ['-NoProfile', '-STA', '-Command', script]);
 const KEYS = {
-	win32: { front: () => powershell(`(New-Object -ComObject WScript.Shell).AppActivate(${app.pid}) | Out-Null`), text: (t) => powershell(`Add-Type -AssemblyName System.Windows.Forms; foreach ($c in '${t}'.ToCharArray()) { [System.Windows.Forms.SendKeys]::SendWait([string]$c); Start-Sleep -Milliseconds 150 }`), click: (x, y) => powershell(`Add-Type -Name M -Namespace W -MemberDefinition '[System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)] public struct P { public int X; public int Y; } [System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool ClientToScreen(System.IntPtr h, ref P p); [System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y); [System.Runtime.InteropServices.DllImport("user32.dll")] public static extern void mouse_event(uint f, uint x, uint y, uint d, System.UIntPtr e);'; $p = New-Object W.M+P; $p.X = ${x}; $p.Y = ${y}; [W.M]::ClientToScreen((Get-Process -Id ${app.pid}).MainWindowHandle, [ref]$p) | Out-Null; [W.M]::SetCursorPos($p.X, $p.Y) | Out-Null; Start-Sleep -Milliseconds 300; [W.M]::mouse_event(2, 0, 0, 0, [UIntPtr]::Zero); Start-Sleep -Milliseconds 80; [W.M]::mouse_event(4, 0, 0, 0, [UIntPtr]::Zero)`), key: (k) => powershell(`Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('${{ Backspace: '{BACKSPACE}', Escape: '{ESC}', Down: '{DOWN}', Enter: '{ENTER}', All: '^a' }[k]}')`) },
+	win32: { front: () => powershell(`(New-Object -ComObject WScript.Shell).AppActivate(${app.pid}) | Out-Null`), text: (t) => powershell(`Add-Type -AssemblyName System.Windows.Forms; foreach ($c in '${t}'.ToCharArray()) { [System.Windows.Forms.SendKeys]::SendWait([string]$c); Start-Sleep -Milliseconds 150 }`), click: (x, y) => powershell(`Add-Type -Name M -Namespace W -MemberDefinition '[System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)] public struct P { public int X; public int Y; } [System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool ClientToScreen(System.IntPtr h, ref P p); [System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y); [System.Runtime.InteropServices.DllImport("user32.dll")] public static extern void mouse_event(uint f, uint x, uint y, uint d, System.UIntPtr e);'; $p = New-Object W.M+P; $p.X = ${x}; $p.Y = ${y}; [W.M]::ClientToScreen((Get-Process -Id ${app.pid}).MainWindowHandle, [ref]$p) | Out-Null; [W.M]::SetCursorPos($p.X, $p.Y) | Out-Null; Start-Sleep -Milliseconds 300; [W.M]::mouse_event(2, 0, 0, 0, [UIntPtr]::Zero); Start-Sleep -Milliseconds 80; [W.M]::mouse_event(4, 0, 0, 0, [UIntPtr]::Zero)`), key: (k) => powershell(`Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('${{ Backspace: '{BACKSPACE}', Escape: '{ESC}', Down: '{DOWN}', Enter: '{ENTER}', Tab: '{TAB}', All: '^a' }[k]}')`) },
 	darwin: {
 		front: () => run('osascript', ['-e', `tell application "System Events" to set frontmost of (first process whose unix id is ${app.pid}) to true`]),
 		text: (t) => run('osascript', [...t].flatMap((c) => ['-e', `tell application "System Events" to keystroke "${c}"`, '-e', 'delay 0.15'])),
-		key: (k) => run('osascript', ['-e', `tell application "System Events" to ${k === 'All' ? 'keystroke "a" using command down' : `key code ${{ Backspace: 51, Escape: 53, Down: 125, Enter: 36 }[k]}`}`]),
+		key: (k) => run('osascript', ['-e', `tell application "System Events" to ${k === 'All' ? 'keystroke "a" using command down' : `key code ${{ Backspace: 51, Escape: 53, Down: 125, Enter: 36, Tab: 48 }[k]}`}`]),
 	},
-	linux: { front: () => {}, text: (t) => run('xdotool', ['type', '--delay', '150', t]), key: (k) => run('xdotool', ['key', { Backspace: 'BackSpace', Escape: 'Escape', Down: 'Down', Enter: 'Return', All: 'ctrl+a' }[k]]) },
+	linux: { front: () => {}, text: (t) => run('xdotool', ['type', '--delay', '150', t]), key: (k) => run('xdotool', ['key', { Backspace: 'BackSpace', Escape: 'Escape', Down: 'Down', Enter: 'Return', Tab: 'Tab', All: 'ctrl+a' }[k]]) },
 }[process.platform];
 
 const problems = [];
@@ -71,6 +71,14 @@ function picture(name) {
 	} catch (e) { console.log(`no picture ${name}: ${e.message}`); }
 }
 
+const SEERAH = 'ch_demo_seerah';
+/** The row the arrow key was on, as the box said it: what is typed after it is added to it. */
+const ALL_FIRST = () => state().first;
+/** The keyboard goes back to the box (a file the app looks for: Tab alone goes where the page's order says). */
+async function back() {
+	writeFileSync(`${log}.focus`, '');
+	await wait(800);
+}
 const [SOME, NONE] = ['se', 'zz'];
 try {
 	for (let i = 0; i < 240 && !ended && !lines().length; i++) await wait(500);
@@ -113,11 +121,11 @@ try {
 	expect('typing opens it again', (s) => s.open && s.items > 0);
 	KEYS.key('Down');
 	await wait(700);
-	expect('the arrow key moves into the list, which stays open', (s) => s.open && s.text.length > 2);
+	expect('the arrow key moves into the list, which stays open, and chooses nothing', (s) => s.open && s.text.length > 2 && !s.chosen);
 	picture('arrow');
 	KEYS.key('Enter');
 	await wait(2500);
-	expect('Enter chooses and closes, and it stays closed', (s) => !s.open && s.text.length > 2);
+	expect('Enter chooses and closes, and it stays closed', (s) => !s.open && s.text.length > 2 && (!server || s.chosen === SEERAH));
 	picture('chosen');
 	if (KEYS.click) {
 		KEYS.key('All');
@@ -127,8 +135,54 @@ try {
 		const [x, y] = state().row.split(',');
 		KEYS.click(x, y);
 		await wait(2500);
-		expect('a click chooses and closes, and it stays closed', (s) => !s.open && s.text.length > SOME.length);
+		expect('a click chooses and closes, and it stays closed', (s) => !s.open && s.text.length > SOME.length && (!server || s.chosen === SEERAH));
 		picture('clicked');
+		KEYS.front();
+	}
+	if (server) {
+		// Every channel has an "a" and an "r"; the one chosen is Seerah's
+		const again = async (what, letter) => {
+			await back();
+			KEYS.key('All');
+			KEYS.text(letter);
+			await wait(1000);
+			expect(`${what}: the list is open while the server is asked`, (s) => s.open && s.text === letter);
+			await wait(2500);
+			expect(`${what}: several are found`, (s) => s.open && s.items === 3 && s.text === letter);
+		};
+		await again('arrow then Escape', 'a');
+		KEYS.key('Down');
+		await wait(500);
+		expect('the arrow key is on another channel, which is not chosen', (s) => s.open && s.text !== 'a' && s.chosen === SEERAH);
+		KEYS.key('Escape');
+		await wait(1500);
+		expect('arrow then Escape keeps what was typed and what was chosen', (s) => !s.open && s.text === 'a' && s.chosen === SEERAH);
+		await again('arrow then Tab', 'r');
+		KEYS.key('Down');
+		await wait(500);
+		KEYS.key('Tab');
+		await wait(1500);
+		expect('arrow then Tab keeps what was typed and what was chosen', (s) => !s.open && s.focus !== 'TextBox' && s.text === 'r' && s.chosen === SEERAH);
+		await back();
+		KEYS.key('All');
+		KEYS.text('zz');
+		KEYS.key('Tab');
+		await wait(2500);
+		expect('Tab before the search has answered: it is given up, the rows are as before', (s) => !s.open && s.focus !== 'TextBox' && s.items === 3 && s.text === 'zz');
+		await back();
+		KEYS.key('All');
+		KEYS.text('se');
+		KEYS.key('Enter');
+		await wait(2500);
+		expect('Enter before the search has answered: it is given up, and nothing is chosen', (s) => !s.open && s.focus === 'TextBox' && s.text === 'se' && s.chosen === SEERAH);
+		// The arrow keys were on a row, then something else is typed: Enter does not take that row
+		await again('arrow, typing, Enter', 'a');
+		KEYS.key('Down');
+		await wait(300);
+		KEYS.text('h');
+		KEYS.key('Enter');
+		await wait(2500);
+		expect('arrow, typing, Enter: the row the arrow was on is not chosen', (s) => !s.open && s.text === `${ALL_FIRST()}h` && s.chosen === SEERAH);
 	}
 } catch (e) {
 	problems.push(e.message);

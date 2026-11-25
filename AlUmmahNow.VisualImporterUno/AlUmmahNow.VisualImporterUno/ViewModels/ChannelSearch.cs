@@ -8,9 +8,12 @@ namespace AlUmmahNow.VisualImporterUno.ViewModels;
 /// <summary>A row of a channel box's list: a channel, or (no channel) a word about the search.</summary>
 public sealed record ChannelSuggestion(ImportChannel? Channel, string Title, string? Detail = null)
 {
+    /// <summary>As it is drawn: a list is a popup, which puts an Arabic line's pieces in the wrong order.</summary>
+    public string Shown => Channel is null ? Loc.PopupLine(Title) : Title;
+
     public Visibility DetailShown => string.IsNullOrEmpty(Detail) ? Visibility.Collapsed : Visibility.Visible;
 
-    /// <summary>What a screen reader says.</summary>
+    /// <summary>What a screen reader says, as it is read.</summary>
     public override string ToString() => Title;
 }
 
@@ -41,9 +44,23 @@ public sealed partial class ChannelSearch : ObservableObject, IDisposable
     /// <summary>The channels last found.</summary>
     public IReadOnlyList<ImportChannel> Found { get; private set; } = [];
 
+    /// <summary>What the channels last found were searched for; null: they were not found by a search</summary>
+    private string? _foundFor;
+
+    /// <summary>The channels last found are this text's.</summary>
+    public bool Answers(string text) => _foundFor == text && Found.Count > 0;
+
+    /// <summary>Shows these channels; a search that has not answered yet is given up.</summary>
     public void Show(IReadOnlyList<ImportChannel> channels)
     {
+        _search?.Cancel();
+        Put(channels, null);
+    }
+
+    private void Put(IReadOnlyList<ImportChannel> channels, string? foundFor)
+    {
         _before = null;
+        _foundFor = foundFor;
         Found = channels;
         Rows = channels.Select(c => new ChannelSuggestion(c, _name(c), c.OwnerEmail)).ToArray();
     }
@@ -56,7 +73,7 @@ public sealed partial class ChannelSearch : ObservableObject, IDisposable
         if (Found.Count == 0 && _before is null)
         {
             _before = Rows;
-            Rows = [new ChannelSuggestion(null, Loc.PopupLine(Loc.Get("Channel_Searching")))];
+            Rows = [new ChannelSuggestion(null, Loc.Get("Channel_Searching"))];
         }
         try
         {
@@ -65,13 +82,14 @@ public sealed partial class ChannelSearch : ObservableObject, IDisposable
             if (search.IsCancellationRequested) return;
             if (found.Count > 0)
             {
-                Show(found);
+                Put(found, query);
             }
             else
             {
                 _before = null;
+                _foundFor = query;
                 Found = [];
-                Rows = [new ChannelSuggestion(null, Loc.PopupLine(_none))];
+                Rows = [new ChannelSuggestion(null, _none)];
             }
             _ended(null);
         }

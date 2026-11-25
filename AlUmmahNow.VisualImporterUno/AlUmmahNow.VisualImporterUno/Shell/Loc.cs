@@ -248,7 +248,7 @@ public static class Loc
 
     private static readonly System.Text.RegularExpressions.Regex DigitRun = new("[0-9][0-9٫:]*[0-9]");
 
-    private static readonly System.Text.RegularExpressions.Regex NeutralBreak = new(@"(\s*[:;!?.()\[\]\-–—|/]+\s*)");
+    private static readonly System.Text.RegularExpressions.Regex NeutralBreak = new(@"(\s*[:;!?.…()\[\]\-–—|/]+\s*)");
 
     /// <summary>
     /// An Arabic line (a title) shown in the English interface. Uno's Skia text lays the line out in the window's direction,
