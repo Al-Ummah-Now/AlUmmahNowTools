@@ -2112,8 +2112,14 @@
   <data name="ImportLog_attempt_failed" xml:space="preserve">
     <value>Couldn’t finish {0} on attempt {1}; trying again in {2} s</value>
   </data>
+  <data name="ImportCount_attempts_One" xml:space="preserve">
+    <value>1 attempt</value>
+  </data>
+  <data name="ImportCount_attempts_Other" xml:space="preserve">
+    <value>{0} attempts</value>
+  </data>
   <data name="ImportLog_failed" xml:space="preserve">
-    <value>Stopped {0} after {1} attempts</value>
+    <value>Stopped {0} after {1}</value>
   </data>
   <data name="ImportLog_reference" xml:space="preserve">
     <value>Reference {0}</value>

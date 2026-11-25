@@ -2379,8 +2379,26 @@
   <data name="ImportLog_attempt_failed" xml:space="preserve">
     <value>تعذّر إتمام {0} في المحاولة {1}، والتالية بعد {2} ث</value>
   </data>
+  <data name="ImportCount_attempts_One" xml:space="preserve">
+    <value>محاولة واحدة</value>
+  </data>
+  <data name="ImportCount_attempts_Two" xml:space="preserve">
+    <value>محاولتين</value>
+  </data>
+  <data name="ImportCount_attempts_Few" xml:space="preserve">
+    <value>{0} محاولات</value>
+  </data>
+  <data name="ImportCount_attempts_Many" xml:space="preserve">
+    <value>{0} محاولة</value>
+  </data>
+  <data name="ImportCount_attempts_Other" xml:space="preserve">
+    <value>{0} محاولة</value>
+  </data>
+  <data name="ImportCount_attempts_Zero" xml:space="preserve">
+    <value>{0} محاولة</value>
+  </data>
   <data name="ImportLog_failed" xml:space="preserve">
-    <value>توقف {0} بعد {1} محاولات</value>
+    <value>توقف {0} بعد {1}</value>
   </data>
   <data name="ImportLog_reference" xml:space="preserve">
     <value>المرجع {0}</value>
