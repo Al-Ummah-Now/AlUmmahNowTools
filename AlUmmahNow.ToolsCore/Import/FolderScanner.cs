@@ -117,7 +117,7 @@ public static class FolderScanner
         foreach (var dir in folders)
         {
             ct.ThrowIfCancellationRequested();
-            var downloads = dir != root && Path.GetRelativePath(root, dir).Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar).Any(UnfinishedDownloads.IsFolder);
+            var downloads = UnfinishedDownloads.IsIn(dir, root);
             ScanOne(source, dir, Show, batchLanguage, downloads ? unfinished : videos, unfinished, notes);
         }
         return new ScanResult(videos, notes) { Unfinished = unfinished };
@@ -153,7 +153,7 @@ public static class FolderScanner
 
         var names = files.Select(f => Path.GetFileName(f)!).ToList();
         var downloads = files.Where(f => UnfinishedDownloads.Is(Path.GetFileName(f), names)).ToHashSet();
-        var videoFiles = files.Where(f => downloads.Contains(f) ? UnfinishedDownloads.VideoName(Path.GetFileName(f)) is not null : IsVideo(f)).ToList();
+        var videoFiles = files.Where(f => downloads.Contains(f) ? UnfinishedDownloads.VideoName(Path.GetFileName(f)) is { } name && (IsVideo(name) || !Path.HasExtension(name)) : IsVideo(f)).ToList();
         var bases = videoFiles.ToDictionary(v => v, v => Path.GetFileNameWithoutExtension(v));
         var sidecars = videoFiles.ToDictionary(v => v, _ => new List<(string Path, string Remainder)>());
         foreach (var file in files)

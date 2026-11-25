@@ -38,6 +38,11 @@
     <ProjectReference Include="..\AlUmmahNow.Data\AlUmmahNow.Data.csproj" />
   </ItemGroup>
 
+  <!-- The names of unfinished downloads: one list with the Import page's scan (ToolsCore itself is net9.0) -->
+  <ItemGroup>
+    <Compile Include="..\AlUmmahNow.ToolsCore\Import\UnfinishedDownloads.cs" Link="Services\UnfinishedDownloads.cs" />
+  </ItemGroup>
+
   <ItemGroup>
     <None Update="appsettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

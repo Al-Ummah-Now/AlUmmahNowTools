@@ -83,6 +83,24 @@ public class FileWatchConcurrencyTests : FileSystemTestBase
     }
 
     [Fact]
+    public async Task An_unfinished_download_waits_for_no_approval_and_the_finished_file_does()
+    {
+        var watch = await AddWatchAsync(TestChannel1Directory);
+        foreach (var name in new[] { "lesson.temp.webm", "talk.f137.mp4", "talk.f140.m4a.part", "temperature.mp4", "lesson.webm" })
+        {
+            var file = Path.Combine(TestChannel1Directory, name);
+            await File.WriteAllTextAsync(file, "video");
+        }
+        foreach (var name in new[] { "lesson.temp.webm", "talk.f137.mp4", "temperature.mp4", "lesson.webm" })
+        {
+            await _service.ProcessDetectedFileAsync(watch, Path.Combine(TestChannel1Directory, name), name);
+        }
+
+        await using var db = _sqlite.NewContext();
+        Assert.Equal(new[] { "lesson.webm", "temperature.mp4" }, (await db.PendingApprovals.Select(p => p.FilePath).ToListAsync()).Select(p => Path.GetFileName(p)).Order());
+    }
+
+    [Fact]
     public async Task A_file_can_be_queued_again_once_its_previous_approval_is_decided()
     {
         var watch = await AddWatchAsync(TestChannel1Directory);
