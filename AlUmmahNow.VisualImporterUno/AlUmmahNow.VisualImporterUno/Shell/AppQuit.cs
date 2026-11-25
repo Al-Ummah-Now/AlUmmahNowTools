@@ -35,11 +35,12 @@ internal sealed class AppQuit
         _coordinator = new QuitCoordinator(
             () => ImportWorkspace.ActiveFiles,
             ConfirmAsync,
-            StopAsync,
+            ct => StopAsync(ct, installUpdate: true),
             ExitApp,
             log: message => Log.Information("[Quit] {Message}", message));
     }
 
+    private int _stopped;
     private readonly Func<FlowDirection> _flow;
     private static AppQuit? _current;
 
@@ -66,7 +67,7 @@ internal sealed class AppQuit
         if (Environment.GetEnvironmentVariable("TOOLS_SCREENSHOT_QUIT") == "1") _ = quit.ShowForScreenshotAsync();
         // However the process is asked to end (SIGTERM, a log-out, the system's terminate): what runs stops and is saved first
         AppDomain.CurrentDomain.ProcessExit += (_, _) => quit.StopOnProcessExit();
-        MacTerminateHook.Install(window.DispatcherQueue, () => quit._coordinator.IsExiting, () => _ = quit.RequestAsync("Cmd+Q / Dock Quit"));
+        MacTerminateHook.Install(window.DispatcherQueue, () => quit._coordinator.IsExiting, () => _ = quit.RequestAsync("Cmd+Q / Dock Quit"), quit.StopOnProcessExit);
     }
 
     /// <summary>For the launch check (<c>TOOLS_SMOKE_CLOSE</c>) and anywhere else the app quits by itself.</summary>
@@ -151,11 +152,15 @@ internal sealed class AppQuit
     /// Stops what the app started: the queue (running steps, so ffmpeg and the others, the queue saved), then the FileScan
     /// service, SignalR, the host and the log. Each step has its own limit inside; the coordinator's budget covers all.
     /// </summary>
-    private static async Task StopAsync(CancellationToken ct)
+    /// <param name="installUpdate">A quit: a staged update is handed to the updater, which waits for this process to end. Not when the
+    /// session ends, where the updater would be cut off in the middle of replacing the app.</param>
+    private static async Task StopAsync(CancellationToken ct, bool installUpdate)
     {
         var quit = _current;
         Log.Information("[Quit] Stopping the work ({Ms} ms after the request)", quit?._since.ElapsedMilliseconds);
         await ImportWorkspace.StopForQuitAsync().ConfigureAwait(false);
+        // Here and not only on ProcessExit: a quit on macOS ends through the system, which never raises it
+        if (installUpdate) AppUpdates.InstallOnQuit();
         await App.Current.ShutdownServicesAsync().ConfigureAwait(false);
         Log.Information("[Quit] Work stopped and saved ({Ms} ms after the request)", quit?._since.ElapsedMilliseconds);
     }
@@ -167,7 +172,8 @@ internal sealed class AppQuit
     /// </summary>
     private void StopOnProcessExit()
     {
-        if (_coordinator.IsExiting) return;
+        // Once: the session's end on macOS comes here before the process does
+        if (_coordinator.IsExiting || Interlocked.Exchange(ref _stopped, 1) != 0) return;
         try
         {
             var wait = TimeSpan.FromSeconds(8);
@@ -178,7 +184,8 @@ internal sealed class AppQuit
                 return;
             }
             Log.Information("[Quit] The process is ending: stopping the work first");
-            StopAsync(CancellationToken.None).Wait(wait);
+            // Off this thread, which may be the interface's
+            Task.Run(() => StopAsync(CancellationToken.None, installUpdate: false)).Wait(wait);
         }
         catch (Exception ex)
         {
@@ -250,7 +257,7 @@ internal static class ExitBackstop
 /// ourselves: no, and the quit goes through <see cref="QuitCoordinator"/>, which exits (and then this answers yes).
 /// Two kinds of terminate are answered yes at once, because they must never wait for a person: the one the coordinator
 /// made itself, and the one the system makes when the session ends (log out, restart, shut down). The second one is
-/// not asked about; the <c>ProcessExit</c> handler saves and stops the work, a few seconds at most.
+/// not asked about; the work is stopped and saved first, a few seconds at most.
 /// </summary>
 internal static class MacTerminateHook
 {
@@ -260,7 +267,8 @@ internal static class MacTerminateHook
     [DllImport("libUnoNativeMac.dylib", EntryPoint = "uno_set_application_can_exit_callback", ExactSpelling = true)]
     private static extern void SetCanExitCallback(IntPtr callback);
 
-    public static void Install(DispatcherQueue ui, Func<bool> exiting, Action request)
+    /// <param name="sessionEnding">Stops and saves the work, a few seconds at most: the system's exit does not raise ProcessExit</param>
+    public static void Install(DispatcherQueue ui, Func<bool> exiting, Action request, Action sessionEnding)
     {
         if (!OperatingSystem.IsMacOS()) return;
         try
@@ -270,7 +278,8 @@ internal static class MacTerminateHook
                 if (exiting()) return 1;
                 if (SessionEnding())
                 {
-                    Log.Information("[Quit] The session is ending (log out, restart or shut down): no question, the work is saved on the way out");
+                    Log.Information("[Quit] The session is ending (log out, restart or shut down): no question, the work is saved first");
+                    sessionEnding();
                     return 1;
                 }
                 ui.TryEnqueue(() => request());
