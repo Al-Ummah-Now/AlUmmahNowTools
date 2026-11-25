@@ -150,8 +150,15 @@ public sealed class QueueItem
     public string? AttachJobId { get; set; }
     /// <summary>The channel already had this file: nothing was uploaded</summary>
     public bool AlreadyImported { get; set; }
-    /// <summary>The server encodes the file: chosen on the page ("Encode on this computer" off) or on the file's row</summary>
+    /// <summary>
+    /// What is wanted: the server encodes the file (the page's "Encode on this computer" off, or the file's row), or this computer
+    /// does. It can change until the upload is open on the server; what was made for the other choice is given up by the encode step.
+    /// </summary>
     public bool ServerEncodes { get; set; }
+    /// <summary>The choice the running encode step was started for (not saved); the queue sets it</summary>
+    [JsonIgnore] internal bool? EncodeRun { get; set; }
+    /// <summary>Its upload was opened on the server, or its renditions were: who encodes it is settled</summary>
+    public bool UploadOpened { get; set; }
     /// <summary>The renditions encoded here, waiting to be sent (deleted once the server has them)</summary>
     public RenditionSet? Renditions { get; set; }
     /// <summary>The server's verdict on the renditions, once its transcode has run</summary>
@@ -206,31 +213,30 @@ public sealed class QueueItem
     }
 
     /// <summary>Its encode here is still to come or running: the row offers to leave it to the server.</summary>
-    [JsonIgnore] public bool CanLeaveToServer => !ServerEncodes && Phase != ItemPhase.Failed && EncodeStep is { Status: StepStatus.Pending or StepStatus.Running } && !UploadBegun;
+    [JsonIgnore] public bool CanLeaveToServer => !ServerEncodes && EncodeOpen && Phase != ItemPhase.Failed && EncodeStep is { Status: StepStatus.Pending or StepStatus.Running };
 
-    [JsonIgnore] private StepState? EncodeStep => Steps.FirstOrDefault(s => s.Kind == ImportStepKind.Encode);
-
-    [JsonIgnore] private bool UploadBegun => Steps.FirstOrDefault(s => s.Kind == ImportStepKind.Upload) is not { Status: StepStatus.Pending };
+    [JsonIgnore] internal StepState? EncodeStep => Steps.FirstOrDefault(s => s.Kind == ImportStepKind.Encode);
 
     /// <summary>
-    /// Who encodes the file, changed before its upload: to the server, what its encode here had not finished is dropped; to this
-    /// computer, the encode is put back in front of the upload.
+    /// Who encodes the file can still change: its upload has not begun (one that was opened and is paused or tried again has), and
+    /// the file is not refused for good.
     /// </summary>
-    /// <returns>Null: nothing to change. Else the step to start again or to stop</returns>
-    internal StepState? SetServerEncodes(bool server)
+    [JsonIgnore]
+    internal bool EncodeOpen => !UploadOpened
+        && Steps.FirstOrDefault(s => s.Kind == ImportStepKind.Upload) is { Status: StepStatus.Pending }
+        && CurrentStep is not { Status: StepStatus.Failed, CanTryAgain: false };
+
+    /// <summary>
+    /// The choice, under the queue's lock. Encoded here already it goes with the upload; given up or not needed here, the server
+    /// encodes it anyway.
+    /// </summary>
+    /// <returns>False: nothing to change</returns>
+    internal bool Choose(bool server)
     {
-        if (ServerEncodes == server || UploadBegun || EncodeStep is not { } encode) return null;
-        if (server)
-        {
-            // Encoded already: it goes with the upload. A failure trying again cannot fix is the file's own
-            if (encode.Status is StepStatus.Done or StepStatus.Skipped || encode is { Status: StepStatus.Failed, CanTryAgain: false }) return null;
-        }
-        else if (encode.Status is not (StepStatus.Pending or StepStatus.Skipped))
-        {
-            return null;
-        }
+        if (ServerEncodes == server || !EncodeOpen || EncodeStep is not { } encode) return false;
+        if (server && encode.Status is StepStatus.Done or StepStatus.Skipped) return false;
         ServerEncodes = server;
-        return encode;
+        return true;
     }
 
     /// <summary>What the row offers: exactly one of Pause and Resume for a file that is neither done nor failed.</summary>
@@ -566,17 +572,19 @@ public sealed class ImportQueue : IDisposable
         {
             foreach (var item in _items.Where(i => id is null || i.Id == id))
             {
-                if (item.SetServerEncodes(server) is not { } encode) continue;
+                if (!item.Choose(server)) continue;
                 changed++;
                 // The step itself says when it leaves the file to the server
                 if (!server) AppendLog(item, LogLevel.Info, "encode_here_chosen", "Encode on this computer was chosen");
+                var encode = item.EncodeStep!;
                 if (encode.Status == StepStatus.Running)
                 {
-                    // It runs again at once, as nothing to do
+                    // Started for the other choice, or already stopping: whichever way it ends, the choice then decides (RunStepAsync)
                     if (_running.TryGetValue(item.Id, out var cts)) Cancel(cts);
                 }
                 else
                 {
+                    // In front of the upload again, as nothing to do or to be encoded
                     encode.Status = StepStatus.Pending;
                     encode.Attempts = 0;
                     (encode.LastError, encode.LastErrorCode, encode.ReadError, encode.Retryable, encode.NextAttemptAt) = (null, null, null, null, null);
@@ -654,7 +662,7 @@ public sealed class ImportQueue : IDisposable
         item.Sending = null;
         (item.Sha256, item.FingerprintHash, item.VideoChecked, item.VideoProbed) = (null, null, false, false);
         (item.ServerItemId, item.VideoId, item.TusSessionId, item.UploadUrl, item.UploadOffset) = (null, null, null, null, 0);
-        (item.SentTo, item.SentSha256, item.StartOver, item.LeftUploadUrl, item.Renditions) = (0, null, false, null, null);
+        (item.SentTo, item.SentSha256, item.StartOver, item.LeftUploadUrl, item.Renditions, item.UploadOpened) = (0, null, false, null, null, false);
         foreach (var step in item.Steps.Where(s => s.Kind <= ImportStepKind.Upload))
         {
             step.Status = StepStatus.Pending;
@@ -894,6 +902,7 @@ public sealed class ImportQueue : IDisposable
                 step.Attempts++;
                 step.NextAttemptAt = null;
                 item.Progress = 0;
+                if (step.Kind == ImportStepKind.Encode) item.EncodeRun = item.ServerEncodes;
                 if (step.WaitingOnServer) { }
                 else if (step.Attempts == 1) AppendLog(item, LogLevel.Info, "started", $"{step.Kind}: started", step.Kind.ToString());
                 else AppendLog(item, LogLevel.Info, "attempt", $"{step.Kind}: attempt {step.Attempts}", step.Kind.ToString(), step.Attempts.ToString(System.Globalization.CultureInfo.InvariantCulture));
@@ -946,7 +955,7 @@ public sealed class ImportQueue : IDisposable
         {
             result = await _steps[step.Kind].RunAsync(item, context, cts.Token).ConfigureAwait(false);
         }
-        catch (Exception) when (cts.IsCancellationRequested)
+        catch (Exception stopped) when (cts.IsCancellationRequested && (_stopped || !Refused(step, stopped)))
         {
             // Whatever it stopped with: a request or a file cut short by the stop is no failure of the file's
             lock (_gate)
@@ -970,7 +979,14 @@ public sealed class ImportQueue : IDisposable
         string? reference = null;
         lock (_gate)
         {
-            if (failure is null && result == StepResult.Later)
+            if (failure is null && step.Kind == ImportStepKind.Encode && result != StepResult.SkipRest && item.EncodeRun != item.ServerEncodes)
+            {
+                // Who encodes it was changed as this ended: it runs again for that, and gives up what this run made
+                step.Status = StepStatus.Pending;
+                step.Attempts = Math.Max(0, step.Attempts - 1);
+                AppendLog(item, LogLevel.Info, "stopped", $"{step.Kind}: stopped", step.Kind.ToString());
+            }
+            else if (failure is null && result == StepResult.Later)
             {
                 // The server is still at it: look again later; the attempt does not count and no slot is held
                 var first = !wasWaiting;
@@ -1049,6 +1065,9 @@ public sealed class ImportQueue : IDisposable
 
         void Finish(QueueItem i)
         {
+            if (step.Kind == ImportStepKind.Encode) i.EncodeRun = null;
+            // Paused, failed or tried again: an upload that was opened never goes back to the encode
+            if (step.Kind == ImportStepKind.Upload && (i.UploadUrl is not null || i.Renditions is { Sent: true } or { StagingId: not null })) i.UploadOpened = true;
             // Not let go of: it has no timer and no handle, and its cancellation may still be running
             _running.Remove(i.Id);
             i.Wait = StepWait.None;
@@ -1057,6 +1076,9 @@ public sealed class ImportQueue : IDisposable
             SaveLocked();
         }
     }
+
+    /// <summary>The encode found that the file is no video: that holds, however it is being stopped.</summary>
+    private static bool Refused(StepState step, Exception error) => step.Kind == ImportStepKind.Encode && error is StepFailedException { Code: "no_video" or "not_video" };
 
     /// <summary>
     /// The kind of failure, for the app's words: the step's own code, admin_unreachable, videos_unreachable,
@@ -1136,6 +1158,8 @@ public sealed class ImportQueue : IDisposable
                     if (item.Paused) step.Attempts = Math.Max(0, step.Attempts - 1);
                 }
                 item.AddMissingSteps();
+                // Saved by a version that did not note it, or the app ended in the middle of the upload
+                if (item.UploadUrl is not null && item.EncodeStep is { Status: StepStatus.Done or StepStatus.Skipped }) item.UploadOpened = true;
                 if (item.Phase != ItemPhase.Paused) item.Paused = false;
                 _items.Add(item);
             }

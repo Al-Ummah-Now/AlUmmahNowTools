@@ -135,7 +135,7 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <StackPanel Spacing="4">
-                            <TextBlock x:Name="EncodeLabel" x:Uid="Import_EncodeHere" Text="Encode on this computer" Style="{StaticResource ToolsCardTitle}" />
+                            <TextBlock x:Name="EncodeLabel" x:Uid="Import_EncodeHere" Text="Encode on this computer" Style="{StaticResource ToolsCardTitle}" TextWrapping="Wrap" />
                             <TextBlock Text="{x:Bind ViewModel.EncodeBody, Mode=OneWay}" Style="{StaticResource ToolsMuted}" TextWrapping="Wrap" />
                         </StackPanel>
                         <ToggleSwitch Grid.Column="1" IsOn="{x:Bind ViewModel.EncodeHereShown, Mode=TwoWay}" IsEnabled="{x:Bind ViewModel.CanChooseEncode, Mode=OneWay}"
