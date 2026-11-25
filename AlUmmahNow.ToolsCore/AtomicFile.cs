@@ -10,30 +10,14 @@ internal static class AtomicFile
 {
     private static long _saves;
 
-    public static void Write(string path, string text) => Write(path, text, overwrite: true);
-
-    /// <summary>Only when the file is not there; false: it is.</summary>
-    public static bool WriteNew(string path, string text)
-    {
-        try
-        {
-            Write(path, text, overwrite: false);
-            return true;
-        }
-        catch (IOException) when (File.Exists(path))
-        {
-            return false;
-        }
-    }
-
-    private static void Write(string path, string text, bool overwrite)
+    public static void Write(string path, string text)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         var temp = $"{path}.{Environment.ProcessId.ToString(CultureInfo.InvariantCulture)}-{Interlocked.Increment(ref _saves).ToString(CultureInfo.InvariantCulture)}.tmp";
         try
         {
             File.WriteAllText(temp, text);
-            File.Move(temp, path, overwrite);
+            File.Move(temp, path, overwrite: true);
         }
         catch
         {
