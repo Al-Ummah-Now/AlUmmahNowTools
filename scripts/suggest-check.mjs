@@ -26,9 +26,9 @@ const wait = (ms) => new Promise((done) => setTimeout(done, ms));
 
 const lines = () => (existsSync(log) ? readFileSync(log, 'utf8').trim().split('\n').filter(Boolean) : []);
 const state = () => {
-	const [ms, open, items, focus, text, first] = (lines().at(-1) ?? '').split('\t');
+	const [ms, open, items, focus, text, first, row, under] = (lines().at(-1) ?? '').split('\t');
 	const of = (field) => (field ?? '').split('=').slice(1).join('=');
-	return { ms: Number(ms), open: of(open) === '1', items: Number(of(items) || 0), focus: of(focus), text: of(text), first: of(first) };
+	return { ms: Number(ms), open: of(open) === '1', items: Number(of(items) || 0), focus: of(focus), text: of(text), first: of(first), row: of(row), under: of(under) };
 };
 
 function run(command, args, timeout = 30_000) {
@@ -39,7 +39,7 @@ function run(command, args, timeout = 30_000) {
 
 const powershell = (script) => run('powershell', ['-NoProfile', '-STA', '-Command', script]);
 const KEYS = {
-	win32: { front: () => powershell(`(New-Object -ComObject WScript.Shell).AppActivate(${app.pid}) | Out-Null`), text: (t) => powershell(`Add-Type -AssemblyName System.Windows.Forms; foreach ($c in '${t}'.ToCharArray()) { [System.Windows.Forms.SendKeys]::SendWait([string]$c); Start-Sleep -Milliseconds 150 }`), key: (k) => powershell(`Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('${{ Backspace: '{BACKSPACE}', Escape: '{ESC}', Down: '{DOWN}', Enter: '{ENTER}', All: '^a' }[k]}')`) },
+	win32: { front: () => powershell(`(New-Object -ComObject WScript.Shell).AppActivate(${app.pid}) | Out-Null`), text: (t) => powershell(`Add-Type -AssemblyName System.Windows.Forms; foreach ($c in '${t}'.ToCharArray()) { [System.Windows.Forms.SendKeys]::SendWait([string]$c); Start-Sleep -Milliseconds 150 }`), click: (x, y) => powershell(`Add-Type -Name M -Namespace W -MemberDefinition '[System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)] public struct P { public int X; public int Y; } [System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool ClientToScreen(System.IntPtr h, ref P p); [System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y); [System.Runtime.InteropServices.DllImport("user32.dll")] public static extern void mouse_event(uint f, uint x, uint y, uint d, System.UIntPtr e);'; $p = New-Object W.M+P; $p.X = ${x}; $p.Y = ${y}; [W.M]::ClientToScreen((Get-Process -Id ${app.pid}).MainWindowHandle, [ref]$p) | Out-Null; [W.M]::SetCursorPos($p.X, $p.Y) | Out-Null; Start-Sleep -Milliseconds 300; [W.M]::mouse_event(2, 0, 0, 0, [UIntPtr]::Zero); Start-Sleep -Milliseconds 80; [W.M]::mouse_event(4, 0, 0, 0, [UIntPtr]::Zero)`), key: (k) => powershell(`Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('${{ Backspace: '{BACKSPACE}', Escape: '{ESC}', Down: '{DOWN}', Enter: '{ENTER}', All: '^a' }[k]}')`) },
 	darwin: {
 		front: () => run('osascript', ['-e', `tell application "System Events" to set frontmost of (first process whose unix id is ${app.pid}) to true`]),
 		text: (t) => run('osascript', [...t].flatMap((c) => ['-e', `tell application "System Events" to keystroke "${c}"`, '-e', 'delay 0.15'])),
@@ -51,8 +51,11 @@ const KEYS = {
 const problems = [];
 function expect(what, ok) {
 	const s = state();
-	console.log(`${ok(s) ? 'ok  ' : 'FAIL'} ${page}: ${what} -- ${JSON.stringify(s)}`);
+	// Wherever it opens, the channel lists lie under their box (they are placed anew at every change)
+	const placed = !server || !s.open || (s.under !== '' && Math.abs(Number(s.under)) <= 2);
+	console.log(`${ok(s) && placed ? 'ok  ' : 'FAIL'} ${page}: ${what} -- ${JSON.stringify(s)}`);
 	if (!ok(s)) problems.push(what);
+	if (!placed) problems.push(`${what}: the list is not under its box (${s.under})`);
 }
 /** Everything the list did from `ms` on. */
 const since = (ms) => lines().filter((l) => Number(l.split('\t')[0]) > ms);
@@ -116,6 +119,17 @@ try {
 	await wait(2500);
 	expect('Enter chooses and closes, and it stays closed', (s) => !s.open && s.text.length > 2);
 	picture('chosen');
+	if (KEYS.click) {
+		KEYS.key('All');
+		KEYS.text(SOME);
+		await wait(3000);
+		expect('typing over the chosen one opens it again', (s) => s.open && s.items > 0 && s.text === SOME && s.row !== '');
+		const [x, y] = state().row.split(',');
+		KEYS.click(x, y);
+		await wait(2500);
+		expect('a click chooses and closes, and it stays closed', (s) => !s.open && s.text.length > SOME.length);
+		picture('clicked');
+	}
 } catch (e) {
 	problems.push(e.message);
 	console.log(e.stack);

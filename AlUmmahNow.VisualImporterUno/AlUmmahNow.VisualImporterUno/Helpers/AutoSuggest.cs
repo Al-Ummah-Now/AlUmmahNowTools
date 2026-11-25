@@ -2,6 +2,7 @@ using System.Collections.Specialized;
 using AlUmmahNow.Data.Search;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 
 namespace AlUmmahNow.VisualImporterUno.Helpers;
 
@@ -32,6 +33,10 @@ public static class AutoSuggest
 
     private static readonly DependencyProperty CommitsProperty = DependencyProperty.RegisterAttached(
         "Commits", typeof(bool), typeof(AutoSuggest), new PropertyMetadata(false));
+
+    /// <summary>Chosen or escaped: closed until something is typed.</summary>
+    private static readonly DependencyProperty ClosedProperty = DependencyProperty.RegisterAttached(
+        "Closed", typeof(bool), typeof(AutoSuggest), new PropertyMetadata(false));
 
     private static void OnValueChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
@@ -76,6 +81,11 @@ public static class AutoSuggest
             box.TextChanged += OnTextChanged;
             box.SuggestionChosen += OnSuggestionChosen;
             box.GotFocus += OnGotFocus;
+            box.QuerySubmitted += (b, _) => b.SetValue(ClosedProperty, true);
+            box.AddHandler(UIElement.KeyDownEvent, new KeyEventHandler((_, key) =>
+            {
+                if (key.Key == Windows.System.VirtualKey.Escape) box.SetValue(ClosedProperty, true);
+            }), true);
         }
     }
 
@@ -94,7 +104,13 @@ public static class AutoSuggest
     private static void OnTextChanged(AutoSuggestBox box, AutoSuggestBoxTextChangedEventArgs args)
     {
         // Only typing asks again; a chosen suggestion or a bound value does not reopen the list
-        if (args.Reason == AutoSuggestionBoxTextChangeReason.UserInput) Update(box);
+        if (args.Reason == AutoSuggestionBoxTextChangeReason.UserInput)
+        {
+            box.SetValue(ClosedProperty, false);
+            Update(box);
+        }
+        // The platform opens the list at every change of the text, also the one choosing made
+        else if ((bool)box.GetValue(ClosedProperty)) box.IsSuggestionListOpen = false;
     }
 
     // Arrowing onto a suggestion shows it in the box (the platform does this too); in a filter the

@@ -25,7 +25,6 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
     private readonly ImportWorkspace _workspace;
     private readonly DispatcherQueue? _dispatcher;
     private readonly Dictionary<string, string> _channelNames = new();
-    private CancellationTokenSource? _search;
     private bool _attached;
     private bool _disposed;
 
@@ -33,6 +32,7 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
     {
         _workspace = ImportWorkspace.Current;
         _dispatcher = App.Current?.MainWindow?.DispatcherQueue ?? DispatcherQueue.GetForCurrentThread();
+        ChannelSearch = new ChannelSearch(FindChannelsAsync, c => c.LocalizedName, Loc.Get("Import_ChannelNone"), TimeSpan.FromMilliseconds(300), ex => ChannelError = ex is null ? "" : ErrorText(ex));
         foreach (var c in DemoImport.Channels.Where(_ => _workspace.IsDemo)) _channelNames[c.Id] = c.LocalizedName;
         Attach();
         var settings = _workspace.Queue.Settings;
@@ -42,9 +42,8 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
         _attachParallel = settings.ParallelFor(ImportStepKind.Attach) - 1;
         if (_workspace.IsDemo && !DemoImport.Empty)
         {
-            Channels.Clear();
-            foreach (var c in DemoImport.Channels) Channels.Add(c);
-            SelectedChannel = Channels[0];
+            ChannelSearch.Show(DemoImport.Channels);
+            SelectedChannel = DemoImport.Channels[0];
             FolderPath = DemoImport.Folder;
             CaptionLanguageIndex = 1;
             ShowScan(DemoImport.Scan());
@@ -182,7 +181,7 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
 
     // ---------------------------------------------------------------- Channel
 
-    public ObservableCollection<ImportChannel> Channels { get; } = new();
+    public ChannelSearch ChannelSearch { get; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasChannel), nameof(ChannelSummary))]
@@ -192,45 +191,17 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private string _channelError = "";
 
-    [ObservableProperty]
-    private bool _isSearchingChannels;
-
     public bool HasChannel => SelectedChannel is not null;
 
     public string ChannelSummary => SelectedChannel is null
         ? ""
         : string.Join("\n", new[] { SelectedChannel.Handle is { Length: > 0 } h ? "@" + h : null, SelectedChannel.OwnerEmail }.Where(t => !string.IsNullOrEmpty(t)));
 
-    /// <summary>Looks channels up by name or handle, a moment after typing stops.</summary>
-    public async Task SearchChannelsAsync(string query)
+    private async Task<IReadOnlyList<ImportChannel>> FindChannelsAsync(string query, CancellationToken ct)
     {
-        _search?.Cancel();
-        var cts = _search = new CancellationTokenSource();
-        try
-        {
-            await Task.Delay(300, cts.Token);
-            IsSearchingChannels = true;
-            var found = await _workspace.Api.ListChannelsAsync(query, 1, cts.Token);
-            if (cts.IsCancellationRequested) return;
-            Channels.Clear();
-            foreach (var c in found)
-            {
-                Channels.Add(c);
-                _channelNames[c.Id] = c.LocalizedName;
-            }
-            ChannelError = found.Count == 0 && !string.IsNullOrWhiteSpace(query) ? Loc.Get("Import_ChannelNone") : "";
-        }
-        catch (OperationCanceledException)
-        {
-        }
-        catch (Exception ex)
-        {
-            ChannelError = ErrorText(ex);
-        }
-        finally
-        {
-            if (_search == cts) IsSearchingChannels = false;
-        }
+        var found = await _workspace.Api.ListChannelsAsync(query, 1, ct);
+        foreach (var c in found) _channelNames[c.Id] = c.LocalizedName;
+        return found;
     }
 
     /// <summary>Translates a channel form field via admin-api <c>POST /api/translate/fields</c>.</summary>
@@ -257,7 +228,7 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
                 string.IsNullOrWhiteSpace(descriptionEn) ? null : descriptionEn.Trim(),
                 string.IsNullOrWhiteSpace(descriptionAr) ? null : descriptionAr.Trim());
             _channelNames[channel.Id] = channel.LocalizedName;
-            Channels.Insert(0, channel);
+            ChannelSearch.Show([channel, .. ChannelSearch.Found]);
             SelectedChannel = channel;
             ChannelError = "";
             return new CreateChannelOutcome();
@@ -818,7 +789,7 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
     {
         if (!_attached) return;
         _attached = false;
-        _search?.Cancel();
+        ChannelSearch.Cancel();
         _workspace.Queue.Changed -= OnQueueChanged;
     }
 

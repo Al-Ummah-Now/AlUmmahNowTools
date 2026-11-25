@@ -28,6 +28,7 @@ public sealed partial class ImportView : Page
         DataContext = ViewModel;
         if (ViewModel.SelectedChannel is { } channel) ChannelBox.Text = channel.LocalizedName;
         SuggestionsUnderBox.Attach(ChannelBox);
+        ChannelBoxes.Attach(ChannelBox, ViewModel.ChannelSearch, channel => ViewModel.SelectedChannel = channel);
         AutomationProperties.SetName(RemoveAllButton, Loc.Get("Import_RemoveAllConfirm"));
         Loaded += (_, _) =>
         {
@@ -40,7 +41,7 @@ public sealed partial class ImportView : Page
     }
 
     /// <summary>
-    /// Screenshots of the dialogs and the channel suggestions (<c>TOOLS_DEMO_IMPORT_DIALOG=log|remove|remove-all|channel|suggest</c>)
+    /// Screenshots of the dialogs and the channel suggestions (<c>TOOLS_DEMO_IMPORT_DIALOG=log|remove|remove-all|channel|suggest|suggest-searching|suggest-none</c>)
     /// and of the queue (<c>TOOLS_DEMO_IMPORT_SCROLL=end</c>: the queue card at the top, so no line is cut under the
     /// header), demo only.
     /// </summary>
@@ -64,7 +65,7 @@ public sealed partial class ImportView : Page
         }
         var dialog = Environment.GetEnvironmentVariable("TOOLS_DEMO_IMPORT_DIALOG") ?? (DemoImport.State == "remove-all" ? "remove-all" : null);
         // No caret in a frame unless it shows typing: focus rests on a button, without its keyboard ring
-        if (dialog != "suggest") DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => BrowseButton.Focus(FocusState.Programmatic));
+        if (dialog?.StartsWith("suggest", StringComparison.Ordinal) != true) DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => BrowseButton.Focus(FocusState.Programmatic));
         if (dialog is null) return;
         // A dialog needs the window's XamlRoot, which is ready a moment after the page loads
         await System.Threading.Tasks.Task.Delay(1000);
@@ -77,7 +78,16 @@ public sealed partial class ImportView : Page
             case "remove" when row is not null: Remove_Click(tag, new RoutedEventArgs()); break;
             case "remove-all": RemoveAll_Click(this, new RoutedEventArgs()); break;
             case "channel": NewChannel_Click(this, new RoutedEventArgs()); break;
+            // With TOOLS_DEMO_IMPORT=empty: the row while searching (TOOLS_DEMO_CHANNELS_MS=60000), and the one when nothing is found
+            case "suggest-searching" or "suggest-none":
+                await System.Threading.Tasks.Task.Delay(1200);
+                ChannelBox.Text = Loc.IsArabic ? "درس" : "tafsir";
+                ChannelBox.Focus(FocusState.Keyboard);
+                await ViewModel.ChannelSearch.SearchAsync(ChannelBox.Text);
+                break;
             case "suggest":
+                // The window has its size by then: a list closes when its box gets another width
+                await System.Threading.Tasks.Task.Delay(1200);
                 ChannelBox.Focus(FocusState.Keyboard);
                 // The caret after the typed name, as when typing, never through its first letter
                 if (FindChild<TextBox>(ChannelBox) is { } typed) typed.Select(typed.Text.Length, 0);
@@ -146,8 +156,9 @@ public sealed partial class ImportView : Page
     private void Page_SizeChanged(object sender, SizeChangedEventArgs e)
     {
         var narrow = e.NewSize.Width < NarrowWidth;
-        // The suggestions are placed where the box was when they opened: closed when the page lays out again
-        ChannelBox.IsSuggestionListOpen = false;
+        // The suggestions are placed where the box was when they opened: closed when it moves or gets another width, never
+        // because the page got shorter (the progress strip under it)
+        if (e.NewSize.Width != e.PreviousSize.Width) ChannelBox.IsSuggestionListOpen = false;
         foreach (var (row, button) in new (Grid, FrameworkElement)[] { (ChannelRow, NewChannelButton), (FolderRow, BrowseButton) })
         {
             Grid.SetRow(button, narrow ? 1 : 0);
@@ -179,27 +190,7 @@ public sealed partial class ImportView : Page
 
     // ------------------------------------------------------------ Channel
 
-    private void ChannelBox_TextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)
-    {
-        SetChannelValueDirection();
-        if (args.Reason != AutoSuggestionBoxTextChangeReason.UserInput) return;
-        _ = ViewModel.SearchChannelsAsync(sender.Text);
-        sender.IsSuggestionListOpen = true;
-    }
-
-    /// <summary>Suggestions when the admin moves to the box, never when the page puts focus there itself.</summary>
-    private void ChannelBox_GotFocus(object sender, RoutedEventArgs e)
-    {
-        if (ChannelBox.FocusState == FocusState.Programmatic) return;
-        if (ViewModel.Channels.Count == 0) _ = ViewModel.SearchChannelsAsync(ChannelBox.Text);
-    }
-
-    private void ChannelBox_SuggestionChosen(AutoSuggestBox sender, AutoSuggestBoxSuggestionChosenEventArgs args)
-    {
-        if (args.SelectedItem is not ImportChannel channel) return;
-        ViewModel.SelectedChannel = channel;
-        sender.Text = channel.LocalizedName;
-    }
+    private void ChannelBox_TextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args) => SetChannelValueDirection();
 
     private async void NewChannel_Click(object sender, RoutedEventArgs e)
     {

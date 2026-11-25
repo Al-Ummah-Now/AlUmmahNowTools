@@ -10,7 +10,8 @@ namespace AlUmmahNow.VisualImporterUno.Shell;
 /// <summary>
 /// Keeps an AutoSuggestBox's list under the box at the box's width. In a right-to-left window Uno's Skia popup places the
 /// list from the mirrored edge, so it opens beside the box and runs off the window; once it opens, its offset is
-/// corrected by the distance between the list and the box. The list is then lined up with the box's outer edges and
+/// corrected by the distance between the list and the box. Uno places an open list anew at every change of the text or the rows:
+/// the corrected offset is put back at once. The list is then lined up with the box's outer edges and
 /// drawn opaque to its edge (FlyoutPresenterBackground, the theme's flyout fill, and FanousDividerBrush), so nothing underneath shows beside it.
 /// </summary>
 public static class SuggestionsUnderBox
@@ -20,19 +21,55 @@ public static class SuggestionsUnderBox
         box.Loaded += (_, _) =>
         {
             if (Find<Popup>(box) is not { } popup) return;
-            popup.Opened += (_, _) => box.DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => Align(box, popup));
+            // Its rows follow the window, as the chosen channel's card does; set before any row is drawn (turned round later, Uno
+            // now and then drew a left-to-right line of a row, the email, mirrored)
+            if (popup.Child is FrameworkElement rows) rows.FlowDirection = box.FlowDirection;
+            var place = new Place();
+            popup.Opened += (_, _) => Later(box, popup, place);
+            popup.RegisterPropertyChangedCallback(Popup.HorizontalOffsetProperty, (_, _) =>
+            {
+                if (place.Moving || !popup.IsOpen) return;
+                if (place.Offset is { } offset && place.Width == box.ActualWidth) Move(popup, place, offset);
+                Later(box, popup, place);
+            });
         };
     }
 
-    private static void Align(AutoSuggestBox box, Popup popup)
+    /// <summary>Where the list was last lined up with the box.</summary>
+    private sealed class Place
+    {
+        public double? Offset;
+        public double Width;
+        public bool Moving;
+        public bool Waiting;
+    }
+
+    private static void Move(Popup popup, Place place, double offset)
+    {
+        place.Moving = true;
+        popup.HorizontalOffset = offset;
+        place.Moving = false;
+    }
+
+    private static void Later(AutoSuggestBox box, Popup popup, Place place)
+    {
+        if (place.Waiting) return;
+        place.Waiting = true;
+        box.DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+        {
+            place.Waiting = false;
+            Align(box, popup, place);
+        });
+    }
+
+    private static void Align(AutoSuggestBox box, Popup popup, Place place)
     {
         if (popup.Child is not FrameworkElement list) return;
         if (list.Width != box.ActualWidth) list.Width = box.ActualWidth;
-        // Its rows follow the window, as the chosen channel's card does
         if (list.FlowDirection != box.FlowDirection) list.FlowDirection = box.FlowDirection;
         // Right to left, the popup's origin is the box's right edge but the list is drawn from its left edge there
         var offset = box.FlowDirection == FlowDirection.RightToLeft ? -box.ActualWidth : 0;
-        if (popup.HorizontalOffset != offset) popup.HorizontalOffset = offset;
+        if (place.Offset is null || place.Width != box.ActualWidth) Move(popup, place, offset);
         // Opaque fill and edge: the default edge is see-through, so a border underneath showed along it
         var fill = Application.Current.Resources.TryGetValue("FlyoutPresenterBackground", out var f) ? f as Brush : null;
         var edge = Application.Current.Resources.TryGetValue("FanousDividerBrush", out var e) ? e as Brush : null;
@@ -47,25 +84,26 @@ public static class SuggestionsUnderBox
             if (edge is not null) control.BorderBrush = edge;
         }
         // The template places the list from the text field inside the box, a pixel or two in from its border
-        box.DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => LineUp(box, popup, list, firstTry: true));
+        box.DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => LineUp(box, popup, place, list, firstTry: true));
     }
 
     /// <summary>Moves the list by what is left between its left edge and the box's (measured on screen, both directions).</summary>
-    private static void LineUp(AutoSuggestBox box, Popup popup, FrameworkElement list, bool firstTry)
+    private static void LineUp(AutoSuggestBox box, Popup popup, Place place, FrameworkElement list, bool firstTry)
     {
         if (!popup.IsOpen) return;
         var gap = LeftEdge(box) - LeftEdge(list);
-        if (Math.Abs(gap) < 0.5) return;
-        if (firstTry)
+        if (Math.Abs(gap) >= 0.5)
         {
-            popup.HorizontalOffset += gap;
-            box.DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => LineUp(box, popup, list, firstTry: false));
-        }
-        else
-        {
+            if (firstTry)
+            {
+                Move(popup, place, popup.HorizontalOffset + gap);
+                box.DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => LineUp(box, popup, place, list, firstTry: false));
+                return;
+            }
             // A mirrored popup moves the list the other way, so the first move doubled the gap: go back by it
-            popup.HorizontalOffset -= gap;
+            Move(popup, place, popup.HorizontalOffset - gap);
         }
+        (place.Offset, place.Width) = (popup.HorizontalOffset, box.ActualWidth);
     }
 
     private static double LeftEdge(FrameworkElement element) =>

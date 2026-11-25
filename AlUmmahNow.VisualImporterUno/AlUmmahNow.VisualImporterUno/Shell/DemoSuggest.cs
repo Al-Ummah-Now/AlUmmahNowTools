@@ -26,7 +26,8 @@ internal static class DemoSuggest
             if (clock.ElapsedMilliseconds < 4000) return;
             if (Find<AutoSuggestBox>(root) is not { ActualWidth: > 0 } box)
             {
-                // The Approvals filters are folded
+                // Watched folders' box is in the form its first button opens; the Approvals filters are folded
+                if (root is Frame { Content: Views.WatchManagementPage { ViewModel: { IsCreateDialogOpen: false } watch } }) watch.OpenCreateWatchDialogCommand.Execute(null);
                 if (Find<Expander>(root) is { IsExpanded: false } folded) folded.IsExpanded = true;
                 return;
             }
@@ -37,12 +38,29 @@ internal static class DemoSuggest
                 text.SelectAll();
             }
             var items = (box.ItemsSource as IEnumerable)?.Cast<object>().ToList() ?? new List<object>();
-            var state = $"open={(box.IsSuggestionListOpen ? 1 : 0)}\titems={items.Count}\tfocus={FocusManager.GetFocusedElement(box.XamlRoot!)?.GetType().Name}\ttext={box.Text}\tfirst={items.FirstOrDefault()}";
+            var state = $"open={(box.IsSuggestionListOpen ? 1 : 0)}\titems={items.Count}\tfocus={FocusManager.GetFocusedElement(box.XamlRoot!)?.GetType().Name}\ttext={box.Text}\tfirst={items.FirstOrDefault()}\trow={Row(box)}\tunder={Under(box)}";
             if (state == last) return;
             last = state;
             File.AppendAllText(path, $"{clock.ElapsedMilliseconds}\t{state.ReplaceLineEndings(" ")}\n");
         };
         timer.Start();
+    }
+
+    /// <summary>The middle of the open list's first row, in the window's own pixels: where the script clicks.</summary>
+    private static string Row(AutoSuggestBox box)
+    {
+        if (!box.IsSuggestionListOpen || Find<Microsoft.UI.Xaml.Controls.Primitives.Popup>(box)?.Child is not { } list || Find<ListViewItem>(list) is not { ActualHeight: > 0 } row) return "";
+        var scale = box.XamlRoot!.RasterizationScale;
+        var at = row.TransformToVisual(null).TransformPoint(new Windows.Foundation.Point(row.ActualWidth / 2, row.ActualHeight / 2));
+        return FormattableString.Invariant($"{at.X * scale:0},{at.Y * scale:0}");
+    }
+
+    /// <summary>How far the open list's left edge is from the box's.</summary>
+    private static string Under(AutoSuggestBox box)
+    {
+        if (!box.IsSuggestionListOpen || Find<Microsoft.UI.Xaml.Controls.Primitives.Popup>(box)?.Child is not FrameworkElement { ActualWidth: > 0 } list) return "";
+        double Left(FrameworkElement e) => e.TransformToVisual(null).TransformBounds(new Windows.Foundation.Rect(0, 0, e.ActualWidth, e.ActualHeight)).Left;
+        return FormattableString.Invariant($"{Left(list) - Left(box):0}");
     }
 
     private static T? Find<T>(DependencyObject parent) where T : class
