@@ -3783,6 +3783,21 @@
   <data name="Update_ReadyBusy" xml:space="preserve">
     <value>التحديث جاهز. أكمِل عمليات الاستيراد أو أوقِفها مؤقتًا أولًا.</value>
   </data>
+  <data name="Update_ReadyOtherCopy" xml:space="preserve">
+    <value>التحديث جاهز. توجد نسخة أخرى من الأدوات مفتوحة، ويلزم إغلاقها أولًا.</value>
+  </data>
+  <data name="Instance_Title" xml:space="preserve">
+    <value>الأدوات مفتوحة بالفعل</value>
+  </data>
+  <data name="Instance_Body" xml:space="preserve">
+    <value>توجد نسخة أخرى من الأدوات مفتوحة لكنها لا تستجيب. يلزم إغلاقها ثم إعادة المحاولة، فلا يمكن لنسختين الاستيراد من القائمة نفسها.</value>
+  </data>
+  <data name="Instance_TryAgain" xml:space="preserve">
+    <value>إعادة المحاولة</value>
+  </data>
+  <data name="Instance_Close" xml:space="preserve">
+    <value>إغلاق</value>
+  </data>
   <data name="Update_RestartNow" xml:space="preserve">
     <value>إعادة التشغيل الآن</value>
   </data>

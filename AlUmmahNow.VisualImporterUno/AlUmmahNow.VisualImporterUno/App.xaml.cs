@@ -146,6 +146,11 @@ public partial class App : Application
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
+        if (Shell.AppInstance.AlreadyOpen)
+        {
+            ShowAlreadyOpen();
+            return;
+        }
         try
         {
             // Get the application directory
@@ -366,11 +371,13 @@ public partial class App : Application
 #else
             // No root key, or Linux: no updater at all (wiki §4.1.1, APPUPD-D9)
             var selfUpdate = AlUmmahNow.ToolsCore.Updates.SelfUpdate.Supported(AlUmmahNow.ToolsCore.Updates.ToolsUpdateKeys.RootKeys.Length > 0, OperatingSystem.IsWindows(), OperatingSystem.IsMacOS());
-            Shell.AppUpdates.Start(shellState, selfUpdate ? new Services.VelopackInstaller() : new NoSelfUpdate());
+            // Only the copy that has the queue stages and installs updates: the package folder is one for all copies
+            Shell.AppUpdates.Start(shellState, selfUpdate && Shell.AppInstance.OwnsQueue ? new Services.VelopackInstaller() : new NoSelfUpdate());
 #endif
 
             MainWindow = new MainWindow(shellState);
             MainWindow.Activate();
+            Shell.AppInstance.Attach(MainWindow);
             _ = demo != null ? demo.DriveAsync(shellState.Session) : shellState.Session.RestoreAsync();
             // The launch check closes the window by itself (docs/RELEASE.md): TOOLS_SMOKE_CLOSE=close|quit|terminate
             if (Environment.GetEnvironmentVariable("TOOLS_SMOKE_CLOSE") is { Length: > 0 } smokeClose) _ = Shell.QuitSmoke.RunAsync(MainWindow, smokeClose);
@@ -388,6 +395,18 @@ public partial class App : Application
             Log.Fatal(ex, "Failed to launch application");
             throw;
         }
+    }
+
+    /// <summary>Another copy has the queue and does not answer (Tools #89): only the window that says so, no services and no updates.</summary>
+    private void ShowAlreadyOpen()
+    {
+        var preferences = Shell.ShellDemo.FromEnvironment()?.Preferences ?? AlUmmahNow.ToolsCore.ToolsPreferences.Load(AlUmmahNow.ToolsCore.ToolsPreferences.DefaultPath);
+        Shell.ShellState.ApplyLanguage(preferences.Language);
+        MainWindow = new Shell.AlreadyOpenWindow(preferences);
+        MainWindow.Activate();
+#if !WINDOWS
+        if (Environment.GetEnvironmentVariable("TOOLS_SCREENSHOT") is { Length: > 0 } shot) _ = Shell.ScreenshotRunner.RunAsync(MainWindow, shot);
+#endif
     }
 
     private async void InitializeServices()

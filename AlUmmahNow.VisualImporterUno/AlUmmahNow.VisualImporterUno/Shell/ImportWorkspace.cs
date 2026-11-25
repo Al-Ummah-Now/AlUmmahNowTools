@@ -59,7 +59,7 @@ public sealed class ImportWorkspace : IDisposable
             DemoImport.Settle(Queue);
             DemoImport.SettleState(Queue);
         }
-        else
+        else if (AppInstance.OwnsQueue)
         {
             Queue.Start();
         }

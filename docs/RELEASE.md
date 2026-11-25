@@ -98,6 +98,9 @@ AUN-APP-UPDATES). Operating-system code signing is separate and optional.
 - **Keys**: the root public key is in `AlUmmahNow.ToolsCore/Updates/CoreUpdateChecker.cs`; the root-signed key list is
   `AlUmmahNow.ToolsCore/Updates/keys/`, byte for byte the one on the `update-keys` release. Rotation and revocation:
   wiki §3.5.
+- **Another copy running from the same install holds the update back**: Velopack's updater ends every process of the install
+  folder. The app opens once per queue folder (a second start brings the open window forward), and an update installs only
+  when no other copy runs from its install (`AlUmmahNow.ToolsCore/Instance/`).
 - **Update test** (`.github/workflows/update-test.yml`): builds two versions with a test key, installs the first, and
   checks that it becomes the second on Windows and macOS, and that a changed package is refused. Test builds
   (`-p:UpdateTest=true`) are the only ones that take their key and server from the environment; `release.yml`

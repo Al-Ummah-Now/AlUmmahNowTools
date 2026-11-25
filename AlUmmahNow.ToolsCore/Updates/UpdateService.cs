@@ -110,6 +110,7 @@ public sealed class UpdateService : IDisposable
     private readonly string _arch;
     private readonly Func<bool> _busy;
     private readonly bool _hasRootKey;
+    private readonly Func<bool> _otherCopy;
     private readonly TimeProvider _clock;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private ITimer? _timer;
@@ -126,8 +127,9 @@ public sealed class UpdateService : IDisposable
 
     /// <param name="hasRootKey">this build carries a root key: without one it can verify nothing, so it only shows the notice with its fixed page (§4.1.1)</param>
     /// <param name="busy">true while an import, upload or encode runs: never restart then</param>
+    /// <param name="otherCopy">true while another copy runs from the same install: the updater would end it, so nothing is installed then</param>
     public UpdateService(HttpMessageHandler handler, Func<Uri> videosApi, IUpdateCore core, IUpdateInstaller installer, string statePath, string downloadDir,
-        string installedVersion, string platform, string arch, Func<bool> busy, bool hasRootKey, TimeProvider? clock = null)
+        string installedVersion, string platform, string arch, Func<bool> busy, bool hasRootKey, TimeProvider? clock = null, Func<bool>? otherCopy = null)
     {
         // Every redirect hop is checked here, so the handler must never follow one by itself
         if (handler is SocketsHttpHandler { AllowAutoRedirect: true } or HttpClientHandler { AllowAutoRedirect: true })
@@ -143,6 +145,7 @@ public sealed class UpdateService : IDisposable
         _arch = arch;
         _busy = busy;
         _hasRootKey = hasRootKey;
+        _otherCopy = otherCopy ?? (() => false);
         _clock = clock ?? TimeProvider.System;
     }
 
@@ -309,15 +312,20 @@ public sealed class UpdateService : IDisposable
         return null;
     }
 
-    /// <summary>Restart now: refused while work is running (the bar says "Finish or pause your uploads first.").</summary>
+    /// <summary>Another copy of the app runs from the same install: the staged update waits until it has closed.</summary>
+    public bool OtherCopyRunning => _otherCopy();
+
+    /// <summary>Restart now: refused while work is running (the bar says "Finish or pause your uploads first.") or another copy is open.</summary>
     public async Task<bool> RestartNowAsync(CancellationToken cancel = default)
     {
-        if (_view.Stage != UpdateStage.Ready || _busy() || _applying) return false;
+        if (_view.Stage != UpdateStage.Ready || _busy() || _applying || _otherCopy()) return false;
         if (!await StillGoodAsync(cancel).ConfigureAwait(false))
         {
             Publish(_view.Required ? new UpdateView(UpdateStage.RequiredSoon, MessageEn: _view.MessageEn, MessageAr: _view.MessageAr) : UpdateView.None);
             return false;
         }
+        // Once more, after the check of the file: a copy may have started meanwhile
+        if (_otherCopy()) return false;
         _applying = true;
         _installer.ApplyAndRestart();
         return true;
@@ -336,9 +344,10 @@ public sealed class UpdateService : IDisposable
     public void OnExit()
     {
         // Restart now has started the updater already
-        if (_staged is null || _applying) return;
+        if (_staged is null || _applying || _otherCopy()) return;
         _applying = true;
-        if (StillGoodAsync(CancellationToken.None, report: false).GetAwaiter().GetResult()) _installer.ApplyOnExit();
+        // A copy that started during the check counts: the update is staged again at the next start
+        if (StillGoodAsync(CancellationToken.None, report: false).GetAwaiter().GetResult() && !_otherCopy()) _installer.ApplyOnExit();
     }
 
     /// <summary>

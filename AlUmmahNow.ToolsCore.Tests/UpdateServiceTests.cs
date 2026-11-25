@@ -96,7 +96,7 @@ public sealed class UpdateServiceTests : IDisposable
         return r;
     }
 
-    private (UpdateService, FakeCore, FakeInstaller, FakeHttp) Make(bool busy = false, bool rootKey = true)
+    private (UpdateService, FakeCore, FakeInstaller, FakeHttp) Make(bool busy = false, bool rootKey = true, Func<bool>? otherCopy = null)
     {
         var core = new FakeCore();
         var installer = new FakeInstaller();
@@ -105,8 +105,41 @@ public sealed class UpdateServiceTests : IDisposable
         http.Routes[ManifestUrl + ".sig"] = () => Ok(Encoding.UTF8.GetBytes("{\"signatures\":[]}"));
         http.Routes[PackageUrl] = () => Redirect(AssetUrl);
         http.Routes[AssetUrl] = () => Ok(Package);
-        var service = new UpdateService(http, () => new Uri("https://videos.api.alummahnow.net"), core, installer, Path.Combine(_dir, "updates.json"), Path.Combine(_dir, "dl"), "2026.11.22", "windows", "x64", () => busy, rootKey);
+        var service = new UpdateService(http, () => new Uri("https://videos.api.alummahnow.net"), core, installer, Path.Combine(_dir, "updates.json"), Path.Combine(_dir, "dl"), "2026.11.22", "windows", "x64", () => busy, rootKey, otherCopy: otherCopy);
         return (service, core, installer, http);
+    }
+
+    [Fact]
+    public async Task Waits_while_another_copy_runs_from_the_same_install()
+    {
+        var other = true;
+        var (service, _, installer, http) = Make(otherCopy: () => other);
+        await service.CheckAsync(userAsked: true);
+        Assert.Equal(UpdateStage.Ready, service.View.Stage);
+        Assert.True(service.OtherCopyRunning);
+        Assert.False(await service.RestartNowAsync());
+        service.OnExit();
+        Assert.Equal((0, 0), (installer.Restarts, installer.Exits));
+        // Still offered, and nothing to report
+        Assert.Equal(UpdateStage.Ready, service.View.Stage);
+        Assert.Null(http.Reported);
+        other = false;
+        service.OnExit();
+        Assert.Equal((0, 1), (installer.Restarts, installer.Exits));
+    }
+
+    [Fact]
+    public async Task A_copy_started_while_the_file_is_checked_again_holds_the_update_back()
+    {
+        var asked = 0;
+        var (service, _, installer, _) = Make(otherCopy: () => ++asked > 1);
+        await service.CheckAsync(userAsked: true);
+        Assert.False(await service.RestartNowAsync());
+        Assert.Equal(2, asked);
+        Assert.Equal(0, installer.Restarts);
+        asked = 0;
+        service.OnExit();
+        Assert.Equal(0, installer.Exits);
     }
 
     [Fact]

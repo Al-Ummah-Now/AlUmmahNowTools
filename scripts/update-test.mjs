@@ -6,12 +6,13 @@
  *   update-test.mjs --exe <installed app> --package <N+1 nupkg> --platform windows|macos --arch x64|arm64
  *                   --from <version N> --to <version N+1> --packages <Velopack's package folder> --package-name <its file name there>
  *                   --state <the app's updates.json>
- *                   [--case ok|tampered|bad-signature|foreign-host|planted|swapped|yanked]
+ *                   [--case ok|tampered|bad-signature|foreign-host|planted|swapped|yanked|second-copy]
  *
  * `ok` must end on N+1. Every other case must stay on N through a second start:
  *  - tampered, bad-signature, foreign-host: the download is refused and the reason reported;
  *  - planted: a good N+1 package is already in the package folder, but this run verified none;
  *  - swapped: the staged file is replaced (same size) before the app closes;
+ *  - second-copy: another copy runs from the same install (as if importing): it must not be ended, so nothing installs;
  *  - yanked: after staging, a newer key list yanks N+1; the app learns it on a check and then closes.
  */
 import { createHash } from 'node:crypto';
@@ -83,7 +84,7 @@ const server = createServer((req, res) => {
 	res.end();
 });
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
-const env = { ...process.env, TOOLS_DEMO: '1', TOOLS_DEMO_LANG: 'en', TOOLS_UPDATE_TEST_ROOT: root.publicKey, TOOLS_UPDATE_TEST_SERVER: `http://127.0.0.1:${server.address().port}`, TOOLS_UPDATE_TEST_LOG: log, ...(kase === 'swapped' || kase === 'yanked' ? { TOOLS_UPDATE_TEST_EXIT_MS: '8000' } : {}), ...(kase === 'yanked' ? { TOOLS_UPDATE_TEST_RECHECK: '1' } : {}) };
+const env = { ...process.env, TOOLS_DEMO: '1', TOOLS_DEMO_LANG: 'en', TOOLS_UPDATE_TEST_ROOT: root.publicKey, TOOLS_UPDATE_TEST_SERVER: `http://127.0.0.1:${server.address().port}`, TOOLS_UPDATE_TEST_LOG: log, TOOLS_DEMO_INSTANCE: join(dir, 'queue'), ...(kase === 'swapped' || kase === 'yanked' ? { TOOLS_UPDATE_TEST_EXIT_MS: '8000' } : {}), ...(kase === 'yanked' ? { TOOLS_UPDATE_TEST_RECHECK: '1' } : {}) };
 // Each case starts as a new install: a yank is remembered for good, so an earlier case's would count here
 rmSync(a.state, { force: true });
 if (kase === 'planted') {
@@ -115,6 +116,15 @@ function fail(why) {
 	process.exit(1);
 }
 
+// A copy of its own (no queue folder, so it neither hands over nor updates), running from the same install
+let other = null;
+const otherLog = join(dir, 'other.txt');
+if (kase === 'second-copy') {
+	const { TOOLS_DEMO_INSTANCE: _, ...alone } = env;
+	other = spawn(a.exe, [], { env: { ...alone, TOOLS_UPDATE_TEST_LOG: otherLog }, stdio: 'inherit' });
+	process.on('exit', () => other.kill());
+	if (!(await until('the other copy starts', 60_000, () => existsSync(otherLog)))) fail('the other copy did not start');
+}
 const first = start();
 if (!(await until('the app starts', 60_000, () => lines().some((l) => l === `started ${a.from} self=true`)))) fail(`the installed app is not a self-updating ${a.from}`);
 if (kase === 'ok') {
@@ -129,6 +139,15 @@ if (kase === 'ok') {
 	const started = lines().slice(before).find((l) => l.startsWith('started '));
 	if (started !== `started ${a.to} self=true`) fail(`after the update: ${started}`);
 	if (reported) fail('a good update was reported as failed');
+} else if (kase === 'second-copy') {
+	if (!(await until('the update is staged', 180_000, () => lines().some((l) => l === `Ready ${a.to}`)))) fail('never staged');
+	await exited(first);
+	await sleep(20_000);
+	if (other.exitCode !== null || other.signalCode !== null) fail('the update ended the other copy');
+	other.kill();
+	await exited(other);
+	if (reported) fail('a waiting update was reported as failed');
+	await unchanged();
 } else if (kase === 'swapped' || kase === 'yanked') {
 	if (!(await until('the update is staged', 180_000, () => lines().some((l) => l === `Ready ${a.to}`)))) fail('never staged');
 	if (kase === 'swapped') {

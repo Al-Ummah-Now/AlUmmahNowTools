@@ -47,7 +47,9 @@ public static class AppUpdates
             Platform,
             Arch,
             IsBusy,
-            ToolsUpdateKeys.RootKeys.Length > 0);
+            ToolsUpdateKeys.RootKeys.Length > 0,
+            // Velopack's updater ends every process of the install folder: never while another copy runs from it (Tools #89)
+            otherCopy: () => demo == "ready-other" || AppInstance.Install?.OtherCopyRunning() == true);
         AppDomain.CurrentDomain.ProcessExit += (_, _) => Service?.OnExit();
 #if UPDATE_TEST
         UpdateTestHandler.Watch(Service);
@@ -67,7 +69,7 @@ public static class AppUpdates
             // A build with no root key (wiki §5.5): the version, no notes, the fixed page
             "notice" => new UpdateView(UpdateStage.Available, "2026.11.23", DownloadOnly: true),
             "downloading" => new UpdateView(UpdateStage.Downloading, "2026.11.23", notesEn, notesAr, Progress: 0.42),
-            "ready" => new UpdateView(UpdateStage.Ready, "2026.11.23", notesEn, notesAr),
+            "ready" or "ready-other" => new UpdateView(UpdateStage.Ready, "2026.11.23", notesEn, notesAr),
             "required-soon" => new UpdateView(UpdateStage.RequiredSoon),
             "forced" => new UpdateView(UpdateStage.Forced, "2026.11.23", notesEn, notesAr, "Sign-in changed. This version can no longer reach the server.", "تغيّر تسجيل الدخول. لم يعد هذا الإصدار يصل إلى الخادم.", Required: true),
             "forced-notice" => new UpdateView(UpdateStage.Forced, "2026.11.23", DownloadOnly: true, Required: true),

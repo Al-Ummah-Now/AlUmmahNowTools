@@ -1,1 +1,2 @@
 A new channel now takes its name in English and Arabic, and its description too if you add one. Translate fills one language from the other for you to check.
+Tools now opens once: starting it again brings the open window forward, so one queue is never imported twice. An update waits while another copy is open.
