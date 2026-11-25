@@ -577,7 +577,8 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
         var rest = left == 0 ? ""
             : waiting is null ? Loc.GetWithDetail("Approve_RestUnknown", reason)
             : Loc.WithDetail(Loc.Plural(approve ? "Approve_ApproveManyFailed" : "Approve_RejectManyFailed", left), reason);
-        var said = string.Join(" ", new[] { done, rest }.Where(t => t.Length > 0));
+        // A line each: a dialog's Arabic order only holds on one
+        var said = string.Join("\n", new[] { done, rest }.Where(t => t.Length > 0));
         if (said.Length == 0) said = Loc.Get("Approve_DecidedAlready");
         DispatcherExecute(() =>
         {
@@ -585,8 +586,9 @@ public partial class ApprovalViewModel : ObservableObject, IDisposable
             AddLog(said, rest.Length > 0 ? LogType.Error : decided.Count == 0 ? LogType.Information : approve ? LogType.Success : LogType.Warning);
         });
         if (!EnableNotifications) return;
-        if (decided.Count > 0) await _notificationService.ShowApprovalProcessedAsync(decided.Count == 1 ? decided[0].FileName : string.Empty, approve, decided.Count);
-        if (rest.Length > 0) await _notificationService.ShowErrorAsync(Loc.Get(approve ? "Approve_ApproveFailed" : "Approve_RejectFailed"), rest);
+        // One notification for one decision
+        if (rest.Length > 0) await _notificationService.ShowErrorAsync(Loc.Get(approve ? "Approve_ApproveFailed" : "Approve_RejectFailed"), said);
+        else if (decided.Count > 0) await _notificationService.ShowApprovalProcessedAsync(decided.Count == 1 ? decided[0].FileName : string.Empty, approve, decided.Count);
     }
 
     [RelayCommand]
