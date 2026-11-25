@@ -323,10 +323,10 @@ internal static class DemoImport
         // The first two were copied again: another file, by size and time, is in their places
         if (State == "content-changed")
         {
-            foreach (var item in items.Take(2))
+            foreach (var copied in items.Take(2))
             {
                 typeof(QueueItem).GetProperty("OnDisk", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
-                    .SetValue(item, new AlUmmahNow.ToolsCore.Import.Sources.SourceStat(item.Video.Size + 1, 1));
+                    .SetValue(copied, new AlUmmahNow.ToolsCore.Import.Sources.SourceStat(copied.Video.Size + 1, 1));
             }
         }
         if (State is not ("share-waiting" or "share-failed" or "damaged")) return;
