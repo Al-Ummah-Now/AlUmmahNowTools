@@ -268,12 +268,8 @@ public partial class App : Application
                             string? serviceExecutablePath = null;
                             try
                             {
-                                var settingsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                                    "AlUmmahNow", "VisualImporterUno", "settings.json");
-
-                                if (File.Exists(settingsPath))
+                                if (AlUmmahNow.ToolsCore.UserSettingsFile.Default.Read() is { } json)
                                 {
-                                    var json = File.ReadAllText(settingsPath);
                                     var settings = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(json);
 
                                     if (settings.TryGetProperty("FileScanService", out var fileScanService) &&

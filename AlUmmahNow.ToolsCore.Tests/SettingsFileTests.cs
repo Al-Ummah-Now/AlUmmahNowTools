@@ -38,6 +38,33 @@ public sealed class SettingsFileTests : IDisposable
         Assert.Equal("1", new SettingsFile(FilePath).Get("A", "k"));
     }
 
+    [Fact]
+    public void The_old_settings_file_is_taken_over_once()
+    {
+        var old = Path.Combine(_dir, "AlUmmahNow", "VisualImporter", "settings.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(old)!);
+        var file = new UserSettingsFile(_dir);
+        Assert.Null(file.Read());
+        File.WriteAllText(old, "old");
+        Assert.Equal("old", file.Read());
+        File.WriteAllText(old, "older app");
+        Assert.Equal("old", file.Read());
+        file.Write("new");
+        Assert.Equal("new", new UserSettingsFile(_dir).Read());
+        Assert.Equal("older app", File.ReadAllText(old));
+    }
+
+    [Fact]
+    public void The_old_settings_file_is_not_read_when_the_new_one_is_there()
+    {
+        var file = new UserSettingsFile(_dir);
+        file.Write("new");
+        var old = Path.Combine(_dir, "AlUmmahNow", "VisualImporter", "settings.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(old)!);
+        File.WriteAllText(old, "old");
+        Assert.Equal("new", file.Read());
+    }
+
     private sealed class Throws(Exception error) : ISettingsStore
     {
         public string? Get(string section, string key) => throw error;
