@@ -364,7 +364,8 @@ public partial class App : Application
 #if WINDOWS
             Shell.AppUpdates.Start(shellState, new NoSelfUpdate());
 #else
-            Shell.AppUpdates.Start(shellState, new Services.VelopackInstaller());
+            // No root key, no updater (wiki §4.1.1)
+            Shell.AppUpdates.Start(shellState, AlUmmahNow.ToolsCore.Updates.ToolsUpdateKeys.RootKeys.Length > 0 ? new Services.VelopackInstaller() : new NoSelfUpdate());
 #endif
 
             MainWindow = new MainWindow(shellState);

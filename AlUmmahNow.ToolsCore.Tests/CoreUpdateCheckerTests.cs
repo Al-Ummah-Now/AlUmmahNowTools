@@ -40,6 +40,18 @@ public sealed class CoreUpdateCheckerTests
     }
 
     [Fact]
+    public void The_compiled_in_key_list_verifies_under_the_compiled_in_root_key()
+    {
+        var root = Assert.Single(AlUmmahNow.ToolsCore.Updates.ToolsUpdateKeys.RootKeys);
+        // A list the root key didn't sign throws here: such a build must never ship
+        using var checker = new UpdateChecker("AlUmmahNowTools", new[] { root }, "2026.11.22", false, null,
+            AlUmmahNow.ToolsCore.Updates.ToolsUpdateKeys.BundledKeyList, AlUmmahNow.ToolsCore.Updates.ToolsUpdateKeys.BundledKeyListSig);
+        Assert.Contains("\"serial\":1", checker.StateJson());
+        Assert.Throws<AunException.InvalidInput>(() => new UpdateChecker("AlUmmahNowTools", new[] { root }, "2026.11.22", false, null,
+            AlUmmahNow.ToolsCore.Updates.ToolsUpdateKeys.BundledKeyList.Replace("AlUmmahNowTools", "AlUmmahNowDesktop"), AlUmmahNow.ToolsCore.Updates.ToolsUpdateKeys.BundledKeyListSig));
+    }
+
+    [Fact]
     public void Without_trusted_keys_nothing_verifies()
     {
         var v = Vector();

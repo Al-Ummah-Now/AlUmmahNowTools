@@ -31,9 +31,10 @@ public sealed record UpdateView(
     string? MessageEn = null,
     string? MessageAr = null,
     double? Progress = null,
-    /// <summary>"download": the button opens <see cref="Url"/> in the browser instead of installing</summary>
+    /// <summary>The button opens <see cref="UpdateService.DownloadPage"/> in the browser; nothing is downloaded or installed</summary>
     bool DownloadOnly = false,
-    string? Url = null)
+    /// <summary>Below the minimum: the forced screen stays up while its update downloads and waits for a restart</summary>
+    bool Required = false)
 {
     public static readonly UpdateView None = new(UpdateStage.Hidden);
     public bool CanClose => Stage is UpdateStage.Available or UpdateStage.Ready;
@@ -72,8 +73,10 @@ public interface IUpdateInstaller
 {
     /// <summary>A build installed by our own installer (Velopack): it can update itself</summary>
     bool CanSelfUpdate { get; }
-    /// <summary>Hands Velopack the downloaded, verified package; it applies when the app exits</summary>
+    /// <summary>Hands Velopack the downloaded, verified package; <see cref="ApplyOnExit"/> or <see cref="ApplyAndRestart"/> installs it</summary>
     Task StageAsync(string packagePath, CoreRelease release, CoreArtifact artifact, CancellationToken cancel);
+    /// <summary>The app is exiting: installs the staged update once it has</summary>
+    void ApplyOnExit();
     /// <summary>Applies the staged update now and restarts the app</summary>
     void ApplyAndRestart();
 }
@@ -86,6 +89,8 @@ public interface IUpdateInstaller
 public sealed class UpdateService : IDisposable
 {
     public const string Repo = "AlUmmahNowTools";
+    /// <summary>The one page Download opens (wiki §4.1.1): fixed here, never taken from an answer, a manifest or the network.</summary>
+    public const string DownloadPage = "https://github.com/Al-Ummah-Now/AlUmmahNowTools/releases";
     private static readonly TimeSpan FirstCheckDelay = TimeSpan.FromSeconds(30);
     private const int MaxRedirects = 5;
 
@@ -99,6 +104,7 @@ public sealed class UpdateService : IDisposable
     private readonly string _platform;
     private readonly string _arch;
     private readonly Func<bool> _busy;
+    private readonly bool _hasRootKey;
     private readonly TimeProvider _clock;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private ITimer? _timer;
@@ -106,9 +112,10 @@ public sealed class UpdateService : IDisposable
     private CorePrompt? _lastPrompt;
     private string? _stagedVersion;
 
+    /// <param name="hasRootKey">this build carries a root key: without one it can verify nothing, so it only shows the notice with its fixed page (§4.1.1)</param>
     /// <param name="busy">true while an import, upload or encode runs: never restart then</param>
     public UpdateService(HttpMessageHandler handler, Func<Uri> videosApi, IUpdateCore core, IUpdateInstaller installer, string statePath, string downloadDir,
-        string installedVersion, string platform, string arch, Func<bool> busy, TimeProvider? clock = null)
+        string installedVersion, string platform, string arch, Func<bool> busy, bool hasRootKey, TimeProvider? clock = null)
     {
         // Every redirect hop is checked here, so the handler must never follow one by itself
         if (handler is SocketsHttpHandler { AllowAutoRedirect: true } or HttpClientHandler { AllowAutoRedirect: true })
@@ -123,6 +130,7 @@ public sealed class UpdateService : IDisposable
         _platform = platform;
         _arch = arch;
         _busy = busy;
+        _hasRootKey = hasRootKey;
         _clock = clock ?? TimeProvider.System;
     }
 
@@ -140,7 +148,7 @@ public sealed class UpdateService : IDisposable
         }
     }
 
-    public bool CanSelfUpdate => _installer.CanSelfUpdate;
+    public bool CanSelfUpdate => _hasRootKey && _installer.CanSelfUpdate;
 
     /// <summary>The server's appUpdates switch at the last check; null before the first one. Settings → Updates shows only while it is on.</summary>
     public bool? Enabled { get; private set; }
@@ -161,7 +169,7 @@ public sealed class UpdateService : IDisposable
         _timer = _clock.CreateTimer(_ => _ = CheckAsync(userAsked: false), null, FirstCheckDelay, Timeout.InfiniteTimeSpan);
     }
 
-    private string Source => _installer.CanSelfUpdate ? "direct" : "managed";
+    private string Source => CanSelfUpdate ? "direct" : "managed";
 
     /// <summary>One check. Returns false when the server couldn't be reached (Check now shows "Couldn't check…").</summary>
     public async Task<bool> CheckAsync(bool userAsked, CancellationToken cancel = default)
@@ -179,7 +187,7 @@ public sealed class UpdateService : IDisposable
                 {
                     Enabled = answer.RootElement.TryGetProperty("update", out var update) && update.TryGetProperty("enabled", out var on) && on.ValueKind == JsonValueKind.True;
                 }
-                prompt = _core.ApplyAnswer(json, null);
+                prompt = Gate(_core.ApplyAnswer(json, null));
                 _core.MarkChecked(_clock.GetUtcNow().ToUnixTimeMilliseconds());
             }
             catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException or InvalidOperationException)
@@ -199,23 +207,44 @@ public sealed class UpdateService : IDisposable
         }
     }
 
+    /// <summary>
+    /// The root-key rules (wiki §4.1.1). No URL of an answer is ever opened: Download opens <see cref="DownloadPage"/>.
+    /// Without a root key everything is the notice; with one, a notice answer is nothing.
+    /// </summary>
+    private CorePrompt Gate(CorePrompt p)
+    {
+        if (!_hasRootKey)
+            return p.Action is "install" or "download" or "notice" ? p with { Action = "notice", Url = null, ManifestUrl = null, Tag = null } : Nothing(p);
+        return p.Action is "install" or "download" ? p with { Url = null } : Nothing(p);
+    }
+
+    /// <summary>Nothing this build may act on: no notice; below the minimum, the bar that can't be closed.</summary>
+    private static CorePrompt Nothing(CorePrompt p) =>
+        p with { Kind = p.Kind is "Forced" or "RequiredBar" ? "RequiredBar" : "None", Action = "none", Url = null, ManifestUrl = null, Tag = null };
+
     private async Task ActOnAsync(CorePrompt p, CancellationToken cancel)
     {
-        if (p.Version is not null && p.Version == _stagedVersion)
+        if (p.Version is not null && p.Version == _stagedVersion && p.Kind != "None")
         {
-            Publish(new UpdateView(UpdateStage.Ready, p.Version, p.NotesEn, p.NotesAr));
+            Publish(new UpdateView(UpdateStage.Ready, p.Version, p.NotesEn, p.NotesAr, p.MessageEn, p.MessageAr, Required: p.Kind == "Forced"));
             return;
         }
         switch (p.Kind)
         {
             case "Forced":
+                // The whole-window screen needs an update this build can really get (§3.7): verify its manifest first
+                if (Installs(p) && await VerifiedAsync(p, cancel).ConfigureAwait(false) is null)
+                {
+                    Publish(ViewFor(UpdateStage.RequiredSoon, p));
+                    return;
+                }
                 Publish(ViewFor(UpdateStage.Forced, p));
                 return;
             case "RequiredBar":
                 Publish(ViewFor(UpdateStage.RequiredSoon, p));
                 return;
             case "Notice":
-                if (p.Action == "install" && _installer.CanSelfUpdate && AutoInstall)
+                if (Installs(p) && AutoInstall)
                 {
                     await DownloadAndStageAsync(p, cancel).ConfigureAwait(false);
                     return;
@@ -228,16 +257,18 @@ public sealed class UpdateService : IDisposable
         }
     }
 
-    private static UpdateView ViewFor(UpdateStage stage, CorePrompt p) =>
-        new(stage, p.Version, p.NotesEn, p.NotesAr, p.MessageEn, p.MessageAr, DownloadOnly: p.Action == "download", Url: p.Action == "download" ? p.Url : null);
+    private bool Installs(CorePrompt p) => p.Action == "install" && CanSelfUpdate;
+
+    private UpdateView ViewFor(UpdateStage stage, CorePrompt p) =>
+        new(stage, p.Version, p.NotesEn, p.NotesAr, p.MessageEn, p.MessageAr, DownloadOnly: p.Action != "none" && !Installs(p), Required: stage == UpdateStage.Forced);
 
     /// <summary>The bar's Update button (or the forced screen's): install, or open the download page.</summary>
     public async Task<string?> UpdateNowAsync(CancellationToken cancel = default)
     {
         var p = _lastPrompt;
         if (p is null) return null;
-        if (p.Action == "download") return p.Url;
-        if (p.Action != "install" || !_installer.CanSelfUpdate) return null;
+        if (p.Action == "none") return null;
+        if (!Installs(p)) return DownloadPage;
         await DownloadAndStageAsync(p, cancel).ConfigureAwait(false);
         return null;
     }
@@ -259,25 +290,59 @@ public sealed class UpdateService : IDisposable
         Publish(UpdateView.None);
     }
 
+    /// <summary>Every window is closed: install the staged update as the app goes.</summary>
+    public void OnExit()
+    {
+        if (_stagedVersion is not null) _installer.ApplyOnExit();
+    }
+
+    /// <summary>The release the answer names, its signature checked; null when refused (and reported) or unreachable.</summary>
+    private async Task<CoreRelease?> VerifiedAsync(CorePrompt p, CancellationToken cancel)
+    {
+        if (p.ManifestUrl is null || p.Tag is null) return null;
+        try
+        {
+            return await FetchReleaseAsync(p.ManifestUrl, p.Tag, cancel).ConfigureAwait(false);
+        }
+        catch (UpdateVerificationException ex)
+        {
+            await ReportFailureAsync(p.Tag, ex.Reason, cancel).ConfigureAwait(false);
+            return null;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException)
+        {
+            return null;
+        }
+    }
+
+    private async Task<CoreRelease> FetchReleaseAsync(string manifestUrl, string tag, CancellationToken cancel)
+    {
+        var manifest = await FetchAsync(manifestUrl, 256 * 1024, null, cancel).ConfigureAwait(false);
+        var signature = Encoding.UTF8.GetString(await FetchAsync(manifestUrl + ".sig", 4096, null, cancel).ConfigureAwait(false));
+        var release = _core.VerifyManifest(manifest, signature, tag);
+        SaveState();
+        return release;
+    }
+
     private async Task DownloadAndStageAsync(CorePrompt p, CancellationToken cancel)
     {
         if (p.ManifestUrl is null || p.Tag is null || p.Version is null) return;
-        Publish(new UpdateView(UpdateStage.Downloading, p.Version, p.NotesEn, p.NotesAr, Progress: 0));
-        string? reason = null;
+        var required = p.Kind == "Forced";
+        Publish(new UpdateView(UpdateStage.Downloading, p.Version, p.NotesEn, p.NotesAr, p.MessageEn, p.MessageAr, Progress: 0, Required: required));
+        string reason;
         try
         {
-            var manifest = await FetchAsync(p.ManifestUrl, 256 * 1024, null, cancel).ConfigureAwait(false);
-            var signature = Encoding.UTF8.GetString(await FetchAsync(p.ManifestUrl + ".sig", 4096, null, cancel).ConfigureAwait(false));
-            var release = _core.VerifyManifest(manifest, signature, p.Tag);
-            SaveState();
+            var release = await FetchReleaseAsync(p.ManifestUrl, p.Tag, cancel).ConfigureAwait(false);
+            // The signed manifest names the version, not the answer
+            if (release.Version != p.Version) throw new UpdateVerificationException("wrong_tag");
             var artifact = release.Artifacts.FirstOrDefault(a => a.App == "tools" && a.Platform == _platform && a.Kind == "velopack-full" && (a.Arch is null || a.Arch == _arch || a.Arch == "universal"))
-                ?? throw new UpdateVerificationException("no_package");
+                ?? throw new UpdateVerificationException("bad_manifest");
             Directory.CreateDirectory(_downloadDir);
             var path = Path.Combine(_downloadDir, $"tools-{release.Version}-{_arch}.nupkg");
             await DownloadVerifiedAsync(artifact, path, cancel).ConfigureAwait(false);
             await _installer.StageAsync(path, release, artifact, cancel).ConfigureAwait(false);
             _stagedVersion = release.Version;
-            Publish(new UpdateView(UpdateStage.Ready, release.Version, release.NotesEn, release.NotesAr));
+            Publish(new UpdateView(UpdateStage.Ready, release.Version, release.NotesEn, release.NotesAr, p.MessageEn, p.MessageAr, Required: required));
             return;
         }
         catch (UpdateVerificationException ex)
@@ -286,12 +351,13 @@ public sealed class UpdateService : IDisposable
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException)
         {
-            // Network trouble is not a verification failure: try again at the next check, offer nothing now
-            Publish(UpdateView.None);
+            // Network trouble is not a verification failure: try again at the next check (the forced screen stays, to retry)
+            Publish(required ? ViewFor(UpdateStage.Forced, p) : UpdateView.None);
             return;
         }
-        // Fail closed (wiki §5.3 step 6): nothing installed, no link offered, the server is told
-        Publish(UpdateView.None);
+        // Fail closed (wiki §5.3 step 6): nothing installed, no link offered, the server is told. Below the minimum the
+        // app stays usable behind the bar that can't be closed.
+        Publish(required ? ViewFor(UpdateStage.RequiredSoon, p) : UpdateView.None);
         await ReportFailureAsync(p.Tag, reason, cancel).ConfigureAwait(false);
     }
 
