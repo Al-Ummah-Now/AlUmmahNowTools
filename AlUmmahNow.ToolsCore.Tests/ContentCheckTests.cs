@@ -527,8 +527,7 @@ public sealed class ContentCheckTests
     public async Task The_encodes_own_no_video_is_final_the_server_is_not_asked_to_encode_it(string probe, string code)
     {
         var item = Item(Mp4IndexTests.File("vide", "soun"));
-        item.VideoChecked = true;
-        typeof(QueueItem).GetProperty("VideoProbed")?.SetValue(item, true);
+        item.VideoChecked = item.VideoProbed = true;
         var server = new RenditionServer();
         var api = new ImportApiClient(new Uri("https://admin.api.example"), _ => Task.FromResult<string?>("tok"), server);
         var reported = new List<Exception>();

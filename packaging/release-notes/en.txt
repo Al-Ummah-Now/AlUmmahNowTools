@@ -1,2 +1,3 @@
 Searching for a channel: the channels found stay in the list, in Import and Social sources.
 Approve all and Reject all work with any filter and decide exactly the videos listed. If the scanner stops half way, the page says how many were decided and lists the rest.
+A file with sound and no video is never uploaded, also when its own index says it has one (the pictures of chapters).

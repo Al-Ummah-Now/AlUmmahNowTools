@@ -138,6 +138,8 @@ public sealed class QueueItem
     public long ChunkSize { get; set; }
     /// <summary>The file has a video in it (or what would tell is not on this computer)</summary>
     public bool VideoChecked { get; set; }
+    /// <summary>ffprobe was asked too (since 2026.11.25.5; a file checked before is asked about once more)</summary>
+    public bool VideoProbed { get; set; }
     /// <summary>How much was sent, and that much's SHA-256: an upload that goes on later goes on from the same bytes</summary>
     public long SentTo { get; set; }
     public string? SentSha256 { get; set; }
@@ -585,7 +587,7 @@ public sealed class ImportQueue : IDisposable
         item.Hashing = null;
         item.Sending?.Dispose();
         item.Sending = null;
-        (item.Sha256, item.FingerprintHash, item.VideoChecked) = (null, null, false);
+        (item.Sha256, item.FingerprintHash, item.VideoChecked, item.VideoProbed) = (null, null, false, false);
         (item.ServerItemId, item.VideoId, item.TusSessionId, item.UploadUrl, item.UploadOffset) = (null, null, null, null, 0);
         (item.SentTo, item.SentSha256, item.StartOver, item.LeftUploadUrl, item.Renditions) = (0, null, false, null, null);
         foreach (var step in item.Steps.Where(s => s.Kind <= ImportStepKind.Upload))
