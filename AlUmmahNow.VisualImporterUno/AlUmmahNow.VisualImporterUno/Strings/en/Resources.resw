@@ -2132,6 +2132,9 @@ The list shows it once the scanner is back.</value>
   <data name="ImportLog_share_back" xml:space="preserve">
     <value>The network share answers again; going on from byte {0}</value>
   </data>
+  <data name="ImportLog_encode_copy" xml:space="preserve">
+    <value>The video tools couldn’t read the file from the share, so it’s copied to this computer first and encoded from the copy</value>
+  </data>
   <data name="ImportLog_share_tool" xml:space="preserve">
     <value>The video tools couldn’t read the file to its end; trying again</value>
   </data>

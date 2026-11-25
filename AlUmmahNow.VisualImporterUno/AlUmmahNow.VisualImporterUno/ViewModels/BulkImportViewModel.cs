@@ -636,6 +636,7 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
             "upload_kept" => Loc.Format("ImportLog_upload_kept", Num(0)),
             "sent_check" => Loc.Format("ImportLog_sent_check", Bytes(Arg(0))),
             "share_tool" => Loc.WithDetail(Loc.Get("ImportLog_share_tool"), Arg(0)),
+            "encode_copy" => Loc.WithDetail(Loc.Get("ImportLog_encode_copy"), Arg(0)),
             "cloud_download" => Loc.Get("ImportLog_cloud_download"),
             "read_failed" => Loc.WithDetail(Loc.WithDetail(ErrorText(Arg(0), null), ReadText(Arg(1), Arg(2), Arg(3), Arg(4))), Arg(5)),
             "sent" => Loc.Format("ImportLog_sent", Loc.Groups(a.Skip(1).Select(Part))),

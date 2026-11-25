@@ -2399,6 +2399,9 @@
   <data name="ImportLog_share_back" xml:space="preserve">
     <value>عاد مجلد الشبكة إلى الاستجابة، وتُستأنف القراءة من البايت {0}</value>
   </data>
+  <data name="ImportLog_encode_copy" xml:space="preserve">
+    <value>لم تتمكن أدوات المرئيات من قراءة الملف من المجلد المشترك، فيُنسخ إلى هذا الجهاز أولًا ويُرمّز من النسخة</value>
+  </data>
   <data name="ImportLog_share_tool" xml:space="preserve">
     <value>لم تتمكن أدوات المرئيات من قراءة الملف إلى آخره، وتُعاد المحاولة</value>
   </data>

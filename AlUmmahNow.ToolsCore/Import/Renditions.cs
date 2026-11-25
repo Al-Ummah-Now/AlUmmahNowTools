@@ -44,7 +44,12 @@ public sealed class LocalEncodeException : Exception
 }
 
 /// <summary>A source as ffprobe sees it.</summary>
-public sealed record SourceInfo(int Width, int Height, int Rotation, double Fps, bool HasAudio, double DurationSeconds);
+/// <param name="StreamSeconds">How long its video and its first sound are, whichever is longer; 0 when they do not say</param>
+public sealed record SourceInfo(int Width, int Height, int Rotation, double Fps, bool HasAudio, double DurationSeconds, double StreamSeconds = 0)
+{
+    /// <summary>How long what is encoded of it is: a container is as long as its longest track, which may be a subtitle.</summary>
+    public double Seconds => StreamSeconds <= 0 ? DurationSeconds : DurationSeconds <= 0 ? StreamSeconds : Math.Min(StreamSeconds, DurationSeconds);
+}
 
 /// <summary>One rung to encode: the server's rung at this source's size.</summary>
 public sealed record PlannedRung(string Name, int Width, int Height, int Maxrate, int Bufsize, int Audio, string Profile);
@@ -181,7 +186,9 @@ public sealed class FfmpegMediaTools : IMediaTools
     private readonly Func<CancellationToken, Task<(string Ffmpeg, string Ffprobe)?>> _locate;
     private string? _encoder;
 
-    public FfmpegMediaTools(Func<CancellationToken, Task<(string Ffmpeg, string Ffprobe)?>> locate) => _locate = locate;
+    private readonly SourceAccess _source;
+
+    public FfmpegMediaTools(Func<CancellationToken, Task<(string Ffmpeg, string Ffprobe)?>> locate, SourceAccess? source = null) => (_locate, _source) = (locate, source ?? SourceAccess.Default);
 
     private async Task<(string Ffmpeg, string Ffprobe)> Paths(CancellationToken ct) =>
         await _locate(ct).ConfigureAwait(false) ?? throw new LocalEncodeException("ffmpeg_missing", "ffmpeg was not found on this computer");
@@ -190,9 +197,17 @@ public sealed class FfmpegMediaTools : IMediaTools
     {
         var (_, ffprobe) = await Paths(ct).ConfigureAwait(false);
         var (code, output, error) = await RunAsync(ffprobe, new[] { "-v", "error", "-print_format", "json", "-show_streams", "-show_format", path }, null, ct).ConfigureAwait(false);
-        await ThrowIfSourceStoppedAsync(path, error, code, ct).ConfigureAwait(false);
-        if (code != 0) throw new LocalEncodeException("probe_failed", "ffprobe could not read the file: " + LastLine(error, path));
-        return ParseProbe(output);
+        var stopped = await SourceStoppedAsync(path, error, code, ct).ConfigureAwait(false);
+        if (code != 0) throw stopped ?? new LocalEncodeException("probe_failed", "ffprobe could not read the file: " + Why(error, path));
+        try
+        {
+            return ParseProbe(output);
+        }
+        catch (LocalEncodeException) when (stopped is not null)
+        {
+            // What it could not read is not what the file lacks
+            throw stopped;
+        }
     }
 
     /// <summary>ffprobe's JSON: the first video stream's size, rotation and frame rate, whether there is sound, the duration.</summary>
@@ -224,13 +239,27 @@ public sealed class FfmpegMediaTools : IMediaTools
         var fps = Rate(video["avg_frame_rate"]?.GetValue<string>());
         if (fps <= 0) fps = Rate(video["r_frame_rate"]?.GetValue<string>());
         var duration = root?["format"]?["duration"] is JsonNode d ? Number(d) : video["duration"] is JsonNode vd ? Number(vd) : 0;
+        var sound = streams.FirstOrDefault(s => s?["codec_type"]?.GetValue<string>() == "audio");
         return new SourceInfo(
             (int)Number(video["width"]),
             (int)Number(video["height"]),
             rotation,
             fps,
-            streams.Any(s => s?["codec_type"]?.GetValue<string>() == "audio"),
-            duration);
+            sound is not null,
+            duration,
+            // Both known, or it is not known which is the longer
+            Length(video) is > 0 and var v && (sound is null || Length(sound) > 0) ? Math.Max(v, sound is null ? 0 : Length(sound)) : 0);
+    }
+
+    /// <summary>A stream's own length; Matroska keeps it in a tag ("00:00:10.023000000").</summary>
+    private static double Length(JsonNode stream)
+    {
+        if (Number(stream["duration"]) is > 0 and var seconds) return seconds;
+        var tag = stream["tags"]?.AsObject().FirstOrDefault(t => t.Key.Equals("DURATION", StringComparison.OrdinalIgnoreCase)).Value;
+        var parts = (tag is JsonValue value && value.TryGetValue<string>(out var text) ? text : "").Split(':');
+        if (parts.Length != 3) return 0;
+        var numbers = parts.Select(part => double.TryParse(part, NumberStyles.Float, CultureInfo.InvariantCulture, out var n) ? n : -1).ToArray();
+        return numbers.Any(n => n < 0) ? 0 : (numbers[0] * 3600) + (numbers[1] * 60) + numbers[2];
     }
 
     public async Task<string?> PickEncoderAsync(CancellationToken ct)
@@ -245,7 +274,7 @@ public sealed class FfmpegMediaTools : IMediaTools
     {
         var (ffmpeg, _) = await Paths(ct).ConfigureAwait(false);
         var args = Arguments(source, info, rungs, outputs, encoder, settings);
-        var duration = info.DurationSeconds;
+        var duration = info.Seconds;
         void OnLine(string line)
         {
             // -progress pipe:1 writes "out_time_us=12345678" lines
@@ -255,8 +284,32 @@ public sealed class FfmpegMediaTools : IMediaTools
             }
         }
         var (code, _, error) = await RunAsync(ffmpeg, args, OnLine, ct).ConfigureAwait(false);
-        await ThrowIfSourceStoppedAsync(source, error, code, ct).ConfigureAwait(false);
-        if (code != 0) throw new LocalEncodeException("ffmpeg_failed", $"ffmpeg stopped ({encoder}): " + LastLine(error, source));
+        if (await SourceStoppedAsync(source, error, code, ct).ConfigureAwait(false) is { } stopped)
+        {
+            // It ends well all the same, with what it had: whether it read the file to its end is in what it made. The same words
+            // come from a file whose last bytes make no sense
+            if (code != 0 || !await IsWholeAsync(info, outputs, ct).ConfigureAwait(false)) throw stopped;
+        }
+        if (code != 0) throw new LocalEncodeException("ffmpeg_failed", $"ffmpeg stopped ({encoder}, {code.ToString(CultureInfo.InvariantCulture)}): " + Why(error, source));
+    }
+
+    /// <summary>Every rung is as long as the source's own tracks, to the second.</summary>
+    private async Task<bool> IsWholeAsync(SourceInfo info, IReadOnlyList<string> outputs, CancellationToken ct)
+    {
+        if (info.Seconds <= 0) return false;
+        try
+        {
+            foreach (var output in outputs)
+            {
+                if ((await ProbeAsync(output, ct).ConfigureAwait(false)).Seconds < info.Seconds - 1) return false;
+            }
+            return true;
+        }
+        catch (LocalEncodeException)
+        {
+            // Not even a file
+            return false;
+        }
     }
 
     /// <summary>
@@ -268,7 +321,8 @@ public sealed class FfmpegMediaTools : IMediaTools
         var format = H264Encoders.InputFormat(encoder);
         var split = $"[0:v]split={rungs.Count}" + string.Concat(rungs.Select((_, i) => $"[v{i}]"));
         var scales = rungs.Select((r, i) => $"[v{i}]scale=w={r.Width}:h={r.Height}:flags=bicubic,format={format}[v{i}o]");
-        var args = new List<string> { "-hide_banner", "-nostdin", "-y", "-i", source, "-filter_complex", string.Join(";", new[] { split }.Concat(scales)) };
+        // Its warnings and errors, each with its level: the encoders' closing figures are no reason for anything
+        var args = new List<string> { "-hide_banner", "-loglevel", "level+warning", "-nostdin", "-y", "-i", source, "-filter_complex", string.Join(";", new[] { split }.Concat(scales)) };
         var fps = EncodeLadder.CappedFps(info, settings);
         var outFps = fps ?? (info.Fps > 0 ? info.Fps : 30);
         var keyint = Math.Max(1, (int)Math.Round(outFps * settings.GopSeconds));
@@ -318,24 +372,41 @@ public sealed class FfmpegMediaTools : IMediaTools
     /// <summary>The lines that are about reading the source, not about an output.</summary>
     private static readonly Regex Reading = new("(Error during demuxing|Error reading|Error opening input|Error retrieving a packet)", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
 
-    internal static bool SourceStopped(string source, string error, bool network) => error.Split('\n').Any(line =>
+    internal static bool SourceStopped(string source, string error, bool network) => StoppedLine(source, error, network) is not null;
+
+    /// <summary>The line that says the source could not be read.</summary>
+    internal static string? StoppedLine(string source, string error, bool network) => Lines(error).FirstOrDefault(line =>
         (Reading.IsMatch(line) || line.Contains(source + ":", StringComparison.Ordinal)) && (ReadError.IsMatch(line) || (network && NetworkReadError.IsMatch(line))));
 
-    private static async Task ThrowIfSourceStoppedAsync(string source, string error, int code, CancellationToken ct)
+    private async Task<LocalEncodeException?> SourceStoppedAsync(string source, string error, int code, CancellationToken ct)
     {
-        var network = await SourceAccess.Default.IsNetworkAsync(source, ct).ConfigureAwait(false);
+        var network = await _source.IsNetworkAsync(source, ct).ConfigureAwait(false);
         // On a local disk only a run that failed is one that could not read
-        if ((network || code != 0) && SourceStopped(source, error, network))
-        {
-            throw new LocalEncodeException("source_read", "ffmpeg could not read the file to its end: " + LastLine(error, source));
-        }
+        return (network || code != 0) && StoppedLine(source, error, network) is { } line
+            ? new LocalEncodeException("source_read", $"ffmpeg could not read the file to its end ({code.ToString(CultureInfo.InvariantCulture)}): " + Shown(line, source))
+            : null;
     }
 
-    /// <summary>The last line of ffmpeg's messages, with the file's name in place of its path (it may be reported).</summary>
-    private static string LastLine(string text, string source)
+    private static string[] Lines(string text) => text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    private static readonly Regex Level = new(@"\[(panic|fatal|error|warning|info|verbose|debug)\] ?", RegexOptions.CultureInvariant);
+
+    /// <summary>
+    /// Why ffmpeg failed: its last error line but for what it says after every failure; else its last line. (The encoders' closing
+    /// figures come last of all, also when everything went well.)
+    /// </summary>
+    internal static string Why(string text, string source)
     {
-        var line = text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).LastOrDefault() ?? "";
-        line = line.Replace(source, Path.GetFileName(source), StringComparison.Ordinal);
+        var lines = Lines(text);
+        var said = lines.LastOrDefault(l => (l.Contains("[error]", StringComparison.Ordinal) || l.Contains("[fatal]", StringComparison.Ordinal)) && !l.Contains("Conversion failed", StringComparison.Ordinal))
+            ?? lines.LastOrDefault() ?? "";
+        return Shown(said, source);
+    }
+
+    /// <summary>A line of ffmpeg's, without its level and with the file's name in place of its path (it may be reported).</summary>
+    private static string Shown(string line, string source)
+    {
+        line = Level.Replace(line, "", 1).Replace(source, Path.GetFileName(source), StringComparison.Ordinal);
         return line.Length > 300 ? line[..300] : line;
     }
 
@@ -347,10 +418,10 @@ public sealed class FfmpegMediaTools : IMediaTools
         {
             try { File.Delete(wavPath); } catch (IOException) { } catch (UnauthorizedAccessException) { }
         }
-        await ThrowIfSourceStoppedAsync(source, error, code, ct).ConfigureAwait(false);
+        if (await SourceStoppedAsync(source, error, code, ct).ConfigureAwait(false) is { } stopped) throw stopped;
         if (code == 0) return;
         // "-map 0:a:0" matches nothing in a file without sound
-        throw new LocalEncodeException(error.Contains("matches no streams", StringComparison.Ordinal) ? "no_audio" : "ffmpeg_failed", "ffmpeg could not read the file's sound: " + LastLine(error, source));
+        throw new LocalEncodeException(error.Contains("matches no streams", StringComparison.Ordinal) ? "no_audio" : "ffmpeg_failed", "ffmpeg could not read the file's sound: " + Why(error, source));
     }
 
     private static async Task<(int Code, string Output, string Error)> RunAsync(string exe, IEnumerable<string> args, Action<string>? onLine, CancellationToken ct)
@@ -492,11 +563,24 @@ public sealed class EncodeStep : IImportStep
 
             // 90% for the encode, 10% for packaging
             var outputs = rungs.Select(r => Path.Combine(directory, r.Name + ".mp4")).ToList();
-            await _source.WithPathAsync(item.Video.Path, context, async path =>
+            async Task<bool> EncodeAsync(string path)
             {
                 await _media.EncodeAsync(path, info, rungs, outputs, encoder, settings.Ladder, new DirectProgress(p => context.Progress(p * 0.9)), ct).ConfigureAwait(false);
                 return true;
-            }, ct).ConfigureAwait(false);
+            }
+            try
+            {
+                await _source.WithPathAsync(item.Video.Path, context, EncodeAsync, ct, tries: 2).ConfigureAwait(false);
+            }
+            catch (LocalEncodeException stopped) when (stopped.Code == "source_read")
+            {
+                // ffmpeg ends at a share's first hiccup; the app's own reading, which the check and the upload use, goes on after it
+                if (!await _source.IsNetworkAsync(item.Video.Path, ct).ConfigureAwait(false) || !HasRoom(directory, item.Video.Size + Estimate(info, rungs))) throw;
+                context.Log(LogLevel.Info, "encode_copy", $"{stopped.Message}. Copied here first, and encoded from the copy", stopped.Message);
+                var copy = await CopyAsync(item.Video, directory, context, ct).ConfigureAwait(false);
+                await EncodeAsync(copy).ConfigureAwait(false);
+                File.Delete(copy);
+            }
             await _source.CheckUnchangedAsync(item.Video, context, ct, read: true).ConfigureAwait(false);
             foreach (var output in outputs) await CheckLengthAsync(info, output, ct).ConfigureAwait(false);
             for (var i = 0; i < rungs.Count; i++)
@@ -564,11 +648,11 @@ public sealed class EncodeStep : IImportStep
     /// <summary>A read that stops half way ends ffmpeg well, with a short video.</summary>
     private async Task CheckLengthAsync(SourceInfo source, string output, CancellationToken ct)
     {
-        if (source.DurationSeconds <= 0) return;
-        var made = (await _media.ProbeAsync(output, ct).ConfigureAwait(false)).DurationSeconds;
-        if (made < source.DurationSeconds - Math.Max(2, source.DurationSeconds * 0.01))
+        if (source.Seconds <= 0) return;
+        var made = (await _media.ProbeAsync(output, ct).ConfigureAwait(false)).Seconds;
+        if (made < source.Seconds - Math.Max(2, source.Seconds * 0.01))
         {
-            throw new LocalEncodeException("too_short", string.Create(CultureInfo.InvariantCulture, $"The encoded video is {made:0.#} s long and the file {source.DurationSeconds:0.#} s"));
+            throw new LocalEncodeException("too_short", string.Create(CultureInfo.InvariantCulture, $"The encoded video is {made:0.#} s long and the file {source.Seconds:0.#} s"));
         }
     }
 
@@ -591,13 +675,29 @@ public sealed class EncodeStep : IImportStep
     /// <summary>Room for the rungs at their peak rates, and the same again for the MP4s before packaging.</summary>
     private void CheckSpace(string directory, SourceInfo info, IReadOnlyList<PlannedRung> rungs)
     {
-        var free = _freeSpace(directory);
-        if (free is null) return;
-        var estimate = (long)(rungs.Sum(r => (double)(r.Maxrate + r.Audio)) / 8 * Math.Max(1, info.DurationSeconds) * 2.2);
-        if (free < estimate)
+        var estimate = Estimate(info, rungs);
+        if (!HasRoom(directory, estimate))
         {
             throw new LocalEncodeException("disk_space", $"Not enough free space for the renditions (about {estimate / 1048576} MB needed)");
         }
+    }
+
+    private static long Estimate(SourceInfo info, IReadOnlyList<PlannedRung> rungs) =>
+        (long)(rungs.Sum(r => (double)(r.Maxrate + r.Audio)) / 8 * Math.Max(1, info.Seconds) * 2.2);
+
+    private bool HasRoom(string directory, long bytes) => _freeSpace(directory) is not { } free || free >= bytes;
+
+    /// <summary>The source, read as the upload reads it, beside what is made of it (and deleted with it).</summary>
+    private async Task<string> CopyAsync(ScannedVideo video, string directory, IStepContext context, CancellationToken ct)
+    {
+        var path = Path.Combine(directory, "source" + Path.GetExtension(video.Path));
+        var from = _source.Open(video.Path, video.Size, video.LastModifiedMs, context);
+        await using (from.ConfigureAwait(false))
+        {
+            var to = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None, 1 << 20, FileOptions.Asynchronous);
+            await using (to.ConfigureAwait(false)) await from.CopyToAsync(to, 1 << 20, ct).ConfigureAwait(false);
+        }
+        return path;
     }
 
     private static long? FreeSpace(string path)
