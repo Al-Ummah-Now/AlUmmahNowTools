@@ -614,7 +614,8 @@ public sealed class UpdateServiceTests : IDisposable
         File.Delete(path);
         if (how == "restart") Assert.True(await service.RestartNowAsync());
         else service.OnExit();
-        Assert.Equal(new[] { "{\"verified\":1}", "{\"verified\":2}" }, saved);
+        // Restart now is checked before the app quits, and again at the hand-over
+        Assert.Equal(new[] { "{\"verified\":1}", how == "restart" ? "{\"verified\":3}" : "{\"verified\":2}" }, saved);
     }
 
     [Theory]
