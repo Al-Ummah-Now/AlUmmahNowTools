@@ -989,4 +989,30 @@ public class ErrorReportingTests
         Assert.Equal("Upload", report["extra"]!["step"]!.GetValue<string>());
         Assert.DoesNotContain("a.mp4", report.ToJsonString());
     }
+
+    [Theory]
+    [InlineData("no_video", false)]
+    [InlineData("not_video", false)]
+    [InlineData("content_changed", false)]
+    [InlineData("file_changed", false)]
+    [InlineData("file_writing", false)]
+    [InlineData("file_missing", false)]
+    [InlineData("file_link", false)]
+    [InlineData("not_hashed", true)]
+    [InlineData("upload_left", true)]
+    [InlineData("file_read", true)]
+    public async Task What_was_found_out_about_a_file_is_no_error_report_and_still_marks_its_server_item(string code, bool reported)
+    {
+        var server = new FakeServer();
+        var api = new ImportApiClient(new Uri("https://admin.api.example"), _ => Task.FromResult<string?>("t"), server);
+        using var reporter = new ErrorReporter(api.ReportErrorsAsync, "1", () => "en", TimeSpan.FromHours(1));
+        var item = QueueItem.For(new ScannedVideo("/x/a.mp4", 10, 0, "video/mp4", Array.Empty<CaptionFile>(), null, null, null, new ImportMetadata(), Array.Empty<ScanNote>()), "b1", "ch1", DateTimeOffset.UtcNow);
+        item.ServerItemId = "item-7";
+        var step = item.Steps.Single(s => s.Kind == ImportStepKind.Upload);
+        await new ServerFailureSink(api, reporter).ItemFailedAsync(item, step, new StepFailedException(code, "What happened", retryable: false), "ERR-AAAA-BBBB", default);
+        Assert.Equal(reported, server.Calls.Any(c => c.Path.EndsWith("/errors")));
+        var failed = server.Calls.Single(c => c.Path.EndsWith("/items/item-7/failed"));
+        Assert.Contains("What happened", failed.Body);
+        Assert.Equal(reported, failed.Body.Contains("ERR-AAAA-BBBB"));
+    }
 }

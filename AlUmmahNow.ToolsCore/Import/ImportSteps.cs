@@ -534,8 +534,9 @@ public sealed class ServerFailureSink : IImportFailureSink
     public async Task ItemFailedAsync(QueueItem item, StepState step, Exception error, string reference, CancellationToken ct)
     {
         var message = ImportQueue.Describe(error);
+        var answer = StepFailedException.Answers(error);
         var known = error is StepFailedException or ImportApiException or TusException or TusGoneException or IOException or UnauthorizedAccessException or HttpRequestException;
-        _reporter.Report(
+        if (!answer) _reporter.Report(
             known ? "upload" : "unhandled",
             error,
             $"Import {step.Kind} failed: {message}",
@@ -551,7 +552,7 @@ public sealed class ServerFailureSink : IImportFailureSink
             reference: reference);
         if (step.Kind == ImportStepKind.Upload && item.ServerItemId is not null && !item.AlreadyImported)
         {
-            await _api.MarkFailedAsync(item.ServerItemId, $"{message} (reference {reference})", ct).ConfigureAwait(false);
+            await _api.MarkFailedAsync(item.ServerItemId, answer ? message : $"{message} (reference {reference})", ct).ConfigureAwait(false);
         }
         await _reporter.FlushAsync(ct).ConfigureAwait(false);
     }
