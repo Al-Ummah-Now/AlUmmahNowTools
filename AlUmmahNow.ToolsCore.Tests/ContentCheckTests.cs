@@ -56,7 +56,8 @@ public sealed class Mp4IndexTests
     {
         Assert.Equal(VideoContent.NoVideo, await Read(File("soun")));
         Assert.Equal(VideoContent.NoVideo, await Read(File("soun", "text")));
-        Assert.Equal(VideoContent.NoVideo, await Read(File()));
+        Assert.Equal(VideoContent.Damaged, await Read(File()));
+        Assert.Equal(VideoContent.Damaged, await Read(File("text")));
     }
 
     [Fact]
@@ -157,6 +158,7 @@ public sealed class ContentCheckTests
     [Theory]
     [InlineData("no_video", "no_video")]
     [InlineData("probe_failed", "not_video")]
+    [InlineData("no_media", "not_video")]
     [InlineData("ffmpeg_missing", null)]
     [InlineData(null, null)]
     public async Task Other_kinds_are_asked_of_ffprobe_when_it_is_there(string? probe, string? code)
@@ -283,6 +285,56 @@ public sealed class ContentCheckTests
         (item.SentTo, item.SentSha256) = (0, null);
         Assert.Equal(StepResult.Done, await Step(server).RunAsync(item, new RecordingContext(), default));
         Assert.Contains("item-1", server.Uploaded);
+    }
+
+    [Theory]
+    [InlineData(ImportStepKind.Hash)]
+    [InlineData(ImportStepKind.Upload)]
+    public async Task Trying_again_is_offered_once_another_file_is_in_its_place(ImportStepKind at)
+    {
+        var dir = Temp.Folder();
+        var path = Path.Combine(dir, "lesson.mp4");
+        File.WriteAllBytes(path, Mp4IndexTests.File("soun"));
+        var item = QueueItem.For(FolderScanner.Scan(dir, false, null).Videos[0], "b1", "ch1", DateTimeOffset.UtcNow);
+        if (at == ImportStepKind.Upload)
+        {
+            (item.Sha256, item.FingerprintHash) = (Temp.Sha(path), new string('c', 64));
+            foreach (var done in item.Steps.Where(s => s.Kind < at)) done.Status = StepStatus.Done;
+        }
+        var server = new FakeServer();
+        var steps = Enum.GetValues<ImportStepKind>().Select(IImportStep (k) => k switch
+        {
+            ImportStepKind.Hash => new HashStep(),
+            ImportStepKind.Upload => Step(server),
+            _ => new ScriptedStep(k),
+        }).ToArray();
+        var look = new SemaphoreSlim(0);
+        var queue = new ImportQueue(Path.Combine(dir, "queue.json"), steps)
+        {
+            LookAtFile = async (p, ct) =>
+            {
+                await look.WaitAsync(ct);
+                return await SourceAccess.Default.LookAsync(p, ct);
+            },
+        };
+        queue.Add([item]);
+        queue.Start();
+        await Temp.WaitUntil(() => item.Phase == ItemPhase.Failed, 20_000);
+        Assert.Equal("no_video", item.CurrentStep!.LastErrorCode);
+        Assert.True(item.NeedsOtherFile);
+        Assert.False(item.CanRetry);
+        // Asked all the same: nothing happens
+        queue.Retry(item.Id);
+        Assert.Equal(ItemPhase.Failed, item.Phase);
+
+        File.WriteAllBytes(path, Mp4IndexTests.File("vide", "soun"));
+        look.Release(10);
+        await Temp.WaitUntil(() => item.CanRetry, 40_000);
+        queue.Retry(item.Id);
+        await Temp.WaitUntil(() => item.Phase == ItemPhase.Done, 20_000);
+        Assert.Equal(Temp.Sha(path), item.Sha256);
+        Assert.Equal(File.ReadAllBytes(path), Assert.Single(server.Uploads).Value.Data.ToArray());
+        await queue.StopAsync();
     }
 
     [Fact]

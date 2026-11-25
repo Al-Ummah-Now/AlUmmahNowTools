@@ -60,6 +60,13 @@ public sealed class SourceAccess
     /// <summary>A path whose mount does not answer is on a share that is away.</summary>
     public Task<bool> IsNetworkAsync(string path, CancellationToken ct) => AskAsync(path, () => _paths.IsNetwork(path), true, ct);
 
+    /// <summary>The file as it is now, without waiting for a share that is away (null).</summary>
+    public Task<SourceStat?> LookAsync(string path, CancellationToken ct) => AskAsync<SourceStat?>(path, () =>
+    {
+        try { return Files.Stat(path); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return null; }
+    }, null, ct);
+
     /// <summary>The paths to read the file by: its network path first when it is on a mapped drive, then as it was chosen.</summary>
     public async Task<IReadOnlyList<string>> CandidatesAsync(string path, CancellationToken ct) =>
         await AskAsync<string?>(path, () => _paths.Mapped(path), null, ct).ConfigureAwait(false) is { } network && network != path ? [network, path] : [path];
