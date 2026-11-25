@@ -45,6 +45,9 @@ public sealed class SourceAccess
     /// </summary>
     public TimeSpan Answer { get; init; } = TimeSpan.FromSeconds(3);
 
+    /// <summary>Waits for an answer, up to its time.</summary>
+    internal Func<Task, TimeSpan, CancellationToken, Task> Wait { get; init; } = (answer, left, ct) => answer.WaitAsync(left, ct);
+
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, Asking> _asking = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>The question a mount was asked last.</summary>
@@ -98,18 +101,11 @@ public sealed class SourceAccess
                     answered = mine;
                 }
             }
-            try
-            {
-                await answered.WaitAsync(left, ct).ConfigureAwait(false);
-            }
-            catch (TimeoutException) when (!answered.IsCompleted)
-            {
-                return whenSilent;
-            }
-            catch (Exception) when (mine is null && !ct.IsCancellationRequested)
-            {
-                // The question before this one failed: this one is asked now
-            }
+            // How the wait ended says nothing by itself: an answer may come just as its time is up, and is then the answer
+            await Wait(answered, left, ct).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+            ct.ThrowIfCancellationRequested();
+            if (!answered.IsCompleted) return whenSilent;
+            // The question before this one was answered, or failed: this one is asked now
             if (mine is not null) return await mine.ConfigureAwait(false);
         }
     }
