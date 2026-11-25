@@ -2334,6 +2334,9 @@
   <data name="ImportError_file_writing" xml:space="preserve">
     <value>ما زال تطبيق آخر يكتب في الملف. يلزم البحث في المجلد مجددًا بعد اكتماله.</value>
   </data>
+  <data name="Import_FileChangedNow" xml:space="preserve">
+    <value>تغيّر الملف، ويمكن إعادة محاولته الآن.</value>
+  </data>
   <data name="ImportError_no_video" xml:space="preserve">
     <value>هذا الملف فيه صوت بلا صورة. يلزم اختيار الملف الذي فيه المرئي، أو إزالة هذا الملف من القائمة.</value>
   </data>
