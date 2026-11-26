@@ -1,1 +1,1 @@
-Files with sound and no video now show a neutral No video status instead of an error, and are never opened on the server or reported as failures. Replacing the file on disk still lets you try it again.
+Files with sound and no video now show a neutral No video status instead of an error. New audio-only imports skip creating a server item, uploading, and reporting a failure, and replacing the file on disk enables Retry.
