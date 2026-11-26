@@ -252,20 +252,28 @@ internal static class VideoCheck
     /// <summary>How long the index may take to read (a slow share)</summary>
     internal static readonly TimeSpan Limit = TimeSpan.FromSeconds(10);
 
-    public static async Task RunAsync(QueueItem item, SourceAccess source, IMediaTools? media, IStepContext context, CancellationToken ct, TimeSpan? limit = null)
+    public static async Task<StepResult> RunAsync(QueueItem item, SourceAccess source, IMediaTools? media, IStepContext context, CancellationToken ct, TimeSpan? limit = null)
     {
-        if (item.VideoChecked && item.VideoProbed) return;
-        var video = item.Video;
-        var content = VideoContent.Video;
-        if (!item.VideoChecked) content = await IndexAsync(video, source, context, limit ?? Limit, ct).ConfigureAwait(false);
-        if (content == VideoContent.Unknown) content = await ProbeAsync(video.Path, source, media, context, ct).ConfigureAwait(false);
-        else if (content is VideoContent.Video or VideoContent.Undecided && await HasNoVideoAsync(video.Path, source, media, context, ct).ConfigureAwait(false)) content = VideoContent.NoVideo;
+        if (item.VideoChecked && (item.VideoProbed || media is null)) return StepResult.Done;
+        var content = await ReadIndexAsync(item, source, context, ct, limit).ConfigureAwait(false);
+        var probed = false;
+        if (content == VideoContent.Unknown)
+        {
+            content = await ProbeAsync(item.Video.Path, source, media, context, ct).ConfigureAwait(false);
+            probed = content == VideoContent.Video;
+        }
+        else if (content is VideoContent.Video or VideoContent.Undecided)
+        {
+            var (noVideo, answered) = await HasNoVideoAsync(item.Video.Path, source, media, context, ct).ConfigureAwait(false);
+            if (noVideo) return StepResult.NoVideo;
+            probed = answered && content == VideoContent.Video;
+        }
         switch (content)
         {
             case VideoContent.NoVideo:
-                throw new StepFailedException("no_video", "The file has sound and no video", retryable: false);
+                return StepResult.NoVideo;
             case VideoContent.Damaged:
-                throw new StepFailedException("not_video", "The file cannot be read as a video: it may have been cut off while it was copied", retryable: false);
+                throw Unreadable();
             case VideoContent.Unknown:
                 context.Log(LogLevel.Warning, "video_unchecked", "Whether the file has a video in it was not checked: ffprobe is not on this computer");
                 break;
@@ -273,9 +281,17 @@ internal static class VideoCheck
                 context.Log(LogLevel.Warning, "video_undecided", "Whether the file has a video in it could not be told; it goes up");
                 break;
         }
-        item.VideoChecked = item.VideoProbed = true;
+        item.VideoChecked = content == VideoContent.Video || media is null;
+        item.VideoProbed = probed;
         context.Save();
+        return StepResult.Done;
     }
+
+    internal static Task<VideoContent> ReadIndexAsync(QueueItem item, SourceAccess source, IStepContext context, CancellationToken ct, TimeSpan? limit = null) =>
+        item.VideoChecked ? Task.FromResult(VideoContent.Video) : IndexAsync(item.Video, source, context, limit ?? Limit, ct);
+
+    internal static StepFailedException Unreadable(Exception? inner = null) =>
+        new("not_video", "The file cannot be read as a video: it may have been cut off while it was copied", retryable: false, inner);
 
     private static async Task<VideoContent> IndexAsync(ScannedVideo video, SourceAccess source, IStepContext context, TimeSpan allowed, CancellationToken ct)
     {
@@ -302,23 +318,23 @@ internal static class VideoCheck
     private static readonly TimeSpan ProbeLimit = TimeSpan.FromMinutes(1);
 
     /// <summary>ffprobe found sound and no video; anything else it says, or cannot say, leaves what the index said.</summary>
-    private static async Task<bool> HasNoVideoAsync(string path, SourceAccess source, IMediaTools? media, IStepContext context, CancellationToken ct)
+    private static async Task<(bool NoVideo, bool Answered)> HasNoVideoAsync(string path, SourceAccess source, IMediaTools? media, IStepContext context, CancellationToken ct)
     {
-        if (media is null) return false;
+        if (media is null) return (false, false);
         using var time = CancellationTokenSource.CreateLinkedTokenSource(ct);
         time.CancelAfter(ProbeLimit);
         try
         {
             await source.WithPathAsync(path, context, p => media.ProbeAsync(p, time.Token), time.Token).ConfigureAwait(false);
-            return false;
+            return (false, true);
         }
         catch (LocalEncodeException probe)
         {
-            return probe.Code == "no_video";
+            return (probe.Code == "no_video", !probe.TimedOut);
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
-            return false;
+            return (false, false);
         }
     }
 

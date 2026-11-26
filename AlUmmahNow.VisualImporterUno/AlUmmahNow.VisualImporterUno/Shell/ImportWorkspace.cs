@@ -446,7 +446,7 @@ internal static class DemoImport
     /// <summary>The first four files: sound alone, no readable video, not what was checked, and the stopped upload still on the server.</summary>
     private static void SettleContent(IReadOnlyList<QueueItem> items)
     {
-        var codes = new[] { (ImportStepKind.Hash, "no_video", "The file has sound and no video"), (ImportStepKind.Hash, "not_video", "The file cannot be read as a video"), (ImportStepKind.Upload, "content_changed", "What was read to be sent is not what was checked before"), (ImportStepKind.Upload, "upload_left", "The server still has the upload that was given up") };
+        var codes = new[] { (ImportStepKind.Hash, "no_video", "No video track found; not sent to the server"), (ImportStepKind.Hash, "not_video", "The file cannot be read as a video"), (ImportStepKind.Upload, "content_changed", "What was read to be sent is not what was checked before"), (ImportStepKind.Upload, "upload_left", "The server still has the upload that was given up") };
         for (var i = 0; i < codes.Length; i++)
         {
             var (kind, code, text) = codes[i];
@@ -464,10 +464,17 @@ internal static class DemoImport
             item.Log.RemoveRange(1, item.Log.Count - 1);
             var step = item.Steps.First(s => s.Kind == kind);
             step.Attempts = 1;
-            step.LastErrorCode = code;
-            step.LastError = text;
             var at = Now.AddMinutes(-8);
             item.Log.Add(new LogLine(at, LogLevel.Info, $"{kind}: started", "started", new[] { kind.ToString() }));
+            if (code == "no_video")
+            {
+                item.NoVideo = true;
+                foreach (var pending in item.Steps.Where(s => s.Status == StepStatus.Pending)) pending.Status = StepStatus.Skipped;
+                item.Log.Add(new LogLine(at.AddMinutes(1), LogLevel.Info, text, code));
+                continue;
+            }
+            step.LastErrorCode = code;
+            step.LastError = text;
             if (kind == ImportStepKind.Upload) item.Log.Add(new LogLine(at.AddSeconds(2), LogLevel.Info, "Checked again", "sent_check", new[] { "440401920" }));
             if (code == "upload_left")
             {
@@ -476,7 +483,7 @@ internal static class DemoImport
                 continue;
             }
             step.Status = StepStatus.Failed;
-            item.Log.Add(new LogLine(at.AddMinutes(1), LogLevel.Error, $"{kind}: failed", "failed", new[] { kind.ToString(), "1", code, code is "no_video" or "not_video" or "content_changed" ? "" : "ERR-7K2M-Q9XD", text }));
+            item.Log.Add(new LogLine(at.AddMinutes(1), LogLevel.Error, $"{kind}: failed", "failed", new[] { kind.ToString(), "1", code, code is "not_video" or "content_changed" ? "" : "ERR-7K2M-Q9XD", text }));
         }
     }
 

@@ -593,11 +593,11 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
         CanResumeAll = _workspace.Queue.CanResumeAll;
         HasFinished = items.Any(i => i.Phase == ItemPhase.Done);
         QueueSummary = Summary(items);
-        if (items.All(i => i.Phase == ItemPhase.Done)) EncodeChanged = "";
+        if (items.All(i => i.Phase is ItemPhase.Done or ItemPhase.NoVideo)) EncodeChanged = "";
         OnPropertyChanged(nameof(ShowEmptyReview));
     }
 
-    private static string Summary(IReadOnlyList<QueueItem> items)
+    internal static string Summary(IReadOnlyList<QueueItem> items)
     {
         if (items.Count == 0) return "";
         var parts = new List<string>();
@@ -614,6 +614,7 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
         Add(ItemPhase.RetryWaiting, "Import_SumRetrying");
         Add(ItemPhase.Paused, "Import_SumPaused");
         Add(ItemPhase.Failed, "Import_SumFailed");
+        Add(ItemPhase.NoVideo, "Import_SumNoVideo");
         // A separator stays with the count before it, so no line starts with «·»
         return Loc.KeepLastWords(string.Join(Loc.IsArabic ? "، " : "\u00A0· ", parts));
     }
@@ -668,7 +669,7 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
         {
             // A file name, hash, id or reference goes on its own line: Uno only reverses the Arabic runs of a mixed line
             "added" or "sha" or "upload_opened" or "upload_reopened" or "uploaded" or "already_imported" => Loc.WithDetail(Loc.Get("ImportLog_" + line.Code), Arg(0)),
-            "paused" or "resumed" or "finished" or "session_ended" or "video_unchecked" or "video_undecided" => Loc.Get("ImportLog_" + line.Code),
+            "paused" or "resumed" or "finished" or "session_ended" or "video_unchecked" or "video_undecided" or "no_video" or "no_video_found" => Loc.Get("ImportLog_" + line.Code),
             "report_failed" => Loc.WithDetail(Loc.Get("ImportLog_report_failed"), ErrorText(Arg(0), Arg(1))),
             "retry" or "started" or "stopped" or "done" or "skipped" => Loc.Format("ImportLog_" + line.Code, StepName(Arg(0))),
             "attempt" => Loc.Format("ImportLog_attempt", StepName(Arg(0)), Num(1)),
@@ -985,6 +986,7 @@ public sealed partial class QueueRow : ObservableObject
     [ObservableProperty] private bool _showProgress;
     [ObservableProperty] private bool _isDone;
     [ObservableProperty] private bool _isFailed;
+    [ObservableProperty] private bool _isNoVideo;
     [ObservableProperty] private bool _isWaiting;
     [ObservableProperty] private bool _isRetrying;
     [ObservableProperty] private bool _isServerWorking;
@@ -1024,6 +1026,7 @@ public sealed partial class QueueRow : ObservableObject
         if (phase == ItemPhase.Running && kind == ImportStepKind.Encode && item.ServerEncodes) (phase, kind) = (ItemPhase.Waiting, ImportStepKind.Upload);
         IsDone = phase == ItemPhase.Done;
         IsFailed = phase == ItemPhase.Failed;
+        IsNoVideo = phase == ItemPhase.NoVideo;
         IsWaiting = phase == ItemPhase.Waiting;
         IsRetrying = phase == ItemPhase.RetryWaiting;
         IsServerWorking = phase == ItemPhase.ServerWorking;
@@ -1038,6 +1041,7 @@ public sealed partial class QueueRow : ObservableObject
         RemoveFirst = item.NeedsOtherFile;
         Status = phase switch
         {
+            ItemPhase.NoVideo => Loc.Get("ImportPhase_NoVideo"),
             ItemPhase.Done => item.AlreadyImported ? Loc.Get("ImportPhase_AlreadyImported") : Loc.Get("ImportPhase_Done"),
             ItemPhase.Running when item.Wait == StepWait.Share => Loc.Get("ImportPhase_WaitingShare"),
             ItemPhase.Running when item.Wait == StepWait.Cloud => Loc.Get("ImportPhase_WaitingCloud"),
@@ -1058,8 +1062,20 @@ public sealed partial class QueueRow : ObservableObject
         StatusTip = phase == ItemPhase.RetryWaiting ? Loc.UtcText(step!.NextAttemptAt!.Value) : null;
         Detail = phase is ItemPhase.Failed or ItemPhase.RetryWaiting ? Loc.KeepLastWords(BulkImportViewModel.ErrorText(step!.LastErrorCode, step.LastError, step.ReadError)) : "";
         // Another file is in its place: what is said of the one before no longer holds
-        if (item.NeedsOtherFile && item.CanRetry) Detail = Loc.KeepLastWords(Loc.Get("Import_FileChangedNow"));
+        if (!IsNoVideo && item.NeedsOtherFile && item.CanRetry) Detail = Loc.KeepLastWords(Loc.Get("Import_FileChangedNow"));
         HasDetail = Detail.Length > 0;
+        if (IsNoVideo)
+        {
+            var noteKey = item.CanRetry ? "Import_FileChangedNow"
+                : item.ServerItemId is null ? "ImportRow_NoVideo" : "ImportLog_no_video_found";
+            Note = Loc.KeepLastWords(Loc.Get(noteKey));
+            ShowNote = true;
+            ShowProblemNote = false;
+            TranscriptNote = "";
+            ShowTranscriptNote = false;
+            return;
+        }
+
         // The server's verdict once it has one; before that, a file the server encodes says so
         var verdict = BulkImportViewModel.VerdictText(item);
         var encoding = verdict.Length > 0 ? Loc.KeepLastWords(verdict) : item.ServerEncodes && phase != ItemPhase.Done ? Loc.Get("ImportRow_ServerEncodes") : "";

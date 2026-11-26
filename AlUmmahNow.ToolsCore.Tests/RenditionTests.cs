@@ -121,8 +121,14 @@ internal sealed class FakeMedia : IMediaTools
     /// <summary>What is made, as ffprobe sees it</summary>
     public SourceInfo? Output;
 
-    public Task<SourceInfo> ProbeAsync(string path, CancellationToken ct) => Fail is LocalEncodeException { Code: "probe_failed" or "no_video" or "no_media" } ? throw Fail
-        : Task.FromResult(Output is { } made && Encodes > 0 ? made : Encoded is { } seconds && Encodes > 0 ? Info with { DurationSeconds = seconds } : Info);
+    public readonly ConcurrentQueue<string> Probed = new();
+
+    public Task<SourceInfo> ProbeAsync(string path, CancellationToken ct)
+    {
+        Probed.Enqueue(path);
+        if (Fail is LocalEncodeException { Code: "probe_failed" or "no_video" or "no_media" }) throw Fail;
+        return Task.FromResult(Output is { } made && Encodes > 0 ? made : Encoded is { } seconds && Encodes > 0 ? Info with { DurationSeconds = seconds } : Info);
+    }
 
     public Task<string?> PickEncoderAsync(CancellationToken ct) => Task.FromResult(Encoder);
 
@@ -240,8 +246,10 @@ public class EncodeStepTests
     {
         var (item, server, api, work) = Setup();
         var context = new RecordingContext();
-        Assert.Equal(StepResult.Done, await Step(api, work, new FakeMedia()).RunAsync(item, context, default));
+        var media = new FakeMedia();
+        Assert.Equal(StepResult.Done, await Step(api, work, media).RunAsync(item, context, default));
 
+        Assert.Equal(item.Video.Path, Assert.Single(media.Probed, path => path == item.Video.Path));
         Assert.Equal("vid-1", item.VideoId);
         var set = item.Renditions!;
         Assert.Equal(new[] { "360p", "480p", "720p" }, set.Rungs);

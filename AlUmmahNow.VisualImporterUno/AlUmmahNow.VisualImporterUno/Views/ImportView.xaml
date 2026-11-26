@@ -309,6 +309,7 @@
                                         <Grid Width="20" VerticalAlignment="Top" Margin="0,2,0,0">
                                             <FontIcon Glyph="&#xE73E;" FontSize="16" Foreground="{ThemeResource FanousSuccessTextBrush}" Visibility="{x:Bind IsDone, Mode=OneWay}" />
                                             <FontIcon Glyph="&#xE7BA;" FontSize="16" Foreground="{ThemeResource FanousErrorTextBrush}" Visibility="{x:Bind IsFailed, Mode=OneWay}" />
+                                            <FontIcon Glyph="&#xE946;" FontSize="16" Foreground="{ThemeResource FanousTextMutedBrush}" Visibility="{x:Bind IsNoVideo, Mode=OneWay}" />
                                             <FontIcon Glyph="&#xE823;" FontSize="16" Foreground="{ThemeResource FanousTextSecondaryBrush}" Visibility="{x:Bind IsWaiting, Mode=OneWay}" />
                                             <FontIcon Glyph="&#xE753;" FontSize="16" Foreground="{ThemeResource FanousTextSecondaryBrush}" Visibility="{x:Bind IsServerWorking, Mode=OneWay}" />
                                             <FontIcon Glyph="&#xE72C;" FontSize="16" Foreground="{ThemeResource FanousTextSecondaryBrush}" Visibility="{x:Bind IsRetrying, Mode=OneWay}" />
