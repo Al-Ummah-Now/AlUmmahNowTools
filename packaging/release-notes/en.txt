@@ -1,3 +1,1 @@
-Rejecting, deleting, or signing out while imports run asks first and says what it does to how many videos. A deleted filter preset can be put back with Undo.
-Videos filmed in HDR (for example on newer phones) are converted to normal colors when encoded on this computer; before, they could look too bright or pale.
-Unfinished downloads (.temp.webm, .part and the like) are left out of a scan and listed; each can be added anyway. A file the video tools cannot read as a video is no longer uploaded.
+Files with sound and no video now show a neutral No video status instead of an error, and are never opened on the server or reported as failures. Replacing the file on disk still lets you try it again.
