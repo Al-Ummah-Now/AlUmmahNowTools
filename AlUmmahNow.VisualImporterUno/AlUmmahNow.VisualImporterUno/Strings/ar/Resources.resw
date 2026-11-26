@@ -2400,6 +2400,9 @@
   <data name="ImportStep_Attach" xml:space="preserve">
     <value>الترجمات والملحقات</value>
   </data>
+  <data name="ImportPhase_NoVideo" xml:space="preserve">
+    <value>لا يوجد مرئي</value>
+  </data>
   <data name="ImportPhase_Done" xml:space="preserve">
     <value>رُفع</value>
   </data>
@@ -2619,6 +2622,12 @@
   <data name="ImportLog_resumed" xml:space="preserve">
     <value>استُؤنف</value>
   </data>
+  <data name="ImportLog_no_video_found" xml:space="preserve">
+    <value>لم يُعثر على مسار مرئي</value>
+  </data>
+  <data name="ImportLog_no_video" xml:space="preserve">
+    <value>لم يُعثر على مسار مرئي؛ لم يُرسل الملف إلى الخادم</value>
+  </data>
   <data name="ImportLog_finished" xml:space="preserve">
     <value>اكتمل</value>
   </data>
@@ -2769,6 +2778,9 @@
   <data name="Import_Added_Many" xml:space="preserve">
     <value>أُضيف إلى قائمة الرفع {0} مرئيًا لقناة:</value>
   </data>
+  <data name="Import_SumNoVideo" xml:space="preserve">
+    <value>بلا مرئي: {0}</value>
+  </data>
   <data name="Import_SumDone" xml:space="preserve">
     <value>مكتمل: {0}</value>
   </data>
@@ -2852,6 +2864,9 @@
   </data>
   <data name="Import_ParallelEncode.Header" xml:space="preserve">
     <value>الترميز</value>
+  </data>
+  <data name="ImportRow_NoVideo" xml:space="preserve">
+    <value>لا يحتوي هذا الملف على مسار مرئي، ولم يُرسل إلى الخادم.</value>
   </data>
   <data name="ImportRow_ServerEncodes" xml:space="preserve">
     <value>يرمّزه الخادم</value>

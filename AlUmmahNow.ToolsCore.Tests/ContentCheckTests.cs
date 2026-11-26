@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.Text;
+using System.Text.Json;
 using AlUmmahNow.ToolsCore.Import;
 using AlUmmahNow.ToolsCore.Import.Sources;
 using Xunit;
@@ -300,11 +301,14 @@ public sealed class ContentCheckTests
         var item = Item(track is null ? Mp4IndexTests.File("vide")[..2000] : Mp4IndexTests.File(track));
         var server = new FakeServer();
         item.Sha256 = null;
-        Assert.Equal(code, await Refused(() => new HashStep().RunAsync(item, new RecordingContext(), default)));
+        var hash = new HashStep();
+        if (code == "no_video") Assert.Equal(StepResult.NoVideo, await hash.RunAsync(item, new RecordingContext(), default));
+        else Assert.Equal(code, await Refused(() => hash.RunAsync(item, new RecordingContext(), default)));
         Assert.Null(item.Sha256);
         // Hashed by a version that did not check
         item.Sha256 = Temp.Sha(item.Video.Path);
-        Assert.Equal(code, await Refused(() => Step(server).RunAsync(item, new RecordingContext(), default)));
+        if (code == "no_video") Assert.Equal(StepResult.NoVideo, await Step(server).RunAsync(item, new RecordingContext(), default));
+        else Assert.Equal(code, await Refused(() => Step(server).RunAsync(item, new RecordingContext(), default)));
         Assert.Empty(server.Calls);
     }
 
@@ -319,27 +323,31 @@ public sealed class ContentCheckTests
         var item = Item([0x1A, 0x45, 0xDF, 0xA3, .. new byte[500]], "lesson.mkv");
         var media = new Probe(probe);
         var context = new RecordingContext();
-        if (code is not null) Assert.Equal(code, await Refused(() => new HashStep(media: media).RunAsync(item, context, default)));
-        else Assert.Equal(StepResult.Done, await new HashStep(media: media).RunAsync(item, context, default));
+        var hash = new HashStep(media: media);
+        if (code == "not_video") Assert.Equal(code, await Refused(() => hash.RunAsync(item, context, default)));
+        else Assert.Equal(code == "no_video" ? StepResult.NoVideo : StepResult.Done, await hash.RunAsync(item, context, default));
         Assert.Equal(probe == "ffmpeg_missing", context.Lines.Any(l => l.Code == "video_unchecked"));
         Assert.Equal(probe == "probe_failed", context.Lines.Any(l => l.Code == "video_undecided"));
-        Assert.Equal(code is null, item.VideoChecked);
+        Assert.Equal(probe is null, item.VideoChecked);
+        Assert.Equal(probe is null, item.VideoProbed);
         Assert.Equal(1, media.Asked);
-        // Once, not at every step
         if (code is null) await Step(new FakeServer(), media).RunAsync(item, context, default);
-        Assert.Equal(1, media.Asked);
+        Assert.Equal(code is null && probe is not null ? 2 : 1, media.Asked);
     }
 
-    private sealed class Probe(string? code) : IMediaTools
+    private sealed class Probe(string? code, Func<int, LocalEncodeException?>? failure = null) : IMediaTools
     {
         public int Asked;
+        private readonly FakeMedia _media = new();
         public Task<SourceInfo> ProbeAsync(string path, CancellationToken ct)
         {
             Asked++;
+            if (failure?.Invoke(Asked) is { } ex) throw ex;
             return code is null ? Task.FromResult(new SourceInfo(1280, 720, 0, 30, true, 12)) : throw new LocalEncodeException(code, code);
         }
-        public Task<string?> PickEncoderAsync(CancellationToken ct) => throw new NotSupportedException();
-        public Task EncodeAsync(string source, SourceInfo info, IReadOnlyList<PlannedRung> rungs, IReadOnlyList<string> outputs, string encoder, EncodeLadderSettings settings, IProgress<double> progress, CancellationToken ct) => throw new NotSupportedException();
+        public Task<string?> PickEncoderAsync(CancellationToken ct) => _media.PickEncoderAsync(ct);
+        public Task EncodeAsync(string source, SourceInfo info, IReadOnlyList<PlannedRung> rungs, IReadOnlyList<string> outputs, string encoder, EncodeLadderSettings settings, IProgress<double> progress, CancellationToken ct) =>
+            _media.EncodeAsync(source, info, rungs, outputs, encoder, settings, progress, ct);
         public Task ExtractAudioAsync(string source, string wavPath, CancellationToken ct) => throw new NotSupportedException();
     }
 
@@ -442,28 +450,39 @@ public sealed class ContentCheckTests
     }
 
     [Theory]
-    [InlineData(ImportStepKind.Hash)]
-    [InlineData(ImportStepKind.Upload)]
-    public async Task Trying_again_is_offered_once_another_file_is_in_its_place(ImportStepKind at)
+    [InlineData(ImportStepKind.Hash, false)]
+    [InlineData(ImportStepKind.Hash, true)]
+    [InlineData(ImportStepKind.Encode, true)]
+    [InlineData(ImportStepKind.Upload, true)]
+    public async Task A_no_video_result_stays_local_until_the_file_is_replaced(ImportStepKind at, bool ffprobe)
     {
         var dir = Temp.Folder();
         var path = Path.Combine(dir, "lesson.mp4");
-        File.WriteAllBytes(path, Mp4IndexTests.File("soun"));
-        var item = QueueItem.For(FolderScanner.Scan(dir, false, null).Videos[0], "b1", "ch1", DateTimeOffset.UtcNow);
-        if (at == ImportStepKind.Upload)
+        File.WriteAllBytes(path, Mp4IndexTests.File(ffprobe ? "vide" : "soun"));
+        var item = QueueItem.For(FolderScanner.Scan(dir, false, null).Videos[0], "b1", "ch1", DateTimeOffset.UtcNow,
+            serverEncodes: at == ImportStepKind.Upload);
+        if (at != ImportStepKind.Hash)
         {
             (item.Sha256, item.FingerprintHash) = (Temp.Sha(path), new string('c', 64));
             foreach (var done in item.Steps.Where(s => s.Kind < at)) done.Status = StepStatus.Done;
+            item.VideoChecked = true;
         }
-        var server = new FakeServer();
+        if (at == ImportStepKind.Encode) item.VideoProbed = true; // The previous app saved this even after a timeout.
+        var server = new RenditionServer { TakesRenditions = false };
+        var api = new ImportApiClient(new Uri("https://admin.api.example"), _ => Task.FromResult<string?>("tok"), server);
+        using var reporter = new ErrorReporter(api.ReportErrorsAsync, "1", () => "en", TimeSpan.FromHours(1));
+        var sink = new RecordingSink();
+        var media = ffprobe ? new Probe(null, n => n == 1 ? new LocalEncodeException("no_video", "Sound alone") : null) : null;
         var steps = Enum.GetValues<ImportStepKind>().Select(IImportStep (k) => k switch
         {
-            ImportStepKind.Hash => new HashStep(),
-            ImportStepKind.Upload => Step(server),
+            ImportStepKind.Hash => new HashStep(media: media),
+            ImportStepKind.Encode when at == ImportStepKind.Encode => new EncodeStep(api, new Uri("https://videos.api.example"),
+                media!, new FakePackager(), Temp.Folder(), "Tools test", (ex, _) => reporter.Report("encode", ex, ex.Message)),
+            ImportStepKind.Upload => Step(server.Inner, media),
             _ => new ScriptedStep(k),
         }).ToArray();
-        var look = new SemaphoreSlim(0);
-        var queue = new ImportQueue(Path.Combine(dir, "queue.json"), steps)
+        using var look = new SemaphoreSlim(0);
+        using var queue = new ImportQueue(Path.Combine(dir, "queue.json"), steps, sink)
         {
             LookAtFile = async (p, ct) =>
             {
@@ -473,21 +492,42 @@ public sealed class ContentCheckTests
         };
         queue.Add([item]);
         queue.Start();
-        await Temp.WaitUntil(() => item.Phase == ItemPhase.Failed, 20_000);
-        Assert.Equal("no_video", item.CurrentStep!.LastErrorCode);
+        await Temp.WaitUntil(() => item.Phase == ItemPhase.NoVideo, 20_000);
+        Assert.All(item.Steps.Where(s => s.Kind >= at), s =>
+        {
+            Assert.Equal(StepStatus.Skipped, s.Status);
+            Assert.Null(s.LastErrorCode);
+        });
+        Assert.Equal(LogLevel.Info, Assert.Single(queue.LogLines(item.Id), line => line.Code == "no_video").Level);
+        Assert.DoesNotContain(queue.LogLines(item.Id), line => line.Level == LogLevel.Error);
+        Assert.Empty(sink.Failed);
+        Assert.Empty(server.Inner.Calls);
+        Assert.Empty(server.Order);
+        Assert.Equal(0, reporter.Waiting);
         Assert.True(item.NeedsOtherFile);
         Assert.False(item.CanRetry);
-        // Asked all the same: nothing happens
+        Assert.False(item.CanPause);
+        Assert.False(item.CanResume);
+        Assert.False(item.Pausable);
+        Assert.False(item.CanLeaveToServer);
+        Assert.False(item.EncodeOpen);
+        Assert.Equal(0, QuitGuard.ActiveFiles(queue.Items));
+        Assert.Equal(0, queue.ClearDone());
+        using (var reopened = new ImportQueue(Path.Combine(dir, "queue.json"), []))
+            Assert.True(Assert.Single(reopened.Items).NoVideo);
         queue.Retry(item.Id);
-        Assert.Equal(ItemPhase.Failed, item.Phase);
+        Assert.Equal(ItemPhase.NoVideo, item.Phase);
 
         File.WriteAllBytes(path, Mp4IndexTests.File("vide", "soun"));
         look.Release(10);
         await Temp.WaitUntil(() => item.CanRetry, 40_000);
+        Assert.Equal(0, queue.SetServerEncodes(at != ImportStepKind.Upload, item.Id));
         queue.Retry(item.Id);
         await Temp.WaitUntil(() => item.Phase == ItemPhase.Done, 20_000);
+        Assert.False(item.NoVideo);
+        Assert.Equal(StepStatus.Done, item.Steps.Last().Status);
         Assert.Equal(Temp.Sha(path), item.Sha256);
-        Assert.Equal(File.ReadAllBytes(path), Assert.Single(server.Uploads).Value.Data.ToArray());
+        Assert.Equal(File.ReadAllBytes(path), Assert.Single(server.Inner.Uploads).Value.Data.ToArray());
         await queue.StopAsync();
     }
 
@@ -497,12 +537,85 @@ public sealed class ContentCheckTests
         var item = Item(Mp4IndexTests.File("vide", "soun"));
         item.Sha256 = null;
         var media = new Probe("no_video");
-        Assert.Equal("no_video", await Refused(() => new HashStep(media: media).RunAsync(item, new RecordingContext(), default)));
+        Assert.Equal(StepResult.NoVideo, await new HashStep(media: media).RunAsync(item, new RecordingContext(), default));
         // Checked by a version that did not ask ffprobe
         var (checkedBefore, server) = (Item(Mp4IndexTests.File("vide", "soun")), new FakeServer());
         checkedBefore.VideoChecked = true;
-        Assert.Equal("no_video", await Refused(() => Step(server, media).RunAsync(checkedBefore, new RecordingContext(), default)));
+        Assert.Equal(StepResult.NoVideo, await Step(server, media).RunAsync(checkedBefore, new RecordingContext(), default));
         Assert.Empty(server.Calls);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task An_unavailable_or_timed_out_probe_can_find_no_video_at_upload(bool timedOut)
+    {
+        var item = Item(Mp4IndexTests.File("vide", "soun"));
+        var media = new Probe(null, n => timedOut && n == 1
+            ? new LocalEncodeException("probe_failed", "Timed out") { TimedOut = true }
+            : new LocalEncodeException("no_video", "Sound alone"));
+        Assert.Equal(StepResult.Done, await new HashStep(media: timedOut ? media : null).RunAsync(item, new RecordingContext(), default));
+        Assert.False(item.VideoProbed);
+        var server = new FakeServer();
+        Assert.Equal(StepResult.NoVideo, await Step(server, media).RunAsync(item, new RecordingContext(), default));
+        Assert.Equal(timedOut ? 2 : 1, media.Asked);
+        Assert.Empty(server.Calls);
+    }
+
+    [Theory]
+    [InlineData(null, "no_video")]
+    [InlineData("item-9", "no_video_found")]
+    public void A_legacy_no_video_failure_loads_as_a_terminal_skip(string? serverItemId, string logCode)
+    {
+        var item = Item(Mp4IndexTests.File("soun"));
+        item.Paused = true;
+        item.ServerItemId = serverItemId;
+        item.Steps[0].Status = StepStatus.Failed;
+        item.Steps[0].LastErrorCode = "no_video";
+        item.Log.Add(new LogLine(item.CreatedAt, LogLevel.Error, "Hash failed", "failed", ["Hash", "1", "no_video"]));
+        var path = Path.Combine(Temp.Folder(), "queue.json");
+        WriteLegacyQueue(path, item);
+
+        using (var queue = new ImportQueue(path, []))
+        {
+            var loaded = Assert.Single(queue.Items);
+            Assert.True(loaded.NoVideo);
+            Assert.False(loaded.Paused);
+            Assert.Equal(ItemPhase.NoVideo, loaded.Phase);
+            Assert.All(loaded.Steps, step => Assert.Equal(StepStatus.Skipped, step.Status));
+            Assert.Equal(LogLevel.Info, Assert.Single(loaded.Log, line => line.Code == logCode).Level);
+            Assert.DoesNotContain(loaded.Log, line => line.Level == LogLevel.Error);
+            queue.PauseAll();
+        }
+        using var reopened = new ImportQueue(path, []);
+        Assert.Equal(ItemPhase.NoVideo, Assert.Single(reopened.Items).Phase);
+    }
+
+    [Fact]
+    public async Task An_upload_from_an_older_queue_rechecks_a_cached_probe_before_opening()
+    {
+        var item = Item(Mp4IndexTests.File("vide", "soun"));
+        item.VideoChecked = item.VideoProbed = true;
+        item.ServerEncodes = true;
+        foreach (var step in item.Steps.Where(step => step.Kind < ImportStepKind.Upload)) step.Status = StepStatus.Done;
+        var path = Path.Combine(Temp.Folder(), "queue.json");
+        WriteLegacyQueue(path, item);
+        var server = new FakeServer();
+        using var queue = new ImportQueue(path, [Step(server, new Probe("no_video"))]);
+        await Temp.WaitUntil(() =>
+        {
+            queue.Pump();
+            return queue.Items[0].Phase == ItemPhase.NoVideo;
+        });
+        Assert.Empty(server.Calls);
+    }
+
+    private static void WriteLegacyQueue(string path, QueueItem item)
+    {
+        var queue = JsonSerializer.SerializeToNode(new { Settings = new QueueSettings(), Items = new[] { item } },
+            new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+        queue["items"]![0]!.AsObject().Remove("noVideo");
+        File.WriteAllText(path, queue.ToJsonString());
     }
 
     [Theory]
@@ -529,12 +642,14 @@ public sealed class ContentCheckTests
     {
         var item = Item(Mp4IndexTests.File("vide", "soun"));
         item.VideoChecked = item.VideoProbed = true;
-        var server = new RenditionServer();
+        var server = new FakeServer();
         var api = new ImportApiClient(new Uri("https://admin.api.example"), _ => Task.FromResult<string?>("tok"), server);
         var reported = new List<Exception>();
         var media = new FakeMedia { Fail = new LocalEncodeException(probe, "The file has sound and no video track") };
         var step = new EncodeStep(api, new Uri("https://videos.api.example"), media, new FakePackager(), Temp.Folder(), "Tools test", (ex, _) => reported.Add(ex), _ => long.MaxValue);
-        Assert.Equal(code, await Refused(() => step.RunAsync(item, new RecordingContext(), default)));
+        if (code == "no_video") Assert.Equal(StepResult.NoVideo, await step.RunAsync(item, new RecordingContext(), default));
+        else Assert.Equal(code, await Refused(() => step.RunAsync(item, new RecordingContext(), default)));
+        Assert.Empty(server.Calls);
         Assert.Empty(reported);
         Assert.Equal(0, media.Encodes);
     }
@@ -558,7 +673,7 @@ public sealed class ContentCheckTests
     }
 
     [Fact]
-    public async Task A_file_refused_after_its_video_was_opened_marks_it_failed_on_the_server()
+    public async Task A_no_video_answer_neither_marks_an_open_item_failed_nor_flushes_reports()
     {
         var server = new FakeServer();
         var api = new ImportApiClient(new Uri("https://admin.api.example"), _ => Task.FromResult<string?>("t"), server);
@@ -566,8 +681,10 @@ public sealed class ContentCheckTests
         var item = Item(Mp4IndexTests.File("vide", "soun"));
         item.ServerItemId = "item-9";
         var refused = new StepFailedException("no_video", "The file has sound and no video", retryable: false);
+        reporter.Report("test", new IOException("An unrelated report"), "An unrelated report");
         await new ServerFailureSink(api, reporter).ItemFailedAsync(item, item.Steps.Single(s => s.Kind == ImportStepKind.Encode), refused, "ERR-AAAA-BBBB", default);
-        Assert.Contains("sound and no video", server.Calls.Single(c => c.Path.EndsWith("/items/item-9/failed")).Body);
+        Assert.Empty(server.Calls);
+        Assert.Equal(1, reporter.Waiting);
     }
 
     [Fact]
@@ -576,7 +693,7 @@ public sealed class ContentCheckTests
         var item = Item(Mp4IndexTests.File("soun"));
         var context = new RecordingContext();
         // ffprobe answers for it; without one it goes up
-        Assert.Equal("no_video", await Refused(() => VideoCheck.RunAsync(Item(Mp4IndexTests.File("soun")), SourceAccess.Default, new Probe("no_video"), context, default, TimeSpan.Zero)));
+        Assert.Equal(StepResult.NoVideo, await VideoCheck.RunAsync(Item(Mp4IndexTests.File("soun")), SourceAccess.Default, new Probe("no_video"), context, default, TimeSpan.Zero));
         await VideoCheck.RunAsync(item, SourceAccess.Default, new Probe("ffmpeg_missing"), context, default, TimeSpan.Zero);
         Assert.Contains(context.Lines, l => l.Code == "video_undecided");
         // Stopped, it is no answer
@@ -630,7 +747,7 @@ public sealed class ContentCheckTests
         var left = Path.Combine(work, item.Id, "360p");
         Directory.CreateDirectory(left);
         var step = new EncodeStep(api, new Uri("https://videos.api.example"), new FakeMedia(), new FakePackager(), work, "Tools test", (_, _) => { }, _ => long.MaxValue);
-        Assert.Equal("no_video", await Refused(() => step.RunAsync(item, new RecordingContext(), default)));
+        Assert.Equal(StepResult.NoVideo, await step.RunAsync(item, new RecordingContext(), default));
         Assert.Equal(0, server.Inner.OpenCount);
         Assert.False(Directory.Exists(left));
     }

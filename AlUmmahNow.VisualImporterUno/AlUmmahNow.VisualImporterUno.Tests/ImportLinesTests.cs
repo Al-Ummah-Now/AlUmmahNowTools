@@ -1,8 +1,12 @@
 using System.Globalization;
+using System.IO;
+using System.Runtime.CompilerServices;
 using AlUmmahNow.ToolsCore.Import;
+using AlUmmahNow.VisualImporterUno.Shell;
 using AlUmmahNow.VisualImporterUno.ViewModels;
 using FluentAssertions;
 using Microsoft.UI.Xaml;
+using Windows.ApplicationModel.Resources;
 using Xunit;
 using LogLevel = AlUmmahNow.ToolsCore.Import.LogLevel;
 
@@ -97,6 +101,51 @@ public sealed class ImportLinesTests
         ShownLine.Of("").Should().BeEmpty();
         ShownLine.Of("a\nb").Select(l => l.Text).Should().Equal("a", "b");
     }
+
+    [Theory]
+    [InlineData("en", "No video", "1 no video", "This file has no video track and wasn’t sent to the server.", "No video track found; not sent to the server")]
+    [InlineData("ar", "لا يوجد مرئي", "بلا مرئي: ١", "لا يحتوي هذا الملف على مسار مرئي، ولم يُرسل إلى الخادم.", "لم يُعثر على مسار مرئي؛ لم يُرسل الملف إلى الخادم")]
+    public void A_no_video_row_and_its_summary_use_neutral_localized_text(
+        string language, string status, string summary, string note, string log) => WithCulture(language, () =>
+    {
+        _ = ImportResources.Value;
+        var original = Uno.WinRTFeatureConfiguration.ResourceLoader.UsePrimaryLanguageOverride;
+        try
+        {
+            Uno.WinRTFeatureConfiguration.ResourceLoader.UsePrimaryLanguageOverride = false;
+            var item = new QueueItem { NoVideo = true, ServerEncodes = true };
+            var row = new QueueRow(item.Id, "sound.mp4", "Sound");
+            row.Update(item, null);
+            row.IsNoVideo.Should().BeTrue();
+            row.IsFailed.Should().BeFalse();
+            row.HasDetail.Should().BeFalse();
+            row.Status.Should().Be(status);
+            row.Note.Replace(' ', ' ').Should().Be(note);
+            row.ShowNote.Should().BeTrue();
+            row.ShowProblemNote.Should().BeFalse();
+            row.RemoveFirst.Should().BeTrue();
+            BulkImportViewModel.Summary([item]).Replace(' ', ' ').Should().Be(summary);
+            BulkImportViewModel.LogText(new LogLine(DateTimeOffset.UtcNow, LogLevel.Info, "", "no_video")).Should().Be(log);
+        }
+        finally
+        {
+            Uno.WinRTFeatureConfiguration.ResourceLoader.UsePrimaryLanguageOverride = original;
+        }
+    });
+
+    [ModuleInitializer]
+    internal static void ConfigureHeadlessAppData()
+    {
+        // ResourceLoader reads language settings before a desktop host exists in the test process.
+        Uno.WinRTFeatureConfiguration.ApplicationData.ApplicationDataPathOverride =
+            Path.Combine(Path.GetTempPath(), "AlUmmahNow.VisualImporterUno.Tests", Guid.NewGuid().ToString("N"));
+    }
+
+    private static readonly Lazy<bool> ImportResources = new(() =>
+    {
+        ResourceLoader.AddLookupAssembly(typeof(Loc).Assembly);
+        return true;
+    });
 
     [Fact]
     public void A_pasted_folder_loses_its_quotes() => BulkImportViewModel.CleanFolder(" \"\\\\nas\\media\\Lessons\" ").Should().Be(@"\\nas\media\Lessons");

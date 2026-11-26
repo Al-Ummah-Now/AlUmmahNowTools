@@ -44,6 +44,7 @@ public sealed class LocalEncodeException : Exception
 
     /// <summary>What ffmpeg or ffprobe ended with</summary>
     public int? ExitCode { get; init; }
+    internal bool TimedOut { get; init; }
 }
 
 /// <summary>A source as ffprobe sees it.</summary>
@@ -260,7 +261,7 @@ public sealed class FfmpegMediaTools : IMediaTools
 
     private async Task<LocalEncodeException> StalledAsync(string source, string tool, TimeSpan limit, string code, CancellationToken ct) =>
         new(await _source.IsNetworkAsync(source, ct).ConfigureAwait(false) ? "source_read" : code,
-            string.Create(CultureInfo.InvariantCulture, $"{tool} got no further for {limit.TotalMinutes:0.##} minutes"));
+            string.Create(CultureInfo.InvariantCulture, $"{tool} got no further for {limit.TotalMinutes:0.##} minutes")) { TimedOut = true };
 
     /// <summary>ffprobe's JSON: the first video stream's size, rotation and frame rate, whether there is sound, the duration.</summary>
     public static SourceInfo ParseProbe(string json)
@@ -657,8 +658,8 @@ internal sealed class SpaceReservations
 
 /// <summary>
 /// Encodes the server's HLS ladder on this computer (wiki TOOLS-ADMIN TA-12), unless the file was left to the
-/// server ("Encode on this computer" off) or the server does not take renditions for the file (its delivery target is not R2). Opens the file on
-/// admin-api first, so a file the channel already has is never encoded. A local failure is not the file's failure:
+/// server ("Encode on this computer" off) or the server does not take renditions for the file (its delivery target is not R2).
+/// Probes the source before opening it on admin-api, then encodes only if the channel still needs it. A local failure is not the file's failure:
 /// the step logs why, reports it, and the server encodes the file as it would any upload.
 /// </summary>
 public sealed class EncodeStep : IImportStep
@@ -721,31 +722,38 @@ public sealed class EncodeStep : IImportStep
         if (item.Renditions is { } done && (done.Sent || done.Files.All(f => File.Exists(Path.Combine(done.Directory, f.Path))))) return StepResult.Done;
         if (item.Sha256 is null || item.FingerprintHash is null) throw new StepFailedException("not_hashed", "The file has not been checked yet", retryable: false);
         await _source.CheckUnchangedAsync(item.Video, context, ct).ConfigureAwait(false);
-        // Hashed by a version that did not check: before anything is opened on the server
-        await VideoCheck.RunAsync(item, _source, _media, context, ct).ConfigureAwait(false);
-        if (item.ServerItemId is null || item.TusSessionId is null)
-        {
-            if (!await UploadStep.OpenAsync(_api, _tusEndpoint, item, context, ct).ConfigureAwait(false)) return StepResult.SkipRest;
-        }
-        var delivery = await _api.GetDeliveryAsync(item.ServerItemId!, ct).ConfigureAwait(false);
-        if (!delivery.TakesRenditions)
-        {
-            context.Log(LogLevel.Info, "server_encodes_target", "This channel's videos are encoded by its delivery service: nothing to encode here");
-            return StepResult.Skipped;
-        }
-        if (delivery.R2 is not null)
-        {
-            context.Log(LogLevel.Info, "server_encodes_started", "The server already started encoding this file: nothing to encode here");
-            return StepResult.Skipped;
-        }
-        _settings ??= await _api.GetEncodingAsync(null, ct).ConfigureAwait(false);
-        var settings = _settings;
+        var index = await VideoCheck.ReadIndexAsync(item, _source, context, ct).ConfigureAwait(false);
+        if (index == VideoContent.NoVideo) return StepResult.NoVideo;
+        if (index == VideoContent.Damaged) throw VideoCheck.Unreadable();
 
         var directory = Path.Combine(_workRoot, item.Id);
+        item.Renditions = null;
+        var sourceProbed = false;
         try
         {
             WorkFiles.DeleteFolder(directory, _workRoot, item.Id);
-            var (rungs, outputs, encoder) = await MakeAsync(item, settings, directory, context, ct).ConfigureAwait(false);
+            var (info, copy) = await ProbeSourceAsync(item, directory, context, ct).ConfigureAwait(false);
+            sourceProbed = item.VideoChecked = item.VideoProbed = true;
+
+            // Confirm the source has video before any request for this item.
+            if (item.ServerItemId is null || item.TusSessionId is null)
+            {
+                if (!await UploadStep.OpenAsync(_api, _tusEndpoint, item, context, ct).ConfigureAwait(false)) return StepResult.SkipRest;
+            }
+            var delivery = await _api.GetDeliveryAsync(item.ServerItemId!, ct).ConfigureAwait(false);
+            if (!delivery.TakesRenditions)
+            {
+                context.Log(LogLevel.Info, "server_encodes_target", "This channel's videos are encoded by its delivery service: nothing to encode here");
+                return StepResult.Skipped;
+            }
+            if (delivery.R2 is not null)
+            {
+                context.Log(LogLevel.Info, "server_encodes_started", "The server already started encoding this file: nothing to encode here");
+                return StepResult.Skipped;
+            }
+            _settings ??= await _api.GetEncodingAsync(null, ct).ConfigureAwait(false);
+            var settings = _settings;
+            var (rungs, outputs, encoder) = await MakeAsync(item, info, copy, settings, directory, context, ct).ConfigureAwait(false);
             for (var i = 0; i < rungs.Count; i++)
             {
                 await _packager.PackageAsync(outputs[i], Path.Combine(directory, rungs[i].Name), settings.Ladder.SegmentSeconds, ct).ConfigureAwait(false);
@@ -777,40 +785,60 @@ public sealed class EncodeStep : IImportStep
         catch (LocalEncodeException ex) when (ex.Code is "no_video" or "no_media")
         {
             // The server would find the same once everything was sent: refused as when it is checked
-            WorkFiles.DeleteFolder(directory, _workRoot, item.Id);
-            if (ex.Code == "no_media") context.Log(LogLevel.Warning, "unreadable", $"ffprobe cannot read it: {ex.Message}", ex.Message);
-            throw ex.Code == "no_video"
-                ? new StepFailedException("no_video", "The file has sound and no video", retryable: false, ex)
-                : new StepFailedException("not_video", "The file cannot be read as a video: it may have been cut off while it was copied", retryable: false, ex);
+            if (ex.Code == "no_video") return StepResult.NoVideo;
+            context.Log(LogLevel.Warning, "unreadable", $"ffprobe cannot read it: {ex.Message}", ex.Message);
+            throw VideoCheck.Unreadable(ex);
         }
-        catch (Exception ex) when (ex is OperationCanceledException || ct.IsCancellationRequested)
+        catch (Exception ex) when (!ct.IsCancellationRequested && ex is not SourceReadException &&
+            ex is LocalEncodeException or IOException or UnauthorizedAccessException)
         {
-            // Stopped (paused, removed or the app closing), whatever it stopped with: encoded from the start next time
-            WorkFiles.DeleteFolder(directory, _workRoot, item.Id);
-            throw;
-        }
-        catch (Exception ex) when (ex is SourceReadException or StepFailedException)
-        {
-            // The file itself cannot be read: the upload could not either
-            WorkFiles.DeleteFolder(directory, _workRoot, item.Id);
-            throw;
-        }
-        catch (Exception ex) when (ex is LocalEncodeException or IOException or UnauthorizedAccessException)
-        {
-            // Not the file's failure: the server encodes it as any upload
-            WorkFiles.DeleteFolder(directory, _workRoot, item.Id);
-            item.Renditions = null;
+            // The server encodes it if it passes the upload's source check.
+            if (!sourceProbed) item.VideoProbed = false;
             context.Save();
             var code = ex is LocalEncodeException local ? local.Code : "disk";
             var why = ImportQueue.Describe(ex);
             context.Log(LogLevel.Warning, "encode_failed", $"Could not encode here: {why}. The server encodes this file", code, why);
-            _report?.Invoke(ex, item);
+            // An inconclusive probe may still be followed by a local no-video result at upload.
+            if (sourceProbed) _report?.Invoke(ex, item);
             return StepResult.Skipped;
         }
         finally
         {
+            if (item.Renditions is null) WorkFiles.DeleteFolder(directory, _workRoot, item.Id);
             _space.Give(directory);
         }
+    }
+
+    private async Task<(SourceInfo Info, string? Copy)> ProbeSourceAsync(QueueItem item, string directory, IStepContext context, CancellationToken ct)
+    {
+        var video = item.Video;
+        try
+        {
+            return (await _source.ProbeAsync(_media, video.Path, context, ct).ConfigureAwait(false), null);
+        }
+        catch (LocalEncodeException stopped) when (stopped.Code == "source_read")
+        {
+            if (!await _source.IsNetworkAsync(video.Path, ct).ConfigureAwait(false)) throw;
+            if (_space.Take(directory, video.Size) != SpaceReservations.Answer.Yes) throw;
+            using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            limit.CancelAfter(Limit(0, video.Size));
+            try
+            {
+                var copy = await CopySourceAsync(item, directory, stopped, context, limit.Token).ConfigureAwait(false);
+                return (await _media.ProbeAsync(copy, limit.Token).ConfigureAwait(false), copy);
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested && limit.IsCancellationRequested)
+            {
+                throw new LocalEncodeException("took_too_long", "Encoding here took too long");
+            }
+        }
+    }
+
+    private Task<string> CopySourceAsync(QueueItem item, string directory, LocalEncodeException stopped, IStepContext context, CancellationToken ct)
+    {
+        context.Log(LogLevel.Info, "encode_copy", $"{stopped.Message}. Copied here first, and encoded from the copy", stopped.Message);
+        Directory.CreateDirectory(directory);
+        return CopyAsync(item, directory, context, ct);
     }
 
     /// <summary>What is made of a source: what it is, the rungs, their MP4s and the encoder.</summary>
@@ -824,7 +852,7 @@ public sealed class EncodeStep : IImportStep
         (long)(rungs.Sum(r => (double)(r.Maxrate + r.Audio)) / 8 * Math.Max(1, info.Seconds) * 2.2);
 
     /// <summary>Every rung's MP4, as whole as the source: read from where the file is, else from a copy of it.</summary>
-    private async Task<(IReadOnlyList<PlannedRung> Rungs, IReadOnlyList<string> Outputs, string Encoder)> MakeAsync(QueueItem item, EncodingSettings settings, string directory, IStepContext context, CancellationToken ct)
+    private async Task<(IReadOnlyList<PlannedRung> Rungs, IReadOnlyList<string> Outputs, string Encoder)> MakeAsync(QueueItem item, SourceInfo info, string? copy, EncodingSettings settings, string directory, IStepContext context, CancellationToken ct)
     {
         using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
         var time = limit.Token;
@@ -855,36 +883,30 @@ public sealed class EncodeStep : IImportStep
                 context.Log(LogLevel.Info, "encode_hdr", $"HDR ({kind}), converted to standard colors", kind);
             }
         }
-        Plan? plan = null;
+        var plan = await PlanAsync(info).ConfigureAwait(false);
         try
         {
-            try
+            if (copy is null) await RoomAsync(directory, plan.Bytes, context, time).ConfigureAwait(false);
+            else if (_space.Take(directory, video.Size + plan.Bytes) != SpaceReservations.Answer.Yes) throw NoRoom(video.Size + plan.Bytes);
+            limit.CancelAfter(Limit(info.Seconds, video.Size));
+            Start(plan);
+            if (copy is null)
             {
-                var there = plan = await PlanAsync(await _source.ProbeAsync(_media, video.Path, context, time).ConfigureAwait(false)).ConfigureAwait(false);
-                await RoomAsync(directory, there.Bytes, context, time).ConfigureAwait(false);
-                limit.CancelAfter(Limit(there.Info.Seconds, video.Size));
-                Start(there);
-                await _source.WithPathAsync(video.Path, context, p => EncodeAsync(p, there), time, tries: 2).ConfigureAwait(false);
-            }
-            catch (LocalEncodeException stopped) when (stopped.Code == "source_read")
-            {
-                // ffmpeg ends at a share's first hiccup; the app's own reading, which the check and the upload use, goes on after it
-                if (!await _source.IsNetworkAsync(video.Path, time).ConfigureAwait(false)) throw;
-                // What those runs left is in the way
-                foreach (var output in plan?.Outputs ?? Array.Empty<string>()) File.Delete(output);
-                if (_space.Take(directory, video.Size + (plan?.Bytes ?? 0)) != SpaceReservations.Answer.Yes) throw;
-                if (plan is null) limit.CancelAfter(Limit(0, video.Size));
-                context.Log(LogLevel.Info, "encode_copy", $"{stopped.Message}. Copied here first, and encoded from the copy", stopped.Message);
-                System.IO.Directory.CreateDirectory(directory);
-                var copy = await CopyAsync(item, directory, context, time).ConfigureAwait(false);
-                var read = plan is not null;
-                plan = await PlanAsync(await _media.ProbeAsync(copy, time).ConfigureAwait(false)).ConfigureAwait(false);
-                if (_space.Take(directory, video.Size + plan.Bytes) != SpaceReservations.Answer.Yes) throw NoRoom(video.Size + plan.Bytes);
-                if (!read)
+                try
                 {
-                    limit.CancelAfter(Limit(plan.Info.Seconds, video.Size));
-                    Start(plan);
+                    await _source.WithPathAsync(video.Path, context, p => EncodeAsync(p, plan), time, tries: 2).ConfigureAwait(false);
                 }
+                catch (LocalEncodeException stopped) when (stopped.Code == "source_read")
+                {
+                    // The copy is verified against the source hash, so the same probe and plan still apply.
+                    if (!await _source.IsNetworkAsync(video.Path, time).ConfigureAwait(false)) throw;
+                    foreach (var output in plan.Outputs) File.Delete(output);
+                    if (_space.Take(directory, video.Size + plan.Bytes) != SpaceReservations.Answer.Yes) throw;
+                    copy = await CopySourceAsync(item, directory, stopped, context, time).ConfigureAwait(false);
+                }
+            }
+            if (copy is not null)
+            {
                 await EncodeAsync(copy, plan).ConfigureAwait(false);
                 File.Delete(copy);
                 _space.Take(directory, plan.Bytes);

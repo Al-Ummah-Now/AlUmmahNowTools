@@ -993,7 +993,6 @@ public class ErrorReportingTests
     }
 
     [Theory]
-    [InlineData("no_video", false)]
     [InlineData("not_video", false)]
     [InlineData("content_changed", false)]
     [InlineData("file_changed", false)]

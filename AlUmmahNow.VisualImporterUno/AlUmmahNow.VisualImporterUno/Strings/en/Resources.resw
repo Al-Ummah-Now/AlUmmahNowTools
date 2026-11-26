@@ -2085,6 +2085,9 @@ Try again.</value>
   <data name="ImportStep_Attach" xml:space="preserve">
     <value>captions and extras</value>
   </data>
+  <data name="ImportPhase_NoVideo" xml:space="preserve">
+    <value>No video</value>
+  </data>
   <data name="ImportPhase_Done" xml:space="preserve">
     <value>Uploaded</value>
   </data>
@@ -2304,6 +2307,12 @@ Try again.</value>
   <data name="ImportLog_resumed" xml:space="preserve">
     <value>Resumed</value>
   </data>
+  <data name="ImportLog_no_video_found" xml:space="preserve">
+    <value>No video track found</value>
+  </data>
+  <data name="ImportLog_no_video" xml:space="preserve">
+    <value>No video track found; not sent to the server</value>
+  </data>
   <data name="ImportLog_finished" xml:space="preserve">
     <value>Finished</value>
   </data>
@@ -2397,6 +2406,9 @@ Try again.</value>
   <data name="Import_Added_Other" xml:space="preserve">
     <value>{0} videos added to the queue for:</value>
   </data>
+  <data name="Import_SumNoVideo" xml:space="preserve">
+    <value>{0} no video</value>
+  </data>
   <data name="Import_SumDone" xml:space="preserve">
     <value>{0} finished</value>
   </data>
@@ -2456,6 +2468,9 @@ Try again.</value>
   </data>
   <data name="Import_ParallelEncode.Header" xml:space="preserve">
     <value>Encodes</value>
+  </data>
+  <data name="ImportRow_NoVideo" xml:space="preserve">
+    <value>This file has no video track and wasn’t sent to the server.</value>
   </data>
   <data name="ImportRow_ServerEncodes" xml:space="preserve">
     <value>The server encodes this one</value>

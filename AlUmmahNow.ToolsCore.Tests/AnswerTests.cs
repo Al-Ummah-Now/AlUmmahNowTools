@@ -19,7 +19,7 @@ public sealed class AnswerTests
 
     public static TheoryData<Exception, bool> Failures() => new()
     {
-        { new StepFailedException("no_video", "The file has sound and no video", retryable: false), false },
+        { new StepFailedException("not_video", "The file cannot be read as video", retryable: false), false },
         { new SourceReadException(ReadFailure.Of(new FileNotFoundException("gone"))), false },
         { new StepFailedException("not_hashed", "The file has not been checked yet", retryable: false), true },
         // The app's own work missing is the app's failure

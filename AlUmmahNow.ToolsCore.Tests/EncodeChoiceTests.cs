@@ -109,11 +109,11 @@ public sealed class EncodeChoiceTests : IDisposable
     [Fact]
     public async Task A_failure_of_the_files_own_stays()
     {
-        _encodes = _ => throw new StepFailedException("no_video", "The file has sound and no video", retryable: false);
+        _encodes = _ => Task.FromResult(StepResult.NoVideo);
         var item = Add();
-        await Until(() => item.Phase == ItemPhase.Failed);
+        await Until(() => item.Phase == ItemPhase.NoVideo);
         Assert.Equal(0, _queue.SetServerEncodes(true));
-        Assert.Equal(ItemPhase.Failed, item.Phase);
+        Assert.Equal(ItemPhase.NoVideo, item.Phase);
     }
 
     [Fact]
@@ -262,18 +262,20 @@ public sealed class EncodeChoiceTests : IDisposable
     }
 
     [Theory]
-    [InlineData("no_video")]
-    [InlineData("not_video")]
-    public async Task Off_as_the_encode_finds_no_video_it_is_refused_all_the_same(string code)
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Off_as_the_encode_finds_no_video_it_settles_locally_all_the_same(bool noVideo)
     {
         var item = Add();
         _encodes = _ =>
         {
             _queue.SetServerEncodes(true);
-            throw new StepFailedException(code, "No video", retryable: false);
+            if (noVideo) return Task.FromResult(StepResult.NoVideo);
+            throw new StepFailedException("not_video", "Damaged video", retryable: false);
         };
-        await Until(() => item.Phase == ItemPhase.Failed);
-        Assert.Equal(code, item.CurrentStep!.LastErrorCode);
+        await Until(() => item.Phase == (noVideo ? ItemPhase.NoVideo : ItemPhase.Failed));
+        Assert.Equal(noVideo ? StepStatus.Skipped : StepStatus.Failed, Step(item, ImportStepKind.Encode).Status);
+        Assert.Equal(noVideo ? null : "not_video", Step(item, ImportStepKind.Encode).LastErrorCode);
         Assert.Empty(_began);
     }
 
@@ -286,7 +288,8 @@ public sealed class EncodeChoiceTests : IDisposable
     {
         _hashes = () => throw new StepFailedException(code, "Refused", retryable: false);
         var (item, server) = (Add(), Add("b.mp4", serverEncodes: true));
-        await Until(() => item.Phase == ItemPhase.Failed && server.Phase == ItemPhase.Failed);
+        var phase = code == "no_video" ? ItemPhase.NoVideo : ItemPhase.Failed;
+        await Until(() => item.Phase == phase && server.Phase == phase);
         var log = _queue.LogLines(server.Id).Count;
         Assert.Equal(0, _queue.SetServerEncodes(true));
         Assert.Equal(0, _queue.SetServerEncodes(false));

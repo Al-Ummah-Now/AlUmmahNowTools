@@ -23,7 +23,8 @@ public sealed class HashStep : IImportStep
     {
         var video = item.Video;
         await _source.CheckUnchangedAsync(video, context, ct).ConfigureAwait(false);
-        await VideoCheck.RunAsync(item, _source, _media, context, ct).ConfigureAwait(false);
+        if (await VideoCheck.RunAsync(item, _source, _media, context, ct).ConfigureAwait(false) == StepResult.NoVideo)
+            return StepResult.NoVideo;
         if (item.Hashing is { } kept && (kept.Size != video.Size || kept.ModifiedMs != video.LastModifiedMs))
         {
             kept.Dispose();
@@ -86,7 +87,8 @@ public sealed class UploadStep : IImportStep
         if (item.Sha256 is null || item.FingerprintHash is null) throw new StepFailedException("not_hashed", "The file has not been checked yet", retryable: false);
         await _source.CheckUnchangedAsync(item.Video, context, ct).ConfigureAwait(false);
         // Hashed by a version that did not check
-        await VideoCheck.RunAsync(item, _source, _media, context, ct).ConfigureAwait(false);
+        if (await VideoCheck.RunAsync(item, _source, _media, context, ct).ConfigureAwait(false) == StepResult.NoVideo)
+            return StepResult.NoVideo;
         if (item.StartOver) await DropAsync(item, context, ct).ConfigureAwait(false);
         if (item.ServerItemId is null || item.TusSessionId is null)
         {
@@ -553,6 +555,7 @@ public sealed class ServerFailureSink : IImportFailureSink
 
     public async Task ItemFailedAsync(QueueItem item, StepState step, Exception error, string reference, CancellationToken ct)
     {
+        if (error is StepFailedException { Code: "no_video" }) return;
         // It goes to the server: no folders of this computer
         var files = LocalPaths.Of(item.Video).ToList();
         var message = LocalPaths.Clean(ImportQueue.Describe(error), ErrorReporter.Plain(error), files);

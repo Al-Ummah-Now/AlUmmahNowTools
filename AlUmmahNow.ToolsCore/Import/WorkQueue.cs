@@ -117,6 +117,7 @@ public enum ItemPhase
     Paused,
     Failed,
     Done,
+    NoVideo,
 }
 
 /// <summary>One file in the queue: what it is, where each step stands, what the server gave it and its log.</summary>
@@ -127,6 +128,7 @@ public sealed class QueueItem
     public string ChannelId { get; set; } = "";
     public ScannedVideo Video { get; set; } = null!;
     public bool Paused { get; set; }
+    public bool NoVideo { get; set; }
     public List<StepState> Steps { get; set; } = new();
     public DateTimeOffset CreatedAt { get; set; }
 
@@ -205,6 +207,7 @@ public sealed class QueueItem
         get
         {
             var step = CurrentStep;
+            if (NoVideo || step is { Status: StepStatus.Failed, LastErrorCode: "no_video" }) return ItemPhase.NoVideo;
             if (step is null) return ItemPhase.Done;
             // A failure that trying again cannot fix stays in sight, paused or not
             if (step.Status == StepStatus.Failed && !step.CanTryAgain) return ItemPhase.Failed;
@@ -227,7 +230,7 @@ public sealed class QueueItem
     /// the file is not refused for good.
     /// </summary>
     [JsonIgnore]
-    internal bool EncodeOpen => !UploadOpened
+    internal bool EncodeOpen => !UploadOpened && Phase != ItemPhase.NoVideo
         && Steps.FirstOrDefault(s => s.Kind == ImportStepKind.Upload) is { Status: StepStatus.Pending }
         && CurrentStep is not { Status: StepStatus.Failed, CanTryAgain: false };
 
@@ -247,10 +250,12 @@ public sealed class QueueItem
     /// <summary>What the row offers: exactly one of Pause and Resume for a file that is neither done nor failed.</summary>
     [JsonIgnore] public bool CanPause => Phase is ItemPhase.Waiting or ItemPhase.Running or ItemPhase.RetryWaiting or ItemPhase.ServerWorking;
     [JsonIgnore] public bool CanResume => Phase == ItemPhase.Paused;
-    [JsonIgnore] public bool CanRetry => Phase == ItemPhase.RetryWaiting || (Phase == ItemPhase.Failed && (!NeedsOtherFile || OnDisk is not null));
+    [JsonIgnore] public bool CanRetry => Phase == ItemPhase.RetryWaiting
+        || (Phase == ItemPhase.NoVideo && OnDisk is not null)
+        || (Phase == ItemPhase.Failed && (!NeedsOtherFile || OnDisk is not null));
 
     /// <summary>The file itself is what is wrong: trying again helps only once there is another one in its place.</summary>
-    [JsonIgnore] public bool NeedsOtherFile => CurrentStep is { Status: StepStatus.Failed, LastErrorCode: "no_video" or "not_video" };
+    [JsonIgnore] public bool NeedsOtherFile => Phase == ItemPhase.NoVideo || CurrentStep is { Status: StepStatus.Failed, LastErrorCode: "not_video" };
 
     /// <summary>The other file in its place, once there is one (not saved)</summary>
     [JsonIgnore] internal Sources.SourceStat? OnDisk { get; set; }
@@ -259,11 +264,11 @@ public sealed class QueueItem
     /// Pause all takes it: not done, not paused, and not failed for good. Wider than <see cref="CanPause"/>: the row of a file
     /// that gave up on something trying again may fix offers Retry, and Pause all still holds it.
     /// </summary>
-    [JsonIgnore] public bool Pausable => !Paused && Phase != ItemPhase.Done && CurrentStep is not { Status: StepStatus.Failed, CanTryAgain: false };
+    [JsonIgnore] public bool Pausable => !Paused && Phase is not (ItemPhase.Done or ItemPhase.NoVideo) && CurrentStep is not { Status: StepStatus.Failed, CanTryAgain: false };
 
     /// <summary>Its upload began and did not finish: removing the file stops it.</summary>
     [JsonIgnore]
-    public bool UploadUnfinished => Steps.FirstOrDefault(s => s.Kind == ImportStepKind.Upload) is { Status: not (StepStatus.Done or StepStatus.Skipped) } upload
+    public bool UploadUnfinished => Phase != ItemPhase.NoVideo && Steps.FirstOrDefault(s => s.Kind == ImportStepKind.Upload) is { Status: not (StepStatus.Done or StepStatus.Skipped) } upload
         && (upload.Status == StepStatus.Running || UploadUrl is not null);
 
     public static QueueItem For(ScannedVideo video, string batchId, string channelId, DateTimeOffset now, bool serverEncodes = false, TranscribeChoice? transcribe = null, bool translate = false) => new()
@@ -309,6 +314,8 @@ public enum StepResult
     /// (<see cref="IStepContext.Later"/>), without counting an attempt and without holding a slot meanwhile.
     /// </summary>
     Later,
+    /// <summary>The source has no video track. Skip it locally.</summary>
+    NoVideo,
 }
 
 /// <summary>A failure a step knows the nature of. Anything else is classified by <see cref="ImportQueue.IsRetryable"/>.</summary>
@@ -649,14 +656,15 @@ public sealed class ImportQueue : IDisposable
     public void Retry(string id) => Update(id, item =>
     {
         var step = item.CurrentStep;
-        if (step is null || step.Status == StepStatus.Running) return false;
-        if (step.Status != StepStatus.Failed && step.NextAttemptAt is null) return false;
+        if (item.Phase != ItemPhase.NoVideo &&
+            (step is null || step.Status == StepStatus.Running || (step.Status != StepStatus.Failed && step.NextAttemptAt is null))) return false;
         if (item.NeedsOtherFile)
         {
             if (item.OnDisk is not { } other) return false;
             TakeOther(item, other);
-            step = item.CurrentStep!;
+            step = item.CurrentStep;
         }
+        if (step is null) return false;
         item.Paused = false;
         Again(item, step);
         return true;
@@ -665,6 +673,8 @@ public sealed class ImportQueue : IDisposable
     /// <summary>Another file in the same place: nothing that was found out about the one before holds.</summary>
     private static void TakeOther(QueueItem item, Sources.SourceStat other)
     {
+        var noVideo = item.Phase == ItemPhase.NoVideo;
+        item.NoVideo = false;
         item.Video = item.Video with { Size = other.Length, LastModifiedMs = other.ModifiedMs };
         item.OnDisk = null;
         item.Hashing?.Dispose();
@@ -674,10 +684,11 @@ public sealed class ImportQueue : IDisposable
         (item.Sha256, item.FingerprintHash, item.VideoChecked, item.VideoProbed) = (null, null, false, false);
         (item.ServerItemId, item.VideoId, item.TusSessionId, item.UploadUrl, item.UploadOffset) = (null, null, null, null, 0);
         (item.SentTo, item.SentSha256, item.StartOver, item.LeftUploadUrl, item.Renditions, item.UploadOpened) = (0, null, false, null, null, false);
-        foreach (var step in item.Steps.Where(s => s.Kind <= ImportStepKind.Upload))
+        foreach (var step in item.Steps.Where(s => noVideo || s.Kind <= ImportStepKind.Upload))
         {
             step.Status = StepStatus.Pending;
             step.Attempts = 0;
+            step.WaitingOnServer = false;
             (step.LastError, step.LastErrorCode, step.ReadError, step.Retryable, step.NextAttemptAt) = (null, null, null, null, null);
         }
     }
@@ -940,7 +951,7 @@ public sealed class ImportQueue : IDisposable
             var busy = Enum.GetValues<ImportStepKind>().ToDictionary(k => k, k => _items.Count(i => i.CurrentStep is { Status: StepStatus.Running } s && s.Kind == k));
             foreach (var item in _items.OrderBy(i => i.CreatedAt))
             {
-                if (item.Paused || _running.ContainsKey(item.Id)) continue;
+                if (item.Paused || item.NoVideo || _running.ContainsKey(item.Id)) continue;
                 var step = item.CurrentStep;
                 if (step is null || step.Status != StepStatus.Pending) continue;
                 if (step.NextAttemptAt is { } at && at > now) continue;
@@ -1017,6 +1028,10 @@ public sealed class ImportQueue : IDisposable
         {
             result = await _steps[step.Kind].RunAsync(item, context, cts.Token).ConfigureAwait(false);
         }
+        catch (StepFailedException ex) when (ex.Code == "no_video")
+        {
+            result = StepResult.NoVideo;
+        }
         catch (Exception stopped) when (cts.IsCancellationRequested && (_stopped || !Refused(step, stopped)))
         {
             // Whatever it stopped with: a request or a file cut short by the stop is no failure of the file's
@@ -1041,7 +1056,12 @@ public sealed class ImportQueue : IDisposable
         string? reference = null;
         lock (_gate)
         {
-            if (failure is null && step.Kind == ImportStepKind.Encode && result != StepResult.SkipRest && item.EncodeRun != item.ServerEncodes)
+            if (failure is null && result == StepResult.NoVideo)
+            {
+                SkipNoVideo(item, step);
+                AppendLog(item, LogLevel.Info, "no_video", NoVideoMessage);
+            }
+            else if (failure is null && step.Kind == ImportStepKind.Encode && result != StepResult.SkipRest && item.EncodeRun != item.ServerEncodes)
             {
                 // Who encodes it was changed as this ended: it runs again for that, and gives up what this run made
                 step.Status = StepStatus.Pending;
@@ -1139,8 +1159,21 @@ public sealed class ImportQueue : IDisposable
         }
     }
 
-    /// <summary>The encode found that the file is no video: that holds, however it is being stopped.</summary>
-    private static bool Refused(StepState step, Exception error) => step.Kind == ImportStepKind.Encode && error is StepFailedException { Code: "no_video" or "not_video" };
+    private const string NoVideoMessage = "No video track found; not sent to the server";
+
+    private static void SkipNoVideo(QueueItem item, StepState step)
+    {
+        item.Paused = false;
+        item.Progress = 0;
+        step.Status = StepStatus.Skipped;
+        step.WaitingOnServer = false;
+        (step.LastError, step.LastErrorCode, step.ReadError, step.Retryable, step.NextAttemptAt) = (null, null, null, null, null);
+        foreach (var later in item.Steps.Where(s => s.Status == StepStatus.Pending)) later.Status = StepStatus.Skipped;
+        item.NoVideo = true;
+    }
+
+    /// <summary>The encode found that the file cannot be read as video: that holds, however it is being stopped.</summary>
+    private static bool Refused(StepState step, Exception error) => step.Kind == ImportStepKind.Encode && error is StepFailedException { Code: "not_video" };
 
     /// <summary>
     /// The kind of failure, for the app's words: the step's own code, admin_unreachable, videos_unreachable,
@@ -1199,7 +1232,9 @@ public sealed class ImportQueue : IDisposable
         if (item.Log.Count > MaxLogLines) item.Log.RemoveRange(0, item.Log.Count - MaxLogLines);
     }
 
-    private sealed record Saved(QueueSettings Settings, List<QueueItem> Items, bool AllPaused = false, string? Account = null);
+    private const int VideoProbeVersion = 1;
+
+    private sealed record Saved(QueueSettings Settings, List<QueueItem> Items, bool AllPaused = false, string? Account = null, int VideoProbeVersion = 0);
 
     private void Load()
     {
@@ -1221,6 +1256,18 @@ public sealed class ImportQueue : IDisposable
                     if (item.Paused) step.Attempts = Math.Max(0, step.Attempts - 1);
                 }
                 item.AddMissingSteps();
+                // Older queues also saved these flags for checks that did not get an answer.
+                if (saved.VideoProbeVersion < VideoProbeVersion) item.VideoChecked = item.VideoProbed = false;
+                if (item.CurrentStep is { Status: StepStatus.Failed, LastErrorCode: "no_video" } noVideo)
+                {
+                    SkipNoVideo(item, noVideo);
+                    var at = item.Log.FindLastIndex(line => line.Code == "failed" && line.Args is { Length: > 2 } args && args[2] == "no_video");
+                    var (code, message) = item.ServerItemId is null
+                        ? ("no_video", NoVideoMessage)
+                        : ("no_video_found", "No video track found");
+                    if (at >= 0) item.Log[at] = new LogLine(item.Log[at].At, LogLevel.Info, message, code);
+                    else AppendLog(item, LogLevel.Info, code, message);
+                }
                 // Saved by a version that did not note it, or the app ended in the middle of the upload
                 if (item.UploadUrl is not null && item.EncodeStep is { Status: StepStatus.Done or StepStatus.Skipped }) item.UploadOpened = true;
                 if (item.Phase != ItemPhase.Paused) item.Paused = false;
@@ -1238,7 +1285,7 @@ public sealed class ImportQueue : IDisposable
     {
         // Pause all ends with the last file it paused (resumed, finished or removed)
         _allPaused = HeldLocked;
-        AtomicFile.Write(_path, JsonSerializer.Serialize(new Saved(_settings, _items, _allPaused, _account), Json));
+        AtomicFile.Write(_path, JsonSerializer.Serialize(new Saved(_settings, _items, _allPaused, _account, VideoProbeVersion), Json));
     }
 
     private sealed class Context : IStepContext
