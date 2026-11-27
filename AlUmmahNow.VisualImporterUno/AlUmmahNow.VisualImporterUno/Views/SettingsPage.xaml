@@ -123,6 +123,15 @@
                 </StackPanel>
             </Border>
 
+            <!-- Diagnostics: opt-in scrubbed log bundles stored in R2 (30-day expiry) -->
+            <Border x:Name="DiagnosticsCard" Style="{StaticResource ToolsCard}">
+                <StackPanel Spacing="10">
+                    <TextBlock x:Name="DiagnosticsTitle" x:Uid="Settings_DiagnosticsTitle" Text="Diagnostics" Style="{StaticResource ToolsCardTitle}" />
+                    <ToggleSwitch x:Name="DiagnosticsAuto" Toggled="DiagnosticsAuto_Toggled" OnContent="" OffContent="" MinWidth="0" />
+                    <TextBlock x:Name="DiagnosticsAutoHint" x:Uid="Settings_DiagnosticsHint" Text="Off by default. When enabled, failed imports attach a scrubbed log of retries and step events so support can diagnose issues. Local folder paths, drive names, and tokens are stripped before sending, and logs expire after 30 days." Style="{StaticResource ToolsMuted}" TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+
             <!-- Save -->
             <StackPanel Spacing="10">
                 <StackPanel Orientation="Horizontal" Spacing="12">

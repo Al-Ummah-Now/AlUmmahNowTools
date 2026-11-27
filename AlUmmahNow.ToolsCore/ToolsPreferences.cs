@@ -26,6 +26,8 @@ public sealed class ToolsPreferences
     public string? SpeechModel { get; set; }
     /// <summary>Videos are encoded on this computer before their upload (TA-12); off: the server encodes them after it</summary>
     public bool EncodeHere { get; set; } = true;
+    /// <summary>Opt-in: attach scrubbed item diagnostic logs to failed error reports (stored in R2, 30-day expiry).</summary>
+    public bool SendDiagnosticLogs { get; set; } = false;
 
     [JsonIgnore] public bool IsRightToLeft => Language == "ar";
 

@@ -3760,4 +3760,25 @@ The posts and videos it already brought stay on the channel.</value>
   <data name="Quit_Keep" xml:space="preserve">
     <value>Keep running</value>
   </data>
+  <data name="Settings_DiagnosticsTitle.Text" xml:space="preserve">
+    <value>Diagnostics</value>
+  </data>
+  <data name="Settings_DiagnosticsAuto" xml:space="preserve">
+    <value>Attach scrubbed diagnostic logs to failed error reports</value>
+  </data>
+  <data name="Settings_DiagnosticsHint.Text" xml:space="preserve">
+    <value>Off by default. When enabled, failed imports attach a scrubbed log of retries and step events so support can diagnose issues. Local folder paths, drive names, and tokens are stripped before sending, and logs expire after 30 days.</value>
+  </data>
+  <data name="Import_LogSendButton.Text" xml:space="preserve">
+    <value>Send diagnostic log</value>
+  </data>
+  <data name="Import_LogSending" xml:space="preserve">
+    <value>Sending…</value>
+  </data>
+  <data name="Import_LogSent" xml:space="preserve">
+    <value>Sent ({0}, copied)</value>
+  </data>
+  <data name="Import_LogSendFailed" xml:space="preserve">
+    <value>Could not send diagnostic log</value>
+  </data>
 </root>

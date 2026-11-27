@@ -254,6 +254,20 @@ public sealed record ErrorReport(
     }
 }
 
+/// <summary>A scrubbed diagnostic log uploaded to <c>POST /api/admin/import/diagnostics</c>.</summary>
+public sealed record DiagnosticUpload(
+    [property: JsonPropertyName("ref"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Ref,
+    [property: JsonPropertyName("release"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Release,
+    [property: JsonPropertyName("entryCount")] int EntryCount,
+    [property: JsonPropertyName("content")] string Content);
+
+/// <summary>admin-api's answer to <c>POST /api/admin/import/diagnostics</c>.</summary>
+public sealed record DiagnosticUploadResult(
+    [property: JsonPropertyName("ref")] string Ref,
+    [property: JsonPropertyName("sizeBytes")] int SizeBytes,
+    [property: JsonPropertyName("storedBytes")] int StoredBytes,
+    [property: JsonPropertyName("entryCount")] int EntryCount);
+
 /// <summary>admin-api's <c>GET /quran-index</c>: the index and when the app must drop it.</summary>
 public sealed record QuranIndexReply(
     [property: JsonPropertyName("index")] AlUmmahNow.ToolsCore.Transcription.QuranIndexFile Index,
@@ -521,6 +535,13 @@ public partial class ImportApiClient
 
     public virtual Task ReportErrorsAsync(IReadOnlyList<ErrorReport> events, CancellationToken ct = default) =>
         SendAsync(HttpMethod.Post, "/api/admin/import/errors", new { events }, ct);
+
+    /// <summary>Uploads a scrubbed diagnostic log bundle to R2 (opt-in or user-triggered) linked to an ERR-XXXX-XXXX ref.</summary>
+    public virtual async Task<DiagnosticUploadResult> UploadDiagnosticAsync(DiagnosticUpload upload, CancellationToken ct = default)
+    {
+        var result = await SendAsync(HttpMethod.Post, "/api/admin/import/diagnostics", upload, ct).ConfigureAwait(false);
+        return result?.Deserialize<DiagnosticUploadResult>(Json) ?? throw Unreadable();
+    }
 
     private static string? TextOf(JsonNode? json, string key) =>
         (json as JsonObject)?[key] is JsonValue v && v.TryGetValue<string>(out var text) && !string.IsNullOrWhiteSpace(text) ? text : null;

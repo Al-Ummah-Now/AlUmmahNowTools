@@ -395,7 +395,14 @@
                                                                 <TextBlock x:Uid="Import_LogCopyButton" Text="Copy log" />
                                                             </StackPanel>
                                                         </Button>
+                                                        <Button Style="{StaticResource ToolsSecondaryButton}" Tag="{x:Bind}" Click="SendLog_Click" IsEnabled="{x:Bind CanSendLog, Mode=OneWay}">
+                                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                                <FontIcon Glyph="&#xE724;" FontSize="14" />
+                                                                <TextBlock x:Uid="Import_LogSendButton" Text="Send diagnostic log" />
+                                                            </StackPanel>
+                                                        </Button>
                                                         <TextBlock x:Uid="Import_LogCopiedNote" Text="Copied" Style="{StaticResource ToolsMuted}" VerticalAlignment="Center" Visibility="{x:Bind LogCopied, Mode=OneWay}" />
+                                                        <TextBlock Text="{x:Bind DiagnosticStatus, Mode=OneWay}" Style="{StaticResource ToolsMuted}" VerticalAlignment="Center" Visibility="{x:Bind HasDiagnosticStatus, Mode=OneWay}" IsTextSelectionEnabled="True" />
                                                     </StackPanel>
                                                 </StackPanel>
                                             </Border>

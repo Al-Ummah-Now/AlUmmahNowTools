@@ -19,7 +19,20 @@ namespace AlUmmahNow.VisualImporterUno.Views
             ViewModel = App.GetService<SettingsViewModel>();
             InitializeComponent();
             ShowUpdates();
+            ShowDiagnostics();
             DemoDialogs.OnLoaded(this, "reset", ResetAsync);
+        }
+
+        private void ShowDiagnostics()
+        {
+            DiagnosticsAuto.Header = Loc.Get("Settings_DiagnosticsAuto");
+            DiagnosticsAuto.IsOn = ShellState.Current.Preferences.SendDiagnosticLogs;
+        }
+
+        private void DiagnosticsAuto_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (ShellState.Current.Preferences.SendDiagnosticLogs != DiagnosticsAuto.IsOn)
+                ShellState.Current.SetSendDiagnosticLogs(DiagnosticsAuto.IsOn);
         }
 
         /// <summary>Settings → Updates (wiki AUN-APP-UPDATES §5.3): version, last check, install automatically, Check now.</summary>

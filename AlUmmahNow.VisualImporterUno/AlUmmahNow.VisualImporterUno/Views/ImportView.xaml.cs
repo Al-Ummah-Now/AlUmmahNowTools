@@ -508,4 +508,17 @@ public sealed partial class ImportView : Page
         Clipboard.SetContent(package);
         row.LogCopied = true;
     }
+
+    /// <summary>Uploads a scrubbed diagnostic log for this file on demand and copies its reference.</summary>
+    private async void SendLog_Click(object sender, RoutedEventArgs e)
+    {
+        if (RowOf(sender) is not { } row) return;
+        var reference = await ViewModel.SendDiagnosticLogAsync(row);
+        if (!string.IsNullOrEmpty(reference))
+        {
+            var package = new DataPackage();
+            package.SetText(reference);
+            Clipboard.SetContent(package);
+        }
+    }
 }

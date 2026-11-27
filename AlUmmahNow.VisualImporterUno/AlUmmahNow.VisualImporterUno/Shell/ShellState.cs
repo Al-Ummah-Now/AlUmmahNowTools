@@ -84,6 +84,14 @@ public sealed class ShellState
         Save();
     }
 
+    /// <summary>Opt-in setting: attach scrubbed diagnostic logs to failed error reports.</summary>
+    public void SetSendDiagnosticLogs(bool send)
+    {
+        if (Preferences.SendDiagnosticLogs == send) return;
+        Preferences.SendDiagnosticLogs = send;
+        Save();
+    }
+
     public void SetTheme(ToolsTheme theme)
     {
         Preferences.Theme = theme;

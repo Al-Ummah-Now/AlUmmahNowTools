@@ -574,11 +574,15 @@ public sealed class ServerFailureSink : IImportFailureSink
 {
     private readonly ImportApiClient _api;
     private readonly ErrorReporter _reporter;
+    private readonly Func<bool> _sendDiagnosticLogs;
+    private readonly string _release;
 
-    public ServerFailureSink(ImportApiClient api, ErrorReporter reporter)
+    public ServerFailureSink(ImportApiClient api, ErrorReporter reporter, Func<bool>? sendDiagnosticLogs = null, string? release = null)
     {
         _api = api;
         _reporter = reporter;
+        _sendDiagnosticLogs = sendDiagnosticLogs ?? (() => false);
+        _release = release ?? "";
     }
 
     public async Task ItemFailedAsync(QueueItem item, StepState step, Exception error, string reference, CancellationToken ct)
@@ -610,5 +614,16 @@ public sealed class ServerFailureSink : IImportFailureSink
             await _api.MarkFailedAsync(item.ServerItemId, answer ? message : $"{message} (reference {reference})", ct).ConfigureAwait(false);
         }
         await _reporter.FlushAsync(ct).ConfigureAwait(false);
+        if (!answer && !string.IsNullOrEmpty(reference) && _sendDiagnosticLogs())
+        {
+            try
+            {
+                await _api.UploadDiagnosticAsync(DiagnosticLog.Build(item, _release, reference), ct).ConfigureAwait(false);
+            }
+            catch
+            {
+                // Best effort: never break failure reporting when the diagnostics endpoint is unavailable
+            }
+        }
     }
 }
