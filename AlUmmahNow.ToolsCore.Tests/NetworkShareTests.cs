@@ -530,6 +530,44 @@ public class NetworkShareReadingTests
     }
 
     [Fact]
+    public async Task A_brief_failure_before_a_network_drop_does_not_shorten_patience()
+    {
+        var rig = new Rig();
+        var inUse = new IOException("x", OperatingSystem.IsWindows() ? unchecked((int)0x80070020) : 16);
+        DateTimeOffset? networkStart = null;
+        rig.Files.OnOpen = _ =>
+        {
+            if (rig.Delays.Count == 0) return inUse;
+            networkStart ??= rig.Clock.Now;
+            return Dropped();
+        };
+        rig.OnDelay = () =>
+        {
+            // Simulate 4 minutes elapsing after the brief error before the share drops
+            if (rig.Delays.Count == 1) rig.Clock.Now += TimeSpan.FromMinutes(4);
+        };
+        var error = await Assert.ThrowsAsync<SourceReadException>(() => rig.ReadAll());
+        Assert.Equal("share_lost", error.Failure.Code);
+        Assert.NotNull(networkStart);
+        Assert.InRange((rig.Clock.Now - networkStart!.Value).TotalMinutes, 5.0, 5.5);
+    }
+
+    [Fact]
+    public async Task An_empty_file_clears_share_wait_and_announces_its_path_after_recovery()
+    {
+        var rig = new Rig();
+        rig.Files.Bytes = Array.Empty<byte>();
+        rig.Files.OnOpen = path => rig.Delays.Count < 3 || path != Network ? Dropped() : null;
+        var bytes = await rig.Access.ReadAllBytesAsync(Chosen, rig.Context, default);
+        Assert.Empty(bytes);
+        Assert.Equal(StepWait.None, rig.Context.Wait);
+        var codes = rig.Context.Lines.Select(l => l.Code).ToList();
+        var back = codes.IndexOf("share_back");
+        Assert.True(back > 0);
+        Assert.Equal(new[] { "share_path" }, codes[(back + 1)..].Where(c => c is "share_path" or "share_chosen").ToArray());
+    }
+
+    [Fact]
     public async Task A_stream_that_cannot_be_closed_does_not_matter()
     {
         var rig = new Rig();
