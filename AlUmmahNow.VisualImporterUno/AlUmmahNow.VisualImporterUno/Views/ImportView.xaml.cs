@@ -514,11 +514,17 @@ public sealed partial class ImportView : Page
     {
         if (RowOf(sender) is not { } row) return;
         var reference = await ViewModel.SendDiagnosticLogAsync(row);
-        if (!string.IsNullOrEmpty(reference))
+        if (string.IsNullOrEmpty(reference)) return;
+        try
         {
             var package = new DataPackage();
             package.SetText(reference);
             Clipboard.SetContent(package);
+            row.DiagnosticStatus = Loc.Format("Import_LogSent", reference);
+        }
+        catch
+        {
+            // Clipboard unavailable (e.g. headless/remote session): keep "Sent ({ref})" status
         }
     }
 }

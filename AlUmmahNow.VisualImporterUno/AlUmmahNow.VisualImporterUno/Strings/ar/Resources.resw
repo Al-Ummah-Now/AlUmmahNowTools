@@ -4219,6 +4219,12 @@
   <data name="Import_LogSent" xml:space="preserve">
     <value>تم الإرسال ({0}، نُسخ المرجع)</value>
   </data>
+  <data name="Import_LogSentOnly" xml:space="preserve">
+    <value>تم الإرسال ({0})</value>
+  </data>
+  <data name="Import_LogSendEmpty" xml:space="preserve">
+    <value>لا توجد سطور في السجل لإرسالها</value>
+  </data>
   <data name="Import_LogSendFailed" xml:space="preserve">
     <value>تعذّر إرسال السجل التشخيصي</value>
   </data>

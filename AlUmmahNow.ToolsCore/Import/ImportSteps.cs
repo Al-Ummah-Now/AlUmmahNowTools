@@ -608,17 +608,21 @@ public sealed class ServerFailureSink : IImportFailureSink
             },
             reference: reference,
             files: files);
+        // Snapshot item.Log synchronously before any await so a concurrent retry cannot mutate it during enumeration
+        DiagnosticUpload? diagnostic = !answer && !string.IsNullOrEmpty(reference) && _sendDiagnosticLogs()
+            ? DiagnosticLog.Build(item, _release, reference, item.Log.ToList())
+            : null;
         // The encode opens the file's video on the server before its upload
         if (step.Kind is ImportStepKind.Upload or ImportStepKind.Encode && item.ServerItemId is not null && !item.AlreadyImported)
         {
             await _api.MarkFailedAsync(item.ServerItemId, answer ? message : $"{message} (reference {reference})", ct).ConfigureAwait(false);
         }
         await _reporter.FlushAsync(ct).ConfigureAwait(false);
-        if (!answer && !string.IsNullOrEmpty(reference) && _sendDiagnosticLogs())
+        if (diagnostic is not null && diagnostic.EntryCount > 0)
         {
             try
             {
-                await _api.UploadDiagnosticAsync(DiagnosticLog.Build(item, _release, reference), ct).ConfigureAwait(false);
+                await _api.UploadDiagnosticAsync(diagnostic, ct).ConfigureAwait(false);
             }
             catch
             {
