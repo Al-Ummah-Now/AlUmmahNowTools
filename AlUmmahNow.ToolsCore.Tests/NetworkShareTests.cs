@@ -549,22 +549,54 @@ public class NetworkShareReadingTests
         var error = await Assert.ThrowsAsync<SourceReadException>(() => rig.ReadAll());
         Assert.Equal("share_lost", error.Failure.Code);
         Assert.NotNull(networkStart);
-        Assert.InRange((rig.Clock.Now - networkStart!.Value).TotalMinutes, 5.0, 5.5);
+        Assert.InRange((rig.Clock.Now - networkStart!.Value).TotalMinutes, 4.5, 5.5);
     }
 
-    [Fact]
-    public async Task An_empty_file_clears_share_wait_and_announces_its_path_after_recovery()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task An_empty_file_clears_share_wait_and_announces_its_path_after_recovery(bool viaReadAllBytes)
     {
         var rig = new Rig();
         rig.Files.Bytes = Array.Empty<byte>();
         rig.Files.OnOpen = path => rig.Delays.Count < 3 || path != Network ? Dropped() : null;
-        var bytes = await rig.Access.ReadAllBytesAsync(Chosen, rig.Context, default);
-        Assert.Empty(bytes);
+        if (viaReadAllBytes)
+        {
+            var bytes = await rig.Access.ReadAllBytesAsync(Chosen, rig.Context, default);
+            Assert.Empty(bytes);
+        }
+        else
+        {
+            await using var stream = rig.Access.Open(Chosen, null, null, rig.Context);
+            Assert.Equal(0, await stream.ReadAsync(new byte[16]));
+            // Cleared before disposal, not only on Dispose()
+            Assert.Equal(StepWait.None, rig.Context.Wait);
+        }
         Assert.Equal(StepWait.None, rig.Context.Wait);
         var codes = rig.Context.Lines.Select(l => l.Code).ToList();
         var back = codes.IndexOf("share_back");
         Assert.True(back > 0);
         Assert.Equal(new[] { "share_path" }, codes[(back + 1)..].Where(c => c is "share_path" or "share_chosen").ToArray());
+    }
+
+    [Fact]
+    public async Task A_fresh_retry_round_is_not_started_once_the_next_backoff_would_reach_patience()
+    {
+        var rig = new Rig();
+        var firstDrop = rig.Clock.Now;
+        var roundStarts = new List<DateTimeOffset>();
+        rig.Files.OnOpen = path =>
+        {
+            if (path == Network) roundStarts.Add(rig.Clock.Now);
+            // Each open stalls for 2 minutes
+            rig.Clock.Now += TimeSpan.FromMinutes(2);
+            return Dropped();
+        };
+        var error = await Assert.ThrowsAsync<SourceReadException>(() => rig.ReadAll());
+        Assert.Equal("share_lost", error.Failure.Code);
+        // Round 1: 0->4m (first drop at 2m, deadline 7m), waits 1s; Round 2: 4m01s->8m01s -> throws without starting Round 3
+        Assert.Equal(2, roundStarts.Count);
+        Assert.All(roundStarts, started => Assert.True(started - (firstDrop + TimeSpan.FromMinutes(2)) < rig.Access.Patience));
     }
 
     [Fact]

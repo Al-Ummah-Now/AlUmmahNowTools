@@ -454,9 +454,10 @@ internal sealed class SourceAttempts
         _roundStopped = false;
         if (round.Kind == ReadKind.Network) _since ??= _access.Now;
         _rounds++;
+        var wait = TimeSpan.FromSeconds(Math.Min(30, Math.Pow(2, _rounds - 1)));
         var over = round.Kind switch
         {
-            ReadKind.Network => _access.Now - _since!.Value >= _access.Patience,
+            ReadKind.Network => (_access.Now + wait) - _since!.Value >= _access.Patience,
             ReadKind.Brief => _rounds > BriefTries,
             _ => true,
         };
@@ -472,13 +473,7 @@ internal sealed class SourceAttempts
             _waiting = true;
             _context?.Waiting(StepWait.Share);
         }
-        var wait = TimeSpan.FromSeconds(Math.Min(30, Math.Pow(2, _rounds - 1)));
-        if (round.Kind == ReadKind.Network)
-        {
-            var left = _access.Patience - (_access.Now - _since!.Value);
-            if (left < wait) wait = left > TimeSpan.Zero ? left : TimeSpan.Zero;
-        }
-        if (wait > TimeSpan.Zero) await _access.Delay(wait, ct).ConfigureAwait(false);
+        await _access.Delay(wait, ct).ConfigureAwait(false);
     }
 
     private void Log(ReadFailure failure, string path, long? offset)
@@ -577,7 +572,12 @@ public sealed class SourceStream : Stream
             try
             {
                 await OpenAsync(attempts, ct).ConfigureAwait(false);
-                if (_position >= _size!.Value) return 0;
+                if (_position >= _size!.Value)
+                {
+                    attempts.Succeeded(_position);
+                    if (_openPath is { } donePath) _access.Announce(_path, donePath, _context);
+                    return 0;
+                }
                 reading = true;
                 var want = (int)Math.Min(Math.Min(buffer.Length, attempts.Careful(_position) ? CarefulSize : BufferSize), _size.Value - _position);
                 var n = await ReadInnerAsync(attempts, want, ct).ConfigureAwait(false);
