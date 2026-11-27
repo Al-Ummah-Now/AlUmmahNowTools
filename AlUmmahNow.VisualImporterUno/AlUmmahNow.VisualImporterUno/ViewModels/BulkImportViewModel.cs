@@ -567,15 +567,20 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
         if (row.SendingLog) return null;
         var item = _workspace.Queue.Items.FirstOrDefault(i => i.Id == row.Id);
         if (item is null) return null;
+        var lines = _workspace.Queue.LogLines(row.Id);
+        if (lines.Count == 0)
+        {
+            row.DiagnosticStatus = Loc.Get("Import_LogSendEmpty");
+            return null;
+        }
         row.SendingLog = true;
         row.DiagnosticStatus = Loc.Get("Import_LogSending");
         try
         {
-            var lines = _workspace.Queue.LogLines(row.Id);
             var existingRef = lines.LastOrDefault(l => l.Code == "failed" && l.Args is { Length: > 3 } a && !string.IsNullOrWhiteSpace(a[3]))?.Args?[3];
             var upload = DiagnosticLog.Build(item, ImportWorkspace.Release, existingRef, lines);
             var result = await _workspace.Api.UploadDiagnosticAsync(upload);
-            row.DiagnosticStatus = Loc.Format("Import_LogSent", result.Ref);
+            row.DiagnosticStatus = Loc.Format("Import_LogSentOnly", result.Ref);
             return result.Ref;
         }
         catch

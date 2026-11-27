@@ -34,42 +34,50 @@ public class DiagnosticLogTests
         var at = new DateTimeOffset(2026, 11, 26, 15, 0, 0, TimeSpan.Zero);
         var item = SampleItem(
             new LogLine(at, LogLevel.Info, @"Reading O:\Originals\Lesson 01.mp4 via \\Home-NAS\Originals\Lesson 01.mp4", "share_path"),
-            new LogLine(at.AddSeconds(5), LogLevel.Warning, "Auth failed for admin@example.com with Bearer secret_token_1234567890", "auth"),
-            new LogLine(at.AddSeconds(10), LogLevel.Warning, "GET https://api.alummahnow.net/upload?token=abc123&sig=deadbeef failed with 503", "upload"),
+            new LogLine(at.AddSeconds(2), LogLevel.Info, "Relative file ./private/secret.mp4 and ../uploads/clip.mkv", "rel_path"),
+            new LogLine(at.AddSeconds(5), LogLevel.Warning, "Auth failed for admin@example.com with Bearer secret_token_1234567890 X-API-Key: my_synthetic_key_999", "auth"),
+            new LogLine(at.AddSeconds(10), LogLevel.Warning, "GET https://api.alummahnow.net/upload?token=abc123&X-Amz-Signature=deadbeef&sig=cafebabe failed with 503", "upload"),
             new LogLine(at.AddSeconds(15), LogLevel.Error, "Windows error 59 at byte 2448424960: An unexpected network error occurred", "read_error"));
 
         var upload = DiagnosticLog.Build(item, "2026.11.26.2", "ERR-ABCD-1234");
 
         Assert.Equal("ERR-ABCD-1234", upload.Ref);
         Assert.Equal("2026.11.26.2", upload.Release);
-        Assert.Equal(4, upload.EntryCount);
+        Assert.Equal(5, upload.EntryCount);
+        Assert.DoesNotContain("\r", upload.Content);
         Assert.Contains("app=tools release=2026.11.26.2", upload.Content);
         Assert.Contains("itemId=imp_123 videoId=vid_456", upload.Content);
         Assert.Contains("Windows error 59 at byte 2448424960", upload.Content);
         Assert.DoesNotContain("Home-NAS", upload.Content);
         Assert.DoesNotContain(@"O:\Originals", upload.Content);
+        Assert.DoesNotContain("private/secret.mp4", upload.Content);
+        Assert.DoesNotContain("uploads/clip.mkv", upload.Content);
         Assert.DoesNotContain("admin@example.com", upload.Content);
         Assert.DoesNotContain("secret_token_1234567890", upload.Content);
+        Assert.DoesNotContain("my_synthetic_key_999", upload.Content);
         Assert.DoesNotContain("abc123", upload.Content);
         Assert.DoesNotContain("deadbeef", upload.Content);
+        Assert.DoesNotContain("cafebabe", upload.Content);
     }
 
     [Fact]
-    public void Build_truncates_oldest_entries_when_exceeding_max_bytes()
+    public void Build_truncates_oldest_entries_and_oversized_header_strictly_within_max_bytes()
     {
         var at = new DateTimeOffset(2026, 11, 26, 15, 0, 0, TimeSpan.Zero);
-        var chunk = new string('x', 1000);
-        var lines = Enumerable.Range(0, 350)
+        var chunk = new string('x', 520);
+        var lines = Enumerable.Range(0, 500)
             .Select(i => new LogLine(at.AddSeconds(i), LogLevel.Info, $"entry-{i:D4} {chunk}", "step"))
             .ToArray();
         var item = SampleItem(lines);
+        item.ServerItemId = new string('z', 10_000);
 
-        var upload = DiagnosticLog.Build(item, "2026.11.26.2");
+        var upload = DiagnosticLog.Build(item, new string('r', 5_000));
 
+        Assert.DoesNotContain("\r", upload.Content);
         Assert.True(Encoding.UTF8.GetByteCount(upload.Content) <= DiagnosticLog.MaxBytes);
-        Assert.True(upload.EntryCount < 350);
+        Assert.True(upload.EntryCount < 500);
         Assert.Contains("# truncated:", upload.Content);
-        Assert.Contains("entry-0349", upload.Content);
+        Assert.Contains("entry-0499", upload.Content);
         Assert.DoesNotContain("entry-0000", upload.Content);
     }
 

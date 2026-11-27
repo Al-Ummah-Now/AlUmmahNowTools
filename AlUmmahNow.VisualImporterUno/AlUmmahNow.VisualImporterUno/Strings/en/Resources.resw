@@ -3778,6 +3778,12 @@ The posts and videos it already brought stay on the channel.</value>
   <data name="Import_LogSent" xml:space="preserve">
     <value>Sent ({0}, copied)</value>
   </data>
+  <data name="Import_LogSentOnly" xml:space="preserve">
+    <value>Sent ({0})</value>
+  </data>
+  <data name="Import_LogSendEmpty" xml:space="preserve">
+    <value>No log entries to send</value>
+  </data>
   <data name="Import_LogSendFailed" xml:space="preserve">
     <value>Could not send diagnostic log</value>
   </data>
