@@ -367,6 +367,8 @@ public interface IImportStep
 public interface IImportFailureSink
 {
     Task ItemFailedAsync(QueueItem item, StepState step, Exception error, string reference, CancellationToken ct);
+    Task ItemFailedAsync(QueueItem item, StepState step, Exception error, string reference, IReadOnlyList<LogLine>? logSnapshot, CancellationToken ct) =>
+        ItemFailedAsync(item, step, error, reference, ct);
 }
 
 /// <summary>How many of each step run at once, and how often a step is tried before it fails.</summary>
@@ -1054,6 +1056,7 @@ public sealed class ImportQueue : IDisposable
         }
 
         string? reference = null;
+        IReadOnlyList<LogLine>? logSnapshot = null;
         lock (_gate)
         {
             if (failure is null && result == StepResult.NoVideo)
@@ -1125,6 +1128,7 @@ public sealed class ImportQueue : IDisposable
                     if (!step.CanTryAgain) item.Paused = false;
                     reference = StepFailedException.Answers(failure) ? "" : ErrorReport.NewRef();
                     AppendLog(item, LogLevel.Error, "failed", $"{step.Kind}: failed after {step.Attempts} attempt(s): {message}" + (reference.Length > 0 ? $" (reference {reference})" : ""), [step.Kind.ToString(), attempts, code, reference, message, .. read]);
+                    logSnapshot = item.Log.ToList();
                 }
             }
             Finish(item);
@@ -1136,7 +1140,7 @@ public sealed class ImportQueue : IDisposable
         {
             try
             {
-                await _sink.ItemFailedAsync(item, step, failure!, reference, CancellationToken.None).ConfigureAwait(false);
+                await _sink.ItemFailedAsync(item, step, failure!, reference, logSnapshot, CancellationToken.None).ConfigureAwait(false);
             }
             catch (Exception ex)
             {

@@ -585,7 +585,10 @@ public sealed class ServerFailureSink : IImportFailureSink
         _release = release ?? "";
     }
 
-    public async Task ItemFailedAsync(QueueItem item, StepState step, Exception error, string reference, CancellationToken ct)
+    public Task ItemFailedAsync(QueueItem item, StepState step, Exception error, string reference, CancellationToken ct) =>
+        ItemFailedAsync(item, step, error, reference, null, ct);
+
+    public async Task ItemFailedAsync(QueueItem item, StepState step, Exception error, string reference, IReadOnlyList<LogLine>? logSnapshot, CancellationToken ct)
     {
         if (error is StepFailedException { Code: "no_video" }) return;
         // It goes to the server: no folders of this computer
@@ -608,10 +611,19 @@ public sealed class ServerFailureSink : IImportFailureSink
             },
             reference: reference,
             files: files);
-        // Snapshot item.Log synchronously before any await so a concurrent retry cannot mutate it during enumeration
-        DiagnosticUpload? diagnostic = !answer && !string.IsNullOrEmpty(reference) && _sendDiagnosticLogs()
-            ? DiagnosticLog.Build(item, _release, reference, item.Log.ToList())
-            : null;
+        // Build from the lock-captured snapshot (or copy best-effort when called directly) so building never blocks failure reporting
+        DiagnosticUpload? diagnostic = null;
+        if (!answer && !string.IsNullOrEmpty(reference) && _sendDiagnosticLogs())
+        {
+            try
+            {
+                diagnostic = DiagnosticLog.Build(item, _release, reference, logSnapshot ?? item.Log.ToList());
+            }
+            catch
+            {
+                diagnostic = null;
+            }
+        }
         // The encode opens the file's video on the server before its upload
         if (step.Kind is ImportStepKind.Upload or ImportStepKind.Encode && item.ServerItemId is not null && !item.AlreadyImported)
         {
