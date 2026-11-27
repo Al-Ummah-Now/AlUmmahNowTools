@@ -477,6 +477,59 @@ public class NetworkShareReadingTests
     }
 
     [Fact]
+    public async Task Waiting_on_a_stuck_byte_does_not_repeat_path_announcements()
+    {
+        var rig = new Rig();
+        rig.Files.OnRead = (_, offset, _) => offset >= 1 << 20 ? Dropped() : null;
+        var error = await Assert.ThrowsAsync<SourceReadException>(() => rig.ReadAll());
+        Assert.Equal("share_damaged", error.Failure.Code);
+        Assert.True(rig.Delays.Count >= 10);
+        // Only the initial network path and the first fallback to the chosen path, never ping-pong spam on every wait round
+        Assert.Equal(1, rig.Context.Lines.Count(l => l.Code == "share_path"));
+        Assert.Equal(1, rig.Context.Lines.Count(l => l.Code == "share_chosen"));
+        Assert.Equal(2, rig.Context.Lines.Count(l => l.Code == "read_failed"));
+    }
+
+    [Fact]
+    public async Task A_recovered_share_announces_its_path_only_once_reads_resume()
+    {
+        var rig = new Rig();
+        var stuck = false;
+        rig.Files.OnRead = (path, offset, _) =>
+        {
+            if (offset >= 1 << 20 && rig.Delays.Count == 0) stuck = true;
+            if (!stuck) return null;
+            // After four waiting rounds, only the network path answers again
+            return rig.Delays.Count >= 4 && path == Network ? null : Dropped();
+        };
+        Assert.Equal(rig.Files.Bytes, await rig.ReadAll());
+        var codes = rig.Context.Lines.Select(l => l.Code).ToList();
+        var back = codes.IndexOf("share_back");
+        Assert.True(back > 0);
+        // While waiting, neither path was announced again; once reads resumed on Network, it was announced once after share_back
+        Assert.Equal(new[] { "share_path", "share_chosen" }, codes[..back].Where(c => c is "share_path" or "share_chosen").ToArray());
+        Assert.Equal(new[] { "share_path" }, codes[(back + 1)..].Where(c => c is "share_path" or "share_chosen").ToArray());
+    }
+
+    [Fact]
+    public async Task Slow_network_failures_count_against_patience_from_the_first_drop()
+    {
+        var rig = new Rig();
+        var start = rig.Clock.Now;
+        rig.Files.Before = (_, offset) =>
+        {
+            if (offset >= 1 << 20) rig.Clock.Now += TimeSpan.FromSeconds(75);
+            return Task.CompletedTask;
+        };
+        rig.Files.OnRead = (_, offset, _) => offset >= 1 << 20 ? Dropped() : null;
+        var error = await Assert.ThrowsAsync<SourceReadException>(() => rig.ReadAll());
+        Assert.Equal("share_damaged", error.Failure.Code);
+        // Patience (5m) starts on the first drop, not after a full 2.5m round; 3 rounds of 2x75s = 7.5m max (not 10m+)
+        Assert.InRange((rig.Clock.Now - start).TotalMinutes, 5.0, 8.0);
+        Assert.All(rig.Delays, d => Assert.True(d <= TimeSpan.FromSeconds(30)));
+    }
+
+    [Fact]
     public async Task A_stream_that_cannot_be_closed_does_not_matter()
     {
         var rig = new Rig();

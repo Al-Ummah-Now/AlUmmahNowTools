@@ -45,6 +45,8 @@ internal sealed class SentSoFar : IDisposable
     /// <summary>Hashed up to here</summary>
     public long Offset { get; private set; }
     public long PartStart { get; private set; }
+    /// <summary>The saved <c>SentTo</c> offset whose SHA-256 has already matched this hash</summary>
+    public long VerifiedKnown { get; set; }
     private byte[]? _part;
 
     public string Sha256 => Convert.ToHexString(_hash.GetCurrentHash()).ToLowerInvariant();

@@ -239,25 +239,53 @@ public sealed class UploadStep : IImportStep
     private async Task<SentSoFar> SentAsync(QueueItem item, Stream file, long offset, IStepContext context, CancellationToken ct)
     {
         var video = item.Video;
-        if (item.Sending is { } kept)
-        {
-            if (kept.Size == video.Size && kept.ModifiedMs == video.LastModifiedMs && kept.Covers(offset)) return kept;
-            kept.Dispose();
-        }
-        var sent = item.Sending = new SentSoFar(video.Size, video.LastModifiedMs);
-        if (offset == 0) return sent;
-        var from = offset.ToString(CultureInfo.InvariantCulture);
-        context.Log(LogLevel.Info, "sent_check", $"The first {from} bytes were sent before; they are checked again", from);
         var known = item.SentSha256 is not null && item.SentTo > 0 && item.SentTo <= offset ? item.SentTo : 0;
+        SentSoFar sent;
+        if (item.Sending is { } kept && kept.Size == video.Size && kept.ModifiedMs == video.LastModifiedMs)
+        {
+            if (kept.Covers(offset)) return kept;
+            // A prefix check cut short by a dropped share or a pause goes on from where it stopped
+            if (kept.Offset > 0 && kept.Offset < offset && (known == 0 || kept.Offset <= known || kept.VerifiedKnown == known))
+            {
+                sent = kept;
+                var at = sent.Offset.ToString(CultureInfo.InvariantCulture);
+                context.Log(LogLevel.Info, "hash_resumed", $"The check goes on from byte {at}", at);
+            }
+            else
+            {
+                kept.Dispose();
+                sent = item.Sending = new SentSoFar(video.Size, video.LastModifiedMs);
+            }
+        }
+        else
+        {
+            item.Sending?.Dispose();
+            sent = item.Sending = new SentSoFar(video.Size, video.LastModifiedMs);
+        }
+        if (offset == 0) return sent;
+        if (sent.Offset == 0)
+        {
+            var from = offset.ToString(CultureInfo.InvariantCulture);
+            context.Log(LogLevel.Info, "sent_check", $"The first {from} bytes were sent before; they are checked again", from);
+        }
+        if (known > 0 && sent.Offset == known && sent.VerifiedKnown != known)
+        {
+            if (sent.Sha256 != item.SentSha256) throw await DifferentAsync(item, context, ct).ConfigureAwait(false);
+            sent.VerifiedKnown = known;
+        }
         var buffer = new byte[1 << 20];
-        file.Position = 0;
+        file.Position = sent.Offset;
         while (sent.Offset < offset)
         {
             var until = sent.Offset < known ? known : offset;
             var n = await file.ReadAsync(buffer.AsMemory(0, (int)Math.Min(buffer.Length, until - sent.Offset)), ct).ConfigureAwait(false);
             if (n == 0) throw SourceAccess.Changed(read: true);
             sent.Append(buffer.AsSpan(0, n));
-            if (sent.Offset == known && sent.Sha256 != item.SentSha256) throw await DifferentAsync(item, context, ct).ConfigureAwait(false);
+            if (known > 0 && sent.Offset == known)
+            {
+                if (sent.Sha256 != item.SentSha256) throw await DifferentAsync(item, context, ct).ConfigureAwait(false);
+                sent.VerifiedKnown = known;
+            }
         }
         return sent;
     }

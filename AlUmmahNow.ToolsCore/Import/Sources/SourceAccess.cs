@@ -386,6 +386,9 @@ internal sealed class SourceAttempts
     /// <summary>The file is on a share (asked while it was there, or while its drive was still mapped)</summary>
     public bool Network { get; private set; }
 
+    /// <summary>Both paths have already failed at this spot and we are waiting for the share to answer again</summary>
+    public bool Waiting => _waiting;
+
     /// <summary>Reads are kept short around a place a read stopped at, so the offset is exact (and what can be read there is)</summary>
     public bool Careful(long offset) => offset < _carefulUntil;
 
@@ -439,6 +442,7 @@ internal sealed class SourceAttempts
 
         // The round's failure is the one waiting can help with, if any path had one
         if (_roundFailure is null || (failure.Kind == ReadKind.Network && _roundFailure.Kind != ReadKind.Network)) _roundFailure = failure;
+        if (failure.Kind == ReadKind.Network) _since ??= _access.Now;
         _failedPaths++;
         _index = (_index + 1) % _candidates.Count;
         if (_failedPaths < _candidates.Count) return;
@@ -468,7 +472,13 @@ internal sealed class SourceAttempts
             _waiting = true;
             _context?.Waiting(StepWait.Share);
         }
-        await _access.Delay(TimeSpan.FromSeconds(Math.Min(30, Math.Pow(2, _rounds - 1))), ct).ConfigureAwait(false);
+        var wait = TimeSpan.FromSeconds(Math.Min(30, Math.Pow(2, _rounds - 1)));
+        if (round.Kind == ReadKind.Network)
+        {
+            var left = _access.Patience - (_access.Now - _since.Value);
+            if (left < wait) wait = left > TimeSpan.Zero ? left : TimeSpan.Zero;
+        }
+        if (wait > TimeSpan.Zero) await _access.Delay(wait, ct).ConfigureAwait(false);
     }
 
     private void Log(ReadFailure failure, string path, long? offset)
@@ -499,6 +509,7 @@ public sealed class SourceStream : Stream
     private long? _size;
     private long? _modifiedMs;
     private Stream? _inner;
+    private string? _openPath;
     private byte[]? _buffer;
     private long _position;
     private bool _wasOpen;
@@ -570,6 +581,7 @@ public sealed class SourceStream : Stream
                 _buffer.AsMemory(0, n).CopyTo(buffer);
                 _position += n;
                 attempts.Succeeded(_position);
+                if (_openPath is { } openPath) _access.Announce(_path, openPath, _context);
                 if (_cloud) Downloaded();
                 return n;
             }
@@ -623,8 +635,9 @@ public sealed class SourceStream : Stream
         _size = opened.Stat.Length;
         _modifiedMs = opened.Stat.ModifiedMs;
         _inner = opened.Stream;
+        _openPath = path;
         _wasOpen = true;
-        _access.Announce(_path, path, _context);
+        if (!attempts.Waiting) _access.Announce(_path, path, _context);
         if (opened.Stat.InCloud && !_cloud)
         {
             _cloud = true;
@@ -643,6 +656,7 @@ public sealed class SourceStream : Stream
     {
         if (_inner is { } inner) CloseLater(inner);
         _inner = null;
+        _openPath = null;
     }
 
     /// <summary>Closing a file on a dead share may block too.</summary>
