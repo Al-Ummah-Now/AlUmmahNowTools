@@ -1,1 +1,1 @@
-You can now turn on diagnostic logs in Settings (off by default) to include a redacted log excerpt when reporting an import problem, or send a diagnostic log on demand to get a reference code for support.
+You can now turn on diagnostic log sharing in Settings (off by default) to include a redacted log excerpt when reporting an import problem, or use Send diagnostic log on demand to get a reference code for support.
