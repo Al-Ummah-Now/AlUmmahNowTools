@@ -482,9 +482,10 @@ public sealed class ContentCheckTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task A_sent_check_cut_short_by_a_dropped_share_goes_on_from_where_it_stopped(bool changedAfter)
+    [InlineData("none")]
+    [InlineData("before")]
+    [InlineData("after")]
+    public async Task A_sent_check_cut_short_by_a_dropped_share_goes_on_from_where_it_stopped(string mutation)
     {
         var item = Item(Mp4IndexTests.File("vide"));
         var server = new FakeServer { LoseAt = 2000, LoseKeeps = true };
@@ -493,6 +494,7 @@ public sealed class ContentCheckTests
         Assert.Equal(2000, item.SentTo);
 
         var bytes = File.ReadAllBytes(item.Video.Path);
+        if (mutation == "before") bytes[100] ^= 1;
         var offsets = new List<long>();
         var dropped = true;
         var clock = new TestClock();
@@ -516,9 +518,9 @@ public sealed class ContentCheckTests
 
         dropped = false;
         offsets.Clear();
-        if (changedAfter) bytes[1500] ^= 1;
+        if (mutation == "after") bytes[1500] ^= 1;
         var secondContext = new RecordingContext();
-        if (changedAfter)
+        if (mutation != "none")
         {
             Assert.Equal("content_changed", await Refused(() => Step(server, source: access).RunAsync(item, secondContext, default)));
             Assert.Empty(server.Uploads);

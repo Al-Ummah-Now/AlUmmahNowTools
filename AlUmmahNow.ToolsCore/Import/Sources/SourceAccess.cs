@@ -452,11 +452,11 @@ internal sealed class SourceAttempts
         _failedPaths = 0;
         _roundFailure = null;
         _roundStopped = false;
-        _since ??= _access.Now;
+        if (round.Kind == ReadKind.Network) _since ??= _access.Now;
         _rounds++;
         var over = round.Kind switch
         {
-            ReadKind.Network => _access.Now - _since.Value >= _access.Patience,
+            ReadKind.Network => _access.Now - _since!.Value >= _access.Patience,
             ReadKind.Brief => _rounds > BriefTries,
             _ => true,
         };
@@ -475,7 +475,7 @@ internal sealed class SourceAttempts
         var wait = TimeSpan.FromSeconds(Math.Min(30, Math.Pow(2, _rounds - 1)));
         if (round.Kind == ReadKind.Network)
         {
-            var left = _access.Patience - (_access.Now - _since.Value);
+            var left = _access.Patience - (_access.Now - _since!.Value);
             if (left < wait) wait = left > TimeSpan.Zero ? left : TimeSpan.Zero;
         }
         if (wait > TimeSpan.Zero) await _access.Delay(wait, ct).ConfigureAwait(false);
@@ -552,6 +552,11 @@ public sealed class SourceStream : Stream
             try
             {
                 await OpenAsync(attempts, ct).ConfigureAwait(false);
+                if (_size == 0)
+                {
+                    attempts.Succeeded(0);
+                    if (_openPath is { } openPath) _access.Announce(_path, openPath, _context);
+                }
             }
             catch (Exception ex) when (IsFailure(ex))
             {
