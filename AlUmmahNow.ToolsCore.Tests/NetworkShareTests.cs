@@ -583,20 +583,40 @@ public class NetworkShareReadingTests
     public async Task A_fresh_retry_round_is_not_started_once_the_next_backoff_would_reach_patience()
     {
         var rig = new Rig();
-        var firstDrop = rig.Clock.Now;
         var roundStarts = new List<DateTimeOffset>();
         rig.Files.OnOpen = path =>
         {
             if (path == Network) roundStarts.Add(rig.Clock.Now);
-            // Each open stalls for 2 minutes
-            rig.Clock.Now += TimeSpan.FromMinutes(2);
+            // First path fails at t=0 (_since=0); second path takes 4m59s so the 1s backoff lands exactly on the 5m deadline
+            if (path == Chosen) rig.Clock.Now += TimeSpan.FromSeconds(299);
             return Dropped();
         };
         var error = await Assert.ThrowsAsync<SourceReadException>(() => rig.ReadAll());
         Assert.Equal("share_lost", error.Failure.Code);
-        // Round 1: 0->4m (first drop at 2m, deadline 7m), waits 1s; Round 2: 4m01s->8m01s -> throws without starting Round 3
-        Assert.Equal(2, roundStarts.Count);
-        Assert.All(roundStarts, started => Assert.True(started - (firstDrop + TimeSpan.FromMinutes(2)) < rig.Access.Patience));
+        Assert.Single(roundStarts);
+        Assert.Empty(rig.Delays);
+    }
+
+    [Fact]
+    public async Task A_delay_that_resumes_at_or_after_patience_does_not_start_another_round()
+    {
+        var rig = new Rig();
+        var roundStarts = new List<DateTimeOffset>();
+        rig.Files.OnOpen = path =>
+        {
+            if (path == Network) roundStarts.Add(rig.Clock.Now);
+            return Dropped();
+        };
+        rig.OnDelay = () =>
+        {
+            // Simulate a late wake (e.g. machine sleep) that resumes past the 5m deadline
+            rig.Clock.Now += TimeSpan.FromMinutes(6);
+        };
+        var error = await Assert.ThrowsAsync<SourceReadException>(() => rig.ReadAll());
+        Assert.Equal("share_lost", error.Failure.Code);
+        Assert.Single(roundStarts);
+        Assert.Single(rig.Delays);
+        Assert.Equal(StepWait.None, rig.Context.Wait);
     }
 
     [Fact]

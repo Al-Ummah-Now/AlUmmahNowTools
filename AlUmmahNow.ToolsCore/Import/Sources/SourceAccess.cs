@@ -454,6 +454,18 @@ internal sealed class SourceAttempts
         _roundStopped = false;
         if (round.Kind == ReadKind.Network) _since ??= _access.Now;
         _rounds++;
+        SourceReadException Fail()
+        {
+            if (_waiting)
+            {
+                _waiting = false;
+                _context?.Waiting(StepWait.None);
+            }
+            // A path opens the file to the last, and its read stops at one place each time: the file itself, whichever path
+            // was tried last (the other may not open at all)
+            if (round.Kind == ReadKind.Network && stopped && _stops >= 3) round = round with { Code = "share_damaged", Kind = ReadKind.Final };
+            return new SourceReadException(round, offset ?? _stopOffset, error);
+        }
         var wait = TimeSpan.FromSeconds(Math.Min(30, Math.Pow(2, _rounds - 1)));
         var over = round.Kind switch
         {
@@ -461,19 +473,14 @@ internal sealed class SourceAttempts
             ReadKind.Brief => _rounds > BriefTries,
             _ => true,
         };
-        if (over)
-        {
-            // A path opens the file to the last, and its read stops at one place each time: the file itself, whichever path
-            // was tried last (the other may not open at all)
-            if (round.Kind == ReadKind.Network && stopped && _stops >= 3) round = round with { Code = "share_damaged", Kind = ReadKind.Final };
-            throw new SourceReadException(round, offset ?? _stopOffset, error);
-        }
+        if (over) throw Fail();
         if (round.Kind == ReadKind.Network && !_waiting)
         {
             _waiting = true;
             _context?.Waiting(StepWait.Share);
         }
         await _access.Delay(wait, ct).ConfigureAwait(false);
+        if (round.Kind == ReadKind.Network && _access.Now - _since!.Value >= _access.Patience) throw Fail();
     }
 
     private void Log(ReadFailure failure, string path, long? offset)
