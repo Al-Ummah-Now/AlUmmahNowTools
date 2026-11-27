@@ -269,11 +269,12 @@ public sealed class ContentCheckTests
         return item;
     }
 
-    private static UploadStep Step(FakeServer server, IMediaTools? media = null) => new(
+    private static UploadStep Step(FakeServer server, IMediaTools? media = null, SourceAccess? source = null) => new(
         new ImportApiClient(new Uri("https://admin.api.example"), _ => Task.FromResult<string?>("tok"), server),
         new TusClient(server),
         new Uri("https://videos.api.example"),
         _ => Task.FromResult<string?>("tok"),
+        source: source,
         media: media);
 
     private static async Task<string> Refused(Func<Task> work, bool retryable = false)
@@ -435,6 +436,102 @@ public sealed class ContentCheckTests
         Assert.Contains(context.Lines, l => l.Code == "sent_check");
         Assert.Equal(changed, server.Uploads.Count == 0);
         if (!changed) Assert.Equal(File.ReadAllBytes(item.Video.Path), Assert.Single(server.Uploads).Value.Data.ToArray());
+    }
+
+    private sealed class PartialReadStream(byte[] data, List<long> offsets, Func<long, int, int> limit) : Stream
+    {
+        private long _pos;
+        public override bool CanRead => true;
+        public override bool CanSeek => true;
+        public override bool CanWrite => false;
+        public override long Length => data.Length;
+        public override long Position { get => _pos; set => _pos = value; }
+        public override void Flush() { }
+        public override int Read(byte[] buffer, int offset, int count) => ReadAsync(buffer.AsMemory(offset, count)).AsTask().GetAwaiter().GetResult();
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken ct = default)
+        {
+            var n = limit(_pos, Math.Min(buffer.Length, (int)(data.Length - _pos)));
+            offsets.Add(_pos);
+            data.AsSpan((int)_pos, n).CopyTo(buffer.Span);
+            _pos += n;
+            return ValueTask.FromResult(n);
+        }
+        public override long Seek(long offset, SeekOrigin origin) => _pos = origin switch { SeekOrigin.Begin => offset, SeekOrigin.Current => _pos + offset, _ => data.Length + offset };
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    }
+
+    private sealed class ShareFiles(byte[] data, long modified, List<long> offsets, Func<long, int, int> limit) : ISourceFileSystem
+    {
+        public SourceStat Stat(string path) => new(data.Length, modified);
+        public OpenedSource Open(string path) => new(new PartialReadStream(data, offsets, limit), new SourceStat(data.Length, modified));
+        public bool RootAnswers(string path) => true;
+        public bool FolderExists(string path) => true;
+    }
+
+    private sealed class OneNetwork : INetworkPaths
+    {
+        public string? Mapped(string path) => null;
+        public bool IsNetwork(string path) => true;
+    }
+
+    private sealed class TestClock : TimeProvider
+    {
+        public DateTimeOffset Now = new(2026, 11, 26, 12, 0, 0, TimeSpan.Zero);
+        public override DateTimeOffset GetUtcNow() => Now;
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task A_sent_check_cut_short_by_a_dropped_share_goes_on_from_where_it_stopped(bool changedAfter)
+    {
+        var item = Item(Mp4IndexTests.File("vide"));
+        var server = new FakeServer { LoseAt = 2000, LoseKeeps = true };
+        await Assert.ThrowsAsync<TusException>(() => Step(server).RunAsync(item, new RecordingContext(), default));
+        item = Restarted(item);
+        Assert.Equal(2000, item.SentTo);
+
+        var bytes = File.ReadAllBytes(item.Video.Path);
+        var offsets = new List<long>();
+        var dropped = true;
+        var clock = new TestClock();
+        var dropEx = () => new IOException("dropped", OperatingSystem.IsWindows() ? unchecked((int)0x8007003B) : OperatingSystem.IsMacOS() ? 60 : 110);
+        var access = new SourceAccess(
+            new OneNetwork(),
+            new ShareFiles(bytes, item.Video.LastModifiedMs, offsets, (pos, want) =>
+            {
+                if (dropped && pos == 0) return Math.Min(want, 1024);
+                if (dropped && pos >= 1024) throw dropEx();
+                return want;
+            }),
+            clock,
+            (wait, _) => { clock.Now += wait; return Task.CompletedTask; });
+
+        var firstContext = new RecordingContext();
+        await Assert.ThrowsAsync<SourceReadException>(() => Step(server, source: access).RunAsync(item, firstContext, default));
+        Assert.Contains(firstContext.Lines, l => l.Code == "sent_check");
+        Assert.NotNull(item.Sending);
+        Assert.Equal(1024, item.Sending!.Offset);
+
+        dropped = false;
+        offsets.Clear();
+        if (changedAfter) bytes[1500] ^= 1;
+        var secondContext = new RecordingContext();
+        if (changedAfter)
+        {
+            Assert.Equal("content_changed", await Refused(() => Step(server, source: access).RunAsync(item, secondContext, default)));
+            Assert.Empty(server.Uploads);
+        }
+        else
+        {
+            Assert.Equal(StepResult.Done, await Step(server, source: access).RunAsync(item, secondContext, default));
+            Assert.Equal(bytes, Assert.Single(server.Uploads).Value.Data.ToArray());
+        }
+        Assert.Contains(secondContext.Lines, l => l.Code == "hash_resumed");
+        Assert.DoesNotContain(secondContext.Lines, l => l.Code == "sent_check");
+        // Bytes before 1024 were never read a second time
+        Assert.All(offsets, pos => Assert.True(pos >= 1024, $"re-read offset {pos}"));
     }
 
     [Fact]
