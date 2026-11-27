@@ -24,7 +24,8 @@ public static class DiagnosticLog
     private static readonly Regex RelativePathPattern = new(@"(?:^|(?<=[\s""'(:=]))(?:\.{1,2}/[^\s""')]+|[^\s""'():=/\\]+(?:/[^\s""'():=/\\]+)+)", RegexOptions.CultureInvariant, Timeout);
     private static readonly Regex EmailPattern = new(@"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", Options, Timeout);
     private static readonly Regex BearerPattern = new(@"\bBearer\s+[A-Za-z0-9\-._~+/]+=*", Options, Timeout);
-    private static readonly Regex HeaderSecretPattern = new(@"\b((?:x-api-key|x-internal-api-key|authorization)\s*[:=]\s*)(?:(?:Basic|Bearer|Digest|Token)\s+)?[^\s,;]+", Options, Timeout);
+    private static readonly Regex DigestHeaderPattern = new(@"\b(authorization\s*[:=]\s*Digest\s+)[^\r\n]+", Options, Timeout);
+    private static readonly Regex HeaderSecretPattern = new(@"\b((?:x-api-key|x-internal-api-key|authorization)\s*[:=]\s*)(?:(?:Basic|Bearer|Token)\s+)?[^\s,;]+", Options, Timeout);
     private static readonly Regex JwtPattern = new(@"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b", RegexOptions.CultureInvariant, Timeout);
     private static readonly Regex QuerySecretPattern = new(@"([?&](?:token|access_token|refresh_token|key|api_key|apikey|sig|signature|auth|secret|password|x-amz-signature|x-amz-credential|x-amz-security-token)=)[^&\s""']+", Options, Timeout);
     private static readonly Regex ApiKeyPattern = new(@"\b(?:re|sk|pk|ghp|gho|ghu|ghs)_[A-Za-z0-9_-]{12,}\b", RegexOptions.CultureInvariant, Timeout);
@@ -66,6 +67,7 @@ public static class DiagnosticLog
         try
         {
             text = BearerPattern.Replace(text, "Bearer [redacted]");
+            text = DigestHeaderPattern.Replace(text, "$1[redacted]");
             text = HeaderSecretPattern.Replace(text, "$1[redacted]");
             text = JwtPattern.Replace(text, "[jwt]");
             text = QuerySecretPattern.Replace(text, "$1[redacted]");
