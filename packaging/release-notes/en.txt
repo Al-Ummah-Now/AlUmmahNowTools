@@ -1,1 +1,1 @@
-Imports from an unreliable network share no longer fill the log with repeated messages while waiting for the share to come back, avoid starting another retry round once the wait limit is reached, and resume checking the part of the file already uploaded instead of rereading it from the start.
+You can now turn on diagnostic logs in Settings (off by default) to include a redacted log excerpt when reporting an import problem, or send a diagnostic log on demand to get a reference code for support.
