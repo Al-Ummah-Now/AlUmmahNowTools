@@ -1,1 +1,1 @@
-Files with sound and no video now show a neutral No video status instead of an error. New audio-only imports skip creating a server item, uploading, and reporting a failure, and replacing the file on disk enables Retry.
+Imports from a flaky network share no longer flood the log while waiting for the share to come back, stop retrying on time when the share stalls, and resume interrupted upload checks where they left off instead of rereading the file from the start.
