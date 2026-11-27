@@ -54,7 +54,7 @@ public sealed class ImportWorkspace : IDisposable
             ? Path.Combine(Path.GetTempPath(), "aun-tools-demo-" + Guid.NewGuid().ToString("N"), "queue.json")
             : ImportQueue.DefaultPath(Environment);
         WorkFiles.Skipped = text => Serilog.Log.Warning("[Import] {Text}", text);
-        Queue = new ImportQueue(path, steps, new ServerFailureSink(Api, Reporter), work: IsDemo ? null : WorkFolders.Default) { LookAtFile = AlUmmahNow.ToolsCore.Import.Sources.SourceAccess.Default.LookAsync };
+        Queue = new ImportQueue(path, steps, new ServerFailureSink(Api, Reporter, () => shell.Preferences.SendDiagnosticLogs, Release), work: IsDemo ? null : WorkFolders.Default) { LookAtFile = AlUmmahNow.ToolsCore.Import.Sources.SourceAccess.Default.LookAsync };
         if (IsDemo)
         {
             // Screenshots show a queue in every state; nothing runs and nothing is sent
@@ -639,6 +639,10 @@ internal sealed class DemoImportServer : HttpMessageHandler
         else if (path == "/api/admin/import/batches")
         {
             body = "{\"success\":true,\"result\":{\"batch\":{\"id\":\"batch_demo_2\",\"channelId\":\"" + DemoImport.ChannelId + "\",\"name\":null}}}";
+        }
+        else if (path == "/api/admin/import/diagnostics")
+        {
+            body = "{\"success\":true,\"result\":{\"ref\":\"ERR-DEMO-DIAG\",\"sizeBytes\":256,\"storedBytes\":180,\"entryCount\":5}}";
         }
         else if (path == "/api/translate/fields")
         {

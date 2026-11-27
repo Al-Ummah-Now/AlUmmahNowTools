@@ -561,6 +561,34 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
     public string LogTextFor(QueueRow row) =>
         row.FileName + "\n" + string.Join("\n", _workspace.Queue.LogLines(row.Id).Select(l => $"{Loc.TimeWithZone(l.At.LocalDateTime)}  {LogText(l).Replace("\n", " — ")}"));
 
+    /// <summary>Scrubs and uploads this file's diagnostic log on demand; returns the reference on success.</summary>
+    public async Task<string?> SendDiagnosticLogAsync(QueueRow row)
+    {
+        if (row.SendingLog) return null;
+        var item = _workspace.Queue.Items.FirstOrDefault(i => i.Id == row.Id);
+        if (item is null) return null;
+        row.SendingLog = true;
+        row.DiagnosticStatus = Loc.Get("Import_LogSending");
+        try
+        {
+            var lines = _workspace.Queue.LogLines(row.Id);
+            var existingRef = lines.LastOrDefault(l => l.Code == "failed" && l.Args is { Length: > 3 } a && !string.IsNullOrWhiteSpace(a[3]))?.Args?[3];
+            var upload = DiagnosticLog.Build(item, ImportWorkspace.Release, existingRef, lines);
+            var result = await _workspace.Api.UploadDiagnosticAsync(upload);
+            row.DiagnosticStatus = Loc.Format("Import_LogSent", result.Ref);
+            return result.Ref;
+        }
+        catch
+        {
+            row.DiagnosticStatus = Loc.Get("Import_LogSendFailed");
+            return null;
+        }
+        finally
+        {
+            row.SendingLog = false;
+        }
+    }
+
     private void OnQueueChanged(string? id)
     {
         if (_disposed) return;
@@ -1002,6 +1030,14 @@ public sealed partial class QueueRow : ObservableObject
     public bool RemoveLast => !RemoveFirst;
     [ObservableProperty] private bool _showLog;
     [ObservableProperty] private bool _logCopied;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanSendLog))]
+    private bool _sendingLog;
+    public bool CanSendLog => !SendingLog;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasDiagnosticStatus))]
+    private string _diagnosticStatus = "";
+    public bool HasDiagnosticStatus => !string.IsNullOrEmpty(DiagnosticStatus);
 
     /// <summary>The log under the row while it is open: one entry per event, each line of it on its own.</summary>
     public ObservableCollection<LogEntry> LogEntries { get; } = new();

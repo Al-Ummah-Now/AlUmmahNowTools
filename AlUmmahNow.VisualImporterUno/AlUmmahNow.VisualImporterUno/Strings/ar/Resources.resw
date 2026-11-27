@@ -4201,4 +4201,25 @@
   <data name="Quit_Keep" xml:space="preserve">
     <value>استمرار العمل</value>
   </data>
+  <data name="Settings_DiagnosticsTitle.Text" xml:space="preserve">
+    <value>التشخيص</value>
+  </data>
+  <data name="Settings_DiagnosticsAuto" xml:space="preserve">
+    <value>إرفاق سجل تشخيصي مُنقّح مع تقارير الأخطاء</value>
+  </data>
+  <data name="Settings_DiagnosticsHint.Text" xml:space="preserve">
+    <value>مُعطّل افتراضيًا. عند التفعيل، تُرفق محاولات الاستيراد الفاشلة سجلًا مُنقّحًا للمحاولات والخطوات لتسهيل تشخيص الأعطال. تُزال مسارات المجلدات وأسماء الأقراص والرموز السرية قبل الإرسال، وتُحذف السجلات تلقائيًا بعد ٣٠ يومًا.</value>
+  </data>
+  <data name="Import_LogSendButton.Text" xml:space="preserve">
+    <value>إرسال سجل تشخيصي</value>
+  </data>
+  <data name="Import_LogSending" xml:space="preserve">
+    <value>جارٍ الإرسال…</value>
+  </data>
+  <data name="Import_LogSent" xml:space="preserve">
+    <value>تم الإرسال ({0}، نُسخ المرجع)</value>
+  </data>
+  <data name="Import_LogSendFailed" xml:space="preserve">
+    <value>تعذّر إرسال السجل التشخيصي</value>
+  </data>
 </root>
