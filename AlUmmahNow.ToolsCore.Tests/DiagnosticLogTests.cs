@@ -36,6 +36,7 @@ public class DiagnosticLogTests
             new LogLine(at, LogLevel.Info, @"Reading O:\Originals\Lesson 01.mp4 via \\Home-NAS\Originals\Lesson 01.mp4", "share_path"),
             new LogLine(at.AddSeconds(2), LogLevel.Info, "Relative file ./private/secret.mp4 and ../uploads/clip.mkv and دروس/clip.mp4", "rel_path"),
             new LogLine(at.AddSeconds(5), LogLevel.Warning, "Auth failed for admin@example.com with Bearer secret_token_1234567890 X-API-Key: my_synthetic_key_999 Authorization: Basic dXNlcjpwYXNz", "auth"),
+            new LogLine(at.AddSeconds(6), LogLevel.Warning, "Authorization: Digest username=\"u\", realm=\"r\", uri=\"https://api.alummahnow.net/x\", response=\"deadbeefdigest999\"", "digest"),
             new LogLine(at.AddSeconds(10), LogLevel.Warning, "GET https://api.alummahnow.net/upload?token=abc123&X-Amz-Signature=deadbeef&sig=cafebabe failed with 503", "upload"),
             new LogLine(at.AddSeconds(15), LogLevel.Error, "Windows error 59 at byte 2448424960: An unexpected network error occurred", "read_error"));
 
@@ -43,7 +44,7 @@ public class DiagnosticLogTests
 
         Assert.Equal("ERR-ABCD-1234", upload.Ref);
         Assert.Equal("2026.11.26.2", upload.Release);
-        Assert.Equal(5, upload.EntryCount);
+        Assert.Equal(6, upload.EntryCount);
         Assert.DoesNotContain("\r", upload.Content);
         Assert.Contains("app=tools release=2026.11.26.2", upload.Content);
         Assert.Contains("itemId=imp_123 videoId=vid_456", upload.Content);
@@ -57,6 +58,7 @@ public class DiagnosticLogTests
         Assert.DoesNotContain("secret_token_1234567890", upload.Content);
         Assert.DoesNotContain("my_synthetic_key_999", upload.Content);
         Assert.DoesNotContain("dXNlcjpwYXNz", upload.Content);
+        Assert.DoesNotContain("deadbeefdigest999", upload.Content);
         Assert.DoesNotContain("abc123", upload.Content);
         Assert.DoesNotContain("deadbeef", upload.Content);
         Assert.DoesNotContain("cafebabe", upload.Content);
