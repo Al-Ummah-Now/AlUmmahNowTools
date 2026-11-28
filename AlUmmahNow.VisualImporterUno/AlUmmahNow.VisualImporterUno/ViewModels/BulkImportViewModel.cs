@@ -702,6 +702,7 @@ public sealed partial class BulkImportViewModel : ObservableObject, IDisposable
         {
             // A file name, hash, id or reference goes on its own line: Uno only reverses the Arabic runs of a mixed line
             "added" or "sha" or "upload_opened" or "upload_reopened" or "uploaded" or "already_imported" => Loc.WithDetail(Loc.Get("ImportLog_" + line.Code), Arg(0)),
+            "upload_restarted" => Loc.RightToLeftLine(Loc.Get("ImportLog_upload_restarted")),
             "paused" or "resumed" or "finished" or "session_ended" or "video_unchecked" or "video_undecided" or "no_video" or "no_video_found" => Loc.Get("ImportLog_" + line.Code),
             "report_failed" => Loc.WithDetail(Loc.Get("ImportLog_report_failed"), ErrorText(Arg(0), Arg(1))),
             "retry" or "started" or "stopped" or "done" or "skipped" => Loc.Format("ImportLog_" + line.Code, StepName(Arg(0))),

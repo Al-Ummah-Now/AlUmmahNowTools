@@ -2316,6 +2316,9 @@ Try again.</value>
   <data name="ImportLog_finished" xml:space="preserve">
     <value>Finished</value>
   </data>
+  <data name="ImportLog_upload_restarted" xml:space="preserve">
+    <value>The server lost the upload. Sending the file again from the beginning.</value>
+  </data>
   <data name="ImportLog_session_ended" xml:space="preserve">
     <value>The upload session ended; opening it again</value>
   </data>
