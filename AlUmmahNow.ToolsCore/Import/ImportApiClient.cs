@@ -352,8 +352,42 @@ public partial class ImportApiClient
     {
         _base = adminApi;
         _token = token;
-        _http = new HttpClient(handler ?? new HttpClientHandler(), disposeHandler: true) { Timeout = TimeSpan.FromSeconds(60) };
+        _http = new HttpClient(handler ?? new HttpClientHandler { AllowAutoRedirect = false }, disposeHandler: true) { Timeout = TimeSpan.FromSeconds(60) };
         _http.DefaultRequestHeaders.UserAgent.ParseAdd("AlUmmahNowTools/1.0");
+    }
+
+    internal static string SafePathSegment(string value, string paramName)
+    {
+        if (string.IsNullOrEmpty(value)
+            || value.All(c => c == '.')
+            || value.Any(c => c is '/' or '\\' or '?' or '#' or '\0' || c < ' ' || c == '\u007F'))
+        {
+            throw new ArgumentException($"Invalid URL path segment for {paramName}.", paramName);
+        }
+        return Uri.EscapeDataString(value);
+    }
+
+    internal static Uri ResolveSameOrigin(Uri baseUri, string relativePath)
+    {
+        if (!ShellBrowserLauncher.IsAllowedUri(baseUri))
+            throw new ArgumentException("Refused insecure API base URI.", nameof(baseUri));
+        if (string.IsNullOrEmpty(relativePath)
+            || !relativePath.StartsWith('/')
+            || relativePath.StartsWith("//", StringComparison.Ordinal)
+            || relativePath.IndexOfAny(new[] { '\\', '\r', '\n', '\0' }) >= 0)
+        {
+            throw new ArgumentException("Refused unsafe API path.", nameof(relativePath));
+        }
+        var pathOnly = relativePath.Split(new[] { '?', '#' }, 2)[0];
+        foreach (var segment in pathOnly.Split('/', StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (segment is "." or "..")
+                throw new ArgumentException("Refused path traversal segment.", nameof(relativePath));
+        }
+        var resolved = new Uri(baseUri, relativePath);
+        if (!TusClient.SameOrigin(baseUri, resolved))
+            throw new ArgumentException("API request escaped base origin.", nameof(relativePath));
+        return resolved;
     }
 
     /// <summary>Channels matching <paramref name="query"/> (name or handle), 20 per page.</summary>
@@ -430,7 +464,7 @@ public partial class ImportApiClient
     /// </summary>
     public virtual async Task<OpenedItem> OpenItemAsync(string batchId, ItemUploadRequest request, CancellationToken ct = default)
     {
-        var result = await SendAsync(HttpMethod.Post, $"/api/admin/import/batches/{Uri.EscapeDataString(batchId)}/items", request.ToBody(), ct).ConfigureAwait(false);
+        var result = await SendAsync(HttpMethod.Post, $"/api/admin/import/batches/{SafePathSegment(batchId, nameof(batchId))}/items", request.ToBody(), ct).ConfigureAwait(false);
         var item = result?["item"]?.Deserialize<ImportItemRecord>(Json);
         var upload = result?["upload"]?.Deserialize<UploadSession>(Json);
         if (item is null || upload is null || string.IsNullOrEmpty(upload.TusSessionId)) throw Unreadable();
@@ -438,17 +472,17 @@ public partial class ImportApiClient
     }
 
     public virtual Task MarkUploadedAsync(string itemId, CancellationToken ct = default) =>
-        SendAsync(HttpMethod.Post, $"/api/admin/import/items/{Uri.EscapeDataString(itemId)}/uploaded", new { }, ct);
+        SendAsync(HttpMethod.Post, $"/api/admin/import/items/{SafePathSegment(itemId, nameof(itemId))}/uploaded", new { }, ct);
 
     /// <summary>Queues the attach job for the item's video; answers its job id.</summary>
     public virtual async Task<string?> AttachSidecarsAsync(string itemId, SidecarPayload sidecars, CancellationToken ct = default)
     {
-        var result = await SendAsync(HttpMethod.Post, $"/api/admin/import/items/{Uri.EscapeDataString(itemId)}/sidecars", sidecars, ct).ConfigureAwait(false);
+        var result = await SendAsync(HttpMethod.Post, $"/api/admin/import/items/{SafePathSegment(itemId, nameof(itemId))}/sidecars", sidecars, ct).ConfigureAwait(false);
         return result?["jobId"]?.GetValue<string>();
     }
 
     public virtual Task MarkFailedAsync(string itemId, string error, CancellationToken ct = default) =>
-        SendAsync(HttpMethod.Post, $"/api/admin/import/items/{Uri.EscapeDataString(itemId)}/failed", new { error }, ct);
+        SendAsync(HttpMethod.Post, $"/api/admin/import/items/{SafePathSegment(itemId, nameof(itemId))}/failed", new { error }, ct);
 
     /// <summary>The server's ladder and limits; with a channel, whether R2 transcodes its uploads (renditions are used only then).</summary>
     public virtual async Task<EncodingSettings> GetEncodingAsync(string? channelId, CancellationToken ct = default)
@@ -461,7 +495,7 @@ public partial class ImportApiClient
     /// <summary>Declares the rungs and files for the item's video; answers the staging.</summary>
     public virtual async Task<RenditionStaging> StageRenditionsAsync(string itemId, IReadOnlyList<string> rungs, IReadOnlyList<RenditionFile> files, string encoder, CancellationToken ct = default)
     {
-        var result = await SendAsync(HttpMethod.Post, $"/api/admin/import/items/{Uri.EscapeDataString(itemId)}/renditions", new { rungs, files, encoder }, ct).ConfigureAwait(false);
+        var result = await SendAsync(HttpMethod.Post, $"/api/admin/import/items/{SafePathSegment(itemId, nameof(itemId))}/renditions", new { rungs, files, encoder }, ct).ConfigureAwait(false);
         return result?.Deserialize<RenditionStaging>(Json) ?? throw Unreadable();
     }
 
@@ -469,7 +503,11 @@ public partial class ImportApiClient
     public virtual Task PutRenditionFileAsync(string itemId, string stagingId, string path, Stream content, long length, CancellationToken ct = default)
     {
         var slash = path.IndexOf('/');
-        var url = $"/api/admin/import/items/{Uri.EscapeDataString(itemId)}/renditions/{Uri.EscapeDataString(stagingId)}/files/{Uri.EscapeDataString(path[..slash])}/{Uri.EscapeDataString(path[(slash + 1)..])}";
+        if (slash <= 0 || slash >= path.Length - 1 || path.IndexOf('/', slash + 1) >= 0)
+            throw new ArgumentException("Rendition file path must be '<rung>/<file>'.", nameof(path));
+        var rung = SafePathSegment(path[..slash], nameof(path));
+        var file = SafePathSegment(path[(slash + 1)..], nameof(path));
+        var url = $"/api/admin/import/items/{SafePathSegment(itemId, nameof(itemId))}/renditions/{SafePathSegment(stagingId, nameof(stagingId))}/files/{rung}/{file}";
         var body = new StreamContent(content);
         body.Headers.ContentLength = length;
         body.Headers.ContentType = new MediaTypeHeaderValue(path.EndsWith(".m3u8", StringComparison.Ordinal) ? "application/vnd.apple.mpegurl" : "video/mp4");
@@ -484,7 +522,7 @@ public partial class ImportApiClient
     {
         try
         {
-            await SendAsync(HttpMethod.Post, $"/api/admin/import/items/{Uri.EscapeDataString(itemId)}/renditions/{Uri.EscapeDataString(stagingId)}/complete", new { }, ct).ConfigureAwait(false);
+            await SendAsync(HttpMethod.Post, $"/api/admin/import/items/{SafePathSegment(itemId, nameof(itemId))}/renditions/{SafePathSegment(stagingId, nameof(stagingId))}/complete", new { }, ct).ConfigureAwait(false);
             return Array.Empty<string>();
         }
         catch (ImportApiException missing) when (missing.Code == "files_missing" && missing.Body?["missing"] is JsonArray list)
@@ -494,12 +532,12 @@ public partial class ImportApiClient
     }
 
     public virtual Task CancelRenditionsAsync(string itemId, string stagingId, CancellationToken ct = default) =>
-        SendAsync(HttpMethod.Delete, $"/api/admin/import/items/{Uri.EscapeDataString(itemId)}/renditions/{Uri.EscapeDataString(stagingId)}", null, ct);
+        SendAsync(HttpMethod.Delete, $"/api/admin/import/items/{SafePathSegment(itemId, nameof(itemId))}/renditions/{SafePathSegment(stagingId, nameof(stagingId))}", null, ct);
 
     /// <summary>Whether the server takes renditions for the item's video, and what its transcode did with them.</summary>
     public virtual async Task<DeliveryState> GetDeliveryAsync(string itemId, CancellationToken ct = default)
     {
-        var result = await SendAsync(HttpMethod.Get, $"/api/admin/import/items/{Uri.EscapeDataString(itemId)}/delivery", null, ct).ConfigureAwait(false);
+        var result = await SendAsync(HttpMethod.Get, $"/api/admin/import/items/{SafePathSegment(itemId, nameof(itemId))}/delivery", null, ct).ConfigureAwait(false);
         return result?.Deserialize<DeliveryState>(Json) ?? throw Unreadable();
     }
 
@@ -519,7 +557,7 @@ public partial class ImportApiClient
     /// 409 draft_exists or claim_pending when the language already has one.
     /// </summary>
     public virtual Task PostTranscriptAsync(string itemId, TranscriptUpload transcript, string model, CancellationToken ct = default) =>
-        SendAsync(HttpMethod.Post, $"/api/admin/import/items/{Uri.EscapeDataString(itemId)}/transcript", new
+        SendAsync(HttpMethod.Post, $"/api/admin/import/items/{SafePathSegment(itemId, nameof(itemId))}/transcript", new
         {
             language = transcript.Language,
             segments = transcript.Segments,
@@ -529,7 +567,7 @@ public partial class ImportApiClient
     /// <summary>A caption job per language from the video's source draft (TA-7, TA-20); each language answers on its own.</summary>
     public virtual async Task<IReadOnlyList<TranslationResult>> RequestTranslationsAsync(string itemId, string sourceLanguage, IReadOnlyList<string> languages, CancellationToken ct = default)
     {
-        var result = await SendAsync(HttpMethod.Post, $"/api/admin/import/items/{Uri.EscapeDataString(itemId)}/translations", new { sourceLanguage, languages }, ct).ConfigureAwait(false);
+        var result = await SendAsync(HttpMethod.Post, $"/api/admin/import/items/{SafePathSegment(itemId, nameof(itemId))}/translations", new { sourceLanguage, languages }, ct).ConfigureAwait(false);
         return result?["results"]?.Deserialize<List<TranslationResult>>(Json) ?? throw Unreadable();
     }
 
@@ -565,9 +603,10 @@ public partial class ImportApiClient
     {
         var token = await _token(ct).ConfigureAwait(false);
         if (string.IsNullOrEmpty(token)) throw new ImportApiException(401, "signed_out", "Sign in again");
-        using var request = new HttpRequestMessage(method, new Uri(_base, path));
+        using var request = new HttpRequestMessage(method, ResolveSameOrigin(_base, path));
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        if (AppLocale?.Invoke() is { Length: > 0 } locale) request.Headers.TryAddWithoutValidation("X-App-Locale", locale);
+        if (AppLocale?.Invoke() is { Length: > 0 } locale && locale.All(c => c >= ' ' && c != '\u007F'))
+            request.Headers.TryAddWithoutValidation("X-App-Locale", locale);
         if (body is HttpContent raw) request.Content = raw;
         else if (body is not null) request.Content = JsonContent.Create(body, body.GetType(), options: Json);
         HttpResponseMessage response;

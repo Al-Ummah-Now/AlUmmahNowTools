@@ -174,13 +174,15 @@ namespace AlUmmahNow.VisualImporterUno.Services
                     // dotnet run command
                     var parts = serviceExecutable.Split('|');
                     processStartInfo.FileName = parts[0]; // "dotnet"
-                    processStartInfo.Arguments = string.Join(" ", parts.Skip(1).Select(QuoteArgument)); // "run --project ..." or the .dll
+                    foreach (var arg in parts.Skip(1))
+                    {
+                        processStartInfo.ArgumentList.Add(arg);
+                    }
                 }
                 else
                 {
                     // Direct executable
                     processStartInfo.FileName = serviceExecutable;
-                    processStartInfo.Arguments = "";
                 }
 
                 Process? process = null;

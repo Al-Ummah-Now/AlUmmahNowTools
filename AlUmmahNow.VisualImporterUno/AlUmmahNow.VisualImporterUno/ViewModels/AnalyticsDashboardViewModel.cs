@@ -468,8 +468,8 @@ public partial class AnalyticsDashboardViewModel : ObservableObject, IDisposable
         csv.AppendLine($"Approval Rate,{ApprovalRate:F2}%");
         csv.AppendLine($"Rejection Rate,{RejectionRate:F2}%");
         csv.AppendLine($"Files Pending,{FilesPending}");
-        csv.AppendLine($"Total Size Approved,{FormatFileSize(TotalSizeApproved)}");
-        csv.AppendLine($"Most Active Channel,{MostActiveChannel}");
+        csv.AppendLine($"Total Size Approved,{AlUmmahNow.ToolsCore.Import.CsvField.Escape(FormatFileSize(TotalSizeApproved))}");
+        csv.AppendLine($"Most Active Channel,{AlUmmahNow.ToolsCore.Import.CsvField.Escape(MostActiveChannel)}");
         csv.AppendLine($"Avg Approval Time (hours),{AvgApprovalTimeHours:F2}");
         csv.AppendLine();
 
@@ -478,7 +478,7 @@ public partial class AnalyticsDashboardViewModel : ObservableObject, IDisposable
         csv.AppendLine("Channel,Total Files,Approved,Rejected,Pending,Total Size");
         foreach (var channel in TopChannels)
         {
-            csv.AppendLine($"{channel.ChannelName},{channel.TotalFiles},{channel.ApprovedFiles},{channel.RejectedFiles},{channel.PendingFiles},{FormatFileSize(channel.TotalSize)}");
+            csv.AppendLine($"{AlUmmahNow.ToolsCore.Import.CsvField.Escape(channel.ChannelName)},{channel.TotalFiles},{channel.ApprovedFiles},{channel.RejectedFiles},{channel.PendingFiles},{AlUmmahNow.ToolsCore.Import.CsvField.Escape(FormatFileSize(channel.TotalSize))}");
         }
         csv.AppendLine();
 

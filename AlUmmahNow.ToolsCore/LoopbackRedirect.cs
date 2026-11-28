@@ -53,8 +53,11 @@ public sealed class LoopbackRedirect : IDisposable
                 {
                     var line = await ReadRequestLineAsync(stream, cancellationToken).ConfigureAwait(false);
                     var parts = line?.Split(' ');
-                    var path = parts is { Length: >= 2 } ? parts[1] : "";
-                    if (!path.StartsWith(CallbackPath + "?", StringComparison.Ordinal) && path != CallbackPath)
+                    var method = parts is { Length: >= 3 } ? parts[0] : "";
+                    var path = parts is { Length: >= 3 } ? parts[1] : "";
+                    if (!string.Equals(method, "GET", StringComparison.Ordinal)
+                        || (!path.StartsWith(CallbackPath + "?", StringComparison.Ordinal) && path != CallbackPath)
+                        || path.Any(c => c < ' ' || c == '\u007F'))
                     {
                         await WriteAsync(stream, "404 Not Found", "", cancellationToken).ConfigureAwait(false);
                         continue;

@@ -394,12 +394,15 @@ Or download from: https://ffmpeg.org/download.html";
             process.StartInfo = new ProcessStartInfo
             {
                 FileName = fileName,
-                Arguments = arguments,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
                 CreateNoWindow = true
             };
+            foreach (var arg in arguments.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            {
+                process.StartInfo.ArgumentList.Add(arg);
+            }
 
             var output = new System.Text.StringBuilder();
             var error = new System.Text.StringBuilder();

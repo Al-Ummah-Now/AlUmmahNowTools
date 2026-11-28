@@ -110,7 +110,7 @@ public static class TakeoutExport
             .Where(f => f.Info.Length > 0)
             .ToList();
         var rows = new List<Row>();
-        foreach (var csv in Directory.EnumerateFiles(folder, "*.csv", new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true }))
+        foreach (var csv in Directory.EnumerateFiles(folder, "*.csv", new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true, AttributesToSkip = FileAttributes.Hidden | FileAttributes.System | FileAttributes.ReparsePoint }))
         {
             rows.AddRange(ParseCsv(File.ReadAllText(csv, Encoding.UTF8)));
         }
@@ -281,7 +281,7 @@ public sealed class TakeoutUploader
         Uri url;
         if (!fresh && !string.IsNullOrEmpty(upload.TusUploadId))
         {
-            url = new Uri(_tusEndpoint, _tusEndpoint.AbsolutePath.TrimEnd('/') + "/" + upload.TusUploadId);
+            url = TusClient.ResolveUploadUrl(_tusEndpoint, upload.TusUploadId);
         }
         else
         {
