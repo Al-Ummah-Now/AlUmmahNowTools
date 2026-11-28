@@ -148,7 +148,7 @@ public sealed class TusException : Exception
 
     public int Status { get; }
     public TimeSpan? RetryAfter { get; }
-    public bool IsRetryable => Status is 0 or 401 or 408 or 409 or 423 or 429 or >= 500;
+    public bool IsRetryable => Status is 0 or 401 or 408 or 409 or 412 or 423 or 429 or >= 500;
 }
 
 /// <summary>
@@ -278,6 +278,7 @@ public class TusClient
     {
         var status = (int)response.StatusCode;
         if (status is 404 or 410) return new TusGoneException($"The upload is gone ({what} {status})");
-        return new TusException(status, $"{what} failed with {status}", response.Headers.RetryAfter?.Delta);
+        return new TusException(status, $"{what} failed with {status}", response.Headers.RetryAfter?.Delta
+            ?? (response.Headers.RetryAfter?.Date - DateTimeOffset.UtcNow));
     }
 }

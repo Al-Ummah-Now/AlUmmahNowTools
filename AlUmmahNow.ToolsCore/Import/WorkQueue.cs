@@ -139,6 +139,8 @@ public sealed class QueueItem
     public string? TusSessionId { get; set; }
     public string? UploadUrl { get; set; }
     public long UploadOffset { get; set; }
+    public bool UploadCreatePending { get; set; }
+    public bool RestartedLostUpload { get; set; }
     public long ChunkSize { get; set; }
     /// <summary>The file has a video in it (or what would tell is not on this computer)</summary>
     public bool VideoChecked { get; set; }
@@ -685,6 +687,7 @@ public sealed class ImportQueue : IDisposable
         item.Sending = null;
         (item.Sha256, item.FingerprintHash, item.VideoChecked, item.VideoProbed) = (null, null, false, false);
         (item.ServerItemId, item.VideoId, item.TusSessionId, item.UploadUrl, item.UploadOffset) = (null, null, null, null, 0);
+        item.UploadCreatePending = item.RestartedLostUpload = false;
         (item.SentTo, item.SentSha256, item.StartOver, item.LeftUploadUrl, item.Renditions, item.UploadOpened) = (0, null, false, null, null, false);
         foreach (var step in item.Steps.Where(s => noVideo || s.Kind <= ImportStepKind.Upload))
         {

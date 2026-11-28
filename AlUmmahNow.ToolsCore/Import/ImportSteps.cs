@@ -90,7 +90,7 @@ public sealed class UploadStep : IImportStep
         if (await VideoCheck.RunAsync(item, _source, _media, context, ct).ConfigureAwait(false) == StepResult.NoVideo)
             return StepResult.NoVideo;
         if (item.StartOver) await DropAsync(item, context, ct).ConfigureAwait(false);
-        if (item.ServerItemId is null || item.TusSessionId is null)
+        if (item.ServerItemId is null || item.TusSessionId is null || item.UploadCreatePending)
         {
             if (!await OpenAsync(_api, _tusEndpoint, item, context, ct).ConfigureAwait(false)) return StepResult.SkipRest;
         }
@@ -108,17 +108,14 @@ public sealed class UploadStep : IImportStep
         {
             try
             {
-                await TransferAsync(item, context, share, ct).ConfigureAwait(false);
+                await TransferAsync(item, context, share, ct, canReplaceGoneUpload: reopened).ConfigureAwait(false);
                 break;
             }
             catch (TusGoneException) when (!reopened)
             {
-                // The proxy session or upload expired: admin-api opens the same video again (from its offset)
                 reopened = true;
                 context.Log(LogLevel.Warning, "session_ended", "The upload session ended; opening it again");
-                item.TusSessionId = null;
-                item.UploadUrl = null;
-                if (!await OpenAsync(_api, _tusEndpoint, item, context, ct).ConfigureAwait(false)) return StepResult.SkipRest;
+                if (!await OpenAsync(_api, _tusEndpoint, item, context, ct, recovering: true).ConfigureAwait(false)) return StepResult.SkipRest;
             }
         }
 
@@ -129,8 +126,17 @@ public sealed class UploadStep : IImportStep
         return StepResult.Done;
     }
 
+    private static void RecordLostUploadRestart(QueueItem item, IStepContext context)
+    {
+        if (item.RestartedLostUpload)
+            throw new StepFailedException("upload_gone", "The server lost the upload again", retryable: false);
+
+        item.RestartedLostUpload = true;
+        context.Log(LogLevel.Warning, "upload_restarted", "The server lost the upload. Sending the file again from the beginning.");
+    }
+
     /// <summary>Opens the file on admin-api (the Encode step does it first, to encode only what will be uploaded); false when the channel already has the file.</summary>
-    internal static async Task<bool> OpenAsync(ImportApiClient api, Uri tusEndpoint, QueueItem item, IStepContext context, CancellationToken ct)
+    internal static async Task<bool> OpenAsync(ImportApiClient api, Uri tusEndpoint, QueueItem item, IStepContext context, CancellationToken ct, bool recovering = false)
     {
         var v = item.Video;
         var request = new ItemUploadRequest(
@@ -143,15 +149,18 @@ public sealed class UploadStep : IImportStep
         try
         {
             var opened = await api.OpenItemAsync(item.BatchId, request, ct).ConfigureAwait(false);
+            var url = string.IsNullOrEmpty(opened.Upload.TusUploadId) ? null : TusClient.ResolveUploadUrl(tusEndpoint, opened.Upload.TusUploadId).ToString();
+            if (url == item.LeftUploadUrl) url = null;
+            if (recovering && item.UploadUrl is not null && url is null)
+                RecordLostUploadRestart(item, context);
             item.ServerItemId = opened.Item.Id;
             item.VideoId = opened.Upload.VideoId;
             item.TusSessionId = opened.Upload.TusSessionId;
             item.ChunkSize = opened.Upload.ChunkSize > 0 ? opened.Upload.ChunkSize : DefaultChunk;
-            item.UploadUrl = string.IsNullOrEmpty(opened.Upload.TusUploadId) ? null : TusClient.ResolveUploadUrl(tusEndpoint, opened.Upload.TusUploadId).ToString();
-            // One that was given up and is still there is not gone on with: its bytes are not the file's
-            if (item.UploadUrl is not null && item.UploadUrl == item.LeftUploadUrl) item.UploadUrl = null;
+            item.UploadUrl = url;
             // A resumed upload keeps its offset until the server's HEAD says where it is
             if (item.UploadUrl is null) item.UploadOffset = 0;
+            else item.UploadCreatePending = false;
             context.Save();
             if (opened.Upload.Reused) context.Log(LogLevel.Info, "upload_reopened", $"Upload opened again: video {item.VideoId}", item.VideoId);
             else context.Log(LogLevel.Info, "upload_opened", $"Upload opened: video {item.VideoId}", item.VideoId);
@@ -168,12 +177,14 @@ public sealed class UploadStep : IImportStep
         }
     }
 
-    private async Task TransferAsync(QueueItem item, IStepContext context, double from, CancellationToken ct)
+    private async Task TransferAsync(QueueItem item, IStepContext context, double from, CancellationToken ct, bool canReplaceGoneUpload = false)
     {
         var size = item.Video.Size;
         var token = await Token(ct).ConfigureAwait(false);
         if (item.UploadUrl is null)
         {
+            if (item.RestartedLostUpload && item.UploadCreatePending)
+                throw new StepFailedException("upload_gone", "The restarted upload could not be recovered", retryable: false);
             var metadata = new Dictionary<string, string>
             {
                 ["filename"] = item.Video.FileName,
@@ -182,16 +193,34 @@ public sealed class UploadStep : IImportStep
                 ["tusSessionId"] = item.TusSessionId!,
                 ["videoId"] = item.VideoId!,
             };
+            item.UploadCreatePending = true;
+            context.Save();
             item.UploadUrl = (await _tus.CreateAsync(_tusEndpoint, token, size, metadata, ct).ConfigureAwait(false)).ToString();
+            item.UploadCreatePending = false;
             item.UploadOffset = 0;
             (item.SentTo, item.SentSha256) = (0, null);
             context.Save();
         }
 
         var url = new Uri(item.UploadUrl);
-        var offset = await _tus.OffsetAsync(url, token, ct).ConfigureAwait(false);
-        if (offset > size) throw new TusException(502, "The server has more than the file");
+        long offset;
+        try
+        {
+            offset = await _tus.OffsetAsync(url, token, ct).ConfigureAwait(false);
+        }
+        catch (TusGoneException) when (canReplaceGoneUpload)
+        {
+            RecordLostUploadRestart(item, context);
+            item.UploadUrl = null;
+            item.UploadOffset = 0;
+            await TransferAsync(item, context, from, ct).ConfigureAwait(false);
+            return;
+        }
+        if (offset < 0 || offset > size) throw new TusException(502, "The server returned an invalid upload offset");
+        if (offset == 0 && item.UploadOffset > 0)
+            RecordLostUploadRestart(item, context);
         item.UploadOffset = offset;
+        context.Save();
         if (item.StartOver || item.UploadUrl == item.LeftUploadUrl)
         {
             if (offset > 0) throw new StepFailedException("upload_left", "The server still has the upload that was given up", retryable: true);
@@ -224,11 +253,13 @@ public sealed class UploadStep : IImportStep
             catch (TusException conflict) when (conflict.Status == 409)
             {
                 // The server holds a different offset (a chunk landed but its answer was lost): continue from its offset
-                offset = await _tus.OffsetAsync(url, token, ct).ConfigureAwait(false);
+                var confirmed = await _tus.OffsetAsync(url, token, ct).ConfigureAwait(false);
+                if (confirmed <= offset) throw;
+                offset = confirmed;
             }
             // Also when only the answer was lost
             if (offset == sent.Offset) (item.SentTo, item.SentSha256) = (offset, sent.Sha256);
-            if (offset > size) throw new TusException(502, "The server has more than the file");
+            if (offset < 0 || offset > size) throw new TusException(502, "The server returned an invalid upload offset");
             item.UploadOffset = offset;
             context.Save();
             context.Progress(from + ((1 - from) * (size == 0 ? 1 : (double)offset / size)));

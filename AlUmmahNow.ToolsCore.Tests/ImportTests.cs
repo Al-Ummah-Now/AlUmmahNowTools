@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using AlUmmahNow.ToolsCore.Import;
 using Xunit;
@@ -235,6 +236,9 @@ internal sealed class FakeServer : HttpMessageHandler
     public readonly HashSet<string> Uploaded = new();
     public string? AlreadyImportedSha;
     public int OpenCount;
+    public bool LoseCreateResponse;
+    public bool ForgetExpiredUpload;
+    private int _uploadSequence;
     /// <summary>Answer 404 to a PATCH at or after this offset (the proxy session expired), <see cref="ExpireCount"/> times</summary>
     public long? ExpireAt;
     public int ExpireCount = 1;
@@ -286,8 +290,13 @@ internal sealed class FakeServer : HttpMessageHandler
 
         if (path == "/api/videos/tus" && request.Method == HttpMethod.Post)
         {
-            var id = "up" + (Uploads.Count + 1);
+            var id = "up" + ++_uploadSequence;
             Uploads[id] = (long.Parse(request.Headers.GetValues("Upload-Length").First()), new MemoryStream());
+            if (LoseCreateResponse)
+            {
+                LoseCreateResponse = false;
+                throw new HttpRequestException("Response lost");
+            }
             var created = new HttpResponseMessage(HttpStatusCode.Created);
             created.Headers.Location = new Uri("/api/videos/tus/" + id, UriKind.Relative);
             return created;
@@ -314,6 +323,7 @@ internal sealed class FakeServer : HttpMessageHandler
                 if (ExpireAt is { } at && offset >= at && ExpireCount > 0)
                 {
                     ExpireCount--;
+                    if (ForgetExpiredUpload) Uploads.Remove(id);
                     return new HttpResponseMessage(HttpStatusCode.NotFound);
                 }
                 if (offset != up.Data.Length) return new HttpResponseMessage(HttpStatusCode.Conflict);
@@ -583,6 +593,50 @@ public class UploadStepTests
         Assert.Equal(2, server.OpenCount);
         Assert.Equal(File.ReadAllBytes(path), Assert.Single(server.Uploads).Value.Data.ToArray());
         Assert.Contains(context.Lines, l => l.Code == "session_ended");
+    }
+
+    [Fact]
+    public async Task Lost_create_response_survives_queue_reload_without_creating_another_upload()
+    {
+        var server = new FakeServer { LoseCreateResponse = true };
+        var (item, path) = Item(2500);
+        await Assert.ThrowsAsync<TusException>(() => Step(server).RunAsync(item, new RecordingContext(), default));
+        item = JsonSerializer.Deserialize<QueueItem>(JsonSerializer.Serialize(item))!;
+        Assert.True(item.UploadCreatePending);
+        Assert.Equal(StepResult.Done, await Step(server).RunAsync(item, new RecordingContext(), default));
+        Assert.Equal(File.ReadAllBytes(path), Assert.Single(server.Uploads).Value.Data.ToArray());
+        Assert.Single(server.Calls, c => c is { Method: "POST", Path: "/api/videos/tus" });
+    }
+
+    [Theory]
+    [InlineData(409)]
+    [InlineData(412)]
+    [InlineData(503)]
+    public async Task Contention_leaves_the_same_upload_for_a_queue_retry(int status)
+    {
+        var server = new FakeServer { LoseAt = 1000, LoseStatus = status };
+        var (item, path) = Item(2500);
+        var error = await Assert.ThrowsAsync<TusException>(() => Step(server).RunAsync(item, new RecordingContext(), default));
+        Assert.True(error.IsRetryable);
+        Assert.Equal(1000, item.UploadOffset);
+        item = JsonSerializer.Deserialize<QueueItem>(JsonSerializer.Serialize(item))!;
+        Assert.Equal(StepResult.Done, await Step(server).RunAsync(item, new RecordingContext(), default));
+        Assert.Equal(1, server.OpenCount);
+        Assert.Equal(File.ReadAllBytes(path), Assert.Single(server.Uploads).Value.Data.ToArray());
+    }
+
+    [Fact]
+    public async Task Lost_upload_restarts_once_even_across_queue_attempts()
+    {
+        var server = new FakeServer { ExpireAt = 1000, ExpireCount = 2, ForgetExpiredUpload = true };
+        var (item, _) = Item(2500);
+        var context = new RecordingContext();
+        await Assert.ThrowsAsync<TusGoneException>(() => Step(server).RunAsync(item, context, default));
+        item = JsonSerializer.Deserialize<QueueItem>(JsonSerializer.Serialize(item))!;
+        var error = await Assert.ThrowsAsync<StepFailedException>(() => Step(server).RunAsync(item, context, default));
+        Assert.False(error.Retryable);
+        Assert.Single(context.Lines, l => l.Code == "upload_restarted");
+        Assert.Equal(2, server.Calls.Count(c => c is { Method: "POST", Path: "/api/videos/tus" }));
     }
 
     [Fact]
