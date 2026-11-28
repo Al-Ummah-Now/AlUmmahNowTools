@@ -29,6 +29,23 @@ public interface IBrowserLauncher
 
 public sealed class ShellBrowserLauncher : IBrowserLauncher
 {
-    public void Open(Uri uri) =>
+    public static bool IsAllowedUri(Uri? uri)
+    {
+        if (uri is null || !uri.IsAbsoluteUri) return false;
+        if (!string.IsNullOrEmpty(uri.UserInfo)) return false;
+        var raw = uri.OriginalString;
+        foreach (var ch in raw)
+        {
+            if (ch < ' ' || ch == '\u007F') return false;
+        }
+        return uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+            || (uri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) && uri.IsLoopback);
+    }
+
+    public void Open(Uri uri)
+    {
+        if (!IsAllowedUri(uri))
+            throw new ArgumentException("Refused to open non-HTTP(S) or malformed URI.", nameof(uri));
         System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true })?.Dispose();
+    }
 }

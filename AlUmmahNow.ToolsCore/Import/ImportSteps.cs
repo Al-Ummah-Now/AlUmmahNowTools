@@ -147,7 +147,7 @@ public sealed class UploadStep : IImportStep
             item.VideoId = opened.Upload.VideoId;
             item.TusSessionId = opened.Upload.TusSessionId;
             item.ChunkSize = opened.Upload.ChunkSize > 0 ? opened.Upload.ChunkSize : DefaultChunk;
-            item.UploadUrl = string.IsNullOrEmpty(opened.Upload.TusUploadId) ? null : new Uri(tusEndpoint, tusEndpoint.AbsolutePath.TrimEnd('/') + "/" + opened.Upload.TusUploadId).ToString();
+            item.UploadUrl = string.IsNullOrEmpty(opened.Upload.TusUploadId) ? null : TusClient.ResolveUploadUrl(tusEndpoint, opened.Upload.TusUploadId).ToString();
             // One that was given up and is still there is not gone on with: its bytes are not the file's
             if (item.UploadUrl is not null && item.UploadUrl == item.LeftUploadUrl) item.UploadUrl = null;
             // A resumed upload keeps its offset until the server's HEAD says where it is

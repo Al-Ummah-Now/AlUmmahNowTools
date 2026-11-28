@@ -55,6 +55,7 @@ public sealed class FfmpegMediaProbe : IMediaProbe
 
     public async Task<bool> ExtractFrameAsync(string videoPath, string outputPath, int width, int height)
     {
+        if (width <= 0 || height <= 0) return false;
         try
         {
             var info = await FFProbe.AnalyseAsync(videoPath).ConfigureAwait(false);

@@ -491,7 +491,10 @@ public sealed class UpdateService : IDisposable
             var artifact = release.Artifacts.FirstOrDefault(a => a.App == "tools" && a.Platform == _platform && a.Kind == "velopack-full" && (a.Arch is null || a.Arch == _arch || a.Arch == "universal"))
                 ?? throw new UpdateVerificationException("bad_manifest");
             Directory.CreateDirectory(_downloadDir);
-            var path = Path.Combine(_downloadDir, $"tools-{release.Version}-{_arch}.nupkg");
+            var fileName = $"tools-{release.Version}-{_arch}.nupkg";
+            if (fileName.IndexOfAny(new[] { '/', '\\', '\0' }) >= 0 || fileName.Contains("..", StringComparison.Ordinal) || Path.GetFileName(fileName) != fileName)
+                throw new UpdateVerificationException("bad_manifest");
+            var path = Path.Combine(_downloadDir, fileName);
             await DownloadVerifiedAsync(artifact, path, cancel).ConfigureAwait(false);
             try
             {

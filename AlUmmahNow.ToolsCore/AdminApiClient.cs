@@ -40,12 +40,13 @@ public sealed class AdminApiClient
     public AdminApiClient(Uri adminApi, HttpMessageHandler? handler = null)
     {
         _base = adminApi;
-        _http = new HttpClient(handler ?? new HttpClientHandler(), disposeHandler: true) { Timeout = TimeSpan.FromSeconds(30) };
+        _http = new HttpClient(handler ?? new HttpClientHandler { AllowAutoRedirect = false }, disposeHandler: true) { Timeout = TimeSpan.FromSeconds(30) };
         _http.DefaultRequestHeaders.UserAgent.ParseAdd("AlUmmahNowTools/1.0");
     }
 
     public async Task<StaffCheck> CheckStaffAsync(string accessToken, CancellationToken ct = default)
     {
+        if (!ShellBrowserLauncher.IsAllowedUri(_base)) throw new ArgumentException("Refused insecure admin API URI.", nameof(accessToken));
         using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(_base, "/api/admin/import/me"));
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
         HttpResponseMessage response;

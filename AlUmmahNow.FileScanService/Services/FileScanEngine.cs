@@ -20,8 +20,11 @@ namespace AlUmmahNow.FileScanService.Services
         private static readonly string[] VideoExtensions = { ".mp4", ".mkv", ".avi", ".mov", ".wmv", ".m4v", ".flv", ".webm" };
         private static readonly string[] ThumbnailExtensions = { ".jpg", ".jpeg", ".png", ".webp", ".bmp" };
 
+        private static bool IsReparsePoint(FileSystemInfo info) =>
+            (info.Attributes & FileAttributes.ReparsePoint) != 0;
+
         private static bool IsFinishedVideo(FileInfo file, string root) =>
-            VideoExtensions.Contains(file.Extension.ToLowerInvariant()) && !AlUmmahNow.ToolsCore.Import.UnfinishedDownloads.IsAt(file.FullName, root);
+            !IsReparsePoint(file) && VideoExtensions.Contains(file.Extension.ToLowerInvariant()) && !AlUmmahNow.ToolsCore.Import.UnfinishedDownloads.IsAt(file.FullName, root);
 
         public event EventHandler<ScanProgressEventArgs>? ProgressChanged;
 
@@ -67,7 +70,7 @@ namespace AlUmmahNow.FileScanService.Services
                 .ToArray();
             
             var subdirectories = rootDir.GetDirectories()
-                .Where(d => !d.Name.StartsWith(".") && !d.Name.StartsWith("_") && !AlUmmahNow.ToolsCore.Import.UnfinishedDownloads.IsFolder(d.Name))
+                .Where(d => !IsReparsePoint(d) && !d.Name.StartsWith(".") && !d.Name.StartsWith("_") && !AlUmmahNow.ToolsCore.Import.UnfinishedDownloads.IsFolder(d.Name))
                 .ToArray();
 
             if (rootFiles.Length > 0 && subdirectories.Length == 0)
@@ -132,7 +135,7 @@ namespace AlUmmahNow.FileScanService.Services
 
                     // Queue subdirectories
                     var subdirs = currentDir.GetDirectories()
-                        .Where(d => !d.Name.StartsWith(".") && !d.Name.StartsWith("_") && !AlUmmahNow.ToolsCore.Import.UnfinishedDownloads.IsFolder(d.Name));
+                        .Where(d => !IsReparsePoint(d) && !d.Name.StartsWith(".") && !d.Name.StartsWith("_") && !AlUmmahNow.ToolsCore.Import.UnfinishedDownloads.IsFolder(d.Name));
 
                     foreach (var subdir in subdirs)
                     {

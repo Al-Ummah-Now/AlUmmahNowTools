@@ -163,13 +163,32 @@ public class TusClient
 
     public TusClient(HttpMessageHandler? handler = null)
     {
-        _http = new HttpClient(handler ?? new HttpClientHandler(), disposeHandler: true) { Timeout = TimeSpan.FromMinutes(10) };
+        _http = new HttpClient(handler ?? new HttpClientHandler { AllowAutoRedirect = false }, disposeHandler: true) { Timeout = TimeSpan.FromMinutes(10) };
         _http.DefaultRequestHeaders.UserAgent.ParseAdd("AlUmmahNowTools/1.0");
     }
 
-    /// <summary>Creates the upload; answers its URL (on the same host as <paramref name="endpoint"/>).</summary>
+    public static bool IsSafeNetworkUri(Uri? uri) => ShellBrowserLauncher.IsAllowedUri(uri);
+
+    public static bool SameOrigin(Uri a, Uri b) =>
+        string.Equals(a.Scheme, b.Scheme, StringComparison.OrdinalIgnoreCase)
+        && string.Equals(a.Host, b.Host, StringComparison.OrdinalIgnoreCase)
+        && a.Port == b.Port;
+
+    public static bool IsValidMetadataKey(string key) =>
+        !string.IsNullOrEmpty(key) && key.All(c => c >= 0x21 && c <= 0x7E && c != ',');
+
+    /// <summary>Resolves a server-returned TUS upload id beneath <paramref name="tusEndpoint"/>, rejecting traversal or origin escape.</summary>
+    public static Uri ResolveUploadUrl(Uri tusEndpoint, string tusUploadId)
+    {
+        var safeId = ImportApiClient.SafePathSegment(tusUploadId, nameof(tusUploadId));
+        var path = tusEndpoint.AbsolutePath.TrimEnd('/') + "/" + safeId;
+        return ImportApiClient.ResolveSameOrigin(tusEndpoint, path);
+    }
+
+    /// <summary>Creates the upload; answers its URL (on the same origin as <paramref name="endpoint"/>).</summary>
     public virtual async Task<Uri> CreateAsync(Uri endpoint, string token, long length, IReadOnlyDictionary<string, string> metadata, CancellationToken ct)
     {
+        if (!IsSafeNetworkUri(endpoint)) throw new TusException(400, "Refused insecure TUS endpoint");
         using var request = new HttpRequestMessage(HttpMethod.Post, endpoint) { Content = new ByteArrayContent(Array.Empty<byte>()) };
         Headers(request, token);
         request.Headers.Add("Upload-Length", length.ToString(System.Globalization.CultureInfo.InvariantCulture));
@@ -178,12 +197,13 @@ public class TusClient
         if (response.StatusCode != HttpStatusCode.Created) throw Failure(response, "create");
         var location = response.Headers.Location ?? throw new TusException((int)response.StatusCode, "The upload was created without a Location");
         var url = location.IsAbsoluteUri ? location : new Uri(endpoint, location);
-        if (url.Scheme != Uri.UriSchemeHttps && !url.IsLoopback || url.Host != endpoint.Host) throw new TusException(502, "The upload URL is not on the videos API");
+        if (!IsSafeNetworkUri(url) || !SameOrigin(url, endpoint)) throw new TusException(502, "The upload URL is not on the videos API");
         return url;
     }
 
     public virtual async Task<long> OffsetAsync(Uri upload, string token, CancellationToken ct)
     {
+        if (!IsSafeNetworkUri(upload)) throw new TusException(400, "Refused insecure TUS upload URL");
         using var request = new HttpRequestMessage(HttpMethod.Head, upload);
         Headers(request, token);
         using var response = await SendAsync(request, ct).ConfigureAwait(false);
@@ -203,6 +223,7 @@ public class TusClient
     /// <summary>Gives up the upload, what it has with it. One that has ended cannot be given up (409).</summary>
     public virtual async Task DeleteAsync(Uri upload, string token, CancellationToken ct)
     {
+        if (!IsSafeNetworkUri(upload)) throw new TusException(400, "Refused insecure TUS upload URL");
         using var request = new HttpRequestMessage(HttpMethod.Delete, upload);
         Headers(request, token);
         using var response = await SendAsync(request, ct).ConfigureAwait(false);
@@ -212,6 +233,7 @@ public class TusClient
     /// <summary>Sends <paramref name="part"/> at <paramref name="offset"/>; answers the new offset.</summary>
     public virtual async Task<long> PatchAsync(Uri upload, string token, byte[] part, long offset, CancellationToken ct)
     {
+        if (!IsSafeNetworkUri(upload)) throw new TusException(400, "Refused insecure TUS upload URL");
         using var request = new HttpRequestMessage(HttpMethod.Patch, upload) { Content = new ByteArrayContent(part) };
         Headers(request, token);
         request.Headers.Add("Upload-Offset", offset.ToString(System.Globalization.CultureInfo.InvariantCulture));
@@ -221,8 +243,15 @@ public class TusClient
         return Offset(response) ?? offset + part.Length;
     }
 
-    public static string EncodeMetadata(IReadOnlyDictionary<string, string> metadata) =>
-        string.Join(",", metadata.Select(kv => $"{kv.Key} {Convert.ToBase64String(Encoding.UTF8.GetBytes(kv.Value))}"));
+    public static string EncodeMetadata(IReadOnlyDictionary<string, string> metadata)
+    {
+        foreach (var key in metadata.Keys)
+        {
+            if (!IsValidMetadataKey(key))
+                throw new ArgumentException($"Invalid TUS metadata key: '{key}'.", nameof(metadata));
+        }
+        return string.Join(",", metadata.Select(kv => $"{kv.Key} {Convert.ToBase64String(Encoding.UTF8.GetBytes(kv.Value))}"));
+    }
 
     private static void Headers(HttpRequestMessage request, string token)
     {

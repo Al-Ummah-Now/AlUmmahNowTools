@@ -35,7 +35,13 @@ public static class DiagnosticLog
     {
         var cleaned = LocalPaths.Clean(text ?? "", "[path redacted]", files);
         var noRelPaths = ScrubRelativePaths(cleaned);
-        return ScrubSecrets(noRelPaths).Replace('\r', ' ').Replace('\n', ' ');
+        var scrubbed = ScrubSecrets(noRelPaths);
+        var sb = new StringBuilder(scrubbed.Length);
+        foreach (var ch in scrubbed)
+        {
+            sb.Append(ch < ' ' || ch is '\u007F' or '\u2028' or '\u2029' ? ' ' : ch);
+        }
+        return sb.ToString();
     }
 
     internal static string ScrubRelativePaths(string text)
@@ -130,7 +136,7 @@ public static class DiagnosticLog
         var formatted = new List<string>(logLines.Count);
         foreach (var entry in logLines)
         {
-            var code = string.IsNullOrWhiteSpace(entry.Code) ? "-" : entry.Code;
+            var code = string.IsNullOrWhiteSpace(entry.Code) ? "-" : ScrubLine(entry.Code);
             var body = ScrubLine(entry.Text, files);
             formatted.Add($"{entry.At.ToUniversalTime():O} [{entry.Level.ToString().ToUpperInvariant()}] {code} {body}");
         }
